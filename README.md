@@ -45,6 +45,7 @@ docker compose exec web python manage.py createsuperuser
 ### AWG vs AWG2 export
 - AWG legacy: отдельный билдер конфига.
 - AWG2: отдельный билдер, который **требует полный набор** параметров: `I1-I5`, `S1-S4`, `Jc`, `Jmin`, `Jmax`, `H1-H4`.
+- Канонические имена ключей в коде/metadata/export: именно `Jc`, `Jmin`, `Jmax` (без `JC/JMIN/JMAX` в сохраненных данных и экспорте).
 - Если любой обязательный AWG2 параметр отсутствует — экспорт AWG2 блокируется явной ошибкой с перечнем недостающих ключей (без фейкового WireGuard fallback).
 
 ## Безопасность
