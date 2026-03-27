@@ -2,6 +2,7 @@ import base64
 import hashlib
 import io
 import ipaddress
+import re
 import shlex
 from dataclasses import dataclass
 
@@ -112,6 +113,14 @@ class BaseProtocolAdapter:
         return peers
 
     def _next_address(self, actor) -> str:
+        subnet_text = self.protocol.runtime_metadata.get("subnet", "")
+        if not subnet_text:
+            raise RuntimeError(f"Address pool for {self.protocol_type} is not discovered. Run runtime sync first.")
+        try:
+            subnet = ipaddress.ip_network(subnet_text, strict=False)
+        except ValueError as exc:
+            raise RuntimeError(f"Invalid discovered subnet: {subnet_text}") from exc
+
         used = set()
         for peer in self.list_peers(actor):
             try:
@@ -119,13 +128,11 @@ class BaseProtocolAdapter:
                 used.add(ipaddress.ip_address(ip))
             except ValueError:
                 continue
-        subnet = ipaddress.ip_network("10.8.0.0/24")
+
         for host in subnet.hosts():
-            if int(host) <= int(ipaddress.ip_address("10.8.0.1")):
-                continue
             if host not in used:
                 return str(host)
-        raise RuntimeError("No free addresses")
+        raise RuntimeError(f"No free addresses in discovered subnet {subnet}")
 
     def generate_keypair(self, actor):
         private_key = self._run(actor, f"{self.protocol_type}.genkey", self._wg_cmd("genkey"), sensitive_output=True).stdout.strip()
@@ -181,13 +188,32 @@ class AdapterFactory:
 
 class VPNClientService:
     @staticmethod
-    def _endpoint_for_server(server, protocol: ServerProtocol) -> str:
-        host = server.host if server.host not in {"127.0.0.1", "localhost"} else "YOUR_VPS_IP"
-        port = protocol.runtime_metadata.get("udp_port") or 51820
-        return f"{host}:{port}"
+    def _is_public_endpoint_host(value: str) -> bool:
+        if not value:
+            return False
+        value = value.strip().lower()
+        if value in {"localhost", "127.0.0.1", "0.0.0.0"}:
+            return False
+        try:
+            ip = ipaddress.ip_address(value)
+            return ip.is_global
+        except ValueError:
+            return bool(re.fullmatch(r"[a-z0-9.-]+", value))
+
+    @classmethod
+    def resolve_endpoint(cls, server: Server, protocol: ServerProtocol) -> str:
+        host_candidates = [server.public_endpoint_host, server.host, protocol.runtime_metadata.get("public_host", "")]
+        host = next((h for h in host_candidates if cls._is_public_endpoint_host(h)), "")
+        if not host:
+            raise RuntimeError("Public endpoint host is not discovered. Set server.public_endpoint_host or configure public server.host.")
+
+        port = server.public_endpoint_port or protocol.runtime_metadata.get("udp_port")
+        if not port:
+            raise RuntimeError("Public endpoint UDP port is not discovered.")
+        return f"{host}:{int(port)}"
 
     @staticmethod
-    def _build_client_config(*, private_key: str, address: str, endpoint: str, server_public_key: str) -> str:
+    def build_awg_legacy_client_config(*, private_key: str, address: str, endpoint: str, server_public_key: str) -> str:
         return (
             "[Interface]\n"
             f"PrivateKey = {private_key}\n"
@@ -198,6 +224,33 @@ class VPNClientService:
             f"Endpoint = {endpoint}\n"
             "AllowedIPs = 0.0.0.0/0, ::/0\n"
             "PersistentKeepalive = 25\n"
+        )
+
+    @staticmethod
+    def build_awg2_client_config(*, private_key: str, address: str, endpoint: str, server_public_key: str, awg2_metadata: dict) -> str:
+        required = ("S1", "S2", "H1", "H2", "H3", "H4")
+        missing = [k for k in required if not awg2_metadata.get(k)]
+        if missing:
+            raise RuntimeError(f"AWG2 metadata is incomplete: missing {', '.join(missing)}. Run runtime sync and verify live AWG2 config.")
+
+        optional = []
+        for key in ("JC", "JMIN", "JMAX"):
+            if awg2_metadata.get(key):
+                optional.append(f"{key} = {awg2_metadata[key]}")
+
+        awg2_lines = [f"{k} = {awg2_metadata[k]}" for k in required] + optional
+        return (
+            "[Interface]\n"
+            f"PrivateKey = {private_key}\n"
+            f"Address = {address}/32\n"
+            "DNS = 1.1.1.1\n\n"
+            "[Peer]\n"
+            f"PublicKey = {server_public_key}\n"
+            f"Endpoint = {endpoint}\n"
+            "AllowedIPs = 0.0.0.0/0, ::/0\n"
+            "PersistentKeepalive = 25\n"
+            + "\n".join(awg2_lines)
+            + "\n"
         )
 
     @staticmethod
@@ -243,13 +296,24 @@ class VPNClientService:
         if client.runtime_peer_public_key:
             adapter.remove_peer(actor, client.runtime_peer_public_key)
         generated = adapter.create_peer(actor)
-        endpoint = VPNClientService._endpoint_for_server(client.server, adapter.protocol)
-        config = VPNClientService._build_client_config(
-            private_key=generated["private_key"],
-            address=generated["address"],
-            endpoint=endpoint,
-            server_public_key=generated["server_public_key"],
-        )
+        endpoint = VPNClientService.resolve_endpoint(client.server, adapter.protocol)
+
+        if client.protocol_type == VPNClient.ProtocolType.AWG:
+            config = VPNClientService.build_awg_legacy_client_config(
+                private_key=generated["private_key"],
+                address=generated["address"],
+                endpoint=endpoint,
+                server_public_key=generated["server_public_key"],
+            )
+        else:
+            config = VPNClientService.build_awg2_client_config(
+                private_key=generated["private_key"],
+                address=generated["address"],
+                endpoint=endpoint,
+                server_public_key=generated["server_public_key"],
+                awg2_metadata=adapter.protocol.runtime_metadata.get("awg2_metadata", {}),
+            )
+
         rev = VPNClientService._store_revision(client, config)
         client.runtime_peer_public_key = generated["public_key"]
         client.runtime_address = generated["address"]

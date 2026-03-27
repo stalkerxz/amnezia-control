@@ -9,6 +9,8 @@ class Server(models.Model):
     ssh_private_key_path = models.CharField(max_length=255, blank=True)
     is_enabled = models.BooleanField(default=True)
     health_status = models.CharField(max_length=30, default="unknown")
+    public_endpoint_host = models.CharField(max_length=255, blank=True)
+    public_endpoint_port = models.PositiveIntegerField(null=True, blank=True)
     last_runtime_sync_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

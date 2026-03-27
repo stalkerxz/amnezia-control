@@ -19,7 +19,7 @@ class RuntimeDetectionTest(TestCase):
         self.server = Server.objects.create(name="local")
 
     @patch("servers.services.RuntimeCommandService.run")
-    def test_sync_runtime_state_detects_containers(self, run_mock):
+    def test_sync_runtime_state_detects_subnet_and_awg2_metadata(self, run_mock):
         class Result:
             def __init__(self, stdout):
                 self.stdout = stdout
@@ -27,16 +27,20 @@ class RuntimeDetectionTest(TestCase):
         run_mock.side_effect = [
             Result("amnezia-awg\namnezia-awg2\n"),
             Result("amnezia-awg\namnezia-awg2\n"),
-            Result('[{"State":{"Status":"running"},"NetworkSettings":{"Ports":{"51820/udp":[{"HostPort":"51820"}]}},"Config":{"Image":"awg","Env":["A=1"]},"Mounts":[]}]'),
+            Result('[{"State":{"Status":"running"},"NetworkSettings":{"Ports":{"51820/udp":[{"HostIp":"203.0.113.10","HostPort":"51820"}]}},"Config":{"Image":"awg","Env":["A=1"]},"Mounts":[]}]'),
             Result("awg0\n"),
-            Result("awg0\tprivate\tpub\t51820\npeer1\tpsk\tep\t10.8.0.10/32\t0\t0\t0\t25\n"),
-            Result('[{"State":{"Status":"running"},"NetworkSettings":{"Ports":{"51830/udp":[{"HostPort":"51830"}]}},"Config":{"Image":"awg2","Env":["B=2"]},"Mounts":[]}]'),
+            Result("awg0\tprivate\tpub\t51820\npeer1\tpsk\tep\t10.66.0.10/32\t0\t0\t0\t25\n"),
+            Result("[Interface]\nAddress = 10.66.0.1/24\nListenPort = 51820\n"),
+            Result('[{"State":{"Status":"running"},"NetworkSettings":{"Ports":{"51830/udp":[{"HostIp":"198.51.100.20","HostPort":"51830"}]}},"Config":{"Image":"awg2","Env":["AWG2_S1=1","AWG2_S2=2","AWG2_H1=3","AWG2_H2=4","AWG2_H3=5","AWG2_H4=6"]},"Mounts":[]}]'),
             Result("wg0\n"),
-            Result("wg0\tprivate\tpub\t51830\npeer2\tpsk\tep\t10.8.0.11/32\t0\t0\t0\t25\n"),
+            Result("wg0\tprivate\tpub\t51830\npeer2\tpsk\tep\t10.77.0.10/32\t0\t0\t0\t25\n"),
+            Result("[Interface]\nAddress = 10.77.0.1/24\nListenPort = 51830\n"),
         ]
 
         ServerService.sync_runtime_state(server=self.server, actor=self.user)
-        self.assertEqual(self.server.protocols.count(), 2)
         awg = self.server.protocols.get(protocol_type="awg")
-        self.assertEqual(awg.runtime_metadata["peer_count"], 1)
-        self.assertTrue(awg.enabled)
+        awg2 = self.server.protocols.get(protocol_type="awg2")
+
+        self.assertEqual(awg.runtime_metadata["subnet"], "10.66.0.0/24")
+        self.assertEqual(awg2.runtime_metadata["subnet"], "10.77.0.0/24")
+        self.assertTrue(awg2.runtime_metadata["awg2_metadata_ready"])

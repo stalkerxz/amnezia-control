@@ -7,7 +7,7 @@
 - `amnezia-control` запускается отдельно и безопасно: только `127.0.0.1:8090`.
 - По умолчанию нет bind на `80/443`.
 
-## Быстрый запуск (без конфликта с существующим nginx/Amnezia)
+## Быстрый запуск
 ```bash
 cp .env.example .env
 python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
@@ -18,55 +18,47 @@ docker compose exec web python manage.py migrate
 docker compose exec web python manage.py createsuperuser
 ```
 
-Открыть:
-- `http://127.0.0.1:8090/login/`
+Открыть: `http://127.0.0.1:8090/login/`
 
-## Режим HTTPS позже
-- Первый запуск: `DJANGO_FORCE_SSL=0` (default) — без HTTP→HTTPS редиректа.
-- После подключения reverse proxy: `DJANGO_FORCE_SSL=1`.
+## Реальная runtime-интеграция
+### Discovery/sync
+Кнопка **«Синхронизировать runtime»** делает:
+- `docker ps -a` + `docker ps`;
+- `docker inspect` для `amnezia-awg` и `amnezia-awg2`;
+- `docker exec ... awg/wg show interfaces` + `show dump`;
+- чтение live конфигов (`/etc/wireguard/<iface>.conf` / `/etc/amnezia/<iface>.conf`) для извлечения Address/ListenPort;
+- для AWG2 дополнительно парсит protocol metadata (`S1/S2/H1/H2/H3/H4/...`) из env/config.
 
-Пример:
-```env
-DJANGO_FORCE_SSL=1
-DJANGO_ALLOWED_HOSTS=panel.internal.example
-```
+### Endpoint discovery (без placeholder)
+Экспорт endpoint выбирается строго в порядке:
+1. `Server.public_endpoint_host` (+ `public_endpoint_port`, если задан)
+2. `Server.host` (только если это публичный IP/домен)
+3. `ServerProtocol.runtime_metadata.public_host` из runtime sync
 
-## Как работает реальная интеграция с runtime
-### Обнаружение протоколов
-На странице сервера кнопка **«Синхронизировать runtime»**:
-- проверяет наличие контейнеров `amnezia-awg` и `amnezia-awg2` через `docker ps -a`;
-- отдельно определяет running-состояние через `docker ps`;
-- читает `docker inspect`;
-- сохраняет статус контейнера, UDP порт, mounts, env, интерфейс и количество peers.
+Порт: `public_endpoint_port` → runtime UDP port.
+Если endpoint невалиден/локальный (`localhost`, `127.0.0.1`) — экспорт завершается ошибкой.
 
-### Поддерживаемые операции
-- отдельные адаптеры: AWG legacy (`awg` binary) и AWG2 (`wg` binary);
-- импорт существующих peers в БД (`Импорт из runtime`);
-- создание нового peer (генерация ключей в контейнере, `wg set peer`);
-- disable/delete (remove peer);
-- reissue (перегенерация ключей и peer);
-- экспорт реального `.conf`;
-- QR из расшифрованного активного конфига в памяти.
+### Address pool discovery (без hardcode 10.8.0.0/24)
+Подсеть берется из реально найденного `Address=` в live конфиге интерфейса.
+Если подсеть не найдена — создание/переиздание клиента завершается явной ошибкой.
 
-### Используемые allowlisted команды
-- `docker ps --format '{{.Names}}'`
-- `docker inspect <container>`
-- `docker exec <container> wg show ...`
-- `docker exec <container> wg genkey`
-- `printf %s '<private_key>' | docker exec -i <container> wg pubkey`
-- `docker exec <container> wg set <iface> peer <pubkey> ...`
+### AWG vs AWG2 export
+- AWG legacy: отдельный билдер конфига.
+- AWG2: отдельный билдер, который **требует** обнаруженные AWG2 metadata параметры.
+- Если AWG2 metadata отсутствует/неполная — экспорт AWG2 явно блокируется ошибкой (без фейкового WireGuard fallback).
 
 ## Безопасность
-- строгая проверка SSH host key (RejectPolicy по умолчанию);
-- `SSH_ALLOW_UNKNOWN_HOSTS=1` только для dev;
-- конфиги клиента хранятся только encrypted-at-rest;
-- plaintext не сохраняется в отдельные поля и не логируется в JobEvent для чувствительных команд.
+- строгая проверка SSH host key (`RejectPolicy` по умолчанию);
+- allowlist команд docker/awg/wg/cat/ls;
+- конфиги клиента хранятся encrypted-at-rest;
+- QR генерируется в памяти на лету.
 
 ## Проверка, что клиент реально создан
-1. Создайте клиента в UI (`/clients/new/`).
-2. Откройте `/jobs/` и убедитесь, что задания `awg.add_peer` / `awg2.add_peer` успешны.
-3. Выполните sync runtime на `/servers/<id>/` и проверьте статус.
-4. Скачайте `.conf` на `/clients/<id>/` и импортируйте в клиент.
+1. Синхронизируйте runtime на `/servers/<id>/`.
+2. Убедитесь, что для протокола заполнены Endpoint/Subnet (и AWG2 metadata ready для AWG2).
+3. Создайте клиента в `/clients/new/`.
+4. Проверьте `/jobs/` (команды add_peer/reissue должны быть успешны).
+5. Скачайте `.conf` и импортируйте в клиент.
 
 ## Полезные команды
 ```bash
