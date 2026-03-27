@@ -7,6 +7,7 @@
 - Web публикуется только на loopback: `127.0.0.1:${APP_PORT:-8090}`.
 - PostgreSQL и Redis доступны только внутри docker-сети.
 - Это позволяет запустить панель рядом с существующими контейнерами Amnezia без конфликта портов.
+- По умолчанию `DJANGO_FORCE_SSL=0`, поэтому первый запуск по HTTP на loopback работает без редиректа.
 
 ## Стек
 - Django 5, PostgreSQL, Redis, Celery, Bootstrap 5
@@ -39,6 +40,11 @@ docker compose exec web python manage.py seed_demo
 Создание демонстрационного `admin/admin12345` только по явному запросу (dev only):
 ```bash
 docker compose exec web python manage.py seed_demo --with-demo-admin
+```
+
+Для режима за reverse-proxy/HTTPS переключите:
+```env
+DJANGO_FORCE_SSL=1
 ```
 
 ## Optional proxy
