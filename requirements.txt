@@ -6,3 +6,4 @@ paramiko==3.5.1
 cryptography==44.0.1
 qrcode[pil]==8.0
 gunicorn==23.0.0
+whitenoise==6.9.0
