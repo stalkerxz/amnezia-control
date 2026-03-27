@@ -2,6 +2,7 @@ from cryptography.fernet import Fernet
 from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
 from servers.models import ProtocolProfile, Server, ServerProtocol
+from servers.services import ServerService
 
 from .models import VPNClient
 from .services import AdapterFactory, VPNClientService
@@ -122,6 +123,28 @@ class VPNClientFlowTest(TestCase):
             client = VPNClientService.create_client(server=self.server, name="awg-client-runtime-host", protocol_type=VPNClient.ProtocolType.AWG, actor=self.user)
         conf = VPNClientService.latest_config(client)
         self.assertIn("Endpoint = vpn2.example.com:51820", conf)
+
+
+    def test_export_succeeds_with_parser_normalized_metadata(self):
+        from unittest.mock import patch
+
+        env = [
+            "AWG2_I1=11", "AWG2_I2=12", "AWG2_I3=13", "AWG2_I4=14", "AWG2_I5=15",
+            "AWG2_S1=1", "AWG2_S2=2", "AWG2_S3=3", "AWG2_S4=4",
+            "AWG2_JC=7", "AWG2_JMIN=8", "AWG2_JMAX=9",
+            "AWG2_H1=3", "AWG2_H2=4", "AWG2_H3=5", "AWG2_H4=6",
+        ]
+        parsed, missing = ServerService._parse_awg2_metadata(env, "")
+        self.assertEqual(missing, [])
+        self.awg2_protocol.runtime_metadata["awg2_metadata"] = parsed
+        self.awg2_protocol.save(update_fields=["runtime_metadata"])
+
+        with patch("vpn.services.RuntimeCommandService.run", side_effect=self._mock_run):
+            client = VPNClientService.create_client(server=self.server, name="awg2-parser-ok", protocol_type=VPNClient.ProtocolType.AWG2, actor=self.user)
+        conf = VPNClientService.latest_config(client)
+        self.assertIn("Jc = 7", conf)
+        self.assertIn("Jmin = 8", conf)
+        self.assertIn("Jmax = 9", conf)
 
     def test_adapter_factory_separates_protocols(self):
         awg_adapter = AdapterFactory.get_for_server(self.server, VPNClient.ProtocolType.AWG)
