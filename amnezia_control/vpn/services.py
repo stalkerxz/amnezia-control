@@ -14,7 +14,7 @@ from django.utils import timezone
 from audit.services import AuditService
 from jobs.executors import SafeSSHExecutor
 from jobs.services import JobService
-from servers.models import ProtocolProfile, ServerProtocol
+from servers.models import ProtocolProfile, Server, ServerProtocol
 from .models import ClientConfigRevision, VPNClient
 
 
@@ -43,7 +43,7 @@ class PeerState:
 
 class RuntimeCommandService:
     @staticmethod
-    def executor_for_server(server):
+    def executor_for_server(server: Server):
         return SafeSSHExecutor(
             host=server.host,
             username=server.ssh_username,
@@ -52,7 +52,7 @@ class RuntimeCommandService:
         )
 
     @staticmethod
-    def run(server, actor, action: str, command: str, sensitive_output: bool = False):
+    def run(server: Server, actor, action: str, command: str, sensitive_output: bool = False):
         job = JobService.create_job(server=server, actor=actor, action=action, payload={"command": command if not sensitive_output else "[REDACTED]"})
         JobService.mark_running(job)
         result = RuntimeCommandService.executor_for_server(server).run(command)
@@ -72,9 +72,10 @@ class RuntimeCommandService:
 
 class BaseProtocolAdapter:
     protocol_type = ""
+    command_bin = "wg"
 
-    def __init__(self, client_or_server):
-        self.server = client_or_server.server if hasattr(client_or_server, "server") else client_or_server
+    def __init__(self, server: Server):
+        self.server = server
         self.protocol = ServerProtocol.objects.filter(server=self.server, protocol_type=self.protocol_type).first()
         if not self.protocol or not self.protocol.container_name:
             raise ValueError(f"Container for {self.protocol_type} not detected")
@@ -86,25 +87,27 @@ class BaseProtocolAdapter:
     def _run(self, actor, action, command, sensitive_output=False):
         return RuntimeCommandService.run(self.server, actor, action, command, sensitive_output=sensitive_output)
 
+    def _wg_cmd(self, subcommand: str) -> str:
+        return f"docker exec {self.container} {self.command_bin} {subcommand}"
+
     def interface_name(self, actor) -> str:
-        out = self._run(actor, f"{self.protocol_type}.iface", f"docker exec {self.container} wg show interfaces").stdout.strip()
+        out = self._run(actor, f"{self.protocol_type}.iface", self._wg_cmd("show interfaces")).stdout.strip()
         if not out:
             raise RuntimeError("WireGuard interface not detected")
         return out.split()[0]
 
     def server_public_key(self, actor, iface: str) -> str:
-        return self._run(actor, f"{self.protocol_type}.server_pub", f"docker exec {self.container} wg show {iface} public-key").stdout.strip()
+        return self._run(actor, f"{self.protocol_type}.server_pub", self._wg_cmd(f"show {iface} public-key")).stdout.strip()
 
     def list_peers(self, actor):
-        out = self._run(actor, f"{self.protocol_type}.list", f"docker exec {self.container} wg show dump").stdout
+        out = self._run(actor, f"{self.protocol_type}.list", self._wg_cmd("show dump")).stdout
         peers = []
         for line in out.splitlines():
             cols = line.split("\t")
             if len(cols) >= 8:
-                # peer line in wg dump
-                public_key = cols[0]
-                allowed_ips = cols[3]
-                if public_key and public_key != "public_key":
+                public_key = cols[0].strip()
+                allowed_ips = cols[3].strip()
+                if public_key:
                     peers.append(PeerState(public_key=public_key, allowed_ips=allowed_ips))
         return peers
 
@@ -125,9 +128,9 @@ class BaseProtocolAdapter:
         raise RuntimeError("No free addresses")
 
     def generate_keypair(self, actor):
-        private_key = self._run(actor, f"{self.protocol_type}.genkey", f"docker exec {self.container} wg genkey", sensitive_output=True).stdout.strip()
+        private_key = self._run(actor, f"{self.protocol_type}.genkey", self._wg_cmd("genkey"), sensitive_output=True).stdout.strip()
         quoted = shlex.quote(private_key)
-        cmd = f"printf %s {quoted} | docker exec -i {self.container} wg pubkey"
+        cmd = f"printf %s {quoted} | docker exec -i {self.container} {self.command_bin} pubkey"
         public_key = self._run(actor, f"{self.protocol_type}.pubkey", cmd, sensitive_output=True).stdout.strip()
         return private_key, public_key
 
@@ -135,7 +138,7 @@ class BaseProtocolAdapter:
         iface = self.interface_name(actor)
         private_key, public_key = self.generate_keypair(actor)
         address = self._next_address(actor)
-        self._run(actor, f"{self.protocol_type}.add_peer", f"docker exec {self.container} wg set {iface} peer {public_key} allowed-ips {address}/32")
+        self._run(actor, f"{self.protocol_type}.add_peer", self._wg_cmd(f"set {iface} peer {public_key} allowed-ips {address}/32"))
         return {
             "private_key": private_key,
             "public_key": public_key,
@@ -144,27 +147,35 @@ class BaseProtocolAdapter:
             "server_public_key": self.server_public_key(actor, iface),
         }
 
+    def disable_peer(self, actor, peer_public_key: str):
+        self.remove_peer(actor, peer_public_key)
+
     def remove_peer(self, actor, peer_public_key: str):
         iface = self.interface_name(actor)
-        self._run(actor, f"{self.protocol_type}.remove_peer", f"docker exec {self.container} wg set {iface} peer {peer_public_key} remove")
+        self._run(actor, f"{self.protocol_type}.remove_peer", self._wg_cmd(f"set {iface} peer {peer_public_key} remove"))
 
 
 class AWGLegacyAdapter(BaseProtocolAdapter):
     protocol_type = VPNClient.ProtocolType.AWG
+    command_bin = "awg"
 
 
 class AWG2Adapter(BaseProtocolAdapter):
     protocol_type = VPNClient.ProtocolType.AWG2
+    command_bin = "wg"
 
 
 class AdapterFactory:
     @staticmethod
-    def get(target):
-        protocol_type = target.protocol_type if hasattr(target, "protocol_type") else target
+    def get_for_client(client: VPNClient):
+        return AdapterFactory.get_for_server(client.server, client.protocol_type)
+
+    @staticmethod
+    def get_for_server(server: Server, protocol_type: str):
         if protocol_type == VPNClient.ProtocolType.AWG:
-            return AWGLegacyAdapter(target)
+            return AWGLegacyAdapter(server)
         if protocol_type == VPNClient.ProtocolType.AWG2:
-            return AWG2Adapter(target)
+            return AWG2Adapter(server)
         raise ValueError("Unsupported protocol")
 
 
@@ -228,7 +239,7 @@ class VPNClientService:
     @staticmethod
     @transaction.atomic
     def reissue_config(*, client: VPNClient, actor):
-        adapter = AdapterFactory.get(client)
+        adapter = AdapterFactory.get_for_client(client)
         if client.runtime_peer_public_key:
             adapter.remove_peer(actor, client.runtime_peer_public_key)
         generated = adapter.create_peer(actor)
@@ -250,8 +261,11 @@ class VPNClientService:
     @transaction.atomic
     def set_status(*, client: VPNClient, status: str, actor):
         if status in {VPNClient.Status.DISABLED, VPNClient.Status.DELETED} and client.runtime_peer_public_key:
-            adapter = AdapterFactory.get(client)
-            adapter.remove_peer(actor, client.runtime_peer_public_key)
+            adapter = AdapterFactory.get_for_client(client)
+            if status == VPNClient.Status.DISABLED:
+                adapter.disable_peer(actor, client.runtime_peer_public_key)
+            else:
+                adapter.remove_peer(actor, client.runtime_peer_public_key)
         client.status = status
         client.save(update_fields=["status"])
         AuditService.log(actor, f"client.{status}", "VPNClient", client.id)
@@ -286,12 +300,12 @@ class VPNClientService:
             if not profile:
                 continue
             try:
-                adapter = AdapterFactory.get(protocol_type)
+                adapter = AdapterFactory.get_for_server(server, protocol_type)
                 peers = adapter.list_peers(actor)
             except Exception:
                 continue
             for idx, peer in enumerate(peers, start=1):
-                obj, created = VPNClient.objects.get_or_create(
+                _, created = VPNClient.objects.get_or_create(
                     server=server,
                     protocol_type=protocol_type,
                     runtime_peer_public_key=peer.public_key,

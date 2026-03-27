@@ -19,12 +19,13 @@ class SafeSSHExecutor:
 
     ALLOWED_PATTERNS = [
         r"^docker ps --format '\{\{\.Names\}\}'$",
+        r"^docker ps -a --format '\{\{\.Names\}\}'$",
         r"^docker inspect [a-zA-Z0-9_.-]+$",
-        r"^docker exec [a-zA-Z0-9_.-]+ wg show(?: [a-zA-Z0-9_.-]+)?(?: dump| interfaces| public-key)?$",
-        r"^docker exec [a-zA-Z0-9_.-]+ wg genkey$",
-        r"^printf %s '[A-Za-z0-9+/=]+' \| docker exec -i [a-zA-Z0-9_.-]+ wg pubkey$",
-        r"^docker exec [a-zA-Z0-9_.-]+ wg set [a-zA-Z0-9_.-]+ peer [A-Za-z0-9+/=]+ allowed-ips [0-9.]+/32$",
-        r"^docker exec [a-zA-Z0-9_.-]+ wg set [a-zA-Z0-9_.-]+ peer [A-Za-z0-9+/=]+ remove$",
+        r"^docker exec [a-zA-Z0-9_.-]+ (?:wg|awg) show(?: [a-zA-Z0-9_.-]+)?(?: dump| interfaces| public-key)?$",
+        r"^docker exec [a-zA-Z0-9_.-]+ (?:wg|awg) genkey$",
+        r"^printf %s '[A-Za-z0-9+/=]+' \| docker exec -i [a-zA-Z0-9_.-]+ (?:wg|awg) pubkey$",
+        r"^docker exec [a-zA-Z0-9_.-]+ (?:wg|awg) set [a-zA-Z0-9_.-]+ peer [A-Za-z0-9+/=]+ allowed-ips [0-9.]+/32$",
+        r"^docker exec [a-zA-Z0-9_.-]+ (?:wg|awg) set [a-zA-Z0-9_.-]+ peer [A-Za-z0-9+/=]+ remove$",
         r"^docker exec [a-zA-Z0-9_.-]+ ls (?:/etc/amnezia|/opt/amnezia|/etc/wireguard)$",
         r"^docker exec [a-zA-Z0-9_.-]+ cat (?:/etc/amnezia/[a-zA-Z0-9_./-]+|/etc/wireguard/[a-zA-Z0-9_./-]+)$",
     ]
@@ -37,14 +38,13 @@ class SafeSSHExecutor:
         self.timeout = timeout
 
     def _validate(self, command: str):
-        shlex.split(command)  # basic shell parsing validation
+        shlex.split(command)
         if not any(re.fullmatch(pattern, command) for pattern in self.ALLOWED_PATTERNS):
             raise ValueError("Command not allowed")
 
     @staticmethod
     def _host_key_policy() -> paramiko.MissingHostKeyPolicy:
         if os.getenv("SSH_ALLOW_UNKNOWN_HOSTS", "0") == "1":
-            # Development-only override. Keep strict checking in production.
             return paramiko.WarningPolicy()
         return paramiko.RejectPolicy()
 

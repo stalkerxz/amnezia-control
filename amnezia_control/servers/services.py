@@ -1,3 +1,5 @@
+import json
+
 from django.utils import timezone
 
 from audit.services import AuditService
@@ -38,26 +40,45 @@ class ServerService:
 
     @classmethod
     def sync_runtime_state(cls, *, server: Server, actor):
-        names = RuntimeCommandService.run(server, actor, "runtime.ps", "docker ps --format '{{.Names}}'").stdout.splitlines()
+        all_names = RuntimeCommandService.run(server, actor, "runtime.ps_all", "docker ps -a --format '{{.Names}}'").stdout.splitlines()
+        running_names = RuntimeCommandService.run(server, actor, "runtime.ps_running", "docker ps --format '{{.Names}}'").stdout.splitlines()
+
         for protocol_type, container_name in cls.CONTAINERS.items():
             protocol, _ = ServerProtocol.objects.get_or_create(server=server, protocol_type=protocol_type)
             protocol.container_name = container_name
-            if container_name in names:
-                inspect_raw = RuntimeCommandService.run(server, actor, f"runtime.inspect.{protocol_type}", f"docker inspect {container_name}").stdout
-                import json
 
+            if container_name in all_names:
+                inspect_raw = RuntimeCommandService.run(server, actor, f"runtime.inspect.{protocol_type}", f"docker inspect {container_name}").stdout
                 inspect_data = json.loads(inspect_raw)
+                config_env = inspect_data[0].get("Config", {}).get("Env", [])
+                command_bin = "awg" if protocol_type == ServerProtocol.ProtocolType.AWG else "wg"
+
+                iface = ""
+                peer_count = 0
+                if container_name in running_names:
+                    try:
+                        iface = RuntimeCommandService.run(server, actor, f"runtime.iface.{protocol_type}", f"docker exec {container_name} {command_bin} show interfaces").stdout.strip()
+                        dump = RuntimeCommandService.run(server, actor, f"runtime.peers.{protocol_type}", f"docker exec {container_name} {command_bin} show dump").stdout
+                        peer_count = sum(1 for line in dump.splitlines() if len(line.split("\t")) >= 8)
+                    except Exception:
+                        iface = ""
+                        peer_count = 0
+
                 protocol.container_status = inspect_data[0].get("State", {}).get("Status", "unknown")
                 protocol.runtime_metadata = {
                     "udp_port": cls._parse_udp_port(inspect_data),
                     "image": inspect_data[0].get("Config", {}).get("Image", ""),
                     "mounts": [m.get("Destination", "") for m in inspect_data[0].get("Mounts", [])],
+                    "env": config_env,
+                    "interface": iface,
+                    "peer_count": peer_count,
                 }
-                protocol.enabled = protocol.container_status == "running"
+                protocol.enabled = container_name in running_names
             else:
                 protocol.container_status = "missing"
                 protocol.runtime_metadata = {}
                 protocol.enabled = False
+
             protocol.last_sync_at = timezone.now()
             protocol.save(update_fields=["container_name", "container_status", "runtime_metadata", "enabled", "last_sync_at"])
 

@@ -26,10 +26,17 @@ class RuntimeDetectionTest(TestCase):
 
         run_mock.side_effect = [
             Result("amnezia-awg\namnezia-awg2\n"),
-            Result('[{"State":{"Status":"running"},"NetworkSettings":{"Ports":{"51820/udp":[{"HostPort":"51820"}]}},"Config":{"Image":"awg"},"Mounts":[]}]'),
-            Result('[{"State":{"Status":"running"},"NetworkSettings":{"Ports":{"51830/udp":[{"HostPort":"51830"}]}},"Config":{"Image":"awg2"},"Mounts":[]}]'),
+            Result("amnezia-awg\namnezia-awg2\n"),
+            Result('[{"State":{"Status":"running"},"NetworkSettings":{"Ports":{"51820/udp":[{"HostPort":"51820"}]}},"Config":{"Image":"awg","Env":["A=1"]},"Mounts":[]}]'),
+            Result("awg0\n"),
+            Result("awg0\tprivate\tpub\t51820\npeer1\tpsk\tep\t10.8.0.10/32\t0\t0\t0\t25\n"),
+            Result('[{"State":{"Status":"running"},"NetworkSettings":{"Ports":{"51830/udp":[{"HostPort":"51830"}]}},"Config":{"Image":"awg2","Env":["B=2"]},"Mounts":[]}]'),
+            Result("wg0\n"),
+            Result("wg0\tprivate\tpub\t51830\npeer2\tpsk\tep\t10.8.0.11/32\t0\t0\t0\t25\n"),
         ]
 
         ServerService.sync_runtime_state(server=self.server, actor=self.user)
         self.assertEqual(self.server.protocols.count(), 2)
-        self.assertTrue(self.server.protocols.filter(protocol_type="awg", enabled=True).exists())
+        awg = self.server.protocols.get(protocol_type="awg")
+        self.assertEqual(awg.runtime_metadata["peer_count"], 1)
+        self.assertTrue(awg.enabled)

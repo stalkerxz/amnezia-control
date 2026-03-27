@@ -34,12 +34,13 @@ DJANGO_ALLOWED_HOSTS=panel.internal.example
 ## Как работает реальная интеграция с runtime
 ### Обнаружение протоколов
 На странице сервера кнопка **«Синхронизировать runtime»**:
-- проверяет наличие контейнеров `amnezia-awg` и `amnezia-awg2`;
+- проверяет наличие контейнеров `amnezia-awg` и `amnezia-awg2` через `docker ps -a`;
+- отдельно определяет running-состояние через `docker ps`;
 - читает `docker inspect`;
-- сохраняет статус контейнера, UDP порт, mounts, image.
+- сохраняет статус контейнера, UDP порт, mounts, env, интерфейс и количество peers.
 
 ### Поддерживаемые операции
-- отдельные адаптеры: AWG legacy и AWG2;
+- отдельные адаптеры: AWG legacy (`awg` binary) и AWG2 (`wg` binary);
 - импорт существующих peers в БД (`Импорт из runtime`);
 - создание нового peer (генерация ключей в контейнере, `wg set peer`);
 - disable/delete (remove peer);

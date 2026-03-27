@@ -10,16 +10,18 @@
   <li>Последняя синхронизация runtime: {{ server.last_runtime_sync_at|default:'-' }}</li>
 </ul>
 <h2 class="h5">Протоколы</h2>
-<table class="table"><tr><th>Тип</th><th>Доступность</th><th>Контейнер</th><th>Статус</th><th>UDP порт</th><th>Последняя синхронизация</th></tr>
+<table class="table"><tr><th>Тип</th><th>Доступность</th><th>Контейнер</th><th>Статус</th><th>Интерфейс</th><th>Peers</th><th>UDP порт</th><th>Последняя синхронизация</th></tr>
 {% for p in protocols %}
 <tr>
   <td>{{ p.protocol_type }}</td>
   <td>{% if p.enabled %}<span class="badge text-bg-success">Да</span>{% else %}<span class="badge text-bg-danger">Нет</span>{% endif %}</td>
   <td>{{ p.container_name|default:'-' }}</td>
   <td>{{ p.container_status|default:'-' }}</td>
+  <td>{{ p.runtime_metadata.interface|default:'-' }}</td>
+  <td>{{ p.runtime_metadata.peer_count|default:'-' }}</td>
   <td>{{ p.runtime_metadata.udp_port|default:'-' }}</td>
   <td>{{ p.last_sync_at|default:'-' }}</td>
 </tr>
-{% empty %}<tr><td colspan="6">Нет протоколов</td></tr>{% endfor %}
+{% empty %}<tr><td colspan="8">Нет протоколов</td></tr>{% endfor %}
 </table>
 {% endblock %}
