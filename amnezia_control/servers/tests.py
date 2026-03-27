@@ -44,6 +44,15 @@ class RuntimeDetectionTest(TestCase):
         self.assertEqual(parsed["Jmax"], "12")
         self.assertEqual(missing, [])
 
+
+    def test_awg2_parser_reports_exact_missing_keys(self):
+        env = ["AWG2_I1=1", "AWG2_S1=2", "AWG2_JC=3"]
+        parsed, missing = ServerService._parse_awg2_metadata(env, "")
+        self.assertEqual(parsed["Jc"], "3")
+        self.assertIn("I2", missing)
+        self.assertIn("Jmin", missing)
+        self.assertIn("Jmax", missing)
+
     @patch("servers.services.RuntimeCommandService.run")
     def test_sync_runtime_state_metadata_storage_canonical_awg2(self, run_mock):
         class Result:
