@@ -1,0 +1,17 @@
+[
+  {
+    "model": "servers.server",
+    "pk": 1,
+    "fields": {
+      "name": "Local VPS",
+      "host": "127.0.0.1",
+      "port": 22,
+      "ssh_username": "amnezia",
+      "ssh_private_key_path": "",
+      "is_enabled": true,
+      "health_status": "unknown",
+      "created_at": "2026-03-27T00:00:00Z",
+      "updated_at": "2026-03-27T00:00:00Z"
+    }
+  }
+]

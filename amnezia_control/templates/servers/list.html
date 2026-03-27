@@ -1,0 +1,7 @@
+{% extends 'partials/base.html' %}
+{% block content %}
+<h1 class="h3">Серверы</h1>
+<table class="table table-hover"><tr><th>Имя</th><th>Хост</th><th>Статус</th></tr>
+{% for s in servers %}<tr><td><a href="/servers/{{ s.id }}/">{{ s.name }}</a></td><td>{{ s.host }}:{{ s.port }}</td><td><span class="badge text-bg-secondary">{{ s.health_status }}</span></td></tr>{% endfor %}
+</table>
+{% endblock %}

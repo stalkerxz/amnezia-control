@@ -1,0 +1,16 @@
+{% extends 'partials/base.html' %}
+{% block content %}
+<h1 class="h3">Клиент: {{ client.name }}</h1>
+<p>Протокол: {{ client.protocol_type }} | Статус: {{ client.status }}</p>
+<div class="d-flex gap-2 flex-wrap mb-3">
+<form method="post" action="/clients/{{ client.id }}/action/disable/">{% csrf_token %}<button class="btn btn-warning">Отключить</button></form>
+<form method="post" action="/clients/{{ client.id }}/action/enable/">{% csrf_token %}<button class="btn btn-success">Включить</button></form>
+<form method="post" action="/clients/{{ client.id }}/action/reissue/">{% csrf_token %}<button class="btn btn-secondary">Переиздать конфиг</button></form>
+<form method="post" action="/clients/{{ client.id }}/action/delete/" onsubmit="return confirm('Удалить клиента?')">{% csrf_token %}<button class="btn btn-danger">Удалить</button></form>
+<a class="btn btn-primary" href="/clients/{{ client.id }}/download/">Скачать конфиг</a>
+</div>
+{% if revision %}
+<p>Ревизия: {{ revision.revision_number }} | {{ revision.created_at }}</p>
+<img src="data:image/png;base64,{{ qr_base64 }}" alt="QR" class="img-thumbnail" style="max-width:300px;">
+{% endif %}
+{% endblock %}

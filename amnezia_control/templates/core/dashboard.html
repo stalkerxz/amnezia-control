@@ -1,0 +1,13 @@
+{% extends 'partials/base.html' %}
+{% block content %}
+<h1 class="h3 mb-4">Дашборд</h1>
+<div class="row g-3 mb-4">
+  <div class="col-md-3"><div class="card card-body"><strong>Серверы:</strong> {{ servers_count }}</div></div>
+  <div class="col-md-3"><div class="card card-body"><strong>Клиенты:</strong> {{ clients_count }}</div></div>
+  <div class="col-md-3"><div class="card card-body"><strong>Активные:</strong> {{ active_clients_count }}</div></div>
+</div>
+<h2 class="h5">Последние задания</h2>
+<table class="table table-striped"><tr><th>ID</th><th>Действие</th><th>Статус</th></tr>
+{% for job in jobs_recent %}<tr><td><a href="/jobs/{{ job.id }}/">{{ job.id }}</a></td><td>{{ job.action }}</td><td>{{ job.status }}</td></tr>{% empty %}<tr><td colspan="3">Нет данных</td></tr>{% endfor %}
+</table>
+{% endblock %}

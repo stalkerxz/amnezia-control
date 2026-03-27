@@ -1,0 +1,8 @@
+{% extends 'partials/base.html' %}
+{% block content %}
+<h1 class="h3">Задание #{{ job.id }}</h1>
+<p>Действие: {{ job.action }} | Статус: {{ job.status }}</p>
+<table class="table table-sm"><tr><th>Время</th><th>Уровень</th><th>Сообщение</th><th>Exit</th></tr>
+{% for e in events %}<tr><td>{{ e.created_at }}</td><td>{{ e.level }}</td><td>{{ e.message }}</td><td>{{ e.exit_code }}</td></tr>{% endfor %}
+</table>
+{% endblock %}

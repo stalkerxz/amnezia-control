@@ -1,0 +1,12 @@
+{% extends 'partials/base.html' %}
+{% block content %}
+<h1 class="h3">Сервер: {{ server.name }}</h1>
+<ul>
+  <li>SSH: {{ server.ssh_username }}@{{ server.host }}:{{ server.port }}</li>
+  <li>Здоровье: <span class="badge text-bg-info">{{ server.health_status }}</span></li>
+</ul>
+<h2 class="h5">Протоколы</h2>
+<table class="table"><tr><th>Тип</th><th>Включен</th></tr>
+{% for p in protocols %}<tr><td>{{ p.protocol_type }}</td><td>{{ p.enabled }}</td></tr>{% empty %}<tr><td colspan="2">Нет протоколов</td></tr>{% endfor %}
+</table>
+{% endblock %}

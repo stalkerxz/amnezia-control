@@ -1,0 +1,7 @@
+{% extends 'partials/base.html' %}
+{% block content %}
+<h1 class="h3">Задания</h1>
+<table class="table table-striped"><tr><th>ID</th><th>Action</th><th>Status</th><th>Created</th></tr>
+{% for j in jobs %}<tr><td><a href="/jobs/{{ j.id }}/">{{ j.id }}</a></td><td>{{ j.action }}</td><td>{{ j.status }}</td><td>{{ j.created_at }}</td></tr>{% endfor %}
+</table>
+{% endblock %}
