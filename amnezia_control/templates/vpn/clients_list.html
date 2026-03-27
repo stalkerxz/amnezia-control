@@ -1,22 +1,29 @@
 {% extends 'partials/base.html' %}
 {% block content %}
-<div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">
-  <h1 class="h3">VPN клиенты</h1>
+<div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-3">
+  <h1 class="h3 mb-0">VPN клиенты</h1>
   <div class="d-flex gap-2">
     <form method="post" action="/clients/import/">{% csrf_token %}<button class="btn btn-outline-secondary">Импорт из runtime</button></form>
-    <a class="btn btn-primary" href="/clients/new/">Создать</a>
+    <a class="btn btn-primary" href="/clients/new/">Создать клиента</a>
   </div>
 </div>
-<form class="my-3"><input class="form-control" name="q" value="{{ q }}" placeholder="Поиск по имени"></form>
-<table class="table table-striped"><tr><th>ID</th><th>Имя</th><th>Протокол</th><th>Статус</th><th>Источник</th></tr>
+
+<form class="mb-3"><input class="form-control" name="q" value="{{ q }}" placeholder="Поиск по имени клиента"></form>
+
+{% if clients %}
+<table class="table table-hover align-middle"><tr><th>ID</th><th>Имя</th><th>Протокол</th><th>Статус</th><th>Источник</th><th>Действия</th></tr>
 {% for c in clients %}
 <tr>
   <td>{{ c.id }}</td>
   <td><a href="/clients/{{ c.id }}/">{{ c.name }}</a></td>
-  <td>{{ c.protocol_type }}</td>
+  <td><span class="badge {% if c.protocol_type == 'awg2' %}text-bg-info{% else %}text-bg-secondary{% endif %}">{{ c.protocol_type|upper }}</span></td>
   <td><span class="badge {% if c.status == 'active' %}text-bg-success{% elif c.status == 'disabled' %}text-bg-warning{% else %}text-bg-danger{% endif %}">{{ c.status }}</span></td>
-  <td>{% if c.imported_from_runtime %}<span class="badge text-bg-info">Импортирован</span>{% else %}<span class="badge text-bg-secondary">Создан в панели</span>{% endif %}</td>
+  <td>{% if c.imported_from_runtime %}<span class="badge text-bg-info">Импорт</span>{% else %}<span class="badge text-bg-secondary">Панель</span>{% endif %}</td>
+  <td><a class="btn btn-sm btn-outline-light" href="/clients/{{ c.id }}/">Открыть</a></td>
 </tr>
 {% endfor %}
 </table>
+{% else %}
+<div class="empty-state">Клиентов пока нет. Создайте клиента или импортируйте peers из runtime.</div>
+{% endif %}
 {% endblock %}

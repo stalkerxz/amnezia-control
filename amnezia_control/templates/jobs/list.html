@@ -1,7 +1,18 @@
 {% extends 'partials/base.html' %}
 {% block content %}
-<h1 class="h3">Задания</h1>
-<table class="table table-striped"><tr><th>ID</th><th>Action</th><th>Status</th><th>Created</th></tr>
-{% for j in jobs %}<tr><td><a href="/jobs/{{ j.id }}/">{{ j.id }}</a></td><td>{{ j.action }}</td><td>{{ j.status }}</td><td>{{ j.created_at }}</td></tr>{% endfor %}
+<h1 class="h3 mb-3">Задания</h1>
+{% if jobs %}
+<table class="table table-hover align-middle"><tr><th>ID</th><th>Действие</th><th>Статус</th><th>Создано</th></tr>
+{% for j in jobs %}
+<tr>
+  <td><a href="/jobs/{{ j.id }}/">#{{ j.id }}</a></td>
+  <td>{{ j.action }}</td>
+  <td><span class="badge {% if j.status == 'success' %}text-bg-success{% elif j.status == 'failed' %}text-bg-danger{% elif j.status == 'running' %}text-bg-warning{% else %}text-bg-secondary{% endif %}">{{ j.status }}</span></td>
+  <td>{{ j.created_at }}</td>
+</tr>
+{% endfor %}
 </table>
+{% else %}
+<div class="empty-state">Заданий пока нет.</div>
+{% endif %}
 {% endblock %}

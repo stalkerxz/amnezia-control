@@ -1,18 +1,40 @@
 {% extends 'partials/base.html' %}
 {% block content %}
-<h1 class="h3">Клиент: {{ client.name }}</h1>
-<p>Протокол: {{ client.protocol_type }} | Статус: {{ client.status }}</p>
-<p>Runtime peer key: <code>{{ client.runtime_peer_public_key|default:'-' }}</code></p>
-<p>Runtime address: <code>{{ client.runtime_address|default:'-' }}</code></p>
+<h1 class="h3 mb-3">Клиент: {{ client.name }}</h1>
+<div class="row g-3 mb-3">
+  <div class="col-lg-6">
+    <div class="card"><div class="card-body">
+      <h2 class="h6">Статус и runtime</h2>
+      <p>Протокол: <span class="badge {% if client.protocol_type == 'awg2' %}text-bg-info{% else %}text-bg-secondary{% endif %}">{{ client.protocol_type|upper }}</span></p>
+      <p>Статус: <span class="badge {% if client.status == 'active' %}text-bg-success{% elif client.status == 'disabled' %}text-bg-warning{% else %}text-bg-danger{% endif %}">{{ client.status }}</span></p>
+      <p class="mb-1">Peer key: <code>{{ client.runtime_peer_public_key|default:'-' }}</code></p>
+      <p class="mb-0">Address: <code>{{ client.runtime_address|default:'-' }}</code></p>
+    </div></div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card"><div class="card-body">
+      <h2 class="h6">Конфиг</h2>
+      {% if revision %}
+        <p>Ревизия: <strong>#{{ revision.revision_number }}</strong> ({{ revision.created_at }})</p>
+        <a class="btn btn-primary" href="/clients/{{ client.id }}/download/">Скачать .conf</a>
+      {% else %}
+        <div class="empty-state">Конфиг пока не выпущен.</div>
+      {% endif %}
+    </div></div>
+  </div>
+</div>
+
 <div class="d-flex gap-2 flex-wrap mb-3">
+<form method="post" action="/clients/{{ client.id }}/action/reissue/">{% csrf_token %}<button class="btn btn-secondary">Переиздать</button></form>
 <form method="post" action="/clients/{{ client.id }}/action/disable/">{% csrf_token %}<button class="btn btn-warning">Отключить</button></form>
 <form method="post" action="/clients/{{ client.id }}/action/enable/">{% csrf_token %}<button class="btn btn-success">Включить</button></form>
-<form method="post" action="/clients/{{ client.id }}/action/reissue/">{% csrf_token %}<button class="btn btn-secondary">Переиздать конфиг</button></form>
 <form method="post" action="/clients/{{ client.id }}/action/delete/" onsubmit="return confirm('Удалить клиента?')">{% csrf_token %}<button class="btn btn-danger">Удалить</button></form>
-<a class="btn btn-primary" href="/clients/{{ client.id }}/download/">Скачать конфиг</a>
 </div>
-{% if revision %}
-<p>Ревизия: {{ revision.revision_number }} | {{ revision.created_at }}</p>
-<img src="data:image/png;base64,{{ qr_base64 }}" alt="QR" class="img-thumbnail" style="max-width:300px;">
+
+{% if revision and qr_base64 %}
+<div class="card"><div class="card-body">
+  <h2 class="h6">QR для подключения</h2>
+  <img src="data:image/png;base64,{{ qr_base64 }}" alt="QR" class="img-thumbnail" style="max-width:300px;">
+</div></div>
 {% endif %}
 {% endblock %}

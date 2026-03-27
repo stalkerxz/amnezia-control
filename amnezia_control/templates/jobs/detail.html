@@ -1,8 +1,24 @@
 {% extends 'partials/base.html' %}
 {% block content %}
 <h1 class="h3">Задание #{{ job.id }}</h1>
-<p>Действие: {{ job.action }} | Статус: {{ job.status }}</p>
-<table class="table table-sm"><tr><th>Время</th><th>Уровень</th><th>Сообщение</th><th>Exit</th></tr>
-{% for e in events %}<tr><td>{{ e.created_at }}</td><td>{{ e.level }}</td><td>{{ e.message }}</td><td>{{ e.exit_code }}</td></tr>{% endfor %}
+<p>Действие: <code>{{ job.action }}</code> | Статус: <span class="badge {% if job.status == 'success' %}text-bg-success{% elif job.status == 'failed' %}text-bg-danger{% elif job.status == 'running' %}text-bg-warning{% else %}text-bg-secondary{% endif %}">{{ job.status }}</span></p>
+
+{% if events %}
+<table class="table table-sm align-middle"><tr><th>Время</th><th>Уровень</th><th>Сообщение</th><th>Exit</th><th>Логи</th></tr>
+{% for e in events %}
+<tr class="{% if e.level == 'error' %}table-danger{% endif %}">
+  <td>{{ e.created_at }}</td>
+  <td><span class="badge {% if e.level == 'error' %}text-bg-danger{% else %}text-bg-secondary{% endif %}">{{ e.level }}</span></td>
+  <td>{{ e.message }}</td>
+  <td>{{ e.exit_code|default:'—' }}</td>
+  <td>
+    {% if e.stdout %}<pre class="log mb-2">{{ e.stdout }}</pre>{% endif %}
+    {% if e.stderr %}<pre class="log text-danger">{{ e.stderr }}</pre>{% endif %}
+  </td>
+</tr>
+{% endfor %}
 </table>
+{% else %}
+<div class="empty-state">Событий по заданию пока нет.</div>
+{% endif %}
 {% endblock %}
