@@ -19,6 +19,10 @@ class VPNClient(models.Model):
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.ACTIVE)
     profile = models.ForeignKey(ProtocolProfile, on_delete=models.PROTECT)
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True)
+    imported_from_runtime = models.BooleanField(default=False)
+    runtime_peer_public_key = models.CharField(max_length=128, blank=True)
+    runtime_address = models.CharField(max_length=64, blank=True)
+    last_runtime_sync_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

@@ -1,5 +1,5 @@
 from celery import shared_task
-from servers.models import Server
+
 from .executors import SafeSSHExecutor
 from .models import Job
 from .services import JobService
@@ -18,7 +18,7 @@ def run_job(job_id: int):
     )
 
     action_map = {
-        "server.health_check": "systemctl is-active amnezia-awg",
+        "server.health_check": "docker ps --format '{{.Names}}'",
     }
     command = action_map.get(job.action)
     if not command:

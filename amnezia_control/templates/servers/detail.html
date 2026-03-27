@@ -1,12 +1,25 @@
 {% extends 'partials/base.html' %}
 {% block content %}
-<h1 class="h3">Сервер: {{ server.name }}</h1>
+<div class="d-flex justify-content-between align-items-center">
+  <h1 class="h3">Сервер: {{ server.name }}</h1>
+  <form method="post" action="/servers/{{ server.id }}/sync-runtime/">{% csrf_token %}<button class="btn btn-outline-primary">Синхронизировать runtime</button></form>
+</div>
 <ul>
   <li>SSH: {{ server.ssh_username }}@{{ server.host }}:{{ server.port }}</li>
   <li>Здоровье: <span class="badge text-bg-info">{{ server.health_status }}</span></li>
+  <li>Последняя синхронизация runtime: {{ server.last_runtime_sync_at|default:'-' }}</li>
 </ul>
 <h2 class="h5">Протоколы</h2>
-<table class="table"><tr><th>Тип</th><th>Включен</th></tr>
-{% for p in protocols %}<tr><td>{{ p.protocol_type }}</td><td>{{ p.enabled }}</td></tr>{% empty %}<tr><td colspan="2">Нет протоколов</td></tr>{% endfor %}
+<table class="table"><tr><th>Тип</th><th>Доступность</th><th>Контейнер</th><th>Статус</th><th>UDP порт</th><th>Последняя синхронизация</th></tr>
+{% for p in protocols %}
+<tr>
+  <td>{{ p.protocol_type }}</td>
+  <td>{% if p.enabled %}<span class="badge text-bg-success">Да</span>{% else %}<span class="badge text-bg-danger">Нет</span>{% endif %}</td>
+  <td>{{ p.container_name|default:'-' }}</td>
+  <td>{{ p.container_status|default:'-' }}</td>
+  <td>{{ p.runtime_metadata.udp_port|default:'-' }}</td>
+  <td>{{ p.last_sync_at|default:'-' }}</td>
+</tr>
+{% empty %}<tr><td colspan="6">Нет протоколов</td></tr>{% endfor %}
 </table>
 {% endblock %}

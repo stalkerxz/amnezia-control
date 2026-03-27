@@ -1,11 +1,22 @@
 {% extends 'partials/base.html' %}
 {% block content %}
-<div class="d-flex justify-content-between align-items-center">
-<h1 class="h3">VPN клиенты</h1>
-<a class="btn btn-primary" href="/clients/new/">Создать</a>
+<div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">
+  <h1 class="h3">VPN клиенты</h1>
+  <div class="d-flex gap-2">
+    <form method="post" action="/clients/import/">{% csrf_token %}<button class="btn btn-outline-secondary">Импорт из runtime</button></form>
+    <a class="btn btn-primary" href="/clients/new/">Создать</a>
+  </div>
 </div>
 <form class="my-3"><input class="form-control" name="q" value="{{ q }}" placeholder="Поиск по имени"></form>
-<table class="table table-striped"><tr><th>ID</th><th>Имя</th><th>Протокол</th><th>Статус</th></tr>
-{% for c in clients %}<tr><td>{{ c.id }}</td><td><a href="/clients/{{ c.id }}/">{{ c.name }}</a></td><td>{{ c.protocol_type }}</td><td><span class="badge {% if c.status == 'active' %}text-bg-success{% elif c.status == 'disabled' %}text-bg-warning{% else %}text-bg-danger{% endif %}">{{ c.status }}</span></td></tr>{% endfor %}
+<table class="table table-striped"><tr><th>ID</th><th>Имя</th><th>Протокол</th><th>Статус</th><th>Источник</th></tr>
+{% for c in clients %}
+<tr>
+  <td>{{ c.id }}</td>
+  <td><a href="/clients/{{ c.id }}/">{{ c.name }}</a></td>
+  <td>{{ c.protocol_type }}</td>
+  <td><span class="badge {% if c.status == 'active' %}text-bg-success{% elif c.status == 'disabled' %}text-bg-warning{% else %}text-bg-danger{% endif %}">{{ c.status }}</span></td>
+  <td>{% if c.imported_from_runtime %}<span class="badge text-bg-info">Импортирован</span>{% else %}<span class="badge text-bg-secondary">Создан в панели</span>{% endif %}</td>
+</tr>
+{% endfor %}
 </table>
 {% endblock %}

@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 import os
+import re
 import shlex
+
 import paramiko
 
 
@@ -13,14 +15,21 @@ class ExecutionResult:
 
 
 class SafeSSHExecutor:
-    ALLOWLIST = {
-        "awg": ["show", "genkey", "pubkey"],
-        "systemctl": ["status", "restart", "is-active", "amnezia-awg"],
-        "cat": ["/etc/amnezia"],
-        "ls": ["/etc/amnezia"],
-    }
+    """Allowlisted SSH executor for Amnezia runtime operations."""
 
-    def __init__(self, host: str, username: str, port: int = 22, key_path: str | None = None, timeout: int = 10):
+    ALLOWED_PATTERNS = [
+        r"^docker ps --format '\{\{\.Names\}\}'$",
+        r"^docker inspect [a-zA-Z0-9_.-]+$",
+        r"^docker exec [a-zA-Z0-9_.-]+ wg show(?: [a-zA-Z0-9_.-]+)?(?: dump| interfaces| public-key)?$",
+        r"^docker exec [a-zA-Z0-9_.-]+ wg genkey$",
+        r"^printf %s '[A-Za-z0-9+/=]+' \| docker exec -i [a-zA-Z0-9_.-]+ wg pubkey$",
+        r"^docker exec [a-zA-Z0-9_.-]+ wg set [a-zA-Z0-9_.-]+ peer [A-Za-z0-9+/=]+ allowed-ips [0-9.]+/32$",
+        r"^docker exec [a-zA-Z0-9_.-]+ wg set [a-zA-Z0-9_.-]+ peer [A-Za-z0-9+/=]+ remove$",
+        r"^docker exec [a-zA-Z0-9_.-]+ ls (?:/etc/amnezia|/opt/amnezia|/etc/wireguard)$",
+        r"^docker exec [a-zA-Z0-9_.-]+ cat (?:/etc/amnezia/[a-zA-Z0-9_./-]+|/etc/wireguard/[a-zA-Z0-9_./-]+)$",
+    ]
+
+    def __init__(self, host: str, username: str, port: int = 22, key_path: str | None = None, timeout: int = 15):
         self.host = host
         self.username = username
         self.port = port
@@ -28,19 +37,9 @@ class SafeSSHExecutor:
         self.timeout = timeout
 
     def _validate(self, command: str):
-        parts = shlex.split(command)
-        if not parts:
-            raise ValueError("Empty command")
-        base = parts[0]
-        if base not in self.ALLOWLIST:
+        shlex.split(command)  # basic shell parsing validation
+        if not any(re.fullmatch(pattern, command) for pattern in self.ALLOWED_PATTERNS):
             raise ValueError("Command not allowed")
-        allowed_args = self.ALLOWLIST[base]
-        for arg in parts[1:]:
-            if arg in allowed_args:
-                continue
-            if any(arg.startswith(prefix) for prefix in allowed_args if prefix.startswith("/")):
-                continue
-            raise ValueError(f"Argument not allowed: {arg}")
 
     @staticmethod
     def _host_key_policy() -> paramiko.MissingHostKeyPolicy:

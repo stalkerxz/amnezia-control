@@ -1,81 +1,77 @@
 # amnezia-control
 
-Приватная админ-панель для управления существующим Amnezia VPN сервером (AWG + AWG2-ready), безопасная для развертывания на VPS, где уже занят nginx на `80/443`.
+Приватная админ-панель для управления **существующим** Amnezia runtime на Ubuntu 24.04 x86_64.
 
-## Что важно для существующего VPS
-- По умолчанию **не поднимаем reverse-proxy** и **не занимаем 80/443**.
-- Web публикуется только на loopback: `127.0.0.1:${APP_PORT:-8090}`.
-- PostgreSQL и Redis доступны только внутри docker-сети.
-- Это позволяет запустить панель рядом с существующими контейнерами Amnezia без конфликта портов.
-- По умолчанию `DJANGO_FORCE_SSL=0`, поэтому первый запуск по HTTP на loopback работает без редиректа.
+## Целевой сценарий
+- На VPS уже работают контейнеры: `amnezia-awg`, `amnezia-awg2`, `amnezia-panel-web`, `amnezia-panel-db`.
+- `amnezia-control` запускается отдельно и безопасно: только `127.0.0.1:8090`.
+- По умолчанию нет bind на `80/443`.
 
-## Стек
-- Django 5, PostgreSQL, Redis, Celery, Bootstrap 5
-- Docker Compose
-- (опционально) Caddy в отдельном compose-файле
-
-## Быстрый запуск (без конфликтов с nginx/Amnezia)
+## Быстрый запуск (без конфликта с существующим nginx/Amnezia)
 ```bash
 cp .env.example .env
 python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
-# вставьте ключ в CONFIG_ENCRYPTION_KEY в .env
+# вставьте ключ в CONFIG_ENCRYPTION_KEY
 
 docker compose up -d --build
-```
-
-Проверка доступности:
-- `http://127.0.0.1:8090/login/` (или порт из `APP_PORT`)
-
-## Первый запуск (обязательно вручную)
-```bash
 docker compose exec web python manage.py migrate
 docker compose exec web python manage.py createsuperuser
 ```
 
-Демо-данные протоколов/сервера (без создания пользователя):
-```bash
-docker compose exec web python manage.py seed_demo
-```
+Открыть:
+- `http://127.0.0.1:8090/login/`
 
-Создание демонстрационного `admin/admin12345` только по явному запросу (dev only):
-```bash
-docker compose exec web python manage.py seed_demo --with-demo-admin
-```
+## Режим HTTPS позже
+- Первый запуск: `DJANGO_FORCE_SSL=0` (default) — без HTTP→HTTPS редиректа.
+- После подключения reverse proxy: `DJANGO_FORCE_SSL=1`.
 
-Для режима за reverse-proxy/HTTPS переключите:
+Пример:
 ```env
 DJANGO_FORCE_SSL=1
+DJANGO_ALLOWED_HOSTS=panel.internal.example
 ```
 
-## Optional proxy
-Если нужен Caddy, используйте отдельный файл:
-```bash
-docker compose -f docker-compose.yml -f docker-compose.proxy.yml up -d --build
-```
+## Как работает реальная интеграция с runtime
+### Обнаружение протоколов
+На странице сервера кнопка **«Синхронизировать runtime»**:
+- проверяет наличие контейнеров `amnezia-awg` и `amnezia-awg2`;
+- читает `docker inspect`;
+- сохраняет статус контейнера, UDP порт, mounts, image.
 
-## SSH security
-`SafeSSHExecutor` использует strict host key verification:
-- загружает system/user known_hosts,
-- неизвестные хосты отклоняются (RejectPolicy) по умолчанию.
+### Поддерживаемые операции
+- отдельные адаптеры: AWG legacy и AWG2;
+- импорт существующих peers в БД (`Импорт из runtime`);
+- создание нового peer (генерация ключей в контейнере, `wg set peer`);
+- disable/delete (remove peer);
+- reissue (перегенерация ключей и peer);
+- экспорт реального `.conf`;
+- QR из расшифрованного активного конфига в памяти.
 
-Только для dev можно временно ослабить:
-```env
-SSH_ALLOW_UNKNOWN_HOSTS=1
-```
+### Используемые allowlisted команды
+- `docker ps --format '{{.Names}}'`
+- `docker inspect <container>`
+- `docker exec <container> wg show ...`
+- `docker exec <container> wg genkey`
+- `printf %s '<private_key>' | docker exec -i <container> wg pubkey`
+- `docker exec <container> wg set <iface> peer <pubkey> ...`
 
-## AWG / AWG2 и секреты конфигов
-- Профили разделены по `protocol_type` (`awg`/`awg2`).
-- Ревизии конфигов разделены по протоколу.
-- Конфиги хранятся в БД только в зашифрованном виде.
-- QR код генерируется в памяти на лету из расшифрованного активного конфига (plaintext не хранится отдельным полем).
+## Безопасность
+- строгая проверка SSH host key (RejectPolicy по умолчанию);
+- `SSH_ALLOW_UNKNOWN_HOSTS=1` только для dev;
+- конфиги клиента хранятся только encrypted-at-rest;
+- plaintext не сохраняется в отдельные поля и не логируется в JobEvent для чувствительных команд.
+
+## Проверка, что клиент реально создан
+1. Создайте клиента в UI (`/clients/new/`).
+2. Откройте `/jobs/` и убедитесь, что задания `awg.add_peer` / `awg2.add_peer` успешны.
+3. Выполните sync runtime на `/servers/<id>/` и проверьте статус.
+4. Скачайте `.conf` на `/clients/<id>/` и импортируйте в клиент.
 
 ## Полезные команды
 ```bash
 make up
-make up-proxy
 make migrate
 make superuser
-make seed
 make test
 make logs
 make down

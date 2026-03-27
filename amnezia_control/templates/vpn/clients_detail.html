@@ -2,6 +2,8 @@
 {% block content %}
 <h1 class="h3">Клиент: {{ client.name }}</h1>
 <p>Протокол: {{ client.protocol_type }} | Статус: {{ client.status }}</p>
+<p>Runtime peer key: <code>{{ client.runtime_peer_public_key|default:'-' }}</code></p>
+<p>Runtime address: <code>{{ client.runtime_address|default:'-' }}</code></p>
 <div class="d-flex gap-2 flex-wrap mb-3">
 <form method="post" action="/clients/{{ client.id }}/action/disable/">{% csrf_token %}<button class="btn btn-warning">Отключить</button></form>
 <form method="post" action="/clients/{{ client.id }}/action/enable/">{% csrf_token %}<button class="btn btn-success">Включить</button></form>

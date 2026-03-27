@@ -9,6 +9,7 @@ class Server(models.Model):
     ssh_private_key_path = models.CharField(max_length=255, blank=True)
     is_enabled = models.BooleanField(default=True)
     health_status = models.CharField(max_length=30, default="unknown")
+    last_runtime_sync_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -24,6 +25,10 @@ class ServerProtocol(models.Model):
     server = models.ForeignKey(Server, on_delete=models.CASCADE, related_name="protocols")
     protocol_type = models.CharField(max_length=16, choices=ProtocolType.choices)
     enabled = models.BooleanField(default=True)
+    container_name = models.CharField(max_length=120, blank=True)
+    container_status = models.CharField(max_length=32, blank=True)
+    runtime_metadata = models.JSONField(default=dict, blank=True)
+    last_sync_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         unique_together = ("server", "protocol_type")
