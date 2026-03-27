@@ -14,12 +14,15 @@
 <div class="card mb-3">
   <div class="card-body">
     <h2 class="h6">Runtime diagnostics</h2>
-    <p class="text-muted mb-0">Показывает обнаруженный endpoint, подсеть, интерфейс и готовность AWG2 metadata.</p>
+    <p class="text-muted">Показывает endpoint, подсеть, интерфейс, UDP порт и готовность AWG2 metadata.</p>
+    {% if not server.public_endpoint_host and server.host == '127.0.0.1' or not server.public_endpoint_host and server.host == 'localhost' %}
+      <div class="alert alert-warning mb-0">Endpoint не готов: заполните <code>public_endpoint_host</code> (и при необходимости <code>public_endpoint_port</code>) в Django Admin → Servers.</div>
+    {% endif %}
   </div>
 </div>
 
 <h2 class="h5">Протоколы</h2>
-<table class="table"><tr><th>Тип</th><th>Доступность</th><th>Контейнер</th><th>Статус</th><th>Endpoint</th><th>Subnet</th><th>Интерфейс</th><th>Peers</th><th>AWG2 meta</th><th>Последняя синхронизация</th></tr>
+<table class="table"><tr><th>Тип</th><th>Доступность</th><th>Контейнер</th><th>Статус</th><th>Endpoint</th><th>Subnet</th><th>Интерфейс</th><th>Peers</th><th>AWG2 meta</th><th>Missing keys</th><th>Последняя синхронизация</th></tr>
 {% for p in protocols %}
 <tr>
   <td>{{ p.protocol_type }}</td>
@@ -30,9 +33,10 @@
   <td>{{ p.runtime_metadata.subnet|default:'-' }}</td>
   <td>{{ p.runtime_metadata.interface|default:'-' }}</td>
   <td>{{ p.runtime_metadata.peer_count|default:'-' }}</td>
-  <td>{% if p.protocol_type == 'awg2' %}{% if p.runtime_metadata.awg2_metadata_ready %}<span class="badge text-bg-success">ready</span>{% else %}<span class="badge text-bg-warning">missing</span>{% endif %}{% else %}-{% endif %}</td>
+  <td>{% if p.protocol_type == 'awg2' %}{% if p.runtime_metadata.awg2_metadata_ready %}<span class="badge text-bg-success">complete</span>{% else %}<span class="badge text-bg-warning">incomplete</span>{% endif %}{% else %}-{% endif %}</td>
+  <td>{% if p.protocol_type == 'awg2' %}{% if p.runtime_metadata.awg2_missing_keys %}<code>{{ p.runtime_metadata.awg2_missing_keys|join:', ' }}</code>{% else %}-{% endif %}{% else %}-{% endif %}</td>
   <td>{{ p.last_sync_at|default:'-' }}</td>
 </tr>
-{% empty %}<tr><td colspan="10">Нет протоколов</td></tr>{% endfor %}
+{% empty %}<tr><td colspan="11">Нет протоколов</td></tr>{% endfor %}
 </table>
 {% endblock %}

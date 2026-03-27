@@ -27,7 +27,7 @@ class VPNClientFlowTest(TestCase):
             runtime_metadata={
                 "udp_port": 51830,
                 "subnet": "10.77.0.0/24",
-                "awg2_metadata": {"S1": "1", "S2": "2", "H1": "3", "H2": "4", "H3": "5", "H4": "6", "JC": "7"},
+                "awg2_metadata": {"I1": "11", "I2": "12", "I3": "13", "I4": "14", "I5": "15", "S1": "1", "S2": "2", "S3": "3", "S4": "4", "Jc": "7", "Jmin": "8", "Jmax": "9", "H1": "3", "H2": "4", "H3": "5", "H4": "6"},
             },
         )
         ProtocolProfile.objects.create(server_protocol=self.awg_protocol, name="default-awg", protocol_type=ServerProtocol.ProtocolType.AWG, config_template="[Interface]")
@@ -84,17 +84,34 @@ class VPNClientFlowTest(TestCase):
         with patch("vpn.services.RuntimeCommandService.run", side_effect=self._mock_run):
             client = VPNClientService.create_client(server=self.server, name="awg2-client", protocol_type=VPNClient.ProtocolType.AWG2, actor=self.user)
         conf = VPNClientService.latest_config(client)
-        self.assertIn("S1 = 1", conf)
+        self.assertIn("I1 = 11", conf)
+        self.assertIn("S4 = 4", conf)
+        self.assertIn("Jc = 7", conf)
         self.assertIn("H4 = 6", conf)
 
     def test_awg2_missing_metadata_fails_export(self):
         from unittest.mock import patch
 
-        self.awg2_protocol.runtime_metadata = {"udp_port": 51830, "subnet": "10.77.0.0/24", "awg2_metadata": {}}
+        self.awg2_protocol.runtime_metadata = {"udp_port": 51830, "subnet": "10.77.0.0/24", "awg2_metadata": {"S1": "1"}}
         self.awg2_protocol.save(update_fields=["runtime_metadata"])
         with patch("vpn.services.RuntimeCommandService.run", side_effect=self._mock_run):
             with self.assertRaises(RuntimeError):
                 VPNClientService.create_client(server=self.server, name="awg2-broken", protocol_type=VPNClient.ProtocolType.AWG2, actor=self.user)
+
+
+    def test_export_succeeds_with_runtime_public_host(self):
+        from unittest.mock import patch
+
+        self.server.public_endpoint_host = ""
+        self.server.host = "127.0.0.1"
+        self.server.save(update_fields=["public_endpoint_host", "host"])
+        self.awg_protocol.runtime_metadata["public_host"] = "vpn2.example.com"
+        self.awg_protocol.save(update_fields=["runtime_metadata"])
+
+        with patch("vpn.services.RuntimeCommandService.run", side_effect=self._mock_run):
+            client = VPNClientService.create_client(server=self.server, name="awg-client-runtime-host", protocol_type=VPNClient.ProtocolType.AWG, actor=self.user)
+        conf = VPNClientService.latest_config(client)
+        self.assertIn("Endpoint = vpn2.example.com:51820", conf)
 
     def test_adapter_factory_separates_protocols(self):
         awg_adapter = AdapterFactory.get_for_server(self.server, VPNClient.ProtocolType.AWG)

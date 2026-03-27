@@ -16,6 +16,12 @@ class ServerService:
         ServerProtocol.ProtocolType.AWG: "amnezia-awg",
         ServerProtocol.ProtocolType.AWG2: "amnezia-awg2",
     }
+    AWG2_CANONICAL_KEYS = [
+        "I1", "I2", "I3", "I4", "I5",
+        "S1", "S2", "S3", "S4",
+        "Jc", "Jmin", "Jmax",
+        "H1", "H2", "H3", "H4",
+    ]
 
     @staticmethod
     def update_health(server: Server, status: str) -> Server:
@@ -69,29 +75,43 @@ class ServerService:
                     listen_port = None
         return subnet, listen_port
 
-    @staticmethod
-    def _parse_awg2_metadata(env_list, conf_text: str):
-        keys = {"S1", "S2", "H1", "H2", "H3", "H4", "Jc", "JMIN", "JMAX"}
+    @classmethod
+    def _normalize_awg2_key(cls, key: str) -> str:
+        compact = re.sub(r"[^A-Za-z0-9]", "", key).upper().replace("AWG2", "")
+        mapping = {
+            "JC": "Jc",
+            "JMIN": "Jmin",
+            "JMAX": "Jmax",
+        }
+        if compact in mapping:
+            return mapping[compact]
+        if compact and compact[0] in {"I", "S", "H"}:
+            return compact
+        return ""
+
+    @classmethod
+    def _parse_awg2_metadata(cls, env_list, conf_text: str):
         discovered = {}
 
         for item in env_list:
             if "=" not in item:
                 continue
             k, v = item.split("=", 1)
-            norm = k.upper().replace("AWG2_", "")
-            if norm in keys:
-                discovered[norm] = v
+            norm = cls._normalize_awg2_key(k)
+            if norm in cls.AWG2_CANONICAL_KEYS:
+                discovered[norm] = v.strip()
 
         for line in conf_text.splitlines():
             text = line.strip()
             if "=" not in text:
                 continue
             k, v = text.split("=", 1)
-            norm = re.sub(r"[^A-Za-z0-9]", "", k).upper().replace("AWG2", "")
-            if norm in keys:
+            norm = cls._normalize_awg2_key(k)
+            if norm in cls.AWG2_CANONICAL_KEYS:
                 discovered[norm] = v.strip()
 
-        return discovered
+        missing = [k for k in cls.AWG2_CANONICAL_KEYS if not discovered.get(k)]
+        return discovered, missing
 
     @classmethod
     def sync_runtime_state(cls, *, server: Server, actor):
@@ -130,7 +150,9 @@ class ServerService:
                                 continue
 
                 subnet, listen_port = cls._parse_interface_metadata(raw_iface_conf)
-                awg2_meta = cls._parse_awg2_metadata(config_env, raw_iface_conf) if protocol_type == ServerProtocol.ProtocolType.AWG2 else {}
+                awg2_meta, awg2_missing = ({}, [])
+                if protocol_type == ServerProtocol.ProtocolType.AWG2:
+                    awg2_meta, awg2_missing = cls._parse_awg2_metadata(config_env, raw_iface_conf)
 
                 protocol.container_status = inspect_data[0].get("State", {}).get("Status", "unknown")
                 protocol.runtime_metadata = {
@@ -143,7 +165,8 @@ class ServerService:
                     "peer_count": peer_count,
                     "subnet": subnet,
                     "awg2_metadata": awg2_meta,
-                    "awg2_metadata_ready": bool(awg2_meta),
+                    "awg2_missing_keys": awg2_missing,
+                    "awg2_metadata_ready": not awg2_missing if protocol_type == ServerProtocol.ProtocolType.AWG2 else True,
                 }
                 protocol.enabled = container_name in running_names
             else:

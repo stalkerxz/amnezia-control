@@ -205,7 +205,7 @@ class VPNClientService:
         host_candidates = [server.public_endpoint_host, server.host, protocol.runtime_metadata.get("public_host", "")]
         host = next((h for h in host_candidates if cls._is_public_endpoint_host(h)), "")
         if not host:
-            raise RuntimeError("Public endpoint host is not discovered. Set server.public_endpoint_host or configure public server.host.")
+            raise RuntimeError("Public endpoint is not configured. Set public_endpoint_host in Server (Django admin) or provide public server.host, then run runtime sync.")
 
         port = server.public_endpoint_port or protocol.runtime_metadata.get("udp_port")
         if not port:
@@ -228,17 +228,12 @@ class VPNClientService:
 
     @staticmethod
     def build_awg2_client_config(*, private_key: str, address: str, endpoint: str, server_public_key: str, awg2_metadata: dict) -> str:
-        required = ("S1", "S2", "H1", "H2", "H3", "H4")
+        required = ("I1", "I2", "I3", "I4", "I5", "S1", "S2", "S3", "S4", "Jc", "Jmin", "Jmax", "H1", "H2", "H3", "H4")
         missing = [k for k in required if not awg2_metadata.get(k)]
         if missing:
             raise RuntimeError(f"AWG2 metadata is incomplete: missing {', '.join(missing)}. Run runtime sync and verify live AWG2 config.")
 
-        optional = []
-        for key in ("JC", "JMIN", "JMAX"):
-            if awg2_metadata.get(key):
-                optional.append(f"{key} = {awg2_metadata[key]}")
-
-        awg2_lines = [f"{k} = {awg2_metadata[k]}" for k in required] + optional
+        awg2_lines = [f"{k} = {awg2_metadata[k]}" for k in required]
         return (
             "[Interface]\n"
             f"PrivateKey = {private_key}\n"

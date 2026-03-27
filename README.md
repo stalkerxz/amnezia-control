@@ -44,8 +44,8 @@ docker compose exec web python manage.py createsuperuser
 
 ### AWG vs AWG2 export
 - AWG legacy: отдельный билдер конфига.
-- AWG2: отдельный билдер, который **требует** обнаруженные AWG2 metadata параметры.
-- Если AWG2 metadata отсутствует/неполная — экспорт AWG2 явно блокируется ошибкой (без фейкового WireGuard fallback).
+- AWG2: отдельный билдер, который **требует полный набор** параметров: `I1-I5`, `S1-S4`, `Jc`, `Jmin`, `Jmax`, `H1-H4`.
+- Если любой обязательный AWG2 параметр отсутствует — экспорт AWG2 блокируется явной ошибкой с перечнем недостающих ключей (без фейкового WireGuard fallback).
 
 ## Безопасность
 - строгая проверка SSH host key (`RejectPolicy` по умолчанию);
@@ -69,3 +69,7 @@ make test
 make logs
 make down
 ```
+
+
+### Endpoint readiness flow
+Если сервер локальный (`127.0.0.1`/`localhost`) и runtime не дал публичный host, оператор должен один раз заполнить `public_endpoint_host` (и опционально `public_endpoint_port`) в Server через Django Admin. После этого экспорт конфигов выполняется без ручного редактирования endpoint.
