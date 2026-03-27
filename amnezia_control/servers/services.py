@@ -75,6 +75,19 @@ class ServerService:
                     listen_port = None
         return subnet, listen_port
 
+
+    @staticmethod
+    def _is_public_host(value: str) -> bool:
+        if not value:
+            return False
+        value = value.strip().lower()
+        if value in {"localhost", "127.0.0.1", "0.0.0.0"}:
+            return False
+        try:
+            return ipaddress.ip_address(value).is_global
+        except ValueError:
+            return bool(re.fullmatch(r"[a-z0-9.-]+", value))
+
     @classmethod
     def _normalize_awg2_key(cls, key: str) -> str:
         compact = re.sub(r"[^A-Za-z0-9]", "", key).upper().replace("AWG2", "")
@@ -155,15 +168,24 @@ class ServerService:
                     awg2_meta, awg2_missing = cls._parse_awg2_metadata(config_env, raw_iface_conf)
 
                 protocol.container_status = inspect_data[0].get("State", {}).get("Status", "unknown")
+                udp_port = cls._parse_udp_port(inspect_data) or listen_port
+                discovered_public_host = cls._parse_public_host(inspect_data)
+                endpoint_host_ready = cls._is_public_host(server.public_endpoint_host) or cls._is_public_host(server.host) or cls._is_public_host(discovered_public_host)
+                endpoint_port_ready = bool(server.public_endpoint_port or udp_port)
+                subnet_ready = bool(subnet)
+
                 protocol.runtime_metadata = {
-                    "udp_port": cls._parse_udp_port(inspect_data) or listen_port,
-                    "public_host": cls._parse_public_host(inspect_data),
+                    "udp_port": udp_port,
+                    "public_host": discovered_public_host,
                     "image": inspect_data[0].get("Config", {}).get("Image", ""),
                     "mounts": [m.get("Destination", "") for m in inspect_data[0].get("Mounts", [])],
                     "env": config_env,
                     "interface": iface,
                     "peer_count": peer_count,
                     "subnet": subnet,
+                    "subnet_ready": subnet_ready,
+                    "endpoint_host_ready": endpoint_host_ready,
+                    "endpoint_port_ready": endpoint_port_ready,
                     "awg2_metadata": awg2_meta,
                     "awg2_missing_keys": awg2_missing,
                     "awg2_metadata_ready": not awg2_missing if protocol_type == ServerProtocol.ProtocolType.AWG2 else True,

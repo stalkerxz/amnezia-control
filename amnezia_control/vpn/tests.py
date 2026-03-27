@@ -99,6 +99,16 @@ class VPNClientFlowTest(TestCase):
                 VPNClientService.create_client(server=self.server, name="awg2-broken", protocol_type=VPNClient.ProtocolType.AWG2, actor=self.user)
 
 
+
+    def test_awg2_export_fails_when_subnet_missing(self):
+        from unittest.mock import patch
+
+        self.awg2_protocol.runtime_metadata.pop("subnet", None)
+        self.awg2_protocol.save(update_fields=["runtime_metadata"])
+        with patch("vpn.services.RuntimeCommandService.run", side_effect=self._mock_run):
+            with self.assertRaises(RuntimeError):
+                VPNClientService.create_client(server=self.server, name="awg2-no-subnet", protocol_type=VPNClient.ProtocolType.AWG2, actor=self.user)
+
     def test_export_succeeds_with_runtime_public_host(self):
         from unittest.mock import patch
 

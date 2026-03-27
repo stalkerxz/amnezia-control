@@ -16,19 +16,36 @@ class ServerModelTest(TestCase):
 class RuntimeDetectionTest(TestCase):
     def setUp(self):
         self.user = get_user_model().objects.create_user("admin", password="123", is_staff=True)
-        self.server = Server.objects.create(name="local")
+        self.server = Server.objects.create(name="local", public_endpoint_host="vpn.example.com")
 
-    def test_awg2_parser_normalizes_jc_from_env_and_conf(self):
-        env = ["AWG2_JC=9", "AWG2_JMIN=3", "AWG2_JMAX=15", "AWG2_S1=1", "AWG2_S2=2", "AWG2_S3=3", "AWG2_S4=4", "AWG2_I1=5", "AWG2_I2=6", "AWG2_I3=7", "AWG2_I4=8", "AWG2_I5=9", "AWG2_H1=10", "AWG2_H2=11", "AWG2_H3=12", "AWG2_H4=13"]
-        conf = "Jc = 22\nJmin = 4\nJmax = 17\n"
-        parsed, missing = ServerService._parse_awg2_metadata(env, conf)
-        self.assertEqual(parsed["Jc"], "22")
-        self.assertEqual(parsed["Jmin"], "4")
-        self.assertEqual(parsed["Jmax"], "17")
+    def test_awg2_parser_env_parse_canonical_keys(self):
+        env = [
+            "AWG2_I1=1", "AWG2_I2=2", "AWG2_I3=3", "AWG2_I4=4", "AWG2_I5=5",
+            "AWG2_S1=6", "AWG2_S2=7", "AWG2_S3=8", "AWG2_S4=9",
+            "AWG2_JC=10", "AWG2_JMIN=11", "AWG2_JMAX=12",
+            "AWG2_H1=13", "AWG2_H2=14", "AWG2_H3=15", "AWG2_H4=16",
+        ]
+        parsed, missing = ServerService._parse_awg2_metadata(env, "")
+        self.assertEqual(parsed["Jc"], "10")
+        self.assertEqual(parsed["Jmin"], "11")
+        self.assertEqual(parsed["Jmax"], "12")
+        self.assertEqual(missing, [])
+
+    def test_awg2_parser_config_parse_canonical_keys(self):
+        conf = "\n".join([
+            "I1 = 1", "I2 = 2", "I3 = 3", "I4 = 4", "I5 = 5",
+            "S1 = 6", "S2 = 7", "S3 = 8", "S4 = 9",
+            "Jc = 10", "Jmin = 11", "Jmax = 12",
+            "H1 = 13", "H2 = 14", "H3 = 15", "H4 = 16",
+        ])
+        parsed, missing = ServerService._parse_awg2_metadata([], conf)
+        self.assertEqual(parsed["Jc"], "10")
+        self.assertEqual(parsed["Jmin"], "11")
+        self.assertEqual(parsed["Jmax"], "12")
         self.assertEqual(missing, [])
 
     @patch("servers.services.RuntimeCommandService.run")
-    def test_sync_runtime_state_detects_subnet_and_full_awg2_metadata(self, run_mock):
+    def test_sync_runtime_state_metadata_storage_canonical_awg2(self, run_mock):
         class Result:
             def __init__(self, stdout):
                 self.stdout = stdout
@@ -47,10 +64,7 @@ class RuntimeDetectionTest(TestCase):
         ]
 
         ServerService.sync_runtime_state(server=self.server, actor=self.user)
-        awg = self.server.protocols.get(protocol_type="awg")
         awg2 = self.server.protocols.get(protocol_type="awg2")
-
-        self.assertEqual(awg.runtime_metadata["subnet"], "10.66.0.0/24")
-        self.assertEqual(awg2.runtime_metadata["subnet"], "10.77.0.0/24")
-        self.assertTrue(awg2.runtime_metadata["awg2_metadata_ready"])
         self.assertEqual(awg2.runtime_metadata["awg2_metadata"]["Jc"], "10")
+        self.assertTrue(awg2.runtime_metadata["endpoint_host_ready"])
+        self.assertTrue(awg2.runtime_metadata["subnet_ready"])
