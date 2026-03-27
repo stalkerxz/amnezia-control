@@ -1,6 +1,9 @@
-.PHONY: up down logs migrate superuser seed test
+.PHONY: up up-proxy down logs migrate superuser seed seed-demo-admin test
 up:
 	docker compose up -d --build
+
+up-proxy:
+	docker compose -f docker-compose.yml -f docker-compose.proxy.yml up -d --build
 
 down:
 	docker compose down
@@ -16,6 +19,9 @@ superuser:
 
 seed:
 	docker compose exec web python manage.py seed_demo
+
+seed-demo-admin:
+	docker compose exec web python manage.py seed_demo --with-demo-admin
 
 test:
 	docker compose exec web python manage.py test

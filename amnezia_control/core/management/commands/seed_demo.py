@@ -4,13 +4,21 @@ from servers.models import ProtocolProfile, Server, ServerProtocol
 
 
 class Command(BaseCommand):
-    help = "Seed demo data"
+    help = "Seed demo protocol/server data (optional demo admin with --with-demo-admin)"
+
+    def add_arguments(self, parser):
+        parser.add_argument(
+            "--with-demo-admin",
+            action="store_true",
+            help="Create demo admin/admin12345 (development only)",
+        )
 
     def handle(self, *args, **options):
-        User = get_user_model()
-        if not User.objects.filter(username="admin").exists():
-            User.objects.create_superuser("admin", "admin@example.com", "admin12345")
-            self.stdout.write(self.style.SUCCESS("Created admin/admin12345"))
+        if options["with_demo_admin"]:
+            User = get_user_model()
+            if not User.objects.filter(username="admin").exists():
+                User.objects.create_superuser("admin", "admin@example.com", "admin12345")
+                self.stdout.write(self.style.WARNING("Created demo admin/admin12345"))
 
         server, _ = Server.objects.get_or_create(name="Local VPS", defaults={"host": "127.0.0.1", "ssh_username": "amnezia"})
         awg_sp, _ = ServerProtocol.objects.get_or_create(server=server, protocol_type=ServerProtocol.ProtocolType.AWG)
@@ -28,4 +36,4 @@ class Command(BaseCommand):
             name="default-awg2",
             defaults={"config_template": "[Interface]\\n# {client_name}\\n# {protocol}\\nPrivateKey = changeme-awg2"},
         )
-        self.stdout.write(self.style.SUCCESS("Demo data ready"))
+        self.stdout.write(self.style.SUCCESS("Demo protocol data ready"))

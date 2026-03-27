@@ -4,37 +4,50 @@ services:
     env_file: .env
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
   redis:
     image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
   web:
     build:
       context: .
       dockerfile: Dockerfile.web
     env_file: .env
-    depends_on: [db, redis]
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     volumes:
       - ./amnezia_control:/app
-    expose:
-      - "8000"
+    ports:
+      - "127.0.0.1:${APP_PORT:-8090}:8000"
+
   worker:
     build:
       context: .
       dockerfile: Dockerfile.worker
     env_file: .env
-    depends_on: [db, redis]
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     volumes:
       - ./amnezia_control:/app
-  caddy:
-    image: caddy:2
-    depends_on: [web]
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./deploy/Caddyfile:/etc/caddy/Caddyfile
-      - caddy_data:/data
-      - caddy_config:/config
+    command: ["bash", "-lc", "python manage.py wait_for_db && celery -A amnezia_control worker -l INFO"]
+
 volumes:
   postgres_data:
-  caddy_data:
-  caddy_config:

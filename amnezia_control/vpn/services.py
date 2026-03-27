@@ -91,7 +91,6 @@ class VPNClientService:
             protocol_type=client.protocol_type,
             config_blob_encrypted=encrypted,
             config_hash=hash_value,
-            qr_payload=config,
         )
         AuditService.log(actor, "client.reissue", "VPNClient", client.id, {"revision": next_rev})
 

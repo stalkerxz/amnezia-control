@@ -15,7 +15,7 @@ class ExecutionResult:
 class SafeSSHExecutor:
     ALLOWLIST = {
         "awg": ["show", "genkey", "pubkey"],
-        "systemctl": ["status", "restart", "is-active"],
+        "systemctl": ["status", "restart", "is-active", "amnezia-awg"],
         "cat": ["/etc/amnezia"],
         "ls": ["/etc/amnezia"],
     }
@@ -42,15 +42,29 @@ class SafeSSHExecutor:
                 continue
             raise ValueError(f"Argument not allowed: {arg}")
 
+    @staticmethod
+    def _host_key_policy() -> paramiko.MissingHostKeyPolicy:
+        if os.getenv("SSH_ALLOW_UNKNOWN_HOSTS", "0") == "1":
+            # Development-only override. Keep strict checking in production.
+            return paramiko.WarningPolicy()
+        return paramiko.RejectPolicy()
+
     def run(self, command: str) -> ExecutionResult:
         self._validate(command)
         client = paramiko.SSHClient()
-        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        client.load_system_host_keys()
+        known_hosts = os.path.expanduser("~/.ssh/known_hosts")
+        if os.path.exists(known_hosts):
+            client.load_host_keys(known_hosts)
+        client.set_missing_host_key_policy(self._host_key_policy())
+
         connect_kwargs = {
             "hostname": self.host,
             "username": self.username,
             "port": self.port,
             "timeout": self.timeout,
+            "allow_agent": True,
+            "look_for_keys": True,
         }
         if self.key_path:
             connect_kwargs["key_filename"] = self.key_path

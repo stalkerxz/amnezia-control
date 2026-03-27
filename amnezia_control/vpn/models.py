@@ -34,7 +34,6 @@ class ClientConfigRevision(models.Model):
     protocol_type = models.CharField(max_length=16, choices=VPNClient.ProtocolType.choices)
     config_blob_encrypted = models.TextField()
     config_hash = models.CharField(max_length=128)
-    qr_payload = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

@@ -1,117 +1,76 @@
 # amnezia-control
 
-Приватная production-ready админ-панель для управления существующим Amnezia VPN сервером (AmneziaWG/AWG + AWG2-ready), ориентированная на одного владельца.
+Приватная админ-панель для управления существующим Amnezia VPN сервером (AWG + AWG2-ready), безопасная для развертывания на VPS, где уже занят nginx на `80/443`.
+
+## Что важно для существующего VPS
+- По умолчанию **не поднимаем reverse-proxy** и **не занимаем 80/443**.
+- Web публикуется только на loopback: `127.0.0.1:${APP_PORT:-8090}`.
+- PostgreSQL и Redis доступны только внутри docker-сети.
+- Это позволяет запустить панель рядом с существующими контейнерами Amnezia без конфликта портов.
 
 ## Стек
-- Django 5
-- PostgreSQL
-- Redis
-- Celery
-- Caddy
+- Django 5, PostgreSQL, Redis, Celery, Bootstrap 5
 - Docker Compose
-- Bootstrap 5
+- (опционально) Caddy в отдельном compose-файле
 
-## Возможности v1
-- `/login` — вход
-- `/` — дашборд
-- `/servers` и `/servers/<id>` — серверы и их состояние
-- `/clients` и `/clients/<id>` — список/карточка VPN-клиентов
-- Создание, включение, отключение, удаление клиента
-- Переиздание конфигурации
-- Скачивание конфигурации
-- Показ QR-кода
-- `/audit` — аудит действий
-- `/jobs` — журнал задач/исполнения команд
-- `/health` — health endpoint
-
-## Архитектура приложений
-- `core` — dashboard, health, seed-команда
-- `accounts` — кастомный пользователь
-- `servers` — серверы, протоколы, профили протоколов
-- `vpn` — VPN-клиенты, ревизии конфигов, генераторы AWG/AWG2
-- `audit` — аудит всех действий
-- `jobs` — задания, события, SSH executor, Celery task
-
-## Безопасность
-- Только админ-доступ (`is_staff`)
-- CSRF включен
-- Secure cookie/HTTPS в prod settings
-- Конфиги клиентов шифруются в БД (`CONFIG_ENCRYPTION_KEY`, Fernet)
-- SSH команды allowlist-only (никакого произвольного shell из UI)
-- stdout/stderr/exit code сохраняются в `JobEvent`
-- Приватные ключи не пишутся в логи
-
-## Быстрый старт локально
+## Быстрый запуск (без конфликтов с nginx/Amnezia)
 ```bash
 cp .env.example .env
-# Сгенерируйте CONFIG_ENCRYPTION_KEY и вставьте в .env
 python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+# вставьте ключ в CONFIG_ENCRYPTION_KEY в .env
 
 docker compose up -d --build
 ```
 
-После старта:
+Проверка доступности:
+- `http://127.0.0.1:8090/login/` (или порт из `APP_PORT`)
+
+## Первый запуск (обязательно вручную)
 ```bash
 docker compose exec web python manage.py migrate
+docker compose exec web python manage.py createsuperuser
+```
+
+Демо-данные протоколов/сервера (без создания пользователя):
+```bash
 docker compose exec web python manage.py seed_demo
 ```
 
-Открыть: `http://localhost/login/`
-
-Демо-логин (если `seed_demo` создал):
-- user: `admin`
-- password: `admin12345`
-
-## Деплой на Ubuntu 24.04 (copy-paste)
+Создание демонстрационного `admin/admin12345` только по явному запросу (dev only):
 ```bash
-sudo apt update
-sudo apt install -y ca-certificates curl git docker.io docker-compose-plugin
-sudo systemctl enable --now docker
-
-cd /opt
-sudo git clone <YOUR_REPO_URL> amnezia-control
-cd amnezia-control
-sudo cp .env.example .env
-
-# Вставьте корректные значения в .env
-sudo nano .env
-
-# Ключ шифрования
-python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
-
-sudo docker compose up -d --build
-sudo docker compose exec web python manage.py migrate
-sudo docker compose exec web python manage.py seed_demo
+docker compose exec web python manage.py seed_demo --with-demo-admin
 ```
 
-## SSH execution model
-- V1 работает с текущим VPS по SSH (включая localhost по SSH).
-- Реализован `SafeSSHExecutor` на Paramiko с allowlist-командами.
-- `Job` + `JobEvent` сохраняют историю исполнения.
-- Архитектура готова к добавлению удалённых серверов.
+## Optional proxy
+Если нужен Caddy, используйте отдельный файл:
+```bash
+docker compose -f docker-compose.yml -f docker-compose.proxy.yml up -d --build
+```
 
-## AWG / AWG2 стратегия
-- `ServerProtocol` + `ProtocolProfile` разделяют профили по `protocol_type`.
-- `ClientConfigRevision` хранит ревизии отдельно по протоколу.
-- `GeneratorFactory` выбирает генератор (`AWGGenerator`, `AWG2Generator`).
-- Низкоуровневые AWG2 шаги можно расширить без ломки legacy AWG.
+## SSH security
+`SafeSSHExecutor` использует strict host key verification:
+- загружает system/user known_hosts,
+- неизвестные хосты отклоняются (RejectPolicy) по умолчанию.
+
+Только для dev можно временно ослабить:
+```env
+SSH_ALLOW_UNKNOWN_HOSTS=1
+```
+
+## AWG / AWG2 и секреты конфигов
+- Профили разделены по `protocol_type` (`awg`/`awg2`).
+- Ревизии конфигов разделены по протоколу.
+- Конфиги хранятся в БД только в зашифрованном виде.
+- QR код генерируется в памяти на лету из расшифрованного активного конфига (plaintext не хранится отдельным полем).
 
 ## Полезные команды
 ```bash
 make up
+make up-proxy
 make migrate
+make superuser
 make seed
 make test
 make logs
 make down
-```
-
-## Тесты
-Покрыты базовые сценарии:
-- model tests
-- SSH executor test (mock Paramiko)
-- client creation flow test
-
-```bash
-docker compose exec web python manage.py test
 ```
