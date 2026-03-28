@@ -168,10 +168,10 @@ class BaseProtocolAdapter:
             peers = self.list_peers(actor)
         except Exception:
             return None
+        if peers is None:
+            return None
         if not peers:
             return {}
-        if all(peer.transfer_total == 0 for peer in peers):
-            return None
         return {peer.public_key: peer.transfer_total for peer in peers}
 
     def _next_address(self, actor) -> str:
@@ -253,6 +253,15 @@ class AdapterFactory:
 
 
 class VPNClientService:
+    @staticmethod
+    def get_limit_state(client: VPNClient, now=None):
+        current_time = now or timezone.now()
+        if client.expires_at and client.expires_at <= current_time:
+            return VPNClient.LimitState.EXPIRED
+        if client.traffic_limit_bytes and client.traffic_used_bytes >= client.traffic_limit_bytes:
+            return VPNClient.LimitState.TRAFFIC_EXCEEDED
+        return VPNClient.LimitState.ACTIVE
+
     @staticmethod
     def _is_public_endpoint_host(value: str) -> bool:
         if not value:
@@ -409,9 +418,20 @@ class VPNClientService:
                 client.limit_state = VPNClient.LimitState.TRAFFIC_EXCEEDED
                 update_fields.append("limit_state")
         elif status == VPNClient.Status.ACTIVE:
-            client.disable_reason = VPNClient.DisableReason.NONE
-            client.limit_state = VPNClient.LimitState.ACTIVE
-            update_fields.extend(["disable_reason", "limit_state"])
+            resolved_state = VPNClientService.get_limit_state(client)
+            if resolved_state == VPNClient.LimitState.ACTIVE:
+                client.disable_reason = VPNClient.DisableReason.NONE
+                client.limit_state = VPNClient.LimitState.ACTIVE
+                update_fields.extend(["disable_reason", "limit_state"])
+            else:
+                client.status = VPNClient.Status.DISABLED
+                client.limit_state = resolved_state
+                client.disable_reason = (
+                    VPNClient.DisableReason.EXPIRED
+                    if resolved_state == VPNClient.LimitState.EXPIRED
+                    else VPNClient.DisableReason.TRAFFIC_EXCEEDED
+                )
+                update_fields.extend(["disable_reason", "limit_state"])
 
         client.save(update_fields=update_fields)
         details = {"disable_reason": client.disable_reason} if status == VPNClient.Status.DISABLED else None
@@ -474,12 +494,7 @@ class VPNClientService:
 class VPNClientLimitsService:
     @staticmethod
     def _set_limit_state(client: VPNClient):
-        now = timezone.now()
-        if client.expires_at and client.expires_at <= now:
-            return VPNClient.LimitState.EXPIRED
-        if client.traffic_limit_bytes and client.traffic_used_bytes >= client.traffic_limit_bytes:
-            return VPNClient.LimitState.TRAFFIC_EXCEEDED
-        return VPNClient.LimitState.ACTIVE
+        return VPNClientService.get_limit_state(client)
 
     @staticmethod
     def sync_traffic_usage(*, actor=None):
