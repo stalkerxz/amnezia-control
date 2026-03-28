@@ -14,11 +14,13 @@
 </div></div>
 
 <table class="table align-middle">
-  <tr><th>Протокол</th><th>Config path</th><th>Subnet</th><th>UDP</th><th>Endpoint host</th><th>Endpoint port</th><th>AWG2 metadata</th><th>Missing required</th><th>Missing optional</th><th>Active keys</th></tr>
+  <tr><th>Протокол</th><th>Config path</th><th>Peer source</th><th>Peers</th><th>Subnet</th><th>UDP</th><th>Endpoint host</th><th>Endpoint port</th><th>AWG2 metadata</th><th>Missing required</th><th>Missing optional</th><th>Active keys</th></tr>
   {% for p in protocols %}
   <tr>
     <td><span class="badge {% if p.protocol_type == 'awg2' %}text-bg-info{% else %}text-bg-secondary{% endif %}">{{ p.protocol_type|upper }}</span></td>
     <td><code>{{ p.runtime_metadata.config_path|default:"—" }}</code></td>
+    <td><code>{{ p.runtime_metadata.peer_source|default:"—" }}</code></td>
+    <td>{{ p.runtime_metadata.peer_count|default:'—' }}</td>
     <td>{% if p.runtime_metadata.subnet_ready %}<span class="badge text-bg-success">{{ p.runtime_metadata.subnet }}</span>{% else %}<span class="badge text-bg-warning">не обнаружено</span>{% endif %}</td>
     <td>{{ p.runtime_metadata.udp_port|default:'—' }}</td>
     <td>{% if p.runtime_metadata.endpoint_host_ready %}<span class="badge text-bg-success">ok</span>{% else %}<span class="badge text-bg-warning">missing</span>{% endif %}<br><small>{{ p.runtime_metadata.public_host|default:'—' }}</small></td>
@@ -29,7 +31,7 @@
     <td>{% if p.protocol_type == 'awg2' and p.runtime_metadata.awg2_active_keys %}<code>{{ p.runtime_metadata.awg2_active_keys|join:', ' }}</code>{% else %}—{% endif %}</td>
   </tr>
   {% empty %}
-    <tr><td colspan="10"><div class="empty-state">Протоколы не обнаружены. Нажмите «Синхронизировать runtime».</div></td></tr>
+    <tr><td colspan="12"><div class="empty-state">Протоколы не обнаружены. Нажмите «Синхронизировать runtime».</div></td></tr>
   {% endfor %}
 </table>
 {% endblock %}

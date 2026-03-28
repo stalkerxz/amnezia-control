@@ -130,6 +130,29 @@ class ServerService:
             f"/etc/wireguard/{iface}.conf",
         ]
 
+    @staticmethod
+    def _parse_peers_from_config_text(raw_conf: str):
+        peers = []
+        section = ""
+        current = {}
+        for line in raw_conf.splitlines():
+            text = line.strip()
+            if not text or text.startswith("#"):
+                continue
+            if text.startswith("[") and text.endswith("]"):
+                if section.lower() == "[peer]" and current.get("PublicKey") and current.get("AllowedIPs"):
+                    peers.append({"public_key": current["PublicKey"], "allowed_ips": current["AllowedIPs"]})
+                section = text
+                current = {}
+                continue
+            if "=" not in text or section.lower() != "[peer]":
+                continue
+            k, v = text.split("=", 1)
+            current[k.strip()] = v.strip()
+        if section.lower() == "[peer]" and current.get("PublicKey") and current.get("AllowedIPs"):
+            peers.append({"public_key": current["PublicKey"], "allowed_ips": current["AllowedIPs"]})
+        return peers
+
     @classmethod
     def sync_runtime_state(cls, *, server: Server, actor):
         all_names = RuntimeCommandService.run(server, actor, "runtime.ps_all", "docker ps -a --format '{{.Names}}'").stdout.splitlines()
@@ -146,6 +169,7 @@ class ServerService:
 
                 iface = ""
                 peer_count = 0
+                peer_source = "none"
                 raw_iface_conf = ""
                 config_path = ""
                 if container_name in running_names:
@@ -153,9 +177,11 @@ class ServerService:
                         iface = RuntimeCommandService.run(server, actor, f"runtime.iface.{protocol_type}", f"docker exec {container_name} wg show interfaces").stdout.strip().split()[0]
                         dump = RuntimeCommandService.run(server, actor, f"runtime.peers.{protocol_type}", f"docker exec {container_name} wg show dump").stdout
                         peer_count = sum(1 for line in dump.splitlines() if len(line.split("\t")) >= 8)
+                        peer_source = "runtime_wg_dump"
                     except Exception:
                         iface = ""
                         peer_count = 0
+                        peer_source = "runtime_wg_dump_failed"
 
                     for path in cls._candidate_config_paths(iface or "wg0"):
                         try:
@@ -165,6 +191,10 @@ class ServerService:
                                 break
                         except Exception:
                             continue
+                    if protocol_type == ServerProtocol.ProtocolType.AWG2 and raw_iface_conf:
+                        if peer_source != "runtime_wg_dump":
+                            peer_count = len(cls._parse_peers_from_config_text(raw_iface_conf))
+                            peer_source = "config_file_fallback"
 
                 subnet, listen_port = cls._parse_interface_metadata(raw_iface_conf)
                 awg2_meta, awg2_required_missing, awg2_optional_missing = ({}, [], [])
@@ -187,6 +217,7 @@ class ServerService:
                     "env": config_env,
                     "interface": iface,
                     "peer_count": peer_count,
+                    "peer_source": peer_source,
                     "subnet": subnet,
                     "subnet_ready": subnet_ready,
                     "endpoint_host_ready": endpoint_host_ready,

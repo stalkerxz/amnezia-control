@@ -101,16 +101,51 @@ class BaseProtocolAdapter:
         return self._run(actor, f"{self.protocol_type}.server_pub", self._wg_cmd(f"show {iface} public-key")).stdout.strip()
 
     def list_peers(self, actor):
-        out = self._run(actor, f"{self.protocol_type}.list", self._wg_cmd("show dump")).stdout
+        try:
+            out = self._run(actor, f"{self.protocol_type}.list", self._wg_cmd("show dump")).stdout
+            peers = []
+            for line in out.splitlines():
+                cols = line.split("\t")
+                if len(cols) >= 8:
+                    public_key = cols[0].strip()
+                    allowed_ips = cols[3].strip()
+                    if public_key:
+                        peers.append(PeerState(public_key=public_key, allowed_ips=allowed_ips))
+            return peers
+        except RuntimeError:
+            if self.protocol_type != VPNClient.ProtocolType.AWG2:
+                raise
+            return self._list_peers_from_config(actor)
+
+    @staticmethod
+    def _parse_peers_from_config_text(raw_conf: str):
         peers = []
-        for line in out.splitlines():
-            cols = line.split("\t")
-            if len(cols) >= 8:
-                public_key = cols[0].strip()
-                allowed_ips = cols[3].strip()
-                if public_key:
-                    peers.append(PeerState(public_key=public_key, allowed_ips=allowed_ips))
+        section = ""
+        current = {}
+        for line in raw_conf.splitlines():
+            text = line.strip()
+            if not text or text.startswith("#"):
+                continue
+            if text.startswith("[") and text.endswith("]"):
+                if section.lower() == "[peer]" and current.get("PublicKey") and current.get("AllowedIPs"):
+                    peers.append(PeerState(public_key=current["PublicKey"], allowed_ips=current["AllowedIPs"]))
+                section = text
+                current = {}
+                continue
+            if "=" not in text or section.lower() != "[peer]":
+                continue
+            k, v = text.split("=", 1)
+            current[k.strip()] = v.strip()
+        if section.lower() == "[peer]" and current.get("PublicKey") and current.get("AllowedIPs"):
+            peers.append(PeerState(public_key=current["PublicKey"], allowed_ips=current["AllowedIPs"]))
         return peers
+
+    def _list_peers_from_config(self, actor):
+        config_path = self.protocol.runtime_metadata.get("config_path", "")
+        if not config_path:
+            return []
+        raw_conf = self._run(actor, f"{self.protocol_type}.list_fallback_conf", f"docker exec {self.container} cat {config_path}").stdout
+        return self._parse_peers_from_config_text(raw_conf)
 
     def _next_address(self, actor) -> str:
         subnet_text = self.protocol.runtime_metadata.get("subnet", "")
@@ -123,11 +158,15 @@ class BaseProtocolAdapter:
 
         used = set()
         for peer in self.list_peers(actor):
-            try:
-                ip = peer.allowed_ips.split(",")[0].split("/")[0]
-                used.add(ipaddress.ip_address(ip))
-            except ValueError:
-                continue
+            for token in peer.allowed_ips.split(","):
+                value = token.strip()
+                if not value:
+                    continue
+                try:
+                    iface = ipaddress.ip_interface(value if "/" in value else f"{value}/32")
+                    used.add(iface.ip)
+                except ValueError:
+                    continue
 
         for host in subnet.hosts():
             if host not in used:

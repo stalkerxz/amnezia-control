@@ -5,7 +5,7 @@ from servers.models import ProtocolProfile, Server, ServerProtocol
 from servers.services import ServerService
 
 from .models import VPNClient
-from .services import AdapterFactory, VPNClientService
+from .services import AWG2Adapter, AdapterFactory, VPNClientService
 
 
 @override_settings(CONFIG_ENCRYPTION_KEY=Fernet.generate_key().decode())
@@ -168,3 +168,70 @@ class VPNClientFlowTest(TestCase):
         awg2_adapter = AdapterFactory.get_for_server(self.server, VPNClient.ProtocolType.AWG2)
         self.assertEqual(awg_adapter.command_bin, "wg")
         self.assertEqual(awg2_adapter.command_bin, "wg")
+
+    def test_parse_peers_from_config_text(self):
+        raw_conf = (
+            "[Interface]\nAddress = 10.77.0.1/24\n"
+            "[Peer]\nPublicKey = pk1\nAllowedIPs = 10.77.0.10/32\n"
+            "[Peer]\nPublicKey = pk2\nAllowedIPs = 10.77.0.11/32, 10.77.0.12/32\n"
+        )
+        peers = AWG2Adapter._parse_peers_from_config_text(raw_conf)
+        self.assertEqual(len(peers), 2)
+        self.assertEqual(peers[0].public_key, "pk1")
+        self.assertIn("10.77.0.11/32", peers[1].allowed_ips)
+
+    def test_next_address_uses_all_allowed_ips_tokens(self):
+        from unittest.mock import patch
+
+        self.awg2_protocol.runtime_metadata["subnet"] = "10.77.0.0/29"
+        self.awg2_protocol.save(update_fields=["runtime_metadata"])
+
+        class R:
+            def __init__(self, stdout):
+                self.stdout = stdout
+
+        def run_side_effect(*args, **kwargs):
+            action = args[2]
+            mapping = {
+                "awg2.list": R(
+                    "peerA\tpsk\tep\t10.77.0.2/32,10.77.0.3/32\t0\t0\t0\t25\n"
+                    "peerB\tpsk\tep\t10.77.0.4/32\t0\t0\t0\t25\n"
+                )
+            }
+            return mapping[action]
+
+        with patch("vpn.services.RuntimeCommandService.run", side_effect=run_side_effect):
+            adapter = AdapterFactory.get_for_server(self.server, VPNClient.ProtocolType.AWG2)
+            self.assertEqual(adapter._next_address(self.user), "10.77.0.1")
+
+    def test_awg2_client_creation_falls_back_to_config_peers_when_dump_fails(self):
+        from unittest.mock import patch
+
+        self.awg2_protocol.runtime_metadata["config_path"] = "/opt/amnezia/awg/awg0.conf"
+        self.awg2_protocol.runtime_metadata["subnet"] = "10.77.0.0/24"
+        self.awg2_protocol.save(update_fields=["runtime_metadata"])
+
+        class R:
+            def __init__(self, stdout):
+                self.stdout = stdout
+
+        def run_side_effect(*args, **kwargs):
+            action = args[2]
+            if action == "awg2.list":
+                raise RuntimeError("Unable to access interface: Protocol not supported")
+            mapping = {
+                "awg2.iface": R("wg0\n"),
+                "awg2.genkey": R("client2-private-key==\n"),
+                "awg2.pubkey": R("client2-public-key==\n"),
+                "awg2.list_fallback_conf": R(
+                    "[Interface]\nAddress = 10.77.0.1/24\n"
+                    "[Peer]\nPublicKey = oldpeer\nAllowedIPs = 10.77.0.10/32\n"
+                ),
+                "awg2.add_peer": R(""),
+                "awg2.server_pub": R("server2-public-key==\n"),
+            }
+            return mapping[action]
+
+        with patch("vpn.services.RuntimeCommandService.run", side_effect=run_side_effect):
+            client = VPNClientService.create_client(server=self.server, name="awg2-fallback", protocol_type=VPNClient.ProtocolType.AWG2, actor=self.user)
+        self.assertTrue(client.runtime_address)
