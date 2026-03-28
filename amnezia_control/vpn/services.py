@@ -434,8 +434,8 @@ class VPNClientService:
                 update_fields.extend(["disable_reason", "limit_state"])
 
         client.save(update_fields=update_fields)
-        details = {"disable_reason": client.disable_reason} if status == VPNClient.Status.DISABLED else None
-        AuditService.log(actor, f"client.{status}", "VPNClient", client.id, details=details)
+        details = {"disable_reason": client.disable_reason} if client.status == VPNClient.Status.DISABLED else None
+        AuditService.log(actor, f"client.{client.status}", "VPNClient", client.id, details=details)
 
     @staticmethod
     def latest_config(client: VPNClient) -> str:

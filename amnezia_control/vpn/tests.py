@@ -1,4 +1,5 @@
 from cryptography.fernet import Fernet
+from audit.models import AuditLog
 from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
 from django.utils import timezone
@@ -343,3 +344,19 @@ class VPNClientLimitsTest(TestCase):
         self.assertEqual(client.status, VPNClient.Status.ACTIVE)
         self.assertEqual(client.disable_reason, VPNClient.DisableReason.NONE)
         self.assertEqual(client.limit_state, VPNClient.LimitState.ACTIVE)
+
+    def test_reactivate_with_violated_limit_logs_disabled_action(self):
+        client = self._make_client(
+            expires_at=timezone.now() - timezone.timedelta(minutes=1),
+            disable_reason=VPNClient.DisableReason.EXPIRED,
+            limit_state=VPNClient.LimitState.EXPIRED,
+        )
+
+        VPNClientService.set_status(client=client, status=VPNClient.Status.ACTIVE, actor=self.user)
+        client.refresh_from_db()
+        latest_log = AuditLog.objects.first()
+
+        self.assertEqual(client.status, VPNClient.Status.DISABLED)
+        self.assertIsNotNone(latest_log)
+        self.assertEqual(latest_log.action, "client.disabled")
+        self.assertEqual(latest_log.details.get("disable_reason"), VPNClient.DisableReason.EXPIRED)
