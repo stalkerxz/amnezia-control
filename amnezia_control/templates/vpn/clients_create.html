@@ -1,9 +1,36 @@
 {% extends 'partials/base.html' %}
 {% block content %}
-<h1 class="h3">Создать клиента</h1>
+<h1 class="h3 mb-3">Создать клиента</h1>
 <form method="post" class="card card-body">
-{% csrf_token %}
-{{ form.as_p }}
-<button class="btn btn-success">Создать</button>
+  {% csrf_token %}
+  <div class="mb-3">
+    <label for="server" class="form-label">Сервер</label>
+    <select id="server" name="server" class="form-select" required>
+      {% for server in servers %}
+        <option value="{{ server.id }}" {% if selected_server_id == server.id|stringformat:'s' %}selected{% endif %}>{{ server.name }} ({{ server.host }})</option>
+      {% endfor %}
+    </select>
+    <div class="form-text">Выберите сервер для выпуска конфига клиента.</div>
+  </div>
+
+  <div class="mb-3">
+    <label for="{{ form.name.id_for_label }}" class="form-label">{{ form.name.label }}</label>
+    {{ form.name }}
+    {% if form.name.errors %}<div class="text-danger small mt-1">{{ form.name.errors|striptags }}</div>{% endif %}
+    <div class="form-text">{{ form.name.help_text }}</div>
+  </div>
+
+  <div class="mb-3">
+    <label for="{{ form.protocol_type.id_for_label }}" class="form-label">{{ form.protocol_type.label }}</label>
+    {{ form.protocol_type }}
+    {% if form.protocol_type.errors %}<div class="text-danger small mt-1">{{ form.protocol_type.errors|striptags }}</div>{% endif %}
+    <div class="form-text">{{ form.protocol_type.help_text }}</div>
+  </div>
+
+  <div class="alert alert-secondary mb-3">
+    <strong>Подсказка:</strong> при выборе AWG2 нужны endpoint и metadata после runtime sync.
+  </div>
+
+  <button class="btn btn-success">Создать</button>
 </form>
 {% endblock %}

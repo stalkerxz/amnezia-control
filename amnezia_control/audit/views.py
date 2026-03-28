@@ -1,5 +1,6 @@
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.shortcuts import render
+
 from .models import AuditLog
 
 
@@ -11,7 +12,7 @@ def _admin_required(user):
 @user_passes_test(_admin_required)
 def audit_list_view(request):
     q = request.GET.get("q", "").strip()
-    logs = AuditLog.objects.all()
+    logs = AuditLog.objects.select_related("actor")
     if q:
         logs = logs.filter(action__icontains=q)
     return render(request, "audit/list.html", {"logs": logs[:200], "q": q})

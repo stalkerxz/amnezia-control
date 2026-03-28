@@ -13,20 +13,21 @@
 <div class="d-flex">
   <aside class="sidebar p-3">
     <a class="brand d-block mb-4" href="/">amnezia-control</a>
+    <div class="sidebar-caption mb-2">Операторская консоль</div>
     <nav class="nav flex-column gap-1">
-      <a class="nav-link" href="/">Дашборд</a>
-      <a class="nav-link" href="/servers/">Серверы</a>
-      <a class="nav-link" href="/clients/">Клиенты</a>
-      <a class="nav-link" href="/jobs/">Задания</a>
-      <a class="nav-link" href="/audit/">Аудит</a>
+      <a class="nav-link {% if request.path == '/' %}active{% endif %}" href="/">Дашборд</a>
+      <a class="nav-link {% if '/servers/' in request.path %}active{% endif %}" href="/servers/">Серверы</a>
+      <a class="nav-link {% if '/clients/' in request.path %}active{% endif %}" href="/clients/">Клиенты</a>
+      <a class="nav-link {% if '/jobs/' in request.path %}active{% endif %}" href="/jobs/">Задания</a>
+      <a class="nav-link {% if '/audit/' in request.path %}active{% endif %}" href="/audit/">Аудит</a>
       <hr>
       <a class="nav-link text-secondary" href="/admin/">Django Admin (тех.)</a>
       <a class="nav-link text-danger" href="/logout/">Выход</a>
     </nav>
   </aside>
-  <main class="content flex-grow-1 p-4">
+  <main class="content flex-grow-1 p-4 p-xl-5">
     {% for message in messages %}
-      <div class="alert alert-info">{{ message }}</div>
+      <div class="alert {% if 'error' in message.tags %}alert-danger{% elif 'success' in message.tags %}alert-success{% else %}alert-info{% endif %} mb-3">{{ message }}</div>
     {% endfor %}
 {% else %}
   <main class="container py-4">

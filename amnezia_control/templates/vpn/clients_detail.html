@@ -1,22 +1,40 @@
 {% extends 'partials/base.html' %}
 {% block content %}
-<h1 class="h3 mb-3">Клиент: {{ client.name }}</h1>
+<div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-3">
+  <h1 class="h3 mb-0">Клиент: {{ client.name }}</h1>
+  <div class="d-flex gap-2 flex-wrap">
+    <form method="post" action="/clients/{{ client.id }}/action/reissue/">{% csrf_token %}<button class="btn btn-primary">Reissue config</button></form>
+    <form method="post" action="/clients/{{ client.id }}/action/disable/">{% csrf_token %}<button class="btn btn-warning">Disable</button></form>
+    <form method="post" action="/clients/{{ client.id }}/action/delete/" onsubmit="return confirm('Удалить клиента?')">{% csrf_token %}<button class="btn btn-danger">Delete</button></form>
+  </div>
+</div>
+
+{% if blockers %}
+  {% for blocker in blockers %}<div class="alert alert-warning">{{ blocker }}</div>{% endfor %}
+{% endif %}
+
 <div class="row g-3 mb-3">
-  <div class="col-lg-6">
+  <div class="col-lg-7">
     <div class="card"><div class="card-body">
-      <h2 class="h6">Статус и runtime</h2>
-      <p>Протокол: <span class="badge {% if client.protocol_type == 'awg2' %}text-bg-info{% else %}text-bg-secondary{% endif %}">{{ client.protocol_type|upper }}</span></p>
-      <p>Статус: <span class="badge {% if client.status == 'active' %}text-bg-success{% elif client.status == 'disabled' %}text-bg-warning{% else %}text-bg-danger{% endif %}">{{ client.status }}</span></p>
-      <p class="mb-1">Peer key: <code>{{ client.runtime_peer_public_key|default:'-' }}</code></p>
-      <p class="mb-0">Address: <code>{{ client.runtime_address|default:'-' }}</code></p>
+      <h2 class="h6">Сводка клиента</h2>
+      <div class="row g-3">
+        <div class="col-md-4"><small class="text-secondary d-block">Протокол</small><span class="badge {% if client.protocol_type == 'awg2' %}text-bg-info{% else %}text-bg-secondary{% endif %}">{{ client.protocol_type|upper }}</span></div>
+        <div class="col-md-4"><small class="text-secondary d-block">Статус</small><span class="badge {% if client.status == 'active' %}text-bg-success{% elif client.status == 'disabled' %}text-bg-warning{% else %}text-bg-danger{% endif %}">{{ client.get_status_display }}</span></div>
+        <div class="col-md-4"><small class="text-secondary d-block">Created by</small>{{ client.created_by|default:'system' }}</div>
+        <div class="col-md-6"><small class="text-secondary d-block">Runtime peer public key</small><code>{{ client.runtime_peer_public_key|default:'—' }}</code></div>
+        <div class="col-md-6"><small class="text-secondary d-block">Runtime address</small><code>{{ client.runtime_address|default:'—' }}</code></div>
+        <div class="col-md-6"><small class="text-secondary d-block">Imported from runtime</small>{% if client.imported_from_runtime %}Да{% else %}Нет{% endif %}</div>
+        <div class="col-md-6"><small class="text-secondary d-block">Last runtime sync</small>{{ client.last_runtime_sync_at|date:'d.m.Y H:i'|default:'—' }}</div>
+        <div class="col-md-6"><small class="text-secondary d-block">Config revision count</small>{{ revisions_count }}</div>
+      </div>
     </div></div>
   </div>
-  <div class="col-lg-6">
-    <div class="card"><div class="card-body">
-      <h2 class="h6">Конфиг</h2>
+  <div class="col-lg-5">
+    <div class="card h-100"><div class="card-body">
+      <h2 class="h6">Текущий конфиг</h2>
       {% if revision %}
-        <p>Ревизия: <strong>#{{ revision.revision_number }}</strong> ({{ revision.created_at }})</p>
-        <a class="btn btn-primary" href="/clients/{{ client.id }}/download/">Скачать .conf</a>
+        <p>Актуальная ревизия: <strong>#{{ revision.revision_number }}</strong> от {{ revision.created_at|date:'d.m.Y H:i' }}</p>
+        <a class="btn btn-outline-light" href="/clients/{{ client.id }}/download/">Скачать .conf</a>
       {% else %}
         <div class="empty-state">Конфиг пока не выпущен.</div>
       {% endif %}
@@ -24,17 +42,30 @@
   </div>
 </div>
 
-<div class="d-flex gap-2 flex-wrap mb-3">
-<form method="post" action="/clients/{{ client.id }}/action/reissue/">{% csrf_token %}<button class="btn btn-secondary">Переиздать</button></form>
-<form method="post" action="/clients/{{ client.id }}/action/disable/">{% csrf_token %}<button class="btn btn-warning">Отключить</button></form>
-<form method="post" action="/clients/{{ client.id }}/action/enable/">{% csrf_token %}<button class="btn btn-success">Включить</button></form>
-<form method="post" action="/clients/{{ client.id }}/action/delete/" onsubmit="return confirm('Удалить клиента?')">{% csrf_token %}<button class="btn btn-danger">Удалить</button></form>
+<div class="row g-3">
+  <div class="col-lg-6" id="qr">
+    <div class="card"><div class="card-body">
+      <h2 class="h6">QR preview</h2>
+      {% if revision and qr_base64 %}
+        <img src="data:image/png;base64,{{ qr_base64 }}" alt="QR" class="img-thumbnail" style="max-width:320px;">
+      {% else %}
+        <div class="empty-state">QR появится после выпуска конфига.</div>
+      {% endif %}
+    </div></div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card"><div class="card-body">
+      <h2 class="h6">История ревизий (summary)</h2>
+      {% if revision %}
+      <ul class="mb-0">
+        <li>Текущая ревизия: #{{ revision.revision_number }}.</li>
+        <li>Всего ревизий: {{ revisions_count }}.</li>
+        <li>Хэш текущего конфига: <code>{{ revision.config_hash|slice:':20' }}...</code></li>
+      </ul>
+      {% else %}
+      <div class="empty-state">История ревизий отсутствует.</div>
+      {% endif %}
+    </div></div>
+  </div>
 </div>
-
-{% if revision and qr_base64 %}
-<div class="card"><div class="card-body">
-  <h2 class="h6">QR для подключения</h2>
-  <img src="data:image/png;base64,{{ qr_base64 }}" alt="QR" class="img-thumbnail" style="max-width:300px;">
-</div></div>
-{% endif %}
 {% endblock %}

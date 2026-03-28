@@ -1,5 +1,6 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, user_passes_test
+from django.db.models import Count
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 
@@ -17,59 +18,133 @@ def _admin_required(user):
 @user_passes_test(_admin_required)
 def clients_list_view(request):
     q = request.GET.get("q", "").strip()
-    clients = VPNClient.objects.select_related("server").order_by("-id")
+    protocol = request.GET.get("protocol", "").strip()
+    status = request.GET.get("status", "").strip()
+    source = request.GET.get("source", "").strip()
+
+    clients = VPNClient.objects.select_related("server").order_by("-created_at")
     if q:
         clients = clients.filter(name__icontains=q)
-    server = Server.objects.filter(is_enabled=True).first()
-    return render(request, "vpn/clients_list.html", {"clients": clients, "q": q, "server": server})
+    if protocol in {choice[0] for choice in VPNClient.ProtocolType.choices}:
+        clients = clients.filter(protocol_type=protocol)
+    if status in {choice[0] for choice in VPNClient.Status.choices}:
+        clients = clients.filter(status=status)
+    if source == "imported":
+        clients = clients.filter(imported_from_runtime=True)
+    elif source == "manual":
+        clients = clients.filter(imported_from_runtime=False)
+
+    filters = {
+        "q": q,
+        "protocol": protocol,
+        "status": status,
+        "source": source,
+    }
+
+    return render(
+        request,
+        "vpn/clients_list.html",
+        {
+            "clients": clients,
+            "filters": filters,
+            "protocol_choices": VPNClient.ProtocolType.choices,
+            "status_choices": VPNClient.Status.choices,
+        },
+    )
 
 
 @login_required
 @user_passes_test(_admin_required)
 def clients_import_view(request):
-    server = Server.objects.filter(is_enabled=True).first()
+    server_id = request.GET.get("server") or request.POST.get("server")
+    server = None
+    if server_id:
+        server = Server.objects.filter(pk=server_id, is_enabled=True).first()
     if not server:
-        messages.error(request, "Сервер не настроен")
+        server = Server.objects.filter(is_enabled=True).first()
+
+    if not server:
+        messages.error(request, "Нет доступного сервера для импорта peers.")
         return redirect("clients-list")
+
     if request.method == "POST":
         imported = VPNClientService.import_runtime_peers(server=server, actor=request.user)
-        messages.success(request, f"Импортировано клиентов: {imported}")
+        messages.success(request, f"Импорт runtime peers завершен. Добавлено клиентов: {imported}.")
     return redirect("clients-list")
 
 
 @login_required
 @user_passes_test(_admin_required)
 def clients_create_view(request):
-    server = Server.objects.filter(is_enabled=True).first()
-    if not server:
-        messages.error(request, "Сервер не настроен")
+    servers_qs = Server.objects.filter(is_enabled=True).order_by("name")
+    selected_server_id = request.GET.get("server") or request.POST.get("server")
+    selected_server = servers_qs.filter(pk=selected_server_id).first() if selected_server_id else servers_qs.first()
+
+    if not selected_server:
+        messages.error(request, "Сначала добавьте и включите сервер.")
         return redirect("clients-list")
+
+    initial_protocol = request.GET.get("protocol")
 
     if request.method == "POST":
         form = VPNClientCreateForm(request.POST)
         if form.is_valid():
             try:
                 client = VPNClientService.create_client(
-                    server=server,
+                    server=selected_server,
                     name=form.cleaned_data["name"],
                     protocol_type=form.cleaned_data["protocol_type"],
                     actor=request.user,
                 )
-                messages.success(request, "Клиент создан")
+                messages.success(request, "Клиент создан и конфиг выпущен.")
                 return redirect("clients-detail", pk=client.id)
             except Exception as exc:
-                messages.error(request, f"Ошибка создания клиента: {exc}")
+                messages.error(request, f"Не удалось создать клиента: {exc}")
     else:
-        form = VPNClientCreateForm()
-    return render(request, "vpn/clients_create.html", {"form": form})
+        initial = {"protocol_type": initial_protocol} if initial_protocol else None
+        form = VPNClientCreateForm(initial=initial)
+
+    return render(
+        request,
+        "vpn/clients_create.html",
+        {
+            "form": form,
+            "selected_server": selected_server,
+            "servers": servers_qs,
+            "selected_server_id": str(selected_server.id),
+        },
+    )
 
 
 @login_required
 @user_passes_test(_admin_required)
 def clients_detail_view(request, pk: int):
-    client = get_object_or_404(VPNClient, pk=pk)
-    qr_base64 = VPNClientService.qr_png_base64(client) if client.revisions.exists() else ""
-    return render(request, "vpn/clients_detail.html", {"client": client, "revision": client.revisions.first(), "qr_base64": qr_base64})
+    client = get_object_or_404(VPNClient.objects.select_related("server", "created_by"), pk=pk)
+    revisions = client.revisions.all()
+    revision = revisions.first()
+    qr_base64 = VPNClientService.qr_png_base64(client) if revision else ""
+
+    blockers = []
+    if not client.runtime_address:
+        blockers.append("Runtime address отсутствует. Выполните перевыпуск конфига.")
+    if client.protocol_type == VPNClient.ProtocolType.AWG2:
+        protocol = client.server.protocols.filter(protocol_type=VPNClient.ProtocolType.AWG2).first()
+        if protocol and not protocol.runtime_metadata.get("awg2_metadata_ready", False):
+            blockers.append("AWG2 metadata неполная — runtime sync обязателен до выпуска AWG2 конфигов.")
+        if protocol and not protocol.runtime_metadata.get("endpoint_host_ready", False):
+            blockers.append("Публичный endpoint host не готов. Проверьте настройки сервера.")
+
+    return render(
+        request,
+        "vpn/clients_detail.html",
+        {
+            "client": client,
+            "revision": revision,
+            "revisions_count": revisions.aggregate(total=Count("id")).get("total") or 0,
+            "qr_base64": qr_base64,
+            "blockers": blockers,
+        },
+    )
 
 
 @login_required
@@ -82,13 +157,18 @@ def client_action_view(request, pk: int, action: str):
     try:
         if action == "disable":
             VPNClientService.set_status(client=client, status=VPNClient.Status.DISABLED, actor=request.user)
+            messages.success(request, "Клиент отключен.")
         elif action == "enable":
             VPNClientService.set_status(client=client, status=VPNClient.Status.ACTIVE, actor=request.user)
+            messages.success(request, "Клиент снова активен.")
         elif action == "delete":
             VPNClientService.set_status(client=client, status=VPNClient.Status.DELETED, actor=request.user)
+            messages.success(request, "Клиент помечен как удаленный.")
         elif action == "reissue":
             VPNClientService.reissue_config(client=client, actor=request.user)
-        messages.success(request, "Действие выполнено")
+            messages.success(request, "Конфиг успешно перевыпущен.")
+        else:
+            messages.error(request, "Неизвестное действие.")
     except Exception as exc:
         messages.error(request, f"Ошибка выполнения действия: {exc}")
     return redirect("clients-detail", pk=client.id)

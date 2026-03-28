@@ -1,19 +1,42 @@
 {% extends 'partials/base.html' %}
 {% block content %}
-<h1 class="h3 mb-3">Серверы</h1>
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+  <div>
+    <h1 class="h3 mb-1">Серверы</h1>
+    <p class="text-secondary mb-0">Основная страница управления инфраструктурой.</p>
+  </div>
+</div>
+
 {% if servers %}
+<div class="table-responsive">
 <table class="table table-hover align-middle">
-  <tr><th>Имя</th><th>SSH</th><th>Здоровье</th><th>Последняя sync</th></tr>
+  <thead><tr><th>Имя</th><th>Host</th><th>Public endpoint host</th><th>Health</th><th>Last runtime sync</th><th>AWG</th><th>AWG2</th><th class="text-end">Действия</th></tr></thead>
+  <tbody>
   {% for s in servers %}
   <tr>
-    <td><a href="/servers/{{ s.id }}/">{{ s.name }}</a></td>
-    <td>{{ s.ssh_username }}@{{ s.host }}:{{ s.port }}</td>
-    <td><span class="badge text-bg-secondary">{{ s.health_status }}</span></td>
-    <td>{{ s.last_runtime_sync_at|default:'—' }}</td>
+    <td class="fw-semibold">{{ s.name }}</td>
+    <td><code>{{ s.host }}</code></td>
+    <td><code>{{ s.public_endpoint_host|default:'—' }}</code></td>
+    <td><span class="badge {% if s.health_status == 'healthy' %}text-bg-success{% elif s.health_status == 'unknown' %}text-bg-secondary{% else %}text-bg-warning{% endif %}">{{ s.health_status }}</span></td>
+    <td>{{ s.last_runtime_sync_at|date:'d.m.Y H:i'|default:'—' }}</td>
+    <td>{% if s.protocols.all %}{% for p in s.protocols.all %}{% if p.protocol_type == 'awg' %}<span class="badge {% if p.enabled %}text-bg-success{% else %}text-bg-danger{% endif %}">{% if p.enabled %}Да{% else %}Нет{% endif %}</span>{% endif %}{% endfor %}{% else %}<span class="badge text-bg-secondary">—</span>{% endif %}</td>
+    <td>{% if s.protocols.all %}{% for p in s.protocols.all %}{% if p.protocol_type == 'awg2' %}<span class="badge {% if p.enabled %}text-bg-success{% else %}text-bg-danger{% endif %}">{% if p.enabled %}Да{% else %}Нет{% endif %}</span>{% endif %}{% endfor %}{% else %}<span class="badge text-bg-secondary">—</span>{% endif %}</td>
+    <td class="text-end">
+      <div class="btn-group btn-group-sm" role="group">
+        <a class="btn btn-outline-light" href="/servers/{{ s.id }}/">Open</a>
+        <form method="post" action="/servers/{{ s.id }}/sync-runtime/" class="d-inline">{% csrf_token %}<button class="btn btn-primary">Sync runtime</button></form>
+        <form method="post" action="/clients/import/?server={{ s.id }}" class="d-inline">{% csrf_token %}<button class="btn btn-outline-secondary">Import peers</button></form>
+      </div>
+    </td>
   </tr>
   {% endfor %}
+  </tbody>
 </table>
+</div>
 {% else %}
-<div class="empty-state">Серверы еще не добавлены.</div>
+<div class="empty-state">
+  <h2 class="h6">Серверов пока нет</h2>
+  <p class="mb-0">Добавьте сервер в Django Admin (техническая настройка), затем вернитесь сюда для ежедневной работы.</p>
+</div>
 {% endif %}
 {% endblock %}

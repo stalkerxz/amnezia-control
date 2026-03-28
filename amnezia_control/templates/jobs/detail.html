@@ -1,19 +1,29 @@
 {% extends 'partials/base.html' %}
 {% block content %}
 <h1 class="h3">Задание #{{ job.id }}</h1>
-<p>Действие: <code>{{ job.action }}</code> | Статус: <span class="badge {% if job.status == 'success' %}text-bg-success{% elif job.status == 'failed' %}text-bg-danger{% elif job.status == 'running' %}text-bg-warning{% else %}text-bg-secondary{% endif %}">{{ job.status }}</span></p>
+<p>
+  Действие: <code>{{ job.action }}</code> |
+  Сервер: <strong>{{ job.server.name }}</strong> |
+  Актор: <strong>{{ job.actor|default:'system' }}</strong> |
+  Статус: <span class="badge {% if job.status == 'success' %}text-bg-success{% elif job.status == 'failed' %}text-bg-danger{% elif job.status == 'running' %}text-bg-warning{% else %}text-bg-secondary{% endif %}">{{ job.status }}</span>
+</p>
+
+<div class="card mb-3"><div class="card-body">
+  <h2 class="h6">Payload</h2>
+  <pre class="log">{{ job.payload }}</pre>
+</div></div>
 
 {% if events %}
-<table class="table table-sm align-middle"><tr><th>Время</th><th>Уровень</th><th>Сообщение</th><th>Exit</th><th>Логи</th></tr>
+<table class="table table-sm align-middle"><tr><th>Время</th><th>Уровень</th><th>Сообщение</th><th>Exit</th><th>stdout / stderr</th></tr>
 {% for e in events %}
-<tr class="{% if e.level == 'error' %}table-danger{% endif %}">
-  <td>{{ e.created_at }}</td>
+<tr class="{% if e.level == 'error' or e.exit_code %}table-danger{% endif %}">
+  <td>{{ e.created_at|date:'d.m.Y H:i:s' }}</td>
   <td><span class="badge {% if e.level == 'error' %}text-bg-danger{% else %}text-bg-secondary{% endif %}">{{ e.level }}</span></td>
   <td>{{ e.message }}</td>
   <td>{{ e.exit_code|default:'—' }}</td>
   <td>
-    {% if e.stdout %}<pre class="log mb-2">{{ e.stdout }}</pre>{% endif %}
-    {% if e.stderr %}<pre class="log text-danger">{{ e.stderr }}</pre>{% endif %}
+    {% if e.stdout %}<div><small class="text-secondary">stdout</small><pre class="log mb-2">{{ e.stdout }}</pre></div>{% endif %}
+    {% if e.stderr %}<div><small class="text-danger">stderr</small><pre class="log text-danger">{{ e.stderr }}</pre></div>{% endif %}
   </td>
 </tr>
 {% endfor %}

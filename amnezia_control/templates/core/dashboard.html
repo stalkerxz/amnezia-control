@@ -1,22 +1,52 @@
 {% extends 'partials/base.html' %}
 {% block content %}
-<h1 class="h3 mb-4">Операционный дашборд</h1>
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
+  <div>
+    <h1 class="h3 mb-1">Операционный дашборд</h1>
+    <p class="text-secondary mb-0">Основной экран ежедневной работы оператора.</p>
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
+    {% if server_for_actions %}
+      <form method="post" action="/servers/{{ server_for_actions.id }}/sync-runtime/">{% csrf_token %}<button class="btn btn-primary">Sync runtime</button></form>
+      <form method="post" action="/clients/import/?server={{ server_for_actions.id }}">{% csrf_token %}<button class="btn btn-outline-secondary">Import peers</button></form>
+      <a class="btn btn-outline-light" href="/servers/{{ server_for_actions.id }}/">Open server details</a>
+      <a class="btn btn-success" href="/clients/new/?server={{ server_for_actions.id }}&protocol=awg2">Create AWG2 client</a>
+    {% else %}
+      <a class="btn btn-outline-light" href="/servers/">Добавить сервер</a>
+    {% endif %}
+  </div>
+</div>
+
 <div class="row g-3 mb-4">
-  <div class="col-xl-2 col-md-4"><div class="card card-body"><small class="text-secondary">Серверы</small><div class="h4 mb-0">{{ servers_count }}</div></div></div>
-  <div class="col-xl-2 col-md-4"><div class="card card-body"><small class="text-secondary">Активные клиенты</small><div class="h4 mb-0">{{ active_clients_count }}</div></div></div>
-  <div class="col-xl-2 col-md-4"><div class="card card-body"><small class="text-secondary">AWG</small><div class="h4 mb-0">{% if awg_available %}<span class="badge text-bg-success">Доступен</span>{% else %}<span class="badge text-bg-danger">Нет</span>{% endif %}</div></div></div>
-  <div class="col-xl-2 col-md-4"><div class="card card-body"><small class="text-secondary">AWG2</small><div class="h4 mb-0">{% if awg2_available %}<span class="badge text-bg-success">Доступен</span>{% else %}<span class="badge text-bg-danger">Нет</span>{% endif %}</div></div></div>
-  <div class="col-xl-4 col-md-8"><div class="card card-body"><small class="text-secondary">Последняя runtime sync</small><div class="h6 mb-0">{{ last_runtime_sync|default:'Не запускалась' }}</div></div></div>
+  <div class="col-xl-2 col-md-4"><div class="card card-body stat-card"><small>Серверы</small><div class="h3 mb-0">{{ servers_count }}</div></div></div>
+  <div class="col-xl-2 col-md-4"><div class="card card-body stat-card"><small>Активные клиенты</small><div class="h3 mb-0">{{ active_clients_count }}</div></div></div>
+  <div class="col-xl-2 col-md-4"><div class="card card-body stat-card"><small>AWG</small><div class="h5 mb-0">{% if awg_available %}<span class="badge text-bg-success">Доступен</span>{% else %}<span class="badge text-bg-danger">Нет</span>{% endif %}</div></div></div>
+  <div class="col-xl-2 col-md-4"><div class="card card-body stat-card"><small>AWG2</small><div class="h5 mb-0">{% if awg2_available %}<span class="badge text-bg-success">Доступен</span>{% else %}<span class="badge text-bg-danger">Нет</span>{% endif %}</div></div></div>
+  <div class="col-xl-4 col-md-8"><div class="card card-body stat-card"><small>Последняя runtime sync</small><div class="h6 mb-0">{{ last_runtime_sync|date:'d.m.Y H:i'|default:'Не запускалась' }}</div></div></div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-body">
+    <h2 class="h6 mb-3">Системное здоровье</h2>
+    <div class="d-flex gap-2 flex-wrap">
+      {% for service_name, is_ok in system_health.items %}
+      <div class="health-pill {% if is_ok %}health-ok{% else %}health-warn{% endif %}">
+        <span>{{ service_name|upper }}</span>
+        <strong>{% if is_ok %}OK{% else %}N/A{% endif %}</strong>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
 </div>
 
 <div class="row g-3">
   <div class="col-lg-7">
     <div class="card"><div class="card-body">
       <h2 class="h6">Последние задания</h2>
-      <table class="table table-sm align-middle"><tr><th>ID</th><th>Действие</th><th>Статус</th></tr>
+      <table class="table table-sm align-middle"><tr><th>ID</th><th>Действие</th><th>Сервер</th><th>Статус</th></tr>
       {% for job in jobs_recent %}
-      <tr><td><a href="/jobs/{{ job.id }}/">#{{ job.id }}</a></td><td>{{ job.action }}</td><td><span class="badge {% if job.status == 'success' %}text-bg-success{% elif job.status == 'failed' %}text-bg-danger{% elif job.status == 'running' %}text-bg-warning{% else %}text-bg-secondary{% endif %}">{{ job.status }}</span></td></tr>
-      {% empty %}<tr><td colspan="3"><div class="empty-state">Заданий пока нет.</div></td></tr>{% endfor %}
+      <tr><td><a href="/jobs/{{ job.id }}/">#{{ job.id }}</a></td><td>{{ job.action }}</td><td>{{ job.server.name }}</td><td><span class="badge {% if job.status == 'success' %}text-bg-success{% elif job.status == 'failed' %}text-bg-danger{% elif job.status == 'running' %}text-bg-warning{% else %}text-bg-secondary{% endif %}">{{ job.status }}</span></td></tr>
+      {% empty %}<tr><td colspan="4"><div class="empty-state">Заданий пока нет.</div></td></tr>{% endfor %}
       </table>
     </div></div>
   </div>
@@ -25,7 +55,9 @@
       <h2 class="h6">Последние действия аудита</h2>
       <ul class="list-group list-group-flush">
         {% for log in audit_recent %}
-          <li class="list-group-item bg-transparent px-0"><small class="text-secondary">{{ log.created_at }}</small><br>{{ log.action }}</li>
+          <li class="list-group-item bg-transparent px-0 border-subtle">
+            <small class="text-secondary">{{ log.created_at|date:'d.m.Y H:i' }} · {{ log.actor|default:'system' }}</small><br>{{ log.action }}
+          </li>
         {% empty %}
           <li class="list-group-item bg-transparent px-0"><div class="empty-state">Записей аудита пока нет.</div></li>
         {% endfor %}

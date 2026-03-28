@@ -2,16 +2,24 @@
 {% block content %}
 <h1 class="h3 mb-3">Задания</h1>
 {% if jobs %}
-<table class="table table-hover align-middle"><tr><th>ID</th><th>Действие</th><th>Статус</th><th>Создано</th></tr>
+<div class="table-responsive">
+<table class="table table-hover align-middle">
+  <thead><tr><th>ID</th><th>Action</th><th>Server</th><th>Status</th><th>Created at</th><th>Actor</th><th></th></tr></thead>
+  <tbody>
 {% for j in jobs %}
-<tr>
-  <td><a href="/jobs/{{ j.id }}/">#{{ j.id }}</a></td>
-  <td>{{ j.action }}</td>
+<tr class="{% if j.status == 'failed' %}row-failed{% endif %}">
+  <td>#{{ j.id }}</td>
+  <td><code>{{ j.action }}</code></td>
+  <td>{{ j.server.name }}</td>
   <td><span class="badge {% if j.status == 'success' %}text-bg-success{% elif j.status == 'failed' %}text-bg-danger{% elif j.status == 'running' %}text-bg-warning{% else %}text-bg-secondary{% endif %}">{{ j.status }}</span></td>
-  <td>{{ j.created_at }}</td>
+  <td>{{ j.created_at|date:'d.m.Y H:i:s' }}</td>
+  <td>{{ j.actor|default:'system' }}</td>
+  <td class="text-end"><a class="btn btn-sm btn-outline-light" href="/jobs/{{ j.id }}/">Details</a></td>
 </tr>
 {% endfor %}
+  </tbody>
 </table>
+</div>
 {% else %}
 <div class="empty-state">Заданий пока нет.</div>
 {% endif %}

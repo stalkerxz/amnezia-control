@@ -1,37 +1,75 @@
 {% extends 'partials/base.html' %}
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-3">
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
   <h1 class="h3 mb-0">Сервер: {{ server.name }}</h1>
-  <div class="d-flex gap-2">
-    <form method="post" action="/servers/{{ server.id }}/sync-runtime/">{% csrf_token %}<button class="btn btn-primary">Синхронизировать runtime</button></form>
-    <form method="post" action="/clients/import/">{% csrf_token %}<button class="btn btn-outline-secondary">Импорт peers</button></form>
+  <div class="d-flex gap-2 flex-wrap">
+    <form method="post" action="/servers/{{ server.id }}/sync-runtime/">{% csrf_token %}<button class="btn btn-primary">Sync runtime</button></form>
+    <form method="post" action="/clients/import/?server={{ server.id }}">{% csrf_token %}<button class="btn btn-outline-secondary">Import peers</button></form>
+    <a class="btn btn-outline-light" href="/clients/new/?server={{ server.id }}&protocol=awg">Create AWG client</a>
+    <a class="btn btn-success" href="/clients/new/?server={{ server.id }}&protocol=awg2">Create AWG2 client</a>
   </div>
 </div>
 
-<div class="card mb-3"><div class="card-body">
-  <h2 class="h6">Runtime diagnostics</h2>
-  <p class="text-secondary mb-0">Проверяйте readiness перед созданием/переизданием клиентов.</p>
-</div></div>
-
-<table class="table align-middle">
-  <tr><th>Протокол</th><th>Config path</th><th>Peer source</th><th>Peers</th><th>Subnet</th><th>UDP</th><th>Endpoint host</th><th>Endpoint port</th><th>AWG2 metadata</th><th>Missing required</th><th>Missing optional</th><th>Active keys</th></tr>
-  {% for p in protocols %}
-  <tr>
-    <td><span class="badge {% if p.protocol_type == 'awg2' %}text-bg-info{% else %}text-bg-secondary{% endif %}">{{ p.protocol_type|upper }}</span></td>
-    <td><code>{{ p.runtime_metadata.config_path|default:"—" }}</code></td>
-    <td><code>{{ p.runtime_metadata.peer_source|default:"—" }}</code></td>
-    <td>{{ p.runtime_metadata.peer_count|default:'—' }}</td>
-    <td>{% if p.runtime_metadata.subnet_ready %}<span class="badge text-bg-success">{{ p.runtime_metadata.subnet }}</span>{% else %}<span class="badge text-bg-warning">не обнаружено</span>{% endif %}</td>
-    <td>{{ p.runtime_metadata.udp_port|default:'—' }}</td>
-    <td>{% if p.runtime_metadata.endpoint_host_ready %}<span class="badge text-bg-success">ok</span>{% else %}<span class="badge text-bg-warning">missing</span>{% endif %}<br><small>{{ p.runtime_metadata.public_host|default:'—' }}</small></td>
-    <td>{% if p.runtime_metadata.endpoint_port_ready %}<span class="badge text-bg-success">ok</span>{% else %}<span class="badge text-bg-warning">missing</span>{% endif %}</td>
-    <td>{% if p.protocol_type == 'awg2' %}{% if p.runtime_metadata.awg2_metadata_ready %}<span class="badge text-bg-success">complete</span>{% else %}<span class="badge text-bg-danger">incomplete</span>{% endif %}{% else %}—{% endif %}</td>
-    <td>{% if p.protocol_type == 'awg2' and p.runtime_metadata.awg2_missing_keys %}<code>{{ p.runtime_metadata.awg2_missing_keys|join:', ' }}</code>{% else %}—{% endif %}</td>
-    <td>{% if p.protocol_type == 'awg2' and p.runtime_metadata.awg2_optional_missing_keys %}<code>{{ p.runtime_metadata.awg2_optional_missing_keys|join:', ' }}</code>{% else %}—{% endif %}</td>
-    <td>{% if p.protocol_type == 'awg2' and p.runtime_metadata.awg2_active_keys %}<code>{{ p.runtime_metadata.awg2_active_keys|join:', ' }}</code>{% else %}—{% endif %}</td>
-  </tr>
-  {% empty %}
-    <tr><td colspan="12"><div class="empty-state">Протоколы не обнаружены. Нажмите «Синхронизировать runtime».</div></td></tr>
+{% if warnings %}
+  {% for warning in warnings %}
+    <div class="alert alert-warning">{{ warning }}</div>
   {% endfor %}
-</table>
+{% endif %}
+
+<div class="row g-3 mb-3">
+  <div class="col-lg-8">
+    <div class="card"><div class="card-body">
+      <h2 class="h6">Runtime и endpoint</h2>
+      <div class="row g-3">
+        <div class="col-md-6"><small class="text-secondary d-block">Host</small><code>{{ server.host }}</code></div>
+        <div class="col-md-6"><small class="text-secondary d-block">Public endpoint host</small><code>{{ server.public_endpoint_host|default:'—' }}</code></div>
+        <div class="col-md-6"><small class="text-secondary d-block">SSH summary</small><code>{{ server.ssh_username }}@{{ server.host }}:{{ server.port }}</code></div>
+        <div class="col-md-6"><small class="text-secondary d-block">Health status</small><span class="badge text-bg-secondary">{{ server.health_status }}</span></div>
+        <div class="col-md-6"><small class="text-secondary d-block">Last runtime sync</small>{{ server.last_runtime_sync_at|date:'d.m.Y H:i'|default:'—' }}</div>
+      </div>
+    </div></div>
+  </div>
+  <div class="col-lg-4">
+    <div class="card h-100"><div class="card-body">
+      <h2 class="h6">Диагностика endpoint</h2>
+      {% with p=awg2|default:awg %}
+      {% if p %}
+      <p class="mb-2">Endpoint host: {% if p.runtime_metadata.endpoint_host_ready %}<span class="badge text-bg-success">Готов</span>{% else %}<span class="badge text-bg-danger">Не готов</span>{% endif %}</p>
+      <p class="mb-0">Endpoint port: {% if p.runtime_metadata.endpoint_port_ready %}<span class="badge text-bg-success">Готов</span>{% else %}<span class="badge text-bg-danger">Не готов</span>{% endif %}</p>
+      {% else %}<div class="empty-state">Сначала выполните sync runtime.</div>{% endif %}
+      {% endwith %}
+    </div></div>
+  </div>
+</div>
+
+<div class="row g-3">
+  {% for p in protocols %}
+  <div class="col-12">
+    <div class="card"><div class="card-body">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="h6 mb-0">{{ p.protocol_type|upper }} diagnostics</h2>
+        <span class="badge {% if p.enabled %}text-bg-success{% else %}text-bg-danger{% endif %}">{% if p.enabled %}active{% else %}inactive{% endif %}</span>
+      </div>
+      <div class="row g-3">
+        <div class="col-md-4"><small class="text-secondary d-block">Discovered config path</small><code>{{ p.runtime_metadata.config_path|default:'—' }}</code></div>
+        <div class="col-md-2"><small class="text-secondary d-block">Subnet</small><code>{{ p.runtime_metadata.subnet|default:'—' }}</code></div>
+        <div class="col-md-2"><small class="text-secondary d-block">UDP port</small><code>{{ p.runtime_metadata.udp_port|default:'—' }}</code></div>
+        <div class="col-md-2"><small class="text-secondary d-block">Peer source</small><span>{{ p.runtime_metadata.peer_source|default:'—' }}</span></div>
+        <div class="col-md-2"><small class="text-secondary d-block">Peer count</small><span>{{ p.runtime_metadata.peer_count|default:'—' }}</span></div>
+      </div>
+      {% if p.protocol_type == 'awg2' %}
+      <hr>
+      <div class="row g-3">
+        <div class="col-md-3"><small class="text-secondary d-block">Metadata status</small>{% if p.runtime_metadata.awg2_metadata_ready %}<span class="badge text-bg-success">ready</span>{% else %}<span class="badge text-bg-danger">not ready</span>{% endif %}</div>
+        <div class="col-md-3"><small class="text-secondary d-block">Active keys</small><code>{% if p.runtime_metadata.awg2_active_keys %}{{ p.runtime_metadata.awg2_active_keys|join:', ' }}{% else %}—{% endif %}</code></div>
+        <div class="col-md-3"><small class="text-secondary d-block">Required missing keys</small><code>{% if p.runtime_metadata.awg2_missing_keys %}{{ p.runtime_metadata.awg2_missing_keys|join:', ' }}{% else %}—{% endif %}</code></div>
+        <div class="col-md-3"><small class="text-secondary d-block">Optional missing keys</small><code>{% if p.runtime_metadata.awg2_optional_missing_keys %}{{ p.runtime_metadata.awg2_optional_missing_keys|join:', ' }}{% else %}—{% endif %}</code></div>
+      </div>
+      {% endif %}
+    </div></div>
+  </div>
+  {% empty %}
+  <div class="col-12"><div class="empty-state">Протоколы не обнаружены. Нажмите «Sync runtime».</div></div>
+  {% endfor %}
+</div>
 {% endblock %}
