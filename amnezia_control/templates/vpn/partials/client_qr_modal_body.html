@@ -1,0 +1,13 @@
+<div class="d-flex justify-content-between align-items-start gap-2 mb-3">
+  <div>
+    <h5 class="modal-title mb-1">QR для {{ client.name }}</h5>
+    <div class="text-secondary small">Клиент #{{ client.id }}</div>
+  </div>
+</div>
+{% if revision and qr_base64 %}
+  <div class="text-center">
+    <img src="data:image/png;base64,{{ qr_base64 }}" alt="QR {{ client.name }}" class="img-thumbnail" style="max-width: 320px;">
+  </div>
+{% else %}
+  <div class="empty-state mb-0">Конфиг ещё не выпущен. Сначала выполните «Переиздать конфиг».</div>
+{% endif %}

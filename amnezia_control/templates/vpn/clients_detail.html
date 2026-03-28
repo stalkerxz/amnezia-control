@@ -56,8 +56,11 @@
 
 <div class="d-flex gap-2 flex-wrap mb-3">
 <form method="post" action="/clients/{{ client.id }}/action/reissue/">{% csrf_token %}<button class="btn btn-primary">Переиздать конфиг</button></form>
-<form method="post" action="/clients/{{ client.id }}/action/enable/">{% csrf_token %}<button class="btn btn-outline-success">Включить</button></form>
+{% if client.status == 'active' %}
 <form method="post" action="/clients/{{ client.id }}/action/disable/">{% csrf_token %}<button class="btn btn-outline-warning">Отключить</button></form>
+{% else %}
+<form method="post" action="/clients/{{ client.id }}/action/enable/">{% csrf_token %}<button class="btn btn-outline-success">Включить</button></form>
+{% endif %}
 <form method="post" action="/clients/{{ client.id }}/action/delete/" onsubmit="return confirm('Удалить клиента?')">{% csrf_token %}<button class="btn btn-danger">Удалить</button></form>
 </div>
 

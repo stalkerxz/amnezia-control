@@ -1,22 +1,51 @@
 {% extends 'partials/base.html' %}
 {% block content %}
 <h1 class="h3 mb-3">Журнал аудита</h1>
-<form class="mb-3"><input class="form-control" name="q" value="{{ q }}" placeholder="Фильтр по действию"></form>
+<form class="card card-body mb-3">
+  <div class="row g-2 align-items-end">
+    <div class="col-lg-4">
+      <label class="form-label" for="id_q">Фильтр по действию</label>
+      <input id="id_q" class="form-control" name="q" value="{{ q }}" placeholder="Например, vpn.client.reissue">
+    </div>
+    <div class="col-lg-2">
+      <button class="btn btn-primary w-100" type="submit">Применить</button>
+    </div>
+  </div>
+</form>
 {% if logs %}
-<div class="table-responsive">
-<table class="table table-sm align-middle"><tr><th>Дата</th><th>Пользователь</th><th>Действие</th><th>Сущность</th><th>Детали</th></tr>
-{% for l in logs %}
-<tr>
-  <td>{{ l.created_at }}</td>
-  <td>{{ l.actor|default:'system' }}</td>
-  <td><code>{{ l.action }}</code></td>
-  <td>{{ l.entity_type }}:{{ l.entity_id }}</td>
-  <td><code>{{ l.details }}</code></td>
-</tr>
-{% endfor %}
+<div class="table-responsive card p-2">
+<table class="table table-sm align-middle mb-0">
+  <thead><tr><th>Дата</th><th>Пользователь</th><th>Действие</th><th>Сущность</th><th>Детали</th></tr></thead>
+  <tbody>
+  {% for l in logs %}
+  <tr>
+    <td>{{ l.created_at }}</td>
+    <td>{{ l.actor|default:'system' }}</td>
+    <td><code>{{ l.action }}</code></td>
+    <td>{{ l.entity_type }}:{{ l.entity_id }}</td>
+    <td><code>{{ l.details }}</code></td>
+  </tr>
+  {% endfor %}
+  </tbody>
 </table>
 </div>
+{% if page_obj and page_obj.paginator.num_pages > 1 %}
+<nav class="mt-3" aria-label="Навигация по журналу аудита">
+  <ul class="pagination pagination-sm mb-0">
+    <li class="page-item {% if not page_obj.has_previous %}disabled{% endif %}">
+      <a class="page-link" href="?q={{ q|urlencode }}&page={% if page_obj.has_previous %}{{ page_obj.previous_page_number }}{% else %}1{% endif %}">Назад</a>
+    </li>
+    <li class="page-item disabled"><span class="page-link">Стр. {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span></li>
+    <li class="page-item {% if not page_obj.has_next %}disabled{% endif %}">
+      <a class="page-link" href="?q={{ q|urlencode }}&page={% if page_obj.has_next %}{{ page_obj.next_page_number }}{% else %}{{ page_obj.paginator.num_pages }}{% endif %}">Вперёд</a>
+    </li>
+  </ul>
+</nav>
+{% endif %}
 {% else %}
-<div class="empty-state">Записей аудита пока нет.</div>
+<div class="empty-state">
+  <h2 class="h6 mb-2">Записей аудита пока нет</h2>
+  <p class="mb-0">После действий операторов и фоновых задач здесь появится история изменений.</p>
+</div>
 {% endif %}
 {% endblock %}

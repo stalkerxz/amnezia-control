@@ -46,8 +46,8 @@
 </form>
 
 {% if clients %}
-<div class="table-responsive">
-  <table class="table table-hover align-middle">
+<div class="table-responsive card p-2">
+  <table class="table table-hover align-middle mb-0">
     <thead>
       <tr>
         <th>ID</th>
@@ -73,10 +73,19 @@
         <td><code>{{ c.runtime_address|default:'—' }}</code></td>
         <td>{{ c.updated_at|date:'d.m.Y H:i' }}</td>
         <td>
-          <div class="d-flex flex-wrap justify-content-end gap-1">
+          <div class="client-actions justify-content-end">
             <a class="btn btn-sm btn-outline-secondary" href="/clients/{{ c.id }}/">Открыть</a>
             <a class="btn btn-sm btn-outline-primary" href="/clients/{{ c.id }}/download/">Скачать config</a>
-            <a class="btn btn-sm btn-outline-info" href="/clients/{{ c.id }}/">Показать QR</a>
+            <button
+              class="btn btn-sm btn-outline-info js-open-qr-modal"
+              type="button"
+              data-client-id="{{ c.id }}"
+              data-client-name="{{ c.name }}"
+              data-bs-toggle="modal"
+              data-bs-target="#clientQrModal"
+            >
+              Показать QR
+            </button>
             <form method="post" action="/clients/{{ c.id }}/action/reissue/" class="d-inline">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><button class="btn btn-sm btn-outline-dark">Переиздать</button></form>
             {% if c.status == 'active' %}
               <form method="post" action="/clients/{{ c.id }}/action/disable/" class="d-inline">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><button class="btn btn-sm btn-warning">Отключить</button></form>
@@ -92,9 +101,53 @@
   </table>
 </div>
 {% else %}
-<div class="alert alert-light border" role="status">
-  <h2 class="h6">Клиенты не найдены</h2>
-  <p class="mb-0">Измените фильтры, создайте нового клиента или выполните импорт peers из runtime.</p>
+<div class="empty-state">
+  <h2 class="h6 mb-2">Клиенты не найдены</h2>
+  <p class="mb-3">Измените фильтры, создайте нового клиента или выполните импорт peers из runtime.</p>
+  <a class="btn btn-sm btn-primary" href="/clients/new/">Создать клиента</a>
 </div>
 {% endif %}
+
+<div class="modal fade" id="clientQrModal" tabindex="-1" aria-labelledby="clientQrModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title fs-5" id="clientQrModalLabel">QR клиента</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+      </div>
+      <div class="modal-body" id="clientQrModalBody">
+        <div class="text-secondary">Загрузка…</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  (() => {
+    const modal = document.getElementById('clientQrModal');
+    const body = document.getElementById('clientQrModalBody');
+    const title = document.getElementById('clientQrModalLabel');
+
+    document.querySelectorAll('.js-open-qr-modal').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.clientId;
+        const name = btn.dataset.clientName;
+        title.textContent = `QR клиента: ${name}`;
+        body.innerHTML = '<div class="text-secondary">Загрузка…</div>';
+
+        try {
+          const response = await fetch(`/clients/${id}/qr-modal/`);
+          if (!response.ok) throw new Error('request failed');
+          body.innerHTML = await response.text();
+        } catch (e) {
+          body.innerHTML = '<div class="alert alert-danger mb-0">Не удалось загрузить QR. Попробуйте ещё раз.</div>';
+        }
+      });
+    });
+
+    modal.addEventListener('hidden.bs.modal', () => {
+      body.innerHTML = '<div class="text-secondary">Загрузка…</div>';
+    });
+  })();
+</script>
 {% endblock %}
