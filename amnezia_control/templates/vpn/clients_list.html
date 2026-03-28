@@ -61,8 +61,13 @@
   <td class="text-end">
     <div class="btn-group btn-group-sm table-actions" role="group">
       <a class="btn btn-outline-light" href="/clients/{{ c.id }}/">Открыть</a>
-      <a class="btn btn-outline-secondary" href="/clients/{{ c.id }}/download/">Скачать</a>
-      <a class="btn btn-outline-secondary" href="/clients/{{ c.id }}/#qr">Показать QR</a>
+      {% if c.revisions_total %}
+        <a class="btn btn-outline-secondary" href="/clients/{{ c.id }}/download/">Скачать</a>
+        <a class="btn btn-outline-secondary" href="/clients/{{ c.id }}/#qr">Показать QR</a>
+      {% else %}
+        <button class="btn btn-outline-secondary" type="button" disabled title="Конфиг еще не выпущен">Скачать</button>
+        <button class="btn btn-outline-secondary" type="button" disabled title="QR доступен после выпуска конфига">Показать QR</button>
+      {% endif %}
       <form method="post" action="/clients/{{ c.id }}/action/reissue/">{% csrf_token %}<button class="btn btn-secondary">Перевыпустить</button></form>
       <form method="post" action="/clients/{{ c.id }}/action/disable/">{% csrf_token %}<button class="btn btn-warning">Отключить</button></form>
       <form method="post" action="/clients/{{ c.id }}/action/delete/" onsubmit="return confirm('Удалить клиента?')">{% csrf_token %}<button class="btn btn-danger">Удалить</button></form>

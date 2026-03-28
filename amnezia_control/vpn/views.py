@@ -22,7 +22,11 @@ def clients_list_view(request):
     status = request.GET.get("status", "").strip()
     source = request.GET.get("source", "").strip()
 
-    clients = VPNClient.objects.select_related("server").annotate(last_revision_at=Max("revisions__created_at")).order_by("-created_at")
+    clients = (
+        VPNClient.objects.select_related("server")
+        .annotate(last_revision_at=Max("revisions__created_at"), revisions_total=Count("revisions"))
+        .order_by("-created_at")
+    )
     if q:
         clients = clients.filter(name__icontains=q)
     if protocol in {choice[0] for choice in VPNClient.ProtocolType.choices}:
