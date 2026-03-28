@@ -26,6 +26,10 @@
 </table>
 </div>
 {% else %}
-<div class="empty-state">Заданий пока нет.</div>
+<div class="empty-state">
+  <h2 class="h6">Заданий пока нет</h2>
+  <p class="mb-2">После sync runtime, импорта peers или операций с клиентами здесь появятся технические логи действий.</p>
+  <a class="btn btn-outline-secondary btn-sm" href="/servers/">Открыть серверы</a>
+</div>
 {% endif %}
 {% endblock %}
