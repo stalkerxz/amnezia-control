@@ -7,7 +7,7 @@
   <thead><tr><th>ID</th><th>Действие</th><th>Сервер</th><th>Статус</th><th>Создано</th><th>Актор</th><th></th></tr></thead>
   <tbody>
 {% for j in jobs %}
-<tr class="{% if j.status == 'failed' %}row-failed border-start border-danger border-3{% endif %}">
+<tr class="{% if j.status == 'failed' %}row-failed table-danger border-start border-danger border-3{% endif %}">
   <td>#{{ j.id }}</td>
   <td><code>{{ j.action }}</code></td>
   <td>{{ j.server.name }}</td>

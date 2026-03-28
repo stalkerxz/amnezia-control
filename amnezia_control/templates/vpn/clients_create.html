@@ -1,6 +1,9 @@
 {% extends 'partials/base.html' %}
 {% block content %}
-<h1 class="h3 mb-3">Создать клиента</h1>
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="h3 mb-0">Создать клиента</h1>
+  <a class="btn btn-outline-secondary btn-sm" href="/clients/">К списку клиентов</a>
+</div>
 <form method="post" class="card card-body">
   {% csrf_token %}
   <div class="mb-3">
@@ -28,9 +31,9 @@
   </div>
 
   <div class="alert alert-secondary mb-3">
-    <strong>Подсказка:</strong> при выборе AWG2 нужны endpoint и metadata после runtime sync.
+    <strong>Подсказка:</strong> для AWG2 сначала выполните runtime sync на сервере, проверьте endpoint и metadata, затем создавайте клиента.
   </div>
 
-  <button class="btn btn-success">Создать</button>
+  <button class="btn btn-primary">Создать клиента</button>
 </form>
 {% endblock %}
