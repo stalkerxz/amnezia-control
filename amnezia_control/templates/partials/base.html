@@ -27,7 +27,10 @@
   </aside>
   <main class="content flex-grow-1 p-4 p-xl-5">
     {% for message in messages %}
-      <div class="alert {% if 'error' in message.tags %}alert-danger{% elif 'success' in message.tags %}alert-success{% else %}alert-info{% endif %} mb-3">{{ message }}</div>
+      <div class="alert {% if 'error' in message.tags %}alert-danger{% elif 'success' in message.tags %}alert-success{% else %}alert-info{% endif %} alert-dismissible fade show mb-3" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
     {% endfor %}
 {% else %}
   <main class="container py-4">

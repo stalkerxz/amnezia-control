@@ -14,7 +14,7 @@
   <td><span class="badge {% if j.status == 'success' %}text-bg-success{% elif j.status == 'failed' %}text-bg-danger{% elif j.status == 'running' %}text-bg-warning{% else %}text-bg-secondary{% endif %}">{% if j.status == 'failed' %}failed ⚠{% else %}{{ j.status }}{% endif %}</span></td>
   <td>{{ j.created_at|date:'d.m.Y H:i:s' }}</td>
   <td>{{ j.actor|default:'system' }}</td>
-  <td class="text-end"><a class="btn btn-sm btn-outline-light" href="/jobs/{{ j.id }}/">Детали</a></td>
+  <td class="text-end"><a class="btn btn-sm btn-outline-light" href="/jobs/{{ j.id }}/">Детали / логи</a></td>
 </tr>
 {% endfor %}
   </tbody>

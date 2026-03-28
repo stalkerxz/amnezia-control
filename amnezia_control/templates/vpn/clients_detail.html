@@ -38,7 +38,10 @@
         <p>Актуальная ревизия: <strong>#{{ revision.revision_number }}</strong> от {{ revision.created_at|date:'d.m.Y H:i' }}</p>
         <a class="btn btn-outline-light" href="/clients/{{ client.id }}/download/">Скачать .conf</a>
       {% else %}
-        <div class="empty-state">Конфиг пока не выпущен.</div>
+        <div class="empty-state">
+          <p class="mb-2">Конфиг пока не выпущен.</p>
+          <form method="post" action="/clients/{{ client.id }}/action/reissue/">{% csrf_token %}<button class="btn btn-primary btn-sm">Выпустить конфиг</button></form>
+        </div>
       {% endif %}
     </div></div>
   </div>

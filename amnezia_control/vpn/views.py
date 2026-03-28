@@ -131,12 +131,15 @@ def clients_detail_view(request, pk: int):
         blockers.append("Runtime address отсутствует. Выполните перевыпуск конфига.")
     if not revision:
         blockers.append("Конфиг еще не выпущен. Нажмите «Перевыпустить конфиг».")
+    protocol = client.server.protocols.filter(protocol_type=client.protocol_type).first()
+    if protocol:
+        if not protocol.runtime_metadata.get("endpoint_host_ready", False):
+            blockers.append("Публичный endpoint host не готов. Проверьте сервер и выполните runtime sync.")
+        if not protocol.runtime_metadata.get("endpoint_port_ready", False):
+            blockers.append("UDP endpoint port не определен. Проверьте настройки endpoint и runtime sync.")
     if client.protocol_type == VPNClient.ProtocolType.AWG2:
-        protocol = client.server.protocols.filter(protocol_type=VPNClient.ProtocolType.AWG2).first()
         if protocol and not protocol.runtime_metadata.get("awg2_metadata_ready", False):
             blockers.append("AWG2 metadata неполная — runtime sync обязателен до выпуска AWG2 конфигов.")
-        if protocol and not protocol.runtime_metadata.get("endpoint_host_ready", False):
-            blockers.append("Публичный endpoint host не готов. Проверьте настройки сервера.")
 
     return render(
         request,

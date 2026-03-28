@@ -34,3 +34,4 @@ pre.log { background: #0f1520; color: #d7e2ff; padding: .75rem; border-radius: .
 .row-failed td { background: rgba(130, 26, 26, .15); }
 .compact-table td { font-size: .88rem; }
 .btn-group form { display: inline; }
+.table-actions { flex-wrap: wrap; justify-content: flex-end; }

@@ -33,7 +33,10 @@
         <option value="imported" {% if filters.source == 'imported' %}selected{% endif %}>Только imported</option>
       </select>
     </div>
-    <div class="col-lg-2"><button class="btn btn-outline-light w-100">Применить</button></div>
+    <div class="col-lg-2 d-flex gap-2">
+      <button class="btn btn-outline-light flex-grow-1">Применить</button>
+      <a class="btn btn-outline-secondary" href="/clients/">Сброс</a>
+    </div>
   </div>
 </form>
 
@@ -56,7 +59,7 @@
     {% else %}{{ c.created_at|date:'d.m.Y H:i' }}{% endif %}
   </td>
   <td class="text-end">
-    <div class="btn-group btn-group-sm" role="group">
+    <div class="btn-group btn-group-sm table-actions" role="group">
       <a class="btn btn-outline-light" href="/clients/{{ c.id }}/">Открыть</a>
       <a class="btn btn-outline-secondary" href="/clients/{{ c.id }}/download/">Скачать</a>
       <a class="btn btn-outline-secondary" href="/clients/{{ c.id }}/#qr">Показать QR</a>
@@ -71,6 +74,13 @@
 </table>
 </div>
 {% else %}
-<div class="empty-state">Клиентов по текущему фильтру не найдено. Создайте клиента или импортируйте peers из runtime.</div>
+<div class="empty-state">
+  <h2 class="h6">Клиенты не найдены</h2>
+  <p class="mb-3">Проверьте фильтры или создайте нового клиента. Также можно импортировать peers из runtime.</p>
+  <div class="d-flex gap-2">
+    <a class="btn btn-primary btn-sm" href="/clients/new/">Создать клиента</a>
+    <form method="post" action="/clients/import/">{% csrf_token %}<button class="btn btn-outline-secondary btn-sm">Импорт peers</button></form>
+  </div>
+</div>
 {% endif %}
 {% endblock %}
