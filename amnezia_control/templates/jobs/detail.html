@@ -13,6 +13,10 @@
   <pre class="log">{{ job.payload }}</pre>
 </div></div>
 
+<div class="alert alert-secondary py-2">
+  На этой странице доступны <strong>stdout</strong>, <strong>stderr</strong> и <strong>exit code</strong> по каждому событию задания.
+</div>
+
 {% if events %}
 <table class="table table-sm align-middle"><tr><th>Время</th><th>Уровень</th><th>Сообщение</th><th>Exit</th><th>stdout / stderr</th></tr>
 {% for e in events %}

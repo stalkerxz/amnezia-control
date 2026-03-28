@@ -21,7 +21,7 @@
     <div class="card"><div class="card-body">
       <h2 class="h6">Runtime и endpoint</h2>
       <div class="row g-3">
-        <div class="col-md-6"><small class="text-secondary d-block">Host</small><code>{{ server.host }}</code></div>
+        <div class="col-md-6"><small class="text-secondary d-block">Хост сервера</small><code>{{ server.host }}</code></div>
         <div class="col-md-6"><small class="text-secondary d-block">Публичный endpoint host</small><code>{{ server.public_endpoint_host|default:'—' }}</code></div>
         <div class="col-md-6"><small class="text-secondary d-block">SSH сводка</small><code>{{ server.ssh_username }}@{{ server.host }}:{{ server.port }}</code></div>
         <div class="col-md-6"><small class="text-secondary d-block">Статус здоровья</small><span class="badge text-bg-secondary">{{ server.health_status }}</span></div>
@@ -35,7 +35,7 @@
       {% with p=awg2|default:awg %}
       {% if p %}
       <p class="mb-2">Endpoint host: {% if p.runtime_metadata.endpoint_host_ready %}<span class="badge text-bg-success">Готов</span>{% else %}<span class="badge text-bg-danger">Не готов</span>{% endif %}</p>
-      <p class="mb-0">Endpoint port: {% if p.runtime_metadata.endpoint_port_ready %}<span class="badge text-bg-success">Готов</span>{% else %}<span class="badge text-bg-danger">Не готов</span>{% endif %}</p>
+      <p class="mb-0">Endpoint порт: {% if p.runtime_metadata.endpoint_port_ready %}<span class="badge text-bg-success">Готов</span>{% else %}<span class="badge text-bg-danger">Не готов</span>{% endif %}</p>
       {% else %}<div class="empty-state">Сначала выполните sync runtime.</div>{% endif %}
       {% endwith %}
     </div></div>
@@ -61,9 +61,9 @@
         <span class="badge {% if p.enabled %}text-bg-success{% else %}text-bg-danger{% endif %}">{% if p.enabled %}активен{% else %}неактивен{% endif %}</span>
       </div>
       <div class="row g-3">
-        <div class="col-md-4"><small class="text-secondary d-block">Обнаруженный config path</small><code>{{ p.runtime_metadata.config_path|default:'—' }}</code></div>
-        <div class="col-md-2"><small class="text-secondary d-block">Subnet</small><code>{{ p.runtime_metadata.subnet|default:'—' }}</code></div>
-        <div class="col-md-2"><small class="text-secondary d-block">UDP port</small><code>{{ p.runtime_metadata.udp_port|default:'—' }}</code></div>
+        <div class="col-md-4"><small class="text-secondary d-block">Путь к конфигу</small><code>{{ p.runtime_metadata.config_path|default:'—' }}</code></div>
+        <div class="col-md-2"><small class="text-secondary d-block">Подсеть</small><code>{{ p.runtime_metadata.subnet|default:'—' }}</code></div>
+        <div class="col-md-2"><small class="text-secondary d-block">UDP порт</small><code>{{ p.runtime_metadata.udp_port|default:'—' }}</code></div>
         <div class="col-md-2"><small class="text-secondary d-block">Источник peers</small><span>{{ p.runtime_metadata.peer_source|default:'—' }}</span></div>
         <div class="col-md-2"><small class="text-secondary d-block">Количество peers</small><span>{{ p.runtime_metadata.peer_count|default:'—' }}</span></div>
       </div>
