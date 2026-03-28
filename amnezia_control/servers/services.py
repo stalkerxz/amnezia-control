@@ -177,11 +177,11 @@ class ServerService:
                         iface = RuntimeCommandService.run(server, actor, f"runtime.iface.{protocol_type}", f"docker exec {container_name} wg show interfaces").stdout.strip().split()[0]
                         dump = RuntimeCommandService.run(server, actor, f"runtime.peers.{protocol_type}", f"docker exec {container_name} wg show dump").stdout
                         peer_count = sum(1 for line in dump.splitlines() if len(line.split("\t")) >= 8)
-                        peer_source = "runtime_wg_dump"
+                        peer_source = "runtime wg dump"
                     except Exception:
                         iface = ""
                         peer_count = 0
-                        peer_source = "runtime_wg_dump_failed"
+                        peer_source = "runtime wg dump failed"
 
                     for path in cls._candidate_config_paths(iface or "wg0"):
                         try:
@@ -192,9 +192,9 @@ class ServerService:
                         except Exception:
                             continue
                     if protocol_type == ServerProtocol.ProtocolType.AWG2 and raw_iface_conf:
-                        if peer_source != "runtime_wg_dump":
+                        if peer_source != "runtime wg dump":
                             peer_count = len(cls._parse_peers_from_config_text(raw_iface_conf))
-                            peer_source = "config_file_fallback"
+                            peer_source = "config file fallback"
 
                 subnet, listen_port = cls._parse_interface_metadata(raw_iface_conf)
                 awg2_meta, awg2_required_missing, awg2_optional_missing = ({}, [], [])

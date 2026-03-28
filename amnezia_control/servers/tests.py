@@ -85,7 +85,7 @@ class RuntimeDetectionTest(TestCase):
         self.assertEqual(awg2.runtime_metadata["awg2_metadata"]["Jc"], "10")
         self.assertTrue(awg2.runtime_metadata["endpoint_host_ready"])
         self.assertTrue(awg2.runtime_metadata["subnet_ready"])
-        self.assertEqual(awg2.runtime_metadata["peer_source"], "runtime_wg_dump")
+        self.assertEqual(awg2.runtime_metadata["peer_source"], "runtime wg dump")
 
     @patch("servers.services.RuntimeCommandService.run")
     def test_sync_runtime_state_awg2_uses_config_peer_fallback_when_dump_fails(self, run_mock):
@@ -109,5 +109,5 @@ class RuntimeDetectionTest(TestCase):
         run_mock.side_effect = side_effect
         ServerService.sync_runtime_state(server=self.server, actor=self.user)
         awg2 = self.server.protocols.get(protocol_type="awg2")
-        self.assertEqual(awg2.runtime_metadata["peer_source"], "config_file_fallback")
+        self.assertEqual(awg2.runtime_metadata["peer_source"], "config file fallback")
         self.assertEqual(awg2.runtime_metadata["peer_count"], 1)
