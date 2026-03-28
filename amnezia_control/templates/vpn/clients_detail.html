@@ -1,22 +1,52 @@
 {% extends 'partials/base.html' %}
 {% block content %}
 <h1 class="h3 mb-3">Клиент: {{ client.name }}</h1>
+
+<div class="mb-3">
+  {% if revision %}
+  <a class="btn btn-primary btn-lg" href="/clients/{{ client.id }}/download/">Скачать .conf</a>
+  {% else %}
+  <button class="btn btn-primary btn-lg" disabled>Скачать .conf</button>
+  {% endif %}
+</div>
+
+{% if missing_endpoint or missing_awg2_metadata or not revision %}
+<div class="card border-warning mb-3">
+  <div class="card-body">
+    <h2 class="h6 text-warning-emphasis">Нужны действия перед выдачей/переизданием</h2>
+    <ul class="mb-0">
+      {% if missing_endpoint %}
+      <li>Не найден публичный endpoint сервера (host/port). Заполните endpoint и выполните синхронизацию runtime.</li>
+      {% endif %}
+      {% if missing_awg2_metadata %}
+      <li>Отсутствуют обязательные AWG2-метаданные. Выполните синхронизацию runtime и проверьте live-конфиг AWG2.</li>
+      {% endif %}
+      {% if not revision %}
+      <li>Конфиг клиенту ещё не выдан. Нажмите «Переиздать», чтобы выпустить первую ревизию.</li>
+      {% endif %}
+    </ul>
+  </div>
+</div>
+{% endif %}
+
 <div class="row g-3 mb-3">
   <div class="col-lg-6">
     <div class="card"><div class="card-body">
       <h2 class="h6">Статус и runtime</h2>
       <p>Протокол: <span class="badge {% if client.protocol_type == 'awg2' %}text-bg-info{% else %}text-bg-secondary{% endif %}">{{ client.protocol_type|upper }}</span></p>
       <p>Статус: <span class="badge {% if client.status == 'active' %}text-bg-success{% elif client.status == 'disabled' %}text-bg-warning{% else %}text-bg-danger{% endif %}">{{ client.status }}</span></p>
+      <p class="mb-1">Сервер: <strong>{{ client.server.name }}</strong></p>
       <p class="mb-1">Peer key: <code>{{ client.runtime_peer_public_key|default:'-' }}</code></p>
       <p class="mb-0">Address: <code>{{ client.runtime_address|default:'-' }}</code></p>
     </div></div>
   </div>
   <div class="col-lg-6">
     <div class="card"><div class="card-body">
-      <h2 class="h6">Конфиг</h2>
+      <h2 class="h6">Ревизии конфига</h2>
+      <p class="mb-1">Всего ревизий: <strong>{{ revision_count }}</strong></p>
       {% if revision %}
-        <p>Ревизия: <strong>#{{ revision.revision_number }}</strong> ({{ revision.created_at }})</p>
-        <a class="btn btn-primary" href="/clients/{{ client.id }}/download/">Скачать .conf</a>
+        <p class="mb-1">Последняя ревизия: <strong>#{{ revision.revision_number }}</strong></p>
+        <p class="mb-0">Дата последней ревизии: <strong>{{ revision.created_at }}</strong></p>
       {% else %}
         <div class="empty-state">Конфиг пока не выпущен.</div>
       {% endif %}
@@ -25,14 +55,14 @@
 </div>
 
 <div class="d-flex gap-2 flex-wrap mb-3">
-<form method="post" action="/clients/{{ client.id }}/action/reissue/">{% csrf_token %}<button class="btn btn-secondary">Переиздать</button></form>
-<form method="post" action="/clients/{{ client.id }}/action/disable/">{% csrf_token %}<button class="btn btn-warning">Отключить</button></form>
-<form method="post" action="/clients/{{ client.id }}/action/enable/">{% csrf_token %}<button class="btn btn-success">Включить</button></form>
+<form method="post" action="/clients/{{ client.id }}/action/reissue/">{% csrf_token %}<button class="btn btn-primary">Переиздать конфиг</button></form>
+<form method="post" action="/clients/{{ client.id }}/action/enable/">{% csrf_token %}<button class="btn btn-outline-success">Включить</button></form>
+<form method="post" action="/clients/{{ client.id }}/action/disable/">{% csrf_token %}<button class="btn btn-outline-warning">Отключить</button></form>
 <form method="post" action="/clients/{{ client.id }}/action/delete/" onsubmit="return confirm('Удалить клиента?')">{% csrf_token %}<button class="btn btn-danger">Удалить</button></form>
 </div>
 
 {% if revision and qr_base64 %}
-<div class="card"><div class="card-body">
+<div class="card border-primary"><div class="card-body">
   <h2 class="h6">QR для подключения</h2>
   <img src="data:image/png;base64,{{ qr_base64 }}" alt="QR" class="img-thumbnail" style="max-width:300px;">
 </div></div>

@@ -96,9 +96,43 @@ def clients_create_view(request):
 @login_required
 @user_passes_test(_admin_required)
 def clients_detail_view(request, pk: int):
-    client = get_object_or_404(VPNClient, pk=pk)
-    qr_base64 = VPNClientService.qr_png_base64(client) if client.revisions.exists() else ""
-    return render(request, "vpn/clients_detail.html", {"client": client, "revision": client.revisions.first(), "qr_base64": qr_base64})
+    client = get_object_or_404(VPNClient.objects.select_related("server"), pk=pk)
+    revision = client.revisions.first()
+    revision_count = client.revisions.count()
+    qr_base64 = VPNClientService.qr_png_base64(client) if revision else ""
+
+    protocol = client.server.protocols.filter(protocol_type=client.protocol_type).first()
+    missing_endpoint = False
+    missing_awg2_metadata = False
+    if protocol:
+        host_candidates = [
+            client.server.public_endpoint_host,
+            client.server.host,
+            protocol.runtime_metadata.get("public_host", ""),
+        ]
+        host = next((h for h in host_candidates if VPNClientService._is_public_endpoint_host(h)), "")
+        port = client.server.public_endpoint_port or protocol.runtime_metadata.get("udp_port")
+        missing_endpoint = not (host and port)
+        if client.protocol_type == VPNClient.ProtocolType.AWG2:
+            required = ("Jc", "Jmin", "Jmax", "S1", "S2", "S3", "S4", "H1", "H2", "H3", "H4")
+            awg2_metadata = protocol.runtime_metadata.get("awg2_metadata", {})
+            missing_awg2_metadata = any(not awg2_metadata.get(k) for k in required)
+    else:
+        missing_endpoint = True
+        missing_awg2_metadata = client.protocol_type == VPNClient.ProtocolType.AWG2
+
+    return render(
+        request,
+        "vpn/clients_detail.html",
+        {
+            "client": client,
+            "revision": revision,
+            "revision_count": revision_count,
+            "qr_base64": qr_base64,
+            "missing_endpoint": missing_endpoint,
+            "missing_awg2_metadata": missing_awg2_metadata,
+        },
+    )
 
 
 @login_required
