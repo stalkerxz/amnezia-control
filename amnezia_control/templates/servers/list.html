@@ -24,7 +24,7 @@
     <td class="text-end">
       <div class="btn-group btn-group-sm" role="group">
         <a class="btn btn-outline-light" href="/servers/{{ s.id }}/">Открыть</a>
-        <form method="post" action="/servers/{{ s.id }}/sync-runtime/" class="d-inline">{% csrf_token %}<button class="btn btn-primary">Sync runtime</button></form>
+        <form method="post" action="/servers/{{ s.id }}/sync-runtime/" class="d-inline">{% csrf_token %}<button class="btn btn-primary">Синхронизировать runtime</button></form>
         <form method="post" action="/clients/import/?server={{ s.id }}" class="d-inline">{% csrf_token %}<button class="btn btn-outline-secondary">Импорт peers</button></form>
       </div>
     </td>

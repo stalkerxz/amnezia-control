@@ -29,8 +29,8 @@
     <div class="col-lg-2">
       <select class="form-select" name="source">
         <option value="">Источник: любой</option>
-        <option value="manual" {% if filters.source == 'manual' %}selected{% endif %}>Только manual</option>
-        <option value="imported" {% if filters.source == 'imported' %}selected{% endif %}>Только imported</option>
+        <option value="manual" {% if filters.source == 'manual' %}selected{% endif %}>Только из панели</option>
+        <option value="imported" {% if filters.source == 'imported' %}selected{% endif %}>Только импортированные</option>
       </select>
     </div>
     <div class="col-lg-2 d-flex gap-2">
@@ -63,7 +63,7 @@
       <a class="btn btn-outline-light" href="/clients/{{ c.id }}/">Открыть</a>
       <a class="btn btn-outline-secondary" href="/clients/{{ c.id }}/download/">Скачать</a>
       <a class="btn btn-outline-secondary" href="/clients/{{ c.id }}/#qr">Показать QR</a>
-      <form method="post" action="/clients/{{ c.id }}/action/reissue/">{% csrf_token %}<button class="btn btn-primary">Перевыпустить</button></form>
+      <form method="post" action="/clients/{{ c.id }}/action/reissue/">{% csrf_token %}<button class="btn btn-secondary">Перевыпустить</button></form>
       <form method="post" action="/clients/{{ c.id }}/action/disable/">{% csrf_token %}<button class="btn btn-warning">Отключить</button></form>
       <form method="post" action="/clients/{{ c.id }}/action/delete/" onsubmit="return confirm('Удалить клиента?')">{% csrf_token %}<button class="btn btn-danger">Удалить</button></form>
     </div>
