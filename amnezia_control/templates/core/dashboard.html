@@ -7,10 +7,10 @@
   </div>
   <div class="d-flex gap-2 flex-wrap">
     {% if server_for_actions %}
-      <form method="post" action="/servers/{{ server_for_actions.id }}/sync-runtime/">{% csrf_token %}<button class="btn btn-primary">Sync runtime</button></form>
-      <form method="post" action="/clients/import/?server={{ server_for_actions.id }}">{% csrf_token %}<button class="btn btn-outline-secondary">Import peers</button></form>
-      <a class="btn btn-outline-light" href="/servers/{{ server_for_actions.id }}/">Open server details</a>
-      <a class="btn btn-success" href="/clients/new/?server={{ server_for_actions.id }}&protocol=awg2">Create AWG2 client</a>
+      <form method="post" action="/servers/{{ server_for_actions.id }}/sync-runtime/">{% csrf_token %}<button class="btn btn-primary">Синхронизировать runtime</button></form>
+      <form method="post" action="/clients/import/?server={{ server_for_actions.id }}">{% csrf_token %}<button class="btn btn-outline-secondary">Импорт peers</button></form>
+      <a class="btn btn-outline-light" href="/servers/{{ server_for_actions.id }}/">Открыть сервер</a>
+      <a class="btn btn-success" href="/clients/new/?server={{ server_for_actions.id }}&protocol=awg2">Создать AWG2 клиента</a>
     {% else %}
       <a class="btn btn-outline-light" href="/servers/">Добавить сервер</a>
     {% endif %}

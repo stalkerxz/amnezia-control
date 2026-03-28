@@ -3,9 +3,11 @@
 <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-3">
   <h1 class="h3 mb-0">Клиент: {{ client.name }}</h1>
   <div class="d-flex gap-2 flex-wrap">
-    <form method="post" action="/clients/{{ client.id }}/action/reissue/">{% csrf_token %}<button class="btn btn-primary">Reissue config</button></form>
-    <form method="post" action="/clients/{{ client.id }}/action/disable/">{% csrf_token %}<button class="btn btn-warning">Disable</button></form>
-    <form method="post" action="/clients/{{ client.id }}/action/delete/" onsubmit="return confirm('Удалить клиента?')">{% csrf_token %}<button class="btn btn-danger">Delete</button></form>
+    <a class="btn btn-outline-light" href="/clients/{{ client.id }}/download/">Скачать конфиг</a>
+    <a class="btn btn-outline-secondary" href="#qr">Показать QR</a>
+    <form method="post" action="/clients/{{ client.id }}/action/reissue/">{% csrf_token %}<button class="btn btn-primary">Перевыпустить конфиг</button></form>
+    <form method="post" action="/clients/{{ client.id }}/action/disable/">{% csrf_token %}<button class="btn btn-warning">Отключить</button></form>
+    <form method="post" action="/clients/{{ client.id }}/action/delete/" onsubmit="return confirm('Удалить клиента?')">{% csrf_token %}<button class="btn btn-danger">Удалить</button></form>
   </div>
 </div>
 
@@ -55,13 +57,15 @@
   </div>
   <div class="col-lg-6">
     <div class="card"><div class="card-body">
-      <h2 class="h6">История ревизий (summary)</h2>
+      <h2 class="h6">Сводка по ревизиям</h2>
       {% if revision %}
-      <ul class="mb-0">
-        <li>Текущая ревизия: #{{ revision.revision_number }}.</li>
-        <li>Всего ревизий: {{ revisions_count }}.</li>
-        <li>Хэш текущего конфига: <code>{{ revision.config_hash|slice:':20' }}...</code></li>
-      </ul>
+      <div class="row g-2">
+        <div class="col-12"><small class="text-secondary d-block">Количество ревизий</small><strong>{{ revisions_count }}</strong></div>
+        <div class="col-12"><small class="text-secondary d-block">Последняя ревизия</small><strong>#{{ revision.revision_number }}</strong></div>
+        <div class="col-12"><small class="text-secondary d-block">Время последней ревизии</small><strong>{{ latest_revision_at|date:'d.m.Y H:i' }}</strong></div>
+      </div>
+      <hr>
+      <small class="text-secondary">Хэш текущего конфига:</small> <code>{{ revision.config_hash|slice:':20' }}...</code>
       {% else %}
       <div class="empty-state">История ревизий отсутствует.</div>
       {% endif %}

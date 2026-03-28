@@ -3,10 +3,10 @@
 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
   <h1 class="h3 mb-0">Сервер: {{ server.name }}</h1>
   <div class="d-flex gap-2 flex-wrap">
-    <form method="post" action="/servers/{{ server.id }}/sync-runtime/">{% csrf_token %}<button class="btn btn-primary">Sync runtime</button></form>
-    <form method="post" action="/clients/import/?server={{ server.id }}">{% csrf_token %}<button class="btn btn-outline-secondary">Import peers</button></form>
-    <a class="btn btn-outline-light" href="/clients/new/?server={{ server.id }}&protocol=awg">Create AWG client</a>
-    <a class="btn btn-success" href="/clients/new/?server={{ server.id }}&protocol=awg2">Create AWG2 client</a>
+    <form method="post" action="/servers/{{ server.id }}/sync-runtime/">{% csrf_token %}<button class="btn btn-primary">Синхронизировать runtime</button></form>
+    <form method="post" action="/clients/import/?server={{ server.id }}">{% csrf_token %}<button class="btn btn-outline-secondary">Импорт peers</button></form>
+    <a class="btn btn-outline-light" href="/clients/new/?server={{ server.id }}&protocol=awg">Создать AWG клиента</a>
+    <a class="btn btn-success" href="/clients/new/?server={{ server.id }}&protocol=awg2">Создать AWG2 клиента</a>
   </div>
 </div>
 
@@ -41,6 +41,16 @@
     </div></div>
   </div>
 </div>
+
+<div class="card mb-3"><div class="card-body">
+  <h2 class="h6">Операторский workflow</h2>
+  <ol class="mb-0">
+    <li>Синхронизируйте runtime.</li>
+    <li>Проверьте диагностику протокола и endpoint readiness.</li>
+    <li>Импортируйте peers при необходимости.</li>
+    <li>Создайте AWG2 клиента и перейдите в карточку клиента.</li>
+  </ol>
+</div></div>
 
 <div class="row g-3">
   {% for p in protocols %}

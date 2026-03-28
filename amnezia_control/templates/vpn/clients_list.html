@@ -6,7 +6,7 @@
     <p class="text-secondary mb-0">Операционное управление клиентами без перехода в Django Admin.</p>
   </div>
   <div class="d-flex gap-2">
-    <form method="post" action="/clients/import/">{% csrf_token %}<button class="btn btn-outline-secondary">Import peers</button></form>
+    <form method="post" action="/clients/import/">{% csrf_token %}<button class="btn btn-outline-secondary">Импорт peers</button></form>
     <a class="btn btn-primary" href="/clients/new/">Создать клиента</a>
   </div>
 </div>
@@ -40,7 +40,7 @@
 {% if clients %}
 <div class="table-responsive">
 <table class="table table-hover align-middle">
-  <thead><tr><th>Имя</th><th>Протокол</th><th>Статус</th><th>Сервер</th><th>Runtime address</th><th>Imported</th><th>Updated</th><th class="text-end">Действия</th></tr></thead>
+  <thead><tr><th>Имя</th><th>Протокол</th><th>Статус</th><th>Сервер</th><th>Runtime address</th><th>Источник</th><th>Обновлено</th><th class="text-end">Действия</th></tr></thead>
   <tbody>
 {% for c in clients %}
 <tr>
@@ -50,15 +50,19 @@
   <td>{{ c.server.name }}</td>
   <td><code>{{ c.runtime_address|default:'—' }}</code></td>
   <td>{% if c.imported_from_runtime %}<span class="badge text-bg-info">Да</span>{% else %}<span class="badge text-bg-secondary">Нет</span>{% endif %}</td>
-  <td>{% if c.last_runtime_sync_at %}{{ c.last_runtime_sync_at|date:'d.m.Y H:i' }}{% else %}{{ c.created_at|date:'d.m.Y H:i' }}{% endif %}</td>
+  <td>
+    {% if c.last_revision_at %}{{ c.last_revision_at|date:'d.m.Y H:i' }}
+    {% elif c.last_runtime_sync_at %}{{ c.last_runtime_sync_at|date:'d.m.Y H:i' }}
+    {% else %}{{ c.created_at|date:'d.m.Y H:i' }}{% endif %}
+  </td>
   <td class="text-end">
     <div class="btn-group btn-group-sm" role="group">
-      <a class="btn btn-outline-light" href="/clients/{{ c.id }}/">Open</a>
-      <a class="btn btn-outline-secondary" href="/clients/{{ c.id }}/download/">Download</a>
-      <a class="btn btn-outline-secondary" href="/clients/{{ c.id }}/#qr">QR</a>
-      <form method="post" action="/clients/{{ c.id }}/action/reissue/">{% csrf_token %}<button class="btn btn-secondary">Reissue</button></form>
-      <form method="post" action="/clients/{{ c.id }}/action/disable/">{% csrf_token %}<button class="btn btn-warning">Disable</button></form>
-      <form method="post" action="/clients/{{ c.id }}/action/delete/" onsubmit="return confirm('Удалить клиента?')">{% csrf_token %}<button class="btn btn-danger">Delete</button></form>
+      <a class="btn btn-outline-light" href="/clients/{{ c.id }}/">Открыть</a>
+      <a class="btn btn-outline-secondary" href="/clients/{{ c.id }}/download/">Скачать</a>
+      <a class="btn btn-outline-secondary" href="/clients/{{ c.id }}/#qr">Показать QR</a>
+      <form method="post" action="/clients/{{ c.id }}/action/reissue/">{% csrf_token %}<button class="btn btn-primary">Перевыпустить</button></form>
+      <form method="post" action="/clients/{{ c.id }}/action/disable/">{% csrf_token %}<button class="btn btn-warning">Отключить</button></form>
+      <form method="post" action="/clients/{{ c.id }}/action/delete/" onsubmit="return confirm('Удалить клиента?')">{% csrf_token %}<button class="btn btn-danger">Удалить</button></form>
     </div>
   </td>
 </tr>

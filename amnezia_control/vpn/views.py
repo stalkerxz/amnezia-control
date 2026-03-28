@@ -1,6 +1,6 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, user_passes_test
-from django.db.models import Count
+from django.db.models import Count, Max
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 
@@ -22,7 +22,7 @@ def clients_list_view(request):
     status = request.GET.get("status", "").strip()
     source = request.GET.get("source", "").strip()
 
-    clients = VPNClient.objects.select_related("server").order_by("-created_at")
+    clients = VPNClient.objects.select_related("server").annotate(last_revision_at=Max("revisions__created_at")).order_by("-created_at")
     if q:
         clients = clients.filter(name__icontains=q)
     if protocol in {choice[0] for choice in VPNClient.ProtocolType.choices}:
@@ -125,8 +125,12 @@ def clients_detail_view(request, pk: int):
     qr_base64 = VPNClientService.qr_png_base64(client) if revision else ""
 
     blockers = []
+    if client.status == VPNClient.Status.DELETED:
+        blockers.append("Клиент помечен как удаленный. Доступны только просмотр и аудит изменений.")
     if not client.runtime_address:
         blockers.append("Runtime address отсутствует. Выполните перевыпуск конфига.")
+    if not revision:
+        blockers.append("Конфиг еще не выпущен. Нажмите «Перевыпустить конфиг».")
     if client.protocol_type == VPNClient.ProtocolType.AWG2:
         protocol = client.server.protocols.filter(protocol_type=VPNClient.ProtocolType.AWG2).first()
         if protocol and not protocol.runtime_metadata.get("awg2_metadata_ready", False):
@@ -141,6 +145,7 @@ def clients_detail_view(request, pk: int):
             "client": client,
             "revision": revision,
             "revisions_count": revisions.aggregate(total=Count("id")).get("total") or 0,
+            "latest_revision_at": revision.created_at if revision else None,
             "qr_base64": qr_base64,
             "blockers": blockers,
         },
