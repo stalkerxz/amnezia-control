@@ -1,6 +1,7 @@
 import json
 
 from django.contrib.auth.decorators import login_required, user_passes_test
+from django.core.paginator import Paginator
 from django.shortcuts import get_object_or_404, render
 
 from .models import Job
@@ -13,8 +14,10 @@ def _admin_required(user):
 @login_required
 @user_passes_test(_admin_required)
 def jobs_list_view(request):
-    jobs = Job.objects.select_related("server", "actor").order_by("-created_at")[:200]
-    return render(request, "jobs/list.html", {"jobs": jobs})
+    jobs_qs = Job.objects.select_related("server", "actor").order_by("-created_at")
+    paginator = Paginator(jobs_qs, 50)
+    page_obj = paginator.get_page(request.GET.get("page"))
+    return render(request, "jobs/list.html", {"jobs": page_obj.object_list, "page_obj": page_obj})
 
 
 @login_required

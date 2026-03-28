@@ -1,4 +1,5 @@
 from django.contrib.auth.decorators import login_required, user_passes_test
+from django.core.paginator import Paginator
 from django.shortcuts import render
 from .models import AuditLog
 
@@ -14,4 +15,6 @@ def audit_list_view(request):
     logs = AuditLog.objects.all()
     if q:
         logs = logs.filter(action__icontains=q)
-    return render(request, "audit/list.html", {"logs": logs[:200], "q": q})
+    paginator = Paginator(logs, 100)
+    page_obj = paginator.get_page(request.GET.get("page"))
+    return render(request, "audit/list.html", {"logs": page_obj.object_list, "q": q, "page_obj": page_obj})

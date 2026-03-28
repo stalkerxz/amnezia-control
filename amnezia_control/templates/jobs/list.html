@@ -2,8 +2,10 @@
 {% block content %}
 <h1 class="h3 mb-3">Задания</h1>
 {% if jobs %}
-<table class="table table-hover align-middle">
-<tr><th>ID</th><th>Действие</th><th>Сервер</th><th>Инициатор</th><th>Статус</th><th>Создано</th></tr>
+<div class="table-responsive card p-2">
+<table class="table table-hover align-middle mb-0">
+<thead><tr><th>ID</th><th>Действие</th><th>Сервер</th><th>Инициатор</th><th>Статус</th><th>Создано</th></tr></thead>
+<tbody>
 {% for j in jobs %}
 <tr class="{% if j.status == 'failed' %}table-danger{% endif %}">
   <td><a href="/jobs/{{ j.id }}/">#{{ j.id }}</a></td>
@@ -14,8 +16,26 @@
   <td>{{ j.created_at }}</td>
 </tr>
 {% endfor %}
+</tbody>
 </table>
+</div>
+{% if page_obj and page_obj.paginator.num_pages > 1 %}
+<nav class="mt-3" aria-label="Навигация по заданиям">
+  <ul class="pagination pagination-sm mb-0">
+    <li class="page-item {% if not page_obj.has_previous %}disabled{% endif %}">
+      <a class="page-link" href="?page={% if page_obj.has_previous %}{{ page_obj.previous_page_number }}{% else %}1{% endif %}">Назад</a>
+    </li>
+    <li class="page-item disabled"><span class="page-link">Стр. {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span></li>
+    <li class="page-item {% if not page_obj.has_next %}disabled{% endif %}">
+      <a class="page-link" href="?page={% if page_obj.has_next %}{{ page_obj.next_page_number }}{% else %}{{ page_obj.paginator.num_pages }}{% endif %}">Вперёд</a>
+    </li>
+  </ul>
+</nav>
+{% endif %}
 {% else %}
-<div class="empty-state">Заданий пока нет.</div>
+<div class="empty-state">
+  <h2 class="h6 mb-2">Заданий пока нет</h2>
+  <p class="mb-0">Когда запустятся операции по серверам и клиентам, они появятся здесь.</p>
+</div>
 {% endif %}
 {% endblock %}

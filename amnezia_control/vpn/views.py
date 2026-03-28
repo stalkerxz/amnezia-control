@@ -137,6 +137,23 @@ def clients_detail_view(request, pk: int):
 
 @login_required
 @user_passes_test(_admin_required)
+def client_qr_modal_view(request, pk: int):
+    client = get_object_or_404(VPNClient, pk=pk)
+    revision = client.revisions.first()
+    qr_base64 = VPNClientService.qr_png_base64(client) if revision else ""
+    return render(
+        request,
+        "vpn/partials/client_qr_modal_body.html",
+        {
+            "client": client,
+            "revision": revision,
+            "qr_base64": qr_base64,
+        },
+    )
+
+
+@login_required
+@user_passes_test(_admin_required)
 def client_action_view(request, pk: int, action: str):
     client = get_object_or_404(VPNClient, pk=pk)
     if request.method != "POST":
