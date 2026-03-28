@@ -22,16 +22,16 @@
       <h2 class="h6">Runtime и endpoint</h2>
       <div class="row g-3">
         <div class="col-md-6"><small class="text-secondary d-block">Host</small><code>{{ server.host }}</code></div>
-        <div class="col-md-6"><small class="text-secondary d-block">Public endpoint host</small><code>{{ server.public_endpoint_host|default:'—' }}</code></div>
-        <div class="col-md-6"><small class="text-secondary d-block">SSH summary</small><code>{{ server.ssh_username }}@{{ server.host }}:{{ server.port }}</code></div>
-        <div class="col-md-6"><small class="text-secondary d-block">Health status</small><span class="badge text-bg-secondary">{{ server.health_status }}</span></div>
-        <div class="col-md-6"><small class="text-secondary d-block">Last runtime sync</small>{{ server.last_runtime_sync_at|date:'d.m.Y H:i'|default:'—' }}</div>
+        <div class="col-md-6"><small class="text-secondary d-block">Публичный endpoint host</small><code>{{ server.public_endpoint_host|default:'—' }}</code></div>
+        <div class="col-md-6"><small class="text-secondary d-block">SSH сводка</small><code>{{ server.ssh_username }}@{{ server.host }}:{{ server.port }}</code></div>
+        <div class="col-md-6"><small class="text-secondary d-block">Статус здоровья</small><span class="badge text-bg-secondary">{{ server.health_status }}</span></div>
+        <div class="col-md-6"><small class="text-secondary d-block">Последний runtime sync</small>{{ server.last_runtime_sync_at|date:'d.m.Y H:i'|default:'—' }}</div>
       </div>
     </div></div>
   </div>
   <div class="col-lg-4">
     <div class="card h-100"><div class="card-body">
-      <h2 class="h6">Диагностика endpoint</h2>
+      <h2 class="h6">Готовность endpoint</h2>
       {% with p=awg2|default:awg %}
       {% if p %}
       <p class="mb-2">Endpoint host: {% if p.runtime_metadata.endpoint_host_ready %}<span class="badge text-bg-success">Готов</span>{% else %}<span class="badge text-bg-danger">Не готов</span>{% endif %}</p>
@@ -57,23 +57,23 @@
   <div class="col-12">
     <div class="card"><div class="card-body">
       <div class="d-flex justify-content-between align-items-center mb-3">
-        <h2 class="h6 mb-0">{{ p.protocol_type|upper }} diagnostics</h2>
+        <h2 class="h6 mb-0">{{ p.protocol_type|upper }} диагностика</h2>
         <span class="badge {% if p.enabled %}text-bg-success{% else %}text-bg-danger{% endif %}">{% if p.enabled %}active{% else %}inactive{% endif %}</span>
       </div>
       <div class="row g-3">
-        <div class="col-md-4"><small class="text-secondary d-block">Discovered config path</small><code>{{ p.runtime_metadata.config_path|default:'—' }}</code></div>
+        <div class="col-md-4"><small class="text-secondary d-block">Обнаруженный config path</small><code>{{ p.runtime_metadata.config_path|default:'—' }}</code></div>
         <div class="col-md-2"><small class="text-secondary d-block">Subnet</small><code>{{ p.runtime_metadata.subnet|default:'—' }}</code></div>
         <div class="col-md-2"><small class="text-secondary d-block">UDP port</small><code>{{ p.runtime_metadata.udp_port|default:'—' }}</code></div>
-        <div class="col-md-2"><small class="text-secondary d-block">Peer source</small><span>{{ p.runtime_metadata.peer_source|default:'—' }}</span></div>
-        <div class="col-md-2"><small class="text-secondary d-block">Peer count</small><span>{{ p.runtime_metadata.peer_count|default:'—' }}</span></div>
+        <div class="col-md-2"><small class="text-secondary d-block">Источник peers</small><span>{{ p.runtime_metadata.peer_source|default:'—' }}</span></div>
+        <div class="col-md-2"><small class="text-secondary d-block">Количество peers</small><span>{{ p.runtime_metadata.peer_count|default:'—' }}</span></div>
       </div>
       {% if p.protocol_type == 'awg2' %}
       <hr>
       <div class="row g-3">
-        <div class="col-md-3"><small class="text-secondary d-block">Metadata status</small>{% if p.runtime_metadata.awg2_metadata_ready %}<span class="badge text-bg-success">ready</span>{% else %}<span class="badge text-bg-danger">not ready</span>{% endif %}</div>
-        <div class="col-md-3"><small class="text-secondary d-block">Active keys</small><code>{% if p.runtime_metadata.awg2_active_keys %}{{ p.runtime_metadata.awg2_active_keys|join:', ' }}{% else %}—{% endif %}</code></div>
-        <div class="col-md-3"><small class="text-secondary d-block">Required missing keys</small><code>{% if p.runtime_metadata.awg2_missing_keys %}{{ p.runtime_metadata.awg2_missing_keys|join:', ' }}{% else %}—{% endif %}</code></div>
-        <div class="col-md-3"><small class="text-secondary d-block">Optional missing keys</small><code>{% if p.runtime_metadata.awg2_optional_missing_keys %}{{ p.runtime_metadata.awg2_optional_missing_keys|join:', ' }}{% else %}—{% endif %}</code></div>
+        <div class="col-md-3"><small class="text-secondary d-block">Статус metadata</small>{% if p.runtime_metadata.awg2_metadata_ready %}<span class="badge text-bg-success">готово</span>{% else %}<span class="badge text-bg-danger">не готово</span>{% endif %}</div>
+        <div class="col-md-3"><small class="text-secondary d-block">Активные ключи</small><code>{% if p.runtime_metadata.awg2_active_keys %}{{ p.runtime_metadata.awg2_active_keys|join:', ' }}{% else %}—{% endif %}</code></div>
+        <div class="col-md-3"><small class="text-secondary d-block">Обязательные missing keys</small><code>{% if p.runtime_metadata.awg2_missing_keys %}{{ p.runtime_metadata.awg2_missing_keys|join:', ' }}{% else %}—{% endif %}</code></div>
+        <div class="col-md-3"><small class="text-secondary d-block">Опциональные missing keys</small><code>{% if p.runtime_metadata.awg2_optional_missing_keys %}{{ p.runtime_metadata.awg2_optional_missing_keys|join:', ' }}{% else %}—{% endif %}</code></div>
       </div>
       {% endif %}
     </div></div>

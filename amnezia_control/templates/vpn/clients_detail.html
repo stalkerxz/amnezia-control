@@ -22,12 +22,12 @@
       <div class="row g-3">
         <div class="col-md-4"><small class="text-secondary d-block">Протокол</small><span class="badge {% if client.protocol_type == 'awg2' %}text-bg-info{% else %}text-bg-secondary{% endif %}">{{ client.protocol_type|upper }}</span></div>
         <div class="col-md-4"><small class="text-secondary d-block">Статус</small><span class="badge {% if client.status == 'active' %}text-bg-success{% elif client.status == 'disabled' %}text-bg-warning{% else %}text-bg-danger{% endif %}">{{ client.get_status_display }}</span></div>
-        <div class="col-md-4"><small class="text-secondary d-block">Created by</small>{{ client.created_by|default:'system' }}</div>
-        <div class="col-md-6"><small class="text-secondary d-block">Runtime peer public key</small><code>{{ client.runtime_peer_public_key|default:'—' }}</code></div>
-        <div class="col-md-6"><small class="text-secondary d-block">Runtime address</small><code>{{ client.runtime_address|default:'—' }}</code></div>
-        <div class="col-md-6"><small class="text-secondary d-block">Imported from runtime</small>{% if client.imported_from_runtime %}Да{% else %}Нет{% endif %}</div>
-        <div class="col-md-6"><small class="text-secondary d-block">Last runtime sync</small>{{ client.last_runtime_sync_at|date:'d.m.Y H:i'|default:'—' }}</div>
-        <div class="col-md-6"><small class="text-secondary d-block">Config revision count</small>{{ revisions_count }}</div>
+        <div class="col-md-4"><small class="text-secondary d-block">Создал</small>{{ client.created_by|default:'system' }}</div>
+        <div class="col-md-6"><small class="text-secondary d-block">Публичный ключ peer (runtime)</small><code>{{ client.runtime_peer_public_key|default:'—' }}</code></div>
+        <div class="col-md-6"><small class="text-secondary d-block">Адрес (runtime)</small><code>{{ client.runtime_address|default:'—' }}</code></div>
+        <div class="col-md-6"><small class="text-secondary d-block">Импортирован из runtime</small>{% if client.imported_from_runtime %}Да{% else %}Нет{% endif %}</div>
+        <div class="col-md-6"><small class="text-secondary d-block">Последний runtime sync</small>{{ client.last_runtime_sync_at|date:'d.m.Y H:i'|default:'—' }}</div>
+        <div class="col-md-6"><small class="text-secondary d-block">Количество ревизий</small>{{ revisions_count }}</div>
       </div>
     </div></div>
   </div>
@@ -50,7 +50,7 @@
 <div class="row g-3">
   <div class="col-lg-6" id="qr">
     <div class="card"><div class="card-body">
-      <h2 class="h6">QR preview</h2>
+      <h2 class="h6">Предпросмотр QR</h2>
       {% if revision and qr_base64 %}
         <img src="data:image/png;base64,{{ qr_base64 }}" alt="QR" class="img-thumbnail" style="max-width:320px;">
       {% else %}
