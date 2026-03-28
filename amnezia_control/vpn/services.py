@@ -164,7 +164,7 @@ class BaseProtocolAdapter:
 
 class AWGLegacyAdapter(BaseProtocolAdapter):
     protocol_type = VPNClient.ProtocolType.AWG
-    command_bin = "awg"
+    command_bin = "wg"
 
 
 class AWG2Adapter(BaseProtocolAdapter):
@@ -228,12 +228,14 @@ class VPNClientService:
 
     @staticmethod
     def build_awg2_client_config(*, private_key: str, address: str, endpoint: str, server_public_key: str, awg2_metadata: dict) -> str:
-        required = ("I1", "I2", "I3", "I4", "I5", "S1", "S2", "S3", "S4", "Jc", "Jmin", "Jmax", "H1", "H2", "H3", "H4")
+        required = ("Jc", "Jmin", "Jmax", "S1", "S2", "S3", "S4", "H1", "H2", "H3", "H4")
+        optional = ("I1", "I2", "I3", "I4", "I5")
         missing = [k for k in required if not awg2_metadata.get(k)]
         if missing:
             raise RuntimeError(f"AWG2 metadata is incomplete: missing {', '.join(missing)}. Run runtime sync and verify live AWG2 config.")
 
         awg2_lines = [f"{k} = {awg2_metadata[k]}" for k in required]
+        awg2_lines.extend(f"{k} = {awg2_metadata[k]}" for k in optional if awg2_metadata.get(k))
         return (
             "[Interface]\n"
             f"PrivateKey = {private_key}\n"

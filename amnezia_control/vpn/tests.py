@@ -90,6 +90,22 @@ class VPNClientFlowTest(TestCase):
         self.assertIn("Jc = 7", conf)
         self.assertIn("H4 = 6", conf)
 
+
+    def test_awg2_export_succeeds_without_optional_i_keys(self):
+        from unittest.mock import patch
+
+        self.awg2_protocol.runtime_metadata["awg2_metadata"] = {
+            "S1": "1", "S2": "2", "S3": "3", "S4": "4",
+            "Jc": "7", "Jmin": "8", "Jmax": "9",
+            "H1": "3", "H2": "4", "H3": "5", "H4": "6",
+        }
+        self.awg2_protocol.save(update_fields=["runtime_metadata"])
+        with patch("vpn.services.RuntimeCommandService.run", side_effect=self._mock_run):
+            client = VPNClientService.create_client(server=self.server, name="awg2-no-i", protocol_type=VPNClient.ProtocolType.AWG2, actor=self.user)
+        conf = VPNClientService.latest_config(client)
+        self.assertIn("Jc = 7", conf)
+        self.assertNotIn("I1 =", conf)
+
     def test_awg2_missing_metadata_fails_export(self):
         from unittest.mock import patch
 
@@ -134,8 +150,9 @@ class VPNClientFlowTest(TestCase):
             "AWG2_JC=7", "AWG2_JMIN=8", "AWG2_JMAX=9",
             "AWG2_H1=3", "AWG2_H2=4", "AWG2_H3=5", "AWG2_H4=6",
         ]
-        parsed, missing = ServerService._parse_awg2_metadata(env, "")
-        self.assertEqual(missing, [])
+        parsed, required_missing, optional_missing = ServerService._parse_awg2_metadata(env, "")
+        self.assertEqual(required_missing, [])
+        self.assertEqual(optional_missing, [])
         self.awg2_protocol.runtime_metadata["awg2_metadata"] = parsed
         self.awg2_protocol.save(update_fields=["runtime_metadata"])
 
@@ -149,5 +166,5 @@ class VPNClientFlowTest(TestCase):
     def test_adapter_factory_separates_protocols(self):
         awg_adapter = AdapterFactory.get_for_server(self.server, VPNClient.ProtocolType.AWG)
         awg2_adapter = AdapterFactory.get_for_server(self.server, VPNClient.ProtocolType.AWG2)
-        self.assertEqual(awg_adapter.command_bin, "awg")
+        self.assertEqual(awg_adapter.command_bin, "wg")
         self.assertEqual(awg2_adapter.command_bin, "wg")

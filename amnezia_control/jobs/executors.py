@@ -27,7 +27,7 @@ class SafeSSHExecutor:
         r"^docker exec [a-zA-Z0-9_.-]+ (?:wg|awg) set [a-zA-Z0-9_.-]+ peer [A-Za-z0-9+/=]+ allowed-ips [0-9.]+/32$",
         r"^docker exec [a-zA-Z0-9_.-]+ (?:wg|awg) set [a-zA-Z0-9_.-]+ peer [A-Za-z0-9+/=]+ remove$",
         r"^docker exec [a-zA-Z0-9_.-]+ ls (?:/etc/amnezia|/opt/amnezia|/etc/wireguard)$",
-        r"^docker exec [a-zA-Z0-9_.-]+ cat (?:/etc/amnezia/[a-zA-Z0-9_./-]+|/etc/wireguard/[a-zA-Z0-9_./-]+)$",
+        r"^docker exec [a-zA-Z0-9_.-]+ cat (?:/etc/amnezia/[a-zA-Z0-9_./-]+|/etc/wireguard/[a-zA-Z0-9_./-]+|/opt/amnezia/[a-zA-Z0-9_./-]+)$",
     ]
 
     def __init__(self, host: str, username: str, port: int = 22, key_path: str | None = None, timeout: int = 15):

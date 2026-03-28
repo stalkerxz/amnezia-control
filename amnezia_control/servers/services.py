@@ -16,12 +16,8 @@ class ServerService:
         ServerProtocol.ProtocolType.AWG: "amnezia-awg",
         ServerProtocol.ProtocolType.AWG2: "amnezia-awg2",
     }
-    AWG2_CANONICAL_KEYS = [
-        "I1", "I2", "I3", "I4", "I5",
-        "S1", "S2", "S3", "S4",
-        "Jc", "Jmin", "Jmax",
-        "H1", "H2", "H3", "H4",
-    ]
+    AWG2_REQUIRED_KEYS = ["Jc", "Jmin", "Jmax", "S1", "S2", "S3", "S4", "H1", "H2", "H3", "H4"]
+    AWG2_OPTIONAL_KEYS = ["I1", "I2", "I3", "I4", "I5"]
 
     @staticmethod
     def update_health(server: Server, status: str) -> Server:
@@ -31,12 +27,7 @@ class ServerService:
 
     @staticmethod
     def refresh_health_with_job(server: Server, actor):
-        return JobService.create_job(
-            server=server,
-            actor=actor,
-            action="server.health_check",
-            payload={"server_id": server.id},
-        )
+        return JobService.create_job(server=server, actor=actor, action="server.health_check", payload={"server_id": server.id})
 
     @staticmethod
     def _parse_udp_port(inspect_data):
@@ -62,6 +53,8 @@ class ServerService:
         listen_port = None
         for line in raw_conf.splitlines():
             text = line.strip()
+            if not text or text.startswith("#"):
+                continue
             if text.lower().startswith("address") and "=" in text:
                 value = text.split("=", 1)[1].strip().split(",")[0].strip()
                 try:
@@ -74,7 +67,6 @@ class ServerService:
                 except ValueError:
                     listen_port = None
         return subnet, listen_port
-
 
     @staticmethod
     def _is_public_host(value: str) -> bool:
@@ -91,11 +83,7 @@ class ServerService:
     @classmethod
     def _normalize_awg2_key(cls, key: str) -> str:
         compact = re.sub(r"[^A-Za-z0-9]", "", key).upper().replace("AWG2", "")
-        mapping = {
-            "JC": "Jc",
-            "JMIN": "Jmin",
-            "JMAX": "Jmax",
-        }
+        mapping = {"JC": "Jc", "JMIN": "Jmin", "JMAX": "Jmax"}
         if compact in mapping:
             return mapping[compact]
         if compact and compact[0] in {"I", "S", "H"}:
@@ -105,26 +93,42 @@ class ServerService:
     @classmethod
     def _parse_awg2_metadata(cls, env_list, conf_text: str):
         discovered = {}
+        allowed = set(cls.AWG2_REQUIRED_KEYS + cls.AWG2_OPTIONAL_KEYS)
 
         for item in env_list:
             if "=" not in item:
                 continue
             k, v = item.split("=", 1)
             norm = cls._normalize_awg2_key(k)
-            if norm in cls.AWG2_CANONICAL_KEYS:
+            if norm in allowed:
                 discovered[norm] = v.strip()
 
         for line in conf_text.splitlines():
             text = line.strip()
-            if "=" not in text:
+            if not text or text.startswith("#") or "=" not in text:
                 continue
             k, v = text.split("=", 1)
             norm = cls._normalize_awg2_key(k)
-            if norm in cls.AWG2_CANONICAL_KEYS:
+            if norm in allowed:
                 discovered[norm] = v.strip()
 
-        missing = [k for k in cls.AWG2_CANONICAL_KEYS if not discovered.get(k)]
-        return discovered, missing
+        required_missing = [k for k in cls.AWG2_REQUIRED_KEYS if not discovered.get(k)]
+        optional_missing = [k for k in cls.AWG2_OPTIONAL_KEYS if not discovered.get(k)]
+        return discovered, required_missing, optional_missing
+
+    @staticmethod
+    def _candidate_config_paths(iface: str):
+        return [
+            "/opt/amnezia/awg/awg0.conf",
+            "/opt/amnezia/awg/wg0.conf",
+            f"/opt/amnezia/awg/{iface}.conf",
+            "/etc/amnezia/awg0.conf",
+            "/etc/amnezia/wg0.conf",
+            f"/etc/amnezia/{iface}.conf",
+            "/etc/wireguard/awg0.conf",
+            "/etc/wireguard/wg0.conf",
+            f"/etc/wireguard/{iface}.conf",
+        ]
 
     @classmethod
     def sync_runtime_state(cls, *, server: Server, actor):
@@ -139,42 +143,43 @@ class ServerService:
                 inspect_raw = RuntimeCommandService.run(server, actor, f"runtime.inspect.{protocol_type}", f"docker inspect {container_name}").stdout
                 inspect_data = json.loads(inspect_raw)
                 config_env = inspect_data[0].get("Config", {}).get("Env", [])
-                command_bin = "awg" if protocol_type == ServerProtocol.ProtocolType.AWG else "wg"
 
                 iface = ""
                 peer_count = 0
                 raw_iface_conf = ""
+                config_path = ""
                 if container_name in running_names:
                     try:
-                        iface = RuntimeCommandService.run(server, actor, f"runtime.iface.{protocol_type}", f"docker exec {container_name} {command_bin} show interfaces").stdout.strip().split()[0]
-                        dump = RuntimeCommandService.run(server, actor, f"runtime.peers.{protocol_type}", f"docker exec {container_name} {command_bin} show dump").stdout
+                        iface = RuntimeCommandService.run(server, actor, f"runtime.iface.{protocol_type}", f"docker exec {container_name} wg show interfaces").stdout.strip().split()[0]
+                        dump = RuntimeCommandService.run(server, actor, f"runtime.peers.{protocol_type}", f"docker exec {container_name} wg show dump").stdout
                         peer_count = sum(1 for line in dump.splitlines() if len(line.split("\t")) >= 8)
                     except Exception:
                         iface = ""
                         peer_count = 0
 
-                    if iface:
-                        for path in (f"/etc/wireguard/{iface}.conf", f"/etc/amnezia/{iface}.conf", "/etc/amnezia/awg2.conf"):
-                            try:
-                                raw_iface_conf = RuntimeCommandService.run(server, actor, f"runtime.conf.{protocol_type}", f"docker exec {container_name} cat {path}").stdout
-                                if raw_iface_conf:
-                                    break
-                            except Exception:
-                                continue
+                    for path in cls._candidate_config_paths(iface or "wg0"):
+                        try:
+                            raw_iface_conf = RuntimeCommandService.run(server, actor, f"runtime.conf.{protocol_type}", f"docker exec {container_name} cat {path}").stdout
+                            if raw_iface_conf:
+                                config_path = path
+                                break
+                        except Exception:
+                            continue
 
                 subnet, listen_port = cls._parse_interface_metadata(raw_iface_conf)
-                awg2_meta, awg2_missing = ({}, [])
+                awg2_meta, awg2_required_missing, awg2_optional_missing = ({}, [], [])
                 if protocol_type == ServerProtocol.ProtocolType.AWG2:
-                    awg2_meta, awg2_missing = cls._parse_awg2_metadata(config_env, raw_iface_conf)
+                    awg2_meta, awg2_required_missing, awg2_optional_missing = cls._parse_awg2_metadata(config_env, raw_iface_conf)
 
-                protocol.container_status = inspect_data[0].get("State", {}).get("Status", "unknown")
                 udp_port = cls._parse_udp_port(inspect_data) or listen_port
                 discovered_public_host = cls._parse_public_host(inspect_data)
                 endpoint_host_ready = cls._is_public_host(server.public_endpoint_host) or cls._is_public_host(server.host) or cls._is_public_host(discovered_public_host)
                 endpoint_port_ready = bool(server.public_endpoint_port or udp_port)
                 subnet_ready = bool(subnet)
 
+                protocol.container_status = inspect_data[0].get("State", {}).get("Status", "unknown")
                 protocol.runtime_metadata = {
+                    "config_path": config_path,
                     "udp_port": udp_port,
                     "public_host": discovered_public_host,
                     "image": inspect_data[0].get("Config", {}).get("Image", ""),
@@ -187,8 +192,10 @@ class ServerService:
                     "endpoint_host_ready": endpoint_host_ready,
                     "endpoint_port_ready": endpoint_port_ready,
                     "awg2_metadata": awg2_meta,
-                    "awg2_missing_keys": awg2_missing,
-                    "awg2_metadata_ready": not awg2_missing if protocol_type == ServerProtocol.ProtocolType.AWG2 else True,
+                    "awg2_active_keys": sorted(awg2_meta.keys()),
+                    "awg2_missing_keys": awg2_required_missing,
+                    "awg2_optional_missing_keys": awg2_optional_missing,
+                    "awg2_metadata_ready": not awg2_required_missing if protocol_type == ServerProtocol.ProtocolType.AWG2 else True,
                 }
                 protocol.enabled = container_name in running_names
             else:

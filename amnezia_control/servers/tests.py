@@ -25,33 +25,31 @@ class RuntimeDetectionTest(TestCase):
             "AWG2_JC=10", "AWG2_JMIN=11", "AWG2_JMAX=12",
             "AWG2_H1=13", "AWG2_H2=14", "AWG2_H3=15", "AWG2_H4=16",
         ]
-        parsed, missing = ServerService._parse_awg2_metadata(env, "")
+        parsed, required_missing, optional_missing = ServerService._parse_awg2_metadata(env, "")
         self.assertEqual(parsed["Jc"], "10")
         self.assertEqual(parsed["Jmin"], "11")
         self.assertEqual(parsed["Jmax"], "12")
-        self.assertEqual(missing, [])
+        self.assertEqual(required_missing, [])
+        self.assertEqual(optional_missing, [])
 
     def test_awg2_parser_config_parse_canonical_keys(self):
         conf = "\n".join([
-            "I1 = 1", "I2 = 2", "I3 = 3", "I4 = 4", "I5 = 5",
             "S1 = 6", "S2 = 7", "S3 = 8", "S4 = 9",
             "Jc = 10", "Jmin = 11", "Jmax = 12",
             "H1 = 13", "H2 = 14", "H3 = 15", "H4 = 16",
+            "# I1 = 1",
         ])
-        parsed, missing = ServerService._parse_awg2_metadata([], conf)
+        parsed, required_missing, optional_missing = ServerService._parse_awg2_metadata([], conf)
         self.assertEqual(parsed["Jc"], "10")
-        self.assertEqual(parsed["Jmin"], "11")
-        self.assertEqual(parsed["Jmax"], "12")
-        self.assertEqual(missing, [])
-
+        self.assertEqual(required_missing, [])
+        self.assertIn("I1", optional_missing)
 
     def test_awg2_parser_reports_exact_missing_keys(self):
-        env = ["AWG2_I1=1", "AWG2_S1=2", "AWG2_JC=3"]
-        parsed, missing = ServerService._parse_awg2_metadata(env, "")
+        env = ["AWG2_S1=2", "AWG2_JC=3"]
+        parsed, required_missing, _ = ServerService._parse_awg2_metadata(env, "")
         self.assertEqual(parsed["Jc"], "3")
-        self.assertIn("I2", missing)
-        self.assertIn("Jmin", missing)
-        self.assertIn("Jmax", missing)
+        self.assertIn("S2", required_missing)
+        self.assertIn("Jmin", required_missing)
 
     @patch("servers.services.RuntimeCommandService.run")
     def test_sync_runtime_state_metadata_storage_canonical_awg2(self, run_mock):
@@ -66,10 +64,10 @@ class RuntimeDetectionTest(TestCase):
             Result("awg0\n"),
             Result("awg0\tprivate\tpub\t51820\npeer1\tpsk\tep\t10.66.0.10/32\t0\t0\t0\t25\n"),
             Result("[Interface]\nAddress = 10.66.0.1/24\nListenPort = 51820\n"),
-            Result('[{"State":{"Status":"running"},"NetworkSettings":{"Ports":{"51830/udp":[{"HostIp":"198.51.100.20","HostPort":"51830"}]}},"Config":{"Image":"awg2","Env":["AWG2_I1=1","AWG2_I2=2","AWG2_I3=3","AWG2_I4=4","AWG2_I5=5","AWG2_S1=6","AWG2_S2=7","AWG2_S3=8","AWG2_S4=9","AWG2_JC=10","AWG2_JMIN=11","AWG2_JMAX=12","AWG2_H1=13","AWG2_H2=14","AWG2_H3=15","AWG2_H4=16"]},"Mounts":[]}]'),
+            Result('[{"State":{"Status":"running"},"NetworkSettings":{"Ports":{"51830/udp":[{"HostIp":"198.51.100.20","HostPort":"51830"}]}},"Config":{"Image":"awg2","Env":["AWG2_S1=6","AWG2_S2=7","AWG2_S3=8","AWG2_S4=9","AWG2_JC=10","AWG2_JMIN=11","AWG2_JMAX=12","AWG2_H1=13","AWG2_H2=14","AWG2_H3=15","AWG2_H4=16"]},"Mounts":[]}]'),
             Result("wg0\n"),
-            Result("wg0\tprivate\tpub\t51830\npeer2\tpsk\tep\t10.77.0.10/32\t0\t0\t0\t25\n"),
-            Result("[Interface]\nAddress = 10.77.0.1/24\nListenPort = 51830\n"),
+            Result("wg0\tprivate\tpub\t51830\npeer2\tpsk\tep\t10.8.1.10/32\t0\t0\t0\t25\n"),
+            Result("[Interface]\nAddress = 10.8.1.0/24\nListenPort = 49561\nJc = 10\n"),
         ]
 
         ServerService.sync_runtime_state(server=self.server, actor=self.user)
