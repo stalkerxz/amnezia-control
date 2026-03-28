@@ -1,0 +1,19 @@
+{% extends 'partials/base.html' %}
+{% block content %}
+<h1 class="h3 mb-3">Серверы</h1>
+{% if servers %}
+<table class="table table-hover align-middle">
+  <tr><th>Имя</th><th>SSH</th><th>Здоровье</th><th>Последняя sync</th></tr>
+  {% for s in servers %}
+  <tr>
+    <td><a href="/servers/{{ s.id }}/">{{ s.name }}</a></td>
+    <td>{{ s.ssh_username }}@{{ s.host }}:{{ s.port }}</td>
+    <td><span class="badge text-bg-secondary">{{ s.health_status }}</span></td>
+    <td>{{ s.last_runtime_sync_at|default:'—' }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% else %}
+<div class="empty-state">Серверы еще не добавлены.</div>
+{% endif %}
+{% endblock %}

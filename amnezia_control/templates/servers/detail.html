@@ -1,0 +1,37 @@
+{% extends 'partials/base.html' %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="h3 mb-0">Сервер: {{ server.name }}</h1>
+  <div class="d-flex gap-2">
+    <form method="post" action="/servers/{{ server.id }}/sync-runtime/">{% csrf_token %}<button class="btn btn-primary">Синхронизировать runtime</button></form>
+    <form method="post" action="/clients/import/">{% csrf_token %}<button class="btn btn-outline-secondary">Импорт peers</button></form>
+  </div>
+</div>
+
+<div class="card mb-3"><div class="card-body">
+  <h2 class="h6">Runtime diagnostics</h2>
+  <p class="text-secondary mb-0">Проверяйте readiness перед созданием/переизданием клиентов.</p>
+</div></div>
+
+<table class="table align-middle">
+  <tr><th>Протокол</th><th>Config path</th><th>Peer source</th><th>Peers</th><th>Subnet</th><th>UDP</th><th>Endpoint host</th><th>Endpoint port</th><th>AWG2 metadata</th><th>Missing required</th><th>Missing optional</th><th>Active keys</th></tr>
+  {% for p in protocols %}
+  <tr>
+    <td><span class="badge {% if p.protocol_type == 'awg2' %}text-bg-info{% else %}text-bg-secondary{% endif %}">{{ p.protocol_type|upper }}</span></td>
+    <td><code>{{ p.runtime_metadata.config_path|default:"—" }}</code></td>
+    <td><code>{{ p.runtime_metadata.peer_source|default:"—" }}</code></td>
+    <td>{{ p.runtime_metadata.peer_count|default:'—' }}</td>
+    <td>{% if p.runtime_metadata.subnet_ready %}<span class="badge text-bg-success">{{ p.runtime_metadata.subnet }}</span>{% else %}<span class="badge text-bg-warning">не обнаружено</span>{% endif %}</td>
+    <td>{{ p.runtime_metadata.udp_port|default:'—' }}</td>
+    <td>{% if p.runtime_metadata.endpoint_host_ready %}<span class="badge text-bg-success">ok</span>{% else %}<span class="badge text-bg-warning">missing</span>{% endif %}<br><small>{{ p.runtime_metadata.public_host|default:'—' }}</small></td>
+    <td>{% if p.runtime_metadata.endpoint_port_ready %}<span class="badge text-bg-success">ok</span>{% else %}<span class="badge text-bg-warning">missing</span>{% endif %}</td>
+    <td>{% if p.protocol_type == 'awg2' %}{% if p.runtime_metadata.awg2_metadata_ready %}<span class="badge text-bg-success">complete</span>{% else %}<span class="badge text-bg-danger">incomplete</span>{% endif %}{% else %}—{% endif %}</td>
+    <td>{% if p.protocol_type == 'awg2' and p.runtime_metadata.awg2_missing_keys %}<code>{{ p.runtime_metadata.awg2_missing_keys|join:', ' }}</code>{% else %}—{% endif %}</td>
+    <td>{% if p.protocol_type == 'awg2' and p.runtime_metadata.awg2_optional_missing_keys %}<code>{{ p.runtime_metadata.awg2_optional_missing_keys|join:', ' }}</code>{% else %}—{% endif %}</td>
+    <td>{% if p.protocol_type == 'awg2' and p.runtime_metadata.awg2_active_keys %}<code>{{ p.runtime_metadata.awg2_active_keys|join:', ' }}</code>{% else %}—{% endif %}</td>
+  </tr>
+  {% empty %}
+    <tr><td colspan="12"><div class="empty-state">Протоколы не обнаружены. Нажмите «Синхронизировать runtime».</div></td></tr>
+  {% endfor %}
+</table>
+{% endblock %}

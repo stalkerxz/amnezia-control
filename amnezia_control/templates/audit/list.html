@@ -1,0 +1,22 @@
+{% extends 'partials/base.html' %}
+{% block content %}
+<h1 class="h3 mb-3">Журнал аудита</h1>
+<form class="mb-3"><input class="form-control" name="q" value="{{ q }}" placeholder="Фильтр по действию"></form>
+{% if logs %}
+<div class="table-responsive">
+<table class="table table-sm align-middle"><tr><th>Дата</th><th>Пользователь</th><th>Действие</th><th>Сущность</th><th>Детали</th></tr>
+{% for l in logs %}
+<tr>
+  <td>{{ l.created_at }}</td>
+  <td>{{ l.actor|default:'system' }}</td>
+  <td><code>{{ l.action }}</code></td>
+  <td>{{ l.entity_type }}:{{ l.entity_id }}</td>
+  <td><code>{{ l.details }}</code></td>
+</tr>
+{% endfor %}
+</table>
+</div>
+{% else %}
+<div class="empty-state">Записей аудита пока нет.</div>
+{% endif %}
+{% endblock %}
