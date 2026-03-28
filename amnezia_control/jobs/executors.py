@@ -23,7 +23,7 @@ class SafeSSHExecutor:
         r"^docker inspect [a-zA-Z0-9_.-]+$",
         r"^docker exec [a-zA-Z0-9_.-]+ (?:wg|awg) show(?: [a-zA-Z0-9_.-]+)?(?: dump| interfaces| public-key)?$",
         r"^docker exec [a-zA-Z0-9_.-]+ (?:wg|awg) genkey$",
-        r"^printf %s '[A-Za-z0-9+/=]+' \| docker exec -i [a-zA-Z0-9_.-]+ (?:wg|awg) pubkey$",
+        r"^printf %s (?:'[A-Za-z0-9+/=]+'|[A-Za-z0-9+/=]+) \| docker exec -i [a-zA-Z0-9_.-]+ (?:wg|awg) pubkey$",
         r"^docker exec [a-zA-Z0-9_.-]+ (?:wg|awg) set [a-zA-Z0-9_.-]+ peer [A-Za-z0-9+/=]+ allowed-ips [0-9.]+/32$",
         r"^docker exec [a-zA-Z0-9_.-]+ (?:wg|awg) set [a-zA-Z0-9_.-]+ peer [A-Za-z0-9+/=]+ remove$",
         r"^docker exec [a-zA-Z0-9_.-]+ ls (?:/etc/amnezia|/opt/amnezia|/etc/wireguard)$",

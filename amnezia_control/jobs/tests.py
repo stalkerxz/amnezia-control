@@ -25,3 +25,16 @@ class SSHExecutorTest(TestCase):
         executor = SafeSSHExecutor(host="127.0.0.1", username="u")
         with self.assertRaises(ValueError):
             executor._validate("rm -rf /")
+
+    def test_allow_pubkey_pipeline_with_quoted_key(self):
+        executor = SafeSSHExecutor(host="127.0.0.1", username="u")
+        executor._validate("printf %s 'Abc+/=123' | docker exec -i amnezia-awg2 wg pubkey")
+
+    def test_allow_pubkey_pipeline_with_unquoted_key(self):
+        executor = SafeSSHExecutor(host="127.0.0.1", username="u")
+        executor._validate("printf %s Abc+/=123 | docker exec -i amnezia-awg2 wg pubkey")
+
+    def test_reject_pubkey_pipeline_with_unsafe_key(self):
+        executor = SafeSSHExecutor(host="127.0.0.1", username="u")
+        with self.assertRaises(ValueError):
+            executor._validate("printf %s bad$key | docker exec -i amnezia-awg2 wg pubkey")
