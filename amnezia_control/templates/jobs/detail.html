@@ -1,20 +1,44 @@
 {% extends 'partials/base.html' %}
 {% block content %}
 <h1 class="h3">Задание #{{ job.id }}</h1>
-<p>Действие: <code>{{ job.action }}</code> | Статус: <span class="badge {% if job.status == 'success' %}text-bg-success{% elif job.status == 'failed' %}text-bg-danger{% elif job.status == 'running' %}text-bg-warning{% else %}text-bg-secondary{% endif %}">{{ job.status }}</span></p>
+
+{% if job.status == 'failed' %}
+<div class="alert alert-danger" role="alert">Задание завершилось с ошибкой. Проверьте stderr, exit code и payload ниже.</div>
+{% endif %}
+
+<div class="row g-3 mb-3">
+  <div class="col-lg-8">
+    <div class="card"><div class="card-body">
+      <p class="mb-1">Действие: <code>{{ job.action }}</code></p>
+      <p class="mb-1">Сервер: <strong>{{ job.server.name }}</strong></p>
+      <p class="mb-0">Инициатор: {% if job.actor %}<strong>{{ job.actor.username }}</strong>{% else %}<span class="text-secondary">система</span>{% endif %}</p>
+    </div></div>
+  </div>
+  <div class="col-lg-4">
+    <div class="card"><div class="card-body">
+      <p class="mb-1">Статус: <span class="badge {% if job.status == 'success' %}text-bg-success{% elif job.status == 'failed' %}text-bg-danger{% elif job.status == 'running' %}text-bg-warning{% else %}text-bg-secondary{% endif %}">{{ job.status }}</span></p>
+      <p class="mb-1">Создано: {{ job.created_at }}</p>
+      <p class="mb-1">Запуск: {{ job.started_at|default:'—' }}</p>
+      <p class="mb-0">Завершено: {{ job.finished_at|default:'—' }}</p>
+    </div></div>
+  </div>
+</div>
+
+<div class="card mb-3"><div class="card-body">
+  <h2 class="h6">Payload</h2>
+  <pre class="log mb-0">{{ payload_pretty }}</pre>
+</div></div>
 
 {% if events %}
-<table class="table table-sm align-middle"><tr><th>Время</th><th>Уровень</th><th>Сообщение</th><th>Exit</th><th>Логи</th></tr>
+<table class="table table-sm align-middle"><tr><th>Время</th><th>Уровень</th><th>Сообщение</th><th>Exit code</th><th>stdout</th><th>stderr</th></tr>
 {% for e in events %}
-<tr class="{% if e.level == 'error' %}table-danger{% endif %}">
+<tr class="{% if e.level == 'error' or e.exit_code %}table-danger{% endif %}">
   <td>{{ e.created_at }}</td>
   <td><span class="badge {% if e.level == 'error' %}text-bg-danger{% else %}text-bg-secondary{% endif %}">{{ e.level }}</span></td>
   <td>{{ e.message }}</td>
   <td>{{ e.exit_code|default:'—' }}</td>
-  <td>
-    {% if e.stdout %}<pre class="log mb-2">{{ e.stdout }}</pre>{% endif %}
-    {% if e.stderr %}<pre class="log text-danger">{{ e.stderr }}</pre>{% endif %}
-  </td>
+  <td>{% if e.stdout %}<pre class="log mb-0">{{ e.stdout }}</pre>{% else %}—{% endif %}</td>
+  <td>{% if e.stderr %}<pre class="log text-danger mb-0">{{ e.stderr }}</pre>{% else %}—{% endif %}</td>
 </tr>
 {% endfor %}
 </table>
