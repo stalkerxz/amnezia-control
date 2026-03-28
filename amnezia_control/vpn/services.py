@@ -4,6 +4,7 @@ import io
 import ipaddress
 import re
 import shlex
+from collections import defaultdict
 from dataclasses import dataclass
 
 import qrcode
@@ -40,6 +41,12 @@ class ConfigCryptoService:
 class PeerState:
     public_key: str
     allowed_ips: str
+    transfer_rx: int = 0
+    transfer_tx: int = 0
+
+    @property
+    def transfer_total(self) -> int:
+        return self.transfer_rx + self.transfer_tx
 
 
 class RuntimeCommandService:
@@ -109,8 +116,17 @@ class BaseProtocolAdapter:
                 if len(cols) >= 8:
                     public_key = cols[0].strip()
                     allowed_ips = cols[3].strip()
+                    transfer_rx = int(cols[5].strip()) if len(cols) > 5 and cols[5].strip().isdigit() else 0
+                    transfer_tx = int(cols[6].strip()) if len(cols) > 6 and cols[6].strip().isdigit() else 0
                     if public_key:
-                        peers.append(PeerState(public_key=public_key, allowed_ips=allowed_ips))
+                        peers.append(
+                            PeerState(
+                                public_key=public_key,
+                                allowed_ips=allowed_ips,
+                                transfer_rx=transfer_rx,
+                                transfer_tx=transfer_tx,
+                            )
+                        )
             return peers
         except RuntimeError:
             if self.protocol_type != VPNClient.ProtocolType.AWG2:
@@ -128,7 +144,7 @@ class BaseProtocolAdapter:
                 continue
             if text.startswith("[") and text.endswith("]"):
                 if section.lower() == "[peer]" and current.get("PublicKey") and current.get("AllowedIPs"):
-                    peers.append(PeerState(public_key=current["PublicKey"], allowed_ips=current["AllowedIPs"]))
+                    peers.append(PeerState(public_key=current["PublicKey"], allowed_ips=current["AllowedIPs"], transfer_rx=0, transfer_tx=0))
                 section = text
                 current = {}
                 continue
@@ -146,6 +162,17 @@ class BaseProtocolAdapter:
             return []
         raw_conf = self._run(actor, f"{self.protocol_type}.list_fallback_conf", f"docker exec {self.container} cat {config_path}").stdout
         return self._parse_peers_from_config_text(raw_conf)
+
+    def peer_transfer_map(self, actor) -> dict[str, int] | None:
+        try:
+            peers = self.list_peers(actor)
+        except Exception:
+            return None
+        if not peers:
+            return {}
+        if all(peer.transfer_total == 0 for peer in peers):
+            return None
+        return {peer.public_key: peer.transfer_total for peer in peers}
 
     def _next_address(self, actor) -> str:
         subnet_text = self.protocol.runtime_metadata.get("subnet", "")
@@ -305,7 +332,7 @@ class VPNClientService:
 
     @staticmethod
     @transaction.atomic
-    def create_client(*, server, name: str, protocol_type: str, actor):
+    def create_client(*, server, name: str, protocol_type: str, actor, expires_at=None, traffic_limit_bytes=None):
         profile = ProtocolProfile.objects.filter(
             server_protocol__server=server,
             protocol_type=protocol_type,
@@ -320,6 +347,8 @@ class VPNClientService:
             protocol_type=protocol_type,
             profile=profile,
             created_by=actor,
+            expires_at=expires_at,
+            traffic_limit_bytes=traffic_limit_bytes,
         )
         VPNClientService.reissue_config(client=client, actor=actor)
         AuditService.log(actor, "client.create", "VPNClient", client.id, {"protocol_type": protocol_type})
@@ -359,16 +388,34 @@ class VPNClientService:
 
     @staticmethod
     @transaction.atomic
-    def set_status(*, client: VPNClient, status: str, actor):
+    def set_status(*, client: VPNClient, status: str, actor, disable_reason: str | None = None):
         if status in {VPNClient.Status.DISABLED, VPNClient.Status.DELETED} and client.runtime_peer_public_key:
             adapter = AdapterFactory.get_for_client(client)
             if status == VPNClient.Status.DISABLED:
                 adapter.disable_peer(actor, client.runtime_peer_public_key)
             else:
                 adapter.remove_peer(actor, client.runtime_peer_public_key)
+
+        update_fields = ["status"]
         client.status = status
-        client.save(update_fields=["status"])
-        AuditService.log(actor, f"client.{status}", "VPNClient", client.id)
+
+        if status == VPNClient.Status.DISABLED:
+            client.disable_reason = disable_reason or VPNClient.DisableReason.MANUAL
+            update_fields.append("disable_reason")
+            if client.disable_reason == VPNClient.DisableReason.EXPIRED:
+                client.limit_state = VPNClient.LimitState.EXPIRED
+                update_fields.append("limit_state")
+            elif client.disable_reason == VPNClient.DisableReason.TRAFFIC_EXCEEDED:
+                client.limit_state = VPNClient.LimitState.TRAFFIC_EXCEEDED
+                update_fields.append("limit_state")
+        elif status == VPNClient.Status.ACTIVE:
+            client.disable_reason = VPNClient.DisableReason.NONE
+            client.limit_state = VPNClient.LimitState.ACTIVE
+            update_fields.extend(["disable_reason", "limit_state"])
+
+        client.save(update_fields=update_fields)
+        details = {"disable_reason": client.disable_reason} if status == VPNClient.Status.DISABLED else None
+        AuditService.log(actor, f"client.{status}", "VPNClient", client.id, details=details)
 
     @staticmethod
     def latest_config(client: VPNClient) -> str:
@@ -422,3 +469,107 @@ class VPNClientService:
                     imported += 1
         AuditService.log(actor, "client.import", "Server", server.id, {"imported": imported})
         return imported
+
+
+class VPNClientLimitsService:
+    @staticmethod
+    def _set_limit_state(client: VPNClient):
+        now = timezone.now()
+        if client.expires_at and client.expires_at <= now:
+            return VPNClient.LimitState.EXPIRED
+        if client.traffic_limit_bytes and client.traffic_used_bytes >= client.traffic_limit_bytes:
+            return VPNClient.LimitState.TRAFFIC_EXCEEDED
+        return VPNClient.LimitState.ACTIVE
+
+    @staticmethod
+    def sync_traffic_usage(*, actor=None):
+        active_clients = VPNClient.objects.filter(status=VPNClient.Status.ACTIVE).exclude(runtime_peer_public_key="")
+        grouped = defaultdict(list)
+        for client in active_clients.select_related("server"):
+            grouped[(client.server_id, client.protocol_type)].append(client)
+
+        synced = 0
+        unavailable = 0
+        now = timezone.now()
+
+        for (_, protocol_type), clients in grouped.items():
+            server = clients[0].server
+            try:
+                adapter = AdapterFactory.get_for_server(server, protocol_type)
+            except Exception:
+                for client in clients:
+                    client.traffic_sync_error = "Телеметрия недоступна для runtime"
+                    client.traffic_last_sync_at = now
+                    client.save(update_fields=["traffic_sync_error", "traffic_last_sync_at"])
+                    unavailable += 1
+                continue
+
+            transfer_map = adapter.peer_transfer_map(actor)
+            if transfer_map is None:
+                for client in clients:
+                    client.traffic_sync_error = "Счетчики трафика недоступны"
+                    client.traffic_last_sync_at = now
+                    client.save(update_fields=["traffic_sync_error", "traffic_last_sync_at"])
+                    unavailable += 1
+                continue
+
+            for client in clients:
+                if client.runtime_peer_public_key in transfer_map:
+                    used = transfer_map[client.runtime_peer_public_key]
+                    update_fields = []
+                    if used != client.traffic_used_bytes:
+                        client.traffic_used_bytes = used
+                        update_fields.append("traffic_used_bytes")
+                    client.traffic_sync_error = ""
+                    client.traffic_last_sync_at = now
+                    update_fields.extend(["traffic_sync_error", "traffic_last_sync_at"])
+                    if update_fields:
+                        client.save(update_fields=update_fields)
+                    synced += 1
+                else:
+                    client.traffic_sync_error = "Peer отсутствует в runtime"
+                    client.traffic_last_sync_at = now
+                    client.save(update_fields=["traffic_sync_error", "traffic_last_sync_at"])
+                    unavailable += 1
+
+        AuditService.log(actor, "client.limit.traffic_sync", "VPNClient", "bulk", details={"synced": synced, "unavailable": unavailable})
+        return {"synced": synced, "unavailable": unavailable}
+
+    @staticmethod
+    def enforce_limits(*, actor=None):
+        now = timezone.now()
+        processed = 0
+        expired = 0
+        traffic_exceeded = 0
+
+        clients = VPNClient.objects.select_related("server").filter(status=VPNClient.Status.ACTIVE)
+        for client in clients:
+            processed += 1
+            if client.expires_at and client.expires_at <= now:
+                VPNClientService.set_status(
+                    client=client,
+                    status=VPNClient.Status.DISABLED,
+                    actor=actor,
+                    disable_reason=VPNClient.DisableReason.EXPIRED,
+                )
+                expired += 1
+                continue
+
+            if client.traffic_limit_bytes and client.traffic_used_bytes >= client.traffic_limit_bytes:
+                VPNClientService.set_status(
+                    client=client,
+                    status=VPNClient.Status.DISABLED,
+                    actor=actor,
+                    disable_reason=VPNClient.DisableReason.TRAFFIC_EXCEEDED,
+                )
+                traffic_exceeded += 1
+                continue
+
+            state = VPNClientLimitsService._set_limit_state(client)
+            if state != client.limit_state:
+                client.limit_state = state
+                client.save(update_fields=["limit_state"])
+
+        details = {"processed": processed, "expired": expired, "traffic_exceeded": traffic_exceeded}
+        AuditService.log(actor, "client.limit.enforce", "VPNClient", "bulk", details=details)
+        return details

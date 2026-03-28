@@ -1,9 +1,36 @@
 {% extends 'partials/base.html' %}
 {% block content %}
-<h1 class="h3">Создать клиента</h1>
+<h1 class="h3 mb-3">Создать клиента</h1>
 <form method="post" class="card card-body">
-{% csrf_token %}
-{{ form.as_p }}
-<button class="btn btn-success">Создать</button>
+  {% csrf_token %}
+  <div class="row g-3">
+    <div class="col-lg-6">
+      <label class="form-label" for="id_name">{{ form.name.label }}</label>
+      {{ form.name }}
+    </div>
+    <div class="col-lg-6">
+      <label class="form-label" for="id_protocol_type">{{ form.protocol_type.label }}</label>
+      {{ form.protocol_type }}
+    </div>
+    <div class="col-lg-6">
+      <label class="form-label" for="id_expires_at">{{ form.expires_at.label }}</label>
+      {{ form.expires_at }}
+      <div class="form-text">Оставьте пустым, если срок действия не ограничен.</div>
+    </div>
+    <div class="col-lg-6">
+      <label class="form-label" for="id_traffic_limit_bytes">{{ form.traffic_limit_bytes.label }}</label>
+      {{ form.traffic_limit_bytes }}
+      <div class="form-text">{{ form.traffic_limit_bytes.help_text }}</div>
+    </div>
+  </div>
+  <div class="mt-3">
+    <button class="btn btn-success">Создать</button>
+  </div>
 </form>
+<script>
+  document.querySelectorAll('input,select').forEach((el) => {
+    if (!el.classList.contains('form-control') && el.tagName === 'INPUT') el.classList.add('form-control');
+    if (!el.classList.contains('form-select') && el.tagName === 'SELECT') el.classList.add('form-select');
+  });
+</script>
 {% endblock %}
