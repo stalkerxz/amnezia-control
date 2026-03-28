@@ -1,10 +1,11 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, user_passes_test
+from django.db.models.functions import Coalesce
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 
 from servers.models import Server
-from .forms import VPNClientCreateForm
+from .forms import VPNClientCreateForm, VPNClientListFilterForm
 from .models import VPNClient
 from .services import VPNClientService
 
@@ -16,12 +17,40 @@ def _admin_required(user):
 @login_required
 @user_passes_test(_admin_required)
 def clients_list_view(request):
-    q = request.GET.get("q", "").strip()
-    clients = VPNClient.objects.select_related("server").order_by("-id")
-    if q:
-        clients = clients.filter(name__icontains=q)
+    filter_form = VPNClientListFilterForm(request.GET or None)
+    clients = (
+        VPNClient.objects.select_related("server")
+        .annotate(updated_at=Coalesce("last_runtime_sync_at", "created_at"))
+        .order_by("-id")
+    )
+
+    if filter_form.is_valid():
+        q = filter_form.cleaned_data["q"].strip()
+        protocol = filter_form.cleaned_data["protocol"]
+        status = filter_form.cleaned_data["status"]
+        source = filter_form.cleaned_data["source"]
+
+        if q:
+            clients = clients.filter(name__icontains=q)
+        if protocol:
+            clients = clients.filter(protocol_type=protocol)
+        if status:
+            clients = clients.filter(status=status)
+        if source == "imported":
+            clients = clients.filter(imported_from_runtime=True)
+        elif source == "manual":
+            clients = clients.filter(imported_from_runtime=False)
+
     server = Server.objects.filter(is_enabled=True).first()
-    return render(request, "vpn/clients_list.html", {"clients": clients, "q": q, "server": server})
+    return render(
+        request,
+        "vpn/clients_list.html",
+        {
+            "clients": clients,
+            "filter_form": filter_form,
+            "server": server,
+        },
+    )
 
 
 @login_required
@@ -79,6 +108,8 @@ def client_action_view(request, pk: int, action: str):
     if request.method != "POST":
         return redirect("clients-detail", pk=client.id)
 
+    next_url = request.POST.get("next")
+
     try:
         if action == "disable":
             VPNClientService.set_status(client=client, status=VPNClient.Status.DISABLED, actor=request.user)
@@ -91,6 +122,9 @@ def client_action_view(request, pk: int, action: str):
         messages.success(request, "Действие выполнено")
     except Exception as exc:
         messages.error(request, f"Ошибка выполнения действия: {exc}")
+
+    if next_url:
+        return redirect(next_url)
     return redirect("clients-detail", pk=client.id)
 
 
