@@ -7,6 +7,7 @@ from .views import (
     clients_detail_view,
     clients_import_view,
     clients_list_view,
+    client_update_limits_view,
 )
 
 urlpatterns = [
@@ -17,4 +18,5 @@ urlpatterns = [
     path("<int:pk>/download/", client_download_config_view, name="clients-download"),
     path("<int:pk>/qr-modal/", client_qr_modal_view, name="clients-qr-modal"),
     path("<int:pk>/action/<str:action>/", client_action_view, name="clients-action"),
+    path("<int:pk>/limits/update/", client_update_limits_view, name="clients-limits-update"),
 ]

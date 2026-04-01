@@ -6,7 +6,7 @@ from django.utils import timezone
 from servers.models import ProtocolProfile, Server, ServerProtocol
 from servers.services import ServerService
 
-from .forms import VPNClientCreateForm
+from .forms import VPNClientCreateForm, VPNClientLimitsUpdateForm
 from .models import VPNClient
 from .services import AWG2Adapter, AdapterFactory, PeerState, VPNClientLimitsService, VPNClientService
 
@@ -525,3 +525,137 @@ class VPNClientCreateFormTest(SimpleTestCase):
 
         self.assertTrue(form.is_valid(), form.errors)
         self.assertEqual(form.cleaned_data["traffic_limit_bytes"], 25 * 1024**3)
+
+
+@override_settings(CONFIG_ENCRYPTION_KEY=Fernet.generate_key().decode())
+class VPNClientLimitsUpdateFlowTest(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user("admin-limits", password="123", is_staff=True)
+        self.client.force_login(self.user)
+        self.server = Server.objects.create(name="limits-edit-server", public_endpoint_host="vpn.example.com")
+        self.protocol = ServerProtocol.objects.create(
+            server=self.server,
+            protocol_type=ServerProtocol.ProtocolType.AWG,
+            container_name="amnezia-awg",
+            enabled=True,
+            runtime_metadata={"udp_port": 51820, "subnet": "10.66.0.0/24"},
+        )
+        self.profile = ProtocolProfile.objects.create(
+            server_protocol=self.protocol,
+            name="limits-edit-profile",
+            protocol_type=ServerProtocol.ProtocolType.AWG,
+            config_template="[Interface]",
+        )
+        self.vpn_client = VPNClient.objects.create(
+            server=self.server,
+            name="edited-client",
+            protocol_type=VPNClient.ProtocolType.AWG,
+            profile=self.profile,
+            created_by=self.user,
+            runtime_peer_public_key="peer-keep",
+            runtime_address="10.66.0.10",
+            expires_at=None,
+            traffic_limit_bytes=None,
+            status=VPNClient.Status.DISABLED,
+            disable_reason=VPNClient.DisableReason.EXPIRED,
+            limit_state=VPNClient.LimitState.EXPIRED,
+        )
+
+    def test_updating_limits_does_not_reissue_config(self):
+        from unittest.mock import patch
+
+        with patch("vpn.services.RuntimeCommandService.run") as runtime_run:
+            response = self.client.post(
+                f"/clients/{self.vpn_client.id}/limits/update/",
+                data={
+                    "expires_preset": "1w",
+                    "traffic_limit_preset": "10gb",
+                },
+            )
+        self.assertEqual(response.status_code, 302)
+        self.vpn_client.refresh_from_db()
+        self.assertEqual(self.vpn_client.runtime_peer_public_key, "peer-keep")
+        self.assertEqual(self.vpn_client.revisions.count(), 0)
+        runtime_run.assert_not_called()
+
+    def test_updating_unlimited_to_preset(self):
+        self.client.post(
+            f"/clients/{self.vpn_client.id}/limits/update/",
+            data={
+                "expires_preset": "1d",
+                "traffic_limit_preset": "5gb",
+            },
+        )
+        self.vpn_client.refresh_from_db()
+        self.assertIsNotNone(self.vpn_client.expires_at)
+        self.assertEqual(self.vpn_client.traffic_limit_bytes, 5 * 1024**3)
+
+    def test_updating_preset_to_unlimited(self):
+        self.vpn_client.expires_at = timezone.now() + timezone.timedelta(days=5)
+        self.vpn_client.traffic_limit_bytes = 25 * 1024**3
+        self.vpn_client.save(update_fields=["expires_at", "traffic_limit_bytes"])
+
+        self.client.post(
+            f"/clients/{self.vpn_client.id}/limits/update/",
+            data={
+                "expires_preset": "unlimited",
+                "traffic_limit_preset": "unlimited",
+            },
+        )
+        self.vpn_client.refresh_from_db()
+        self.assertIsNone(self.vpn_client.expires_at)
+        self.assertIsNone(self.vpn_client.traffic_limit_bytes)
+
+    def test_custom_traffic_conversion_on_update(self):
+        self.client.post(
+            f"/clients/{self.vpn_client.id}/limits/update/",
+            data={
+                "expires_preset": "unlimited",
+                "traffic_limit_preset": "custom",
+                "traffic_custom_value": "512",
+                "traffic_custom_unit": "mb",
+            },
+        )
+        self.vpn_client.refresh_from_db()
+        self.assertEqual(self.vpn_client.traffic_limit_bytes, 512 * 1024**2)
+
+    def test_blocked_client_limits_update_does_not_auto_reissue(self):
+        self.vpn_client.expires_at = timezone.now() - timezone.timedelta(minutes=10)
+        self.vpn_client.traffic_limit_bytes = 1024
+        self.vpn_client.traffic_used_bytes = 0
+        self.vpn_client.limit_state = VPNClient.LimitState.EXPIRED
+        self.vpn_client.save(update_fields=["expires_at", "traffic_limit_bytes", "traffic_used_bytes", "limit_state"])
+
+        self.client.post(
+            f"/clients/{self.vpn_client.id}/limits/update/",
+            data={
+                "expires_preset": "unlimited",
+                "traffic_limit_preset": "unlimited",
+            },
+        )
+        self.vpn_client.refresh_from_db()
+        self.assertEqual(self.vpn_client.status, VPNClient.Status.DISABLED)
+        self.assertEqual(self.vpn_client.revisions.count(), 0)
+        self.assertEqual(self.vpn_client.limit_state, VPNClient.LimitState.ACTIVE)
+
+    def test_limits_update_writes_audit_log(self):
+        self.client.post(
+            f"/clients/{self.vpn_client.id}/limits/update/",
+            data={
+                "expires_preset": "unlimited",
+                "traffic_limit_preset": "1gb",
+            },
+        )
+        audit = AuditLog.objects.filter(action="client.limits.update", entity_id=str(self.vpn_client.id)).first()
+        self.assertIsNotNone(audit)
+        self.assertEqual(audit.details.get("old_expires_at"), None)
+        self.assertEqual(audit.details.get("new_traffic_limit_bytes"), 1024**3)
+
+    def test_update_form_initializes_custom_traffic_for_non_preset_value(self):
+        self.vpn_client.traffic_limit_bytes = 7 * 1024**3
+        self.vpn_client.expires_at = timezone.now() + timezone.timedelta(days=10)
+        self.vpn_client.save(update_fields=["traffic_limit_bytes", "expires_at"])
+
+        form = VPNClientLimitsUpdateForm(client=self.vpn_client)
+        self.assertEqual(form.initial["expires_preset"], VPNClientLimitsUpdateForm.EXPIRATION_PRESET_CUSTOM)
+        self.assertEqual(form.initial["traffic_limit_preset"], VPNClientLimitsUpdateForm.TRAFFIC_PRESET_CUSTOM)

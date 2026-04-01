@@ -6,7 +6,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
 from servers.models import Server
-from .forms import VPNClientCreateForm, VPNClientListFilterForm
+from .forms import VPNClientCreateForm, VPNClientLimitsUpdateForm, VPNClientListFilterForm
 from .models import VPNClient
 from .services import VPNClientService
 
@@ -139,6 +139,7 @@ def clients_create_view(request):
 @user_passes_test(_admin_required)
 def clients_detail_view(request, pk: int):
     client = get_object_or_404(VPNClient.objects.select_related("server"), pk=pk)
+    limits_form = VPNClientLimitsUpdateForm(client=client)
     revision = client.revisions.first()
     revision_count = client.revisions.count()
     qr_base64 = VPNClientService.qr_png_base64(client) if revision else ""
@@ -190,6 +191,7 @@ def clients_detail_view(request, pk: int):
             "limit_badge_label": limit_badge_label,
             "reissue_blocked": reissue_blocked,
             "reissue_block_reason": reissue_block_reason,
+            "limits_form": limits_form,
         },
     )
 
@@ -246,3 +248,25 @@ def client_download_config_view(request, pk: int):
     response = HttpResponse(config, content_type="text/plain; charset=utf-8")
     response["Content-Disposition"] = f'attachment; filename="{client.name}-{client.protocol_type}.conf"'
     return response
+
+
+@login_required
+@user_passes_test(_admin_required)
+def client_update_limits_view(request, pk: int):
+    client = get_object_or_404(VPNClient, pk=pk)
+    if request.method != "POST":
+        return redirect("clients-detail", pk=client.id)
+
+    form = VPNClientLimitsUpdateForm(request.POST, client=client)
+    if not form.is_valid():
+        messages.error(request, "Проверьте форму изменения лимитов.")
+        return redirect("clients-detail", pk=client.id)
+
+    VPNClientService.update_limits(
+        client=client,
+        expires_at=form.cleaned_data["expires_at"],
+        traffic_limit_bytes=form.cleaned_data["traffic_limit_bytes"],
+        actor=request.user,
+    )
+    messages.success(request, "Лимиты клиента обновлены без переиздания конфига.")
+    return redirect("clients-detail", pk=client.id)

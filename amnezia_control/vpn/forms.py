@@ -84,9 +84,7 @@ class VPNClientCreateForm(forms.Form):
         initial=TRAFFIC_UNIT_GB,
     )
 
-    def clean(self):
-        cleaned_data = super().clean()
-
+    def _clean_limits(self, cleaned_data):
         expires_preset = cleaned_data.get("expires_preset")
         custom_expires_at = cleaned_data.get("expires_at")
         if expires_preset == self.EXPIRATION_PRESET_CUSTOM:
@@ -124,6 +122,50 @@ class VPNClientCreateForm(forms.Form):
                 cleaned_data["traffic_limit_bytes"] = bytes_value
 
         return cleaned_data
+
+    def clean(self):
+        cleaned_data = super().clean()
+        return self._clean_limits(cleaned_data)
+
+
+class VPNClientLimitsUpdateForm(VPNClientCreateForm):
+    name = None
+    protocol_type = None
+
+    def __init__(self, *args, client=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if client:
+            self._init_from_client(client)
+
+    def _init_from_client(self, client):
+        if not self.is_bound:
+            initial = self.initial
+            if client.expires_at:
+                initial["expires_preset"] = self.EXPIRATION_PRESET_CUSTOM
+                local_dt = timezone.localtime(client.expires_at)
+                initial["expires_at"] = local_dt.strftime("%Y-%m-%dT%H:%M")
+            else:
+                initial["expires_preset"] = self.EXPIRATION_PRESET_UNLIMITED
+
+            if client.traffic_limit_bytes is None:
+                initial["traffic_limit_preset"] = self.TRAFFIC_PRESET_UNLIMITED
+            else:
+                preset = next(
+                    (key for key, value in self.TRAFFIC_PRESET_TO_BYTES.items() if value == client.traffic_limit_bytes),
+                    self.TRAFFIC_PRESET_CUSTOM,
+                )
+                initial["traffic_limit_preset"] = preset
+                if preset == self.TRAFFIC_PRESET_CUSTOM:
+                    if client.traffic_limit_bytes % (1024**3) == 0:
+                        initial["traffic_custom_unit"] = self.TRAFFIC_UNIT_GB
+                        initial["traffic_custom_value"] = client.traffic_limit_bytes // (1024**3)
+                    else:
+                        initial["traffic_custom_unit"] = self.TRAFFIC_UNIT_MB
+                        initial["traffic_custom_value"] = max(1, client.traffic_limit_bytes // (1024**2))
+
+    def clean(self):
+        cleaned_data = forms.Form.clean(self)
+        return self._clean_limits(cleaned_data)
 
 
 class VPNClientListFilterForm(forms.Form):

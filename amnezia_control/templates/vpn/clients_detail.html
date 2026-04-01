@@ -88,6 +88,37 @@
   {% endif %}
 </div></div>
 
+<div class="card mb-3"><div class="card-body">
+  <h2 class="h6">Изменить лимиты</h2>
+  <form method="post" action="/clients/{{ client.id }}/limits/update/">
+    {% csrf_token %}
+    <div class="row g-3">
+      <div class="col-lg-6">
+        <label class="form-label" for="{{ limits_form.expires_preset.id_for_label }}">{{ limits_form.expires_preset.label }}</label>
+        {{ limits_form.expires_preset }}
+        <div id="expires-custom-wrapper" class="mt-2">
+          <label class="form-label" for="{{ limits_form.expires_at.id_for_label }}">{{ limits_form.expires_at.label }}</label>
+          {{ limits_form.expires_at }}
+        </div>
+      </div>
+      <div class="col-lg-6">
+        <label class="form-label" for="{{ limits_form.traffic_limit_preset.id_for_label }}">{{ limits_form.traffic_limit_preset.label }}</label>
+        {{ limits_form.traffic_limit_preset }}
+        <div id="traffic-custom-wrapper" class="mt-2">
+          <label class="form-label" for="{{ limits_form.traffic_custom_value.id_for_label }}">{{ limits_form.traffic_custom_value.label }}</label>
+          <div class="input-group">
+            {{ limits_form.traffic_custom_value }}
+            {{ limits_form.traffic_custom_unit }}
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="mt-3">
+      <button class="btn btn-outline-primary">Сохранить лимиты</button>
+    </div>
+  </form>
+</div></div>
+
 <div class="d-flex gap-2 flex-wrap mb-3">
 {% if reissue_blocked %}
 <button class="btn btn-primary" disabled title="{{ reissue_block_reason }}">Переиздать конфиг</button>
@@ -111,4 +142,36 @@
   <img src="data:image/png;base64,{{ qr_base64 }}" alt="QR" class="img-thumbnail" style="max-width:300px;">
 </div></div>
 {% endif %}
+
+<script>
+  const formClassMap = {
+    INPUT: 'form-control',
+    SELECT: 'form-select',
+  };
+
+  document.querySelectorAll('input, select').forEach((el) => {
+    const className = formClassMap[el.tagName];
+    if (className && !el.classList.contains(className)) {
+      el.classList.add(className);
+    }
+  });
+
+  function toggleCustomFields() {
+    const expiresPreset = document.getElementById('id_expires_preset');
+    const expiresCustom = document.getElementById('expires-custom-wrapper');
+    const trafficPreset = document.getElementById('id_traffic_limit_preset');
+    const trafficCustom = document.getElementById('traffic-custom-wrapper');
+
+    if (expiresPreset && expiresCustom) {
+      expiresCustom.classList.toggle('d-none', expiresPreset.value !== 'custom');
+    }
+    if (trafficPreset && trafficCustom) {
+      trafficCustom.classList.toggle('d-none', trafficPreset.value !== 'custom');
+    }
+  }
+
+  document.getElementById('id_expires_preset')?.addEventListener('change', toggleCustomFields);
+  document.getElementById('id_traffic_limit_preset')?.addEventListener('change', toggleCustomFields);
+  toggleCustomFields();
+</script>
 {% endblock %}
