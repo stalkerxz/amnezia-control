@@ -272,6 +272,8 @@ class AdapterFactory:
 
 
 class VPNClientService:
+    AWG_INTERFACE_EXTRA_KEYS = ("Jc", "Jmin", "Jmax", "S1", "S2", "S3", "S4", "H1", "H2", "H3", "H4", "I1", "I2", "I3", "I4", "I5")
+
     @staticmethod
     def get_limit_state(client: VPNClient, now=None):
         current_time = now or timezone.now()
@@ -343,6 +345,61 @@ class VPNClientService:
             + "\n".join(awg2_lines)
             + "\n"
         )
+
+    @staticmethod
+    def _parse_config_sections(config: str) -> dict[str, dict[str, str]]:
+        sections: dict[str, dict[str, str]] = {}
+        current = ""
+        for line in config.splitlines():
+            text = line.strip()
+            if not text or text.startswith("#"):
+                continue
+            if text.startswith("[") and text.endswith("]"):
+                current = text.strip("[]")
+                sections.setdefault(current, {})
+                continue
+            if "=" not in text or not current:
+                continue
+            key, value = [part.strip() for part in text.split("=", 1)]
+            sections[current][key] = value
+        return sections
+
+    @classmethod
+    def build_native_client_config(cls, client: VPNClient) -> str:
+        sections = cls._parse_config_sections(cls.latest_config(client))
+        interface = sections.get("Interface", {})
+        peer = sections.get("Peer", {})
+        if not interface.get("PrivateKey") or not interface.get("Address"):
+            raise RuntimeError("Cannot build native export: latest config has no Interface.PrivateKey/Address.")
+        if not peer.get("PublicKey") or not peer.get("Endpoint"):
+            raise RuntimeError("Cannot build native export: latest config has no Peer.PublicKey/Endpoint.")
+
+        protocol = ServerProtocol.objects.filter(server=client.server, protocol_type=client.protocol_type).first()
+        metadata = (protocol.runtime_metadata or {}).get("awg2_metadata", {}) if protocol else {}
+        extra_values: dict[str, str] = {}
+        for key in cls.AWG_INTERFACE_EXTRA_KEYS:
+            value = interface.get(key) or peer.get(key) or metadata.get(key)
+            if value:
+                extra_values[key] = value
+
+        lines = [
+            "[Interface]",
+            f"PrivateKey = {interface['PrivateKey']}",
+            f"Address = {interface['Address']}",
+        ]
+        if interface.get("DNS"):
+            lines.append(f"DNS = {interface['DNS']}")
+        lines.extend(f"{k} = {extra_values[k]}" for k in cls.AWG_INTERFACE_EXTRA_KEYS if extra_values.get(k))
+        lines.extend(["", "[Peer]", f"PublicKey = {peer['PublicKey']}"])
+        if peer.get("PresharedKey"):
+            lines.append(f"PresharedKey = {peer['PresharedKey']}")
+        lines.extend([
+            f"Endpoint = {peer['Endpoint']}",
+            f"AllowedIPs = {peer.get('AllowedIPs', '0.0.0.0/0, ::/0')}",
+            f"PersistentKeepalive = {peer.get('PersistentKeepalive', '25')}",
+            "",
+        ])
+        return "\n".join(lines)
 
     @staticmethod
     def _store_revision(client: VPNClient, config: str):

@@ -4,9 +4,15 @@
 
 <div class="mb-3">
   {% if revision %}
-  <a class="btn btn-primary btn-lg" href="/clients/{{ client.id }}/download/">Скачать .conf</a>
+  <div class="d-flex gap-2 flex-wrap">
+    <a class="btn btn-primary btn-lg" href="/clients/{{ client.id }}/download/native/">Скачать .conf (AmneziaWG)</a>
+    <a class="btn btn-outline-primary btn-lg" href="/clients/{{ client.id }}/download/">Скачать .conf (AmneziaVPN)</a>
+  </div>
   {% else %}
-  <button class="btn btn-primary btn-lg" disabled>Скачать .conf</button>
+  <div class="d-flex gap-2 flex-wrap">
+    <button class="btn btn-primary btn-lg" disabled>Скачать .conf (AmneziaWG)</button>
+    <button class="btn btn-outline-primary btn-lg" disabled>Скачать .conf (AmneziaVPN)</button>
+  </div>
   {% endif %}
 </div>
 

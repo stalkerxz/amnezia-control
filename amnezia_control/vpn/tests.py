@@ -92,6 +92,7 @@ class VPNClientFlowTest(TestCase):
         self.assertIn("S4 = 4", conf)
         self.assertIn("Jc = 7", conf)
         self.assertIn("H4 = 6", conf)
+        self.assertIn("[Peer]\nPublicKey = server2-public-key==", conf)
 
 
     def test_awg2_export_succeeds_without_optional_i_keys(self):
@@ -108,6 +109,58 @@ class VPNClientFlowTest(TestCase):
         conf = VPNClientService.latest_config(client)
         self.assertIn("Jc = 7", conf)
         self.assertNotIn("I1 =", conf)
+
+    def test_native_awg2_export_moves_amnezia_fields_to_interface(self):
+        from unittest.mock import patch
+
+        with patch("vpn.services.RuntimeCommandService.run", side_effect=self._mock_run):
+            client = VPNClientService.create_client(server=self.server, name="awg2-native", protocol_type=VPNClient.ProtocolType.AWG2, actor=self.user)
+
+        native_conf = VPNClientService.build_native_client_config(client)
+        interface_block = native_conf.split("[Peer]")[0]
+        peer_block = native_conf.split("[Peer]")[1]
+        self.assertIn("Jc = 7", interface_block)
+        self.assertIn("S4 = 4", interface_block)
+        self.assertIn("H4 = 6", interface_block)
+        self.assertIn("I1 = 11", interface_block)
+        self.assertNotIn("Jc = 7", peer_block)
+        self.assertNotIn("S4 = 4", peer_block)
+        self.assertNotIn("H4 = 6", peer_block)
+        self.assertIn("Endpoint = vpn.example.com:51830", peer_block)
+
+    def test_native_export_peer_block_contains_peer_specific_fields_only(self):
+        conf = (
+            "[Interface]\n"
+            "PrivateKey = private\n"
+            "Address = 10.66.0.10/32\n"
+            "DNS = 1.1.1.1\n\n"
+            "[Peer]\n"
+            "PublicKey = server\n"
+            "PresharedKey = psk\n"
+            "Endpoint = vpn.example.com:51820\n"
+            "AllowedIPs = 0.0.0.0/0, ::/0\n"
+            "PersistentKeepalive = 25\n"
+            "Jc = 7\n"
+            "S1 = 1\n"
+        )
+        client = VPNClient.objects.create(
+            server=self.server,
+            name="native-peer-fields",
+            protocol_type=VPNClient.ProtocolType.AWG,
+            profile=ProtocolProfile.objects.filter(protocol_type=ServerProtocol.ProtocolType.AWG).first(),
+            created_by=self.user,
+        )
+        VPNClientService._store_revision(client, conf)
+
+        native_conf = VPNClientService.build_native_client_config(client)
+        peer_block = native_conf.split("[Peer]")[1]
+        self.assertIn("PublicKey = server", peer_block)
+        self.assertIn("PresharedKey = psk", peer_block)
+        self.assertIn("Endpoint = vpn.example.com:51820", peer_block)
+        self.assertIn("AllowedIPs = 0.0.0.0/0, ::/0", peer_block)
+        self.assertIn("PersistentKeepalive = 25", peer_block)
+        self.assertNotIn("Jc =", peer_block)
+        self.assertNotIn("S1 =", peer_block)
 
     def test_awg2_missing_metadata_fails_export(self):
         from unittest.mock import patch
