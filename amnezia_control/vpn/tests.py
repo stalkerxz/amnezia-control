@@ -866,3 +866,65 @@ class VPNClientLimitsUpdateFlowTest(TestCase):
         form = VPNClientLimitsUpdateForm(client=self.vpn_client)
         self.assertEqual(form.initial["expires_preset"], VPNClientLimitsUpdateForm.EXPIRATION_PRESET_CUSTOM)
         self.assertEqual(form.initial["traffic_limit_preset"], VPNClientLimitsUpdateForm.TRAFFIC_PRESET_CUSTOM)
+
+
+@override_settings(CONFIG_ENCRYPTION_KEY=Fernet.generate_key().decode())
+class VPNClientSoftDeleteVisibilityTest(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user("admin-delete-ux", password="123", is_staff=True)
+        self.client.force_login(self.user)
+        self.server = Server.objects.create(name="delete-ux-server", public_endpoint_host="vpn.example.com")
+        self.protocol = ServerProtocol.objects.create(
+            server=self.server,
+            protocol_type=ServerProtocol.ProtocolType.AWG,
+            container_name="amnezia-awg",
+            enabled=True,
+            runtime_metadata={"udp_port": 51820, "subnet": "10.66.0.0/24"},
+        )
+        self.profile = ProtocolProfile.objects.create(
+            server_protocol=self.protocol,
+            name="delete-ux-profile",
+            protocol_type=ServerProtocol.ProtocolType.AWG,
+            config_template="[Interface]",
+        )
+        self.active_client = VPNClient.objects.create(
+            server=self.server,
+            name="visible-client",
+            protocol_type=VPNClient.ProtocolType.AWG,
+            profile=self.profile,
+            created_by=self.user,
+            status=VPNClient.Status.ACTIVE,
+        )
+        self.deleted_client = VPNClient.objects.create(
+            server=self.server,
+            name="hidden-client",
+            protocol_type=VPNClient.ProtocolType.AWG,
+            profile=self.profile,
+            created_by=self.user,
+            status=VPNClient.Status.DELETED,
+        )
+
+    def test_default_clients_list_hides_deleted_clients(self):
+        response = self.client.get("/clients/")
+
+        self.assertContains(response, self.active_client.name)
+        self.assertNotContains(response, self.deleted_client.name)
+
+    def test_deleted_clients_visible_only_when_explicitly_filtered(self):
+        response = self.client.get("/clients/", data={"status": VPNClient.Status.DELETED})
+        self.assertContains(response, self.deleted_client.name)
+        self.assertNotContains(response, self.active_client.name)
+
+    def test_delete_action_marks_client_deleted_and_keeps_row(self):
+        response = self.client.post(
+            f"/clients/{self.active_client.id}/action/delete/",
+            data={"next": "/clients/"},
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.active_client.refresh_from_db()
+        self.assertEqual(self.active_client.status, VPNClient.Status.DELETED)
+        self.assertTrue(VPNClient.objects.filter(pk=self.active_client.pk).exists())
+        self.assertContains(response, "Клиент помечен как удаленный и скрыт из основного списка")
+        self.assertNotContains(response, self.active_client.name)

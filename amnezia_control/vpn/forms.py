@@ -169,6 +169,8 @@ class VPNClientLimitsUpdateForm(VPNClientCreateForm):
 
 
 class VPNClientListFilterForm(forms.Form):
+    STATUS_ALL = "__all__"
+
     q = forms.CharField(required=False, label="Поиск", max_length=120)
     protocol = forms.ChoiceField(
         required=False,
@@ -178,7 +180,11 @@ class VPNClientListFilterForm(forms.Form):
     status = forms.ChoiceField(
         required=False,
         label="Статус",
-        choices=(("", "Все"),) + tuple(VPNClient.Status.choices),
+        choices=(
+            ("", "Активные и отключенные"),
+            (STATUS_ALL, "Все (включая удаленных)"),
+        )
+        + tuple(VPNClient.Status.choices),
     )
     source = forms.ChoiceField(
         required=False,

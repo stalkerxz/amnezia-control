@@ -1,6 +1,11 @@
 {% extends 'partials/base.html' %}
 {% block content %}
 <h1 class="h3 mb-3">Клиент: {{ client.name }}</h1>
+{% if is_deleted %}
+<div class="alert alert-warning">
+  Клиент помечен как удаленный (soft delete). Он скрыт из основного списка по умолчанию.
+</div>
+{% endif %}
 
 <div class="mb-3">
   {% if revision %}
@@ -96,6 +101,9 @@
 
 <div class="card mb-3"><div class="card-body">
   <h2 class="h6">Изменить лимиты</h2>
+  {% if is_deleted %}
+  <div class="alert alert-secondary mb-0">Изменение лимитов недоступно для удаленного клиента.</div>
+  {% else %}
   <form method="post" action="/clients/{{ client.id }}/limits/update/">
     {% csrf_token %}
     <div class="row g-3">
@@ -123,20 +131,27 @@
       <button class="btn btn-outline-primary">Сохранить лимиты</button>
     </div>
   </form>
+  {% endif %}
 </div></div>
 
 <div class="d-flex gap-2 flex-wrap mb-3">
-{% if reissue_blocked %}
+{% if is_deleted %}
+<button class="btn btn-primary" disabled>Переиздать конфиг</button>
+{% elif reissue_blocked %}
 <button class="btn btn-primary" disabled title="{{ reissue_block_reason }}">Переиздать конфиг</button>
 {% else %}
 <form method="post" action="/clients/{{ client.id }}/action/reissue/">{% csrf_token %}<button class="btn btn-primary">Переиздать конфиг</button></form>
 {% endif %}
 {% if client.status == 'active' %}
 <form method="post" action="/clients/{{ client.id }}/action/disable/">{% csrf_token %}<button class="btn btn-outline-warning">Отключить</button></form>
+{% elif is_deleted %}
+<form method="post" action="/clients/{{ client.id }}/action/enable/">{% csrf_token %}<button class="btn btn-outline-success">Восстановить</button></form>
 {% else %}
 <form method="post" action="/clients/{{ client.id }}/action/enable/">{% csrf_token %}<button class="btn btn-outline-success">Включить</button></form>
 {% endif %}
+{% if not is_deleted %}
 <form method="post" action="/clients/{{ client.id }}/action/delete/" onsubmit="return confirm('Удалить клиента?')">{% csrf_token %}<button class="btn btn-danger">Удалить</button></form>
+{% endif %}
 </div>
 {% if reissue_blocked %}
 <div class="alert alert-warning">{{ reissue_block_reason }}</div>
