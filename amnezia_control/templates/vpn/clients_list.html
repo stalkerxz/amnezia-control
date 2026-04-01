@@ -1,20 +1,28 @@
 {% extends 'partials/base.html' %}
 {% block content %}
-<div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-3">
-  <h1 class="h3 mb-0">VPN клиенты</h1>
+<div class="page-header d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
+  <div>
+    <p class="text-secondary small mb-1">Операторская · Клиенты</p>
+    <h1 class="h3 mb-1">Управление VPN клиентами</h1>
+    <p class="text-secondary mb-0">Контроль статусов, лимитов и подключений в одном списке.</p>
+  </div>
   <div class="d-flex gap-2">
     <form method="post" action="/clients/import/">{% csrf_token %}<button class="btn btn-outline-secondary">Импорт из runtime</button></form>
     <a class="btn btn-primary" href="/clients/new/">Создать клиента</a>
   </div>
 </div>
 
-<form method="get" class="card card-body mb-3">
+<form method="get" class="card card-body filter-panel mb-3">
+  <div class="d-flex justify-content-between align-items-center mb-2">
+    <h2 class="h6 mb-0">Фильтры</h2>
+    <a class="small text-decoration-none" href="/clients/">Сбросить все</a>
+  </div>
   <div class="row g-2 align-items-end">
-    <div class="col-lg-4">
+    <div class="col-xl-4 col-lg-6">
       <label class="form-label" for="id_q">Поиск по имени</label>
       <input class="form-control" id="id_q" name="q" value="{{ filter_form.q.value|default:'' }}" placeholder="Например, ivan-phone">
     </div>
-    <div class="col-lg-2 col-md-4">
+    <div class="col-xl-2 col-md-4">
       <label class="form-label" for="id_protocol">Протокол</label>
       <select class="form-select" id="id_protocol" name="protocol">
         {% for value, label in filter_form.fields.protocol.choices %}
@@ -22,7 +30,7 @@
         {% endfor %}
       </select>
     </div>
-    <div class="col-lg-2 col-md-4">
+    <div class="col-xl-2 col-md-4">
       <label class="form-label" for="id_status">Статус</label>
       <select class="form-select" id="id_status" name="status">
         {% for value, label in filter_form.fields.status.choices %}
@@ -30,7 +38,7 @@
         {% endfor %}
       </select>
     </div>
-    <div class="col-lg-2 col-md-4">
+    <div class="col-xl-2 col-md-4">
       <label class="form-label" for="id_source">Источник</label>
       <select class="form-select" id="id_source" name="source">
         {% for value, label in filter_form.fields.source.choices %}
@@ -38,28 +46,24 @@
         {% endfor %}
       </select>
     </div>
-    <div class="col-lg-2 d-flex gap-2">
+    <div class="col-xl-2">
       <button class="btn btn-primary w-100" type="submit">Применить</button>
-      <a class="btn btn-outline-secondary" href="/clients/">Сброс</a>
     </div>
   </div>
 </form>
 
 {% if client_rows %}
-<div class="table-responsive card p-2">
-  <table class="table table-hover align-middle mb-0">
+<div class="table-responsive card p-2 clients-table-wrap">
+  <table class="table table-hover align-middle mb-0 clients-table">
     <thead>
       <tr>
         <th>ID</th>
-        <th>Имя</th>
+        <th>Клиент</th>
         <th>Сервер</th>
-        <th>Протокол</th>
-        <th>Статус</th>
+        <th>Состояние</th>
         <th>Источник</th>
-        <th>Runtime адрес</th>
-        <th>Срок действия</th>
-        <th>Трафик</th>
-        <th>Лимиты</th>
+        <th>Runtime</th>
+        <th>Лимиты / трафик</th>
         <th>Обновлено</th>
         <th class="text-end">Действия</th>
       </tr>
@@ -67,42 +71,44 @@
     <tbody>
       {% for row in client_rows %}
       {% with c=row.client %}
-      <tr>
-        <td class="text-muted">{{ c.id }}</td>
-        <td><a href="/clients/{{ c.id }}/" class="fw-semibold text-decoration-none">{{ c.name }}</a></td>
-        <td>{{ c.server.name|default:'—' }}</td>
-        <td><span class="badge {% if c.protocol_type == 'awg2' %}text-bg-info{% else %}text-bg-secondary{% endif %}">{{ c.protocol_type|upper }}</span></td>
-        <td><span class="badge {% if c.status == 'active' %}text-bg-success{% elif c.status == 'disabled' %}text-bg-warning{% else %}text-bg-danger{% endif %}">{{ c.get_status_display }}</span></td>
-        <td>{% if c.imported_from_runtime %}<span class="badge text-bg-info">Импорт</span>{% else %}<span class="badge text-bg-secondary">Панель</span>{% endif %}</td>
-        <td><code>{{ c.runtime_address|default:'—' }}</code></td>
-        <td>{{ row.expires_display }}</td>
+      <tr class="{% if c.limit_state == 'expired' %}row-expired{% elif c.limit_state == 'traffic_exceeded' %}row-danger{% elif c.status == 'deleted' %}row-deleted{% elif c.traffic_sync_error %}row-warning{% endif %}">
+        <td class="text-muted">#{{ c.id }}</td>
         <td>
-          {% if c.traffic_limit_bytes %}{{ row.traffic_used_display }} / {{ row.traffic_limit_display }}{% else %}{{ row.traffic_used_display }}{% endif %}
-          {% if c.traffic_sync_error %}<div class="small text-secondary">{{ c.traffic_sync_error }}</div>{% endif %}
+          <a href="/clients/{{ c.id }}/" class="fw-semibold text-decoration-none d-block mb-1">{{ c.name }}</a>
+          <div class="d-flex flex-wrap gap-1">
+            <span class="badge badge-soft {% if c.protocol_type == 'awg2' %}badge-protocol-awg2{% else %}badge-protocol-awg{% endif %}">{{ c.protocol_type|upper }}</span>
+            <span class="badge badge-soft {% if c.status == 'active' %}badge-ok{% elif c.status == 'disabled' %}badge-warn{% else %}badge-danger{% endif %}">{{ c.get_status_display }}</span>
+            <span class="badge {{ row.limit_badge_class }}">{{ row.limit_badge_label }}</span>
+            {% if c.limit_state == 'expired' %}<span class="badge badge-soft badge-warn">Истёк</span>{% endif %}
+            {% if c.limit_state == 'traffic_exceeded' %}<span class="badge badge-soft badge-danger">Трафик превышен</span>{% endif %}
+            {% if c.status == 'deleted' %}<span class="badge badge-soft badge-danger">Удалён</span>{% endif %}
+            {% if c.traffic_sync_error %}<span class="badge badge-soft badge-muted">Телеметрия недоступна</span>{% endif %}
+          </div>
         </td>
-        <td><span class="badge {{ row.limit_badge_class }}">{{ row.limit_badge_label }}</span></td>
+        <td>{{ c.server.name|default:'—' }}</td>
+        <td>{{ row.expires_display }}</td>
+        <td>{% if c.imported_from_runtime %}<span class="badge badge-soft badge-protocol-awg2">Импорт</span>{% else %}<span class="badge badge-soft badge-muted">Панель</span>{% endif %}</td>
+        <td>
+          <code>{{ c.runtime_address|default:'—' }}</code>
+          <button type="button" class="btn btn-xs btn-outline-secondary ms-1 js-copy" data-copy="{{ c.runtime_address|default:'' }}">Копия</button>
+        </td>
+        <td>
+          <div>{% if c.traffic_limit_bytes %}{{ row.traffic_used_display }} / {{ row.traffic_limit_display }}{% else %}{{ row.traffic_used_display }}{% endif %}</div>
+          {% if c.traffic_sync_error %}<div class="small text-warning">{{ c.traffic_sync_error }}</div>{% endif %}
+        </td>
         <td>{{ c.updated_at|date:'d.m.Y H:i' }}</td>
         <td>
           <div class="client-actions justify-content-end">
             <a class="btn btn-sm btn-outline-secondary" href="/clients/{{ c.id }}/">Открыть</a>
-            <a class="btn btn-sm btn-outline-primary" href="/clients/{{ c.id }}/download/">Скачать config</a>
-            <button
-              class="btn btn-sm btn-outline-info js-open-qr-modal"
-              type="button"
-              data-client-id="{{ c.id }}"
-              data-client-name="{{ c.name }}"
-              data-bs-toggle="modal"
-              data-bs-target="#clientQrModal"
-            >
-              Показать QR
-            </button>
+            <a class="btn btn-sm btn-outline-primary" href="/clients/{{ c.id }}/download/">Config</a>
+            <button class="btn btn-sm btn-outline-info js-open-qr-modal" type="button" data-client-id="{{ c.id }}" data-client-name="{{ c.name }}" data-bs-toggle="modal" data-bs-target="#clientQrModal">QR</button>
             <form method="post" action="/clients/{{ c.id }}/action/reissue/" class="d-inline">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><button class="btn btn-sm btn-outline-dark">Переиздать</button></form>
             {% if c.status == 'active' %}
-              <form method="post" action="/clients/{{ c.id }}/action/disable/" class="d-inline">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><button class="btn btn-sm btn-warning">Отключить</button></form>
+              <form method="post" action="/clients/{{ c.id }}/action/disable/" class="d-inline">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><button class="btn btn-sm btn-warning">Откл.</button></form>
             {% else %}
-              <form method="post" action="/clients/{{ c.id }}/action/enable/" class="d-inline">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><button class="btn btn-sm btn-success">Включить</button></form>
+              <form method="post" action="/clients/{{ c.id }}/action/enable/" class="d-inline">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><button class="btn btn-sm btn-success">Вкл.</button></form>
             {% endif %}
-            <form method="post" action="/clients/{{ c.id }}/action/delete/" class="d-inline" onsubmit="return confirm('Удалить клиента {{ c.name }}?')">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><button class="btn btn-sm btn-danger">Удалить</button></form>
+            <button class="btn btn-sm btn-danger js-delete-client" data-action="/clients/{{ c.id }}/action/delete/" data-client-name="{{ c.name }}" data-next="{{ request.get_full_path }}" type="button">Удалить</button>
           </div>
         </td>
       </tr>
@@ -126,8 +132,28 @@
         <h2 class="modal-title fs-5" id="clientQrModalLabel">QR клиента</h2>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
       </div>
-      <div class="modal-body" id="clientQrModalBody">
-        <div class="text-secondary">Загрузка…</div>
+      <div class="modal-body" id="clientQrModalBody"><div class="text-secondary">Загрузка…</div></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="deleteClientModal" tabindex="-1" aria-labelledby="deleteClientModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title fs-5" id="deleteClientModalLabel">Подтверждение удаления</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+      </div>
+      <div class="modal-body">
+        Клиент <strong id="deleteClientName">—</strong> будет помечен удалённым. Действие можно отменить через восстановление.
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Отмена</button>
+        <form id="deleteClientForm" method="post" action="">
+          {% csrf_token %}
+          <input type="hidden" name="next" id="deleteClientNext" value="{{ request.get_full_path }}">
+          <button class="btn btn-danger">Удалить клиента</button>
+        </form>
       </div>
     </div>
   </div>
@@ -158,6 +184,35 @@
 
     modal.addEventListener('hidden.bs.modal', () => {
       body.innerHTML = '<div class="text-secondary">Загрузка…</div>';
+    });
+
+    const deleteModal = new bootstrap.Modal(document.getElementById('deleteClientModal'));
+    const deleteForm = document.getElementById('deleteClientForm');
+    const deleteName = document.getElementById('deleteClientName');
+    const deleteNext = document.getElementById('deleteClientNext');
+
+    document.querySelectorAll('.js-delete-client').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        deleteForm.action = btn.dataset.action;
+        deleteName.textContent = btn.dataset.clientName;
+        deleteNext.value = btn.dataset.next || '{{ request.get_full_path }}';
+        deleteModal.show();
+      });
+    });
+
+    document.querySelectorAll('.js-copy').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const text = btn.dataset.copy;
+        if (!text) return;
+        try {
+          await navigator.clipboard.writeText(text);
+          btn.textContent = 'Скопировано';
+          setTimeout(() => btn.textContent = 'Копия', 1200);
+        } catch (_) {
+          btn.textContent = 'Ошибка';
+          setTimeout(() => btn.textContent = 'Копия', 1200);
+        }
+      });
     });
   })();
 </script>
