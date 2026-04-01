@@ -246,7 +246,17 @@ def client_download_config_view(request, pk: int):
     client = get_object_or_404(VPNClient, pk=pk)
     config = VPNClientService.latest_config(client)
     response = HttpResponse(config, content_type="text/plain; charset=utf-8")
-    response["Content-Disposition"] = f'attachment; filename="{client.name}-{client.protocol_type}.conf"'
+    response["Content-Disposition"] = f'attachment; filename="{client.name}-{client.protocol_type}-amneziavpn.conf"'
+    return response
+
+
+@login_required
+@user_passes_test(_admin_required)
+def client_download_native_config_view(request, pk: int):
+    client = get_object_or_404(VPNClient, pk=pk)
+    config = VPNClientService.build_native_client_config(client)
+    response = HttpResponse(config, content_type="text/plain; charset=utf-8")
+    response["Content-Disposition"] = f'attachment; filename="{client.name}-{client.protocol_type}-amneziawg.conf"'
     return response
 
 
