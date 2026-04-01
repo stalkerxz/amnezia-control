@@ -3,34 +3,93 @@
 <h1 class="h3 mb-3">Создать клиента</h1>
 <form method="post" class="card card-body">
   {% csrf_token %}
+
+  {% if form.non_field_errors %}
+    <div class="alert alert-danger">
+      {% for error in form.non_field_errors %}
+        <div>{{ error }}</div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
   <div class="row g-3">
     <div class="col-lg-6">
-      <label class="form-label" for="id_name">{{ form.name.label }}</label>
+      <label class="form-label" for="{{ form.name.id_for_label }}">{{ form.name.label }}</label>
       {{ form.name }}
+      {% for error in form.name.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
     </div>
+
     <div class="col-lg-6">
-      <label class="form-label" for="id_protocol_type">{{ form.protocol_type.label }}</label>
+      <label class="form-label" for="{{ form.protocol_type.id_for_label }}">{{ form.protocol_type.label }}</label>
       {{ form.protocol_type }}
+      {% for error in form.protocol_type.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
     </div>
+
     <div class="col-lg-6">
-      <label class="form-label" for="id_expires_at">{{ form.expires_at.label }}</label>
-      {{ form.expires_at }}
-      <div class="form-text">Оставьте пустым, если срок действия не ограничен.</div>
+      <label class="form-label" for="{{ form.expires_preset.id_for_label }}">{{ form.expires_preset.label }}</label>
+      {{ form.expires_preset }}
+      <div class="form-text">Быстрый выбор срока или полностью ручная дата и время.</div>
+      {% for error in form.expires_preset.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+
+      <div id="expires-custom-wrapper" class="mt-2">
+        <label class="form-label" for="{{ form.expires_at.id_for_label }}">{{ form.expires_at.label }}</label>
+        {{ form.expires_at }}
+        {% for error in form.expires_at.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+      </div>
     </div>
+
     <div class="col-lg-6">
-      <label class="form-label" for="id_traffic_limit_bytes">{{ form.traffic_limit_bytes.label }}</label>
-      {{ form.traffic_limit_bytes }}
-      <div class="form-text">{{ form.traffic_limit_bytes.help_text }}</div>
+      <label class="form-label" for="{{ form.traffic_limit_preset.id_for_label }}">{{ form.traffic_limit_preset.label }}</label>
+      {{ form.traffic_limit_preset }}
+      <div class="form-text">Лимит будет сохранён в байтах автоматически.</div>
+      {% for error in form.traffic_limit_preset.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+
+      <div id="traffic-custom-wrapper" class="mt-2">
+        <label class="form-label" for="{{ form.traffic_custom_value.id_for_label }}">{{ form.traffic_custom_value.label }}</label>
+        <div class="input-group">
+          {{ form.traffic_custom_value }}
+          {{ form.traffic_custom_unit }}
+        </div>
+        {% for error in form.traffic_custom_value.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+        {% for error in form.traffic_custom_unit.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+      </div>
     </div>
   </div>
+
   <div class="mt-3">
     <button class="btn btn-success">Создать</button>
   </div>
 </form>
+
 <script>
-  document.querySelectorAll('input,select').forEach((el) => {
-    if (!el.classList.contains('form-control') && el.tagName === 'INPUT') el.classList.add('form-control');
-    if (!el.classList.contains('form-select') && el.tagName === 'SELECT') el.classList.add('form-select');
+  const formClassMap = {
+    INPUT: 'form-control',
+    SELECT: 'form-select',
+  };
+
+  document.querySelectorAll('input, select').forEach((el) => {
+    const className = formClassMap[el.tagName];
+    if (className && !el.classList.contains(className)) {
+      el.classList.add(className);
+    }
   });
+
+  function toggleCustomFields() {
+    const expiresPreset = document.getElementById('id_expires_preset');
+    const expiresCustom = document.getElementById('expires-custom-wrapper');
+    const trafficPreset = document.getElementById('id_traffic_limit_preset');
+    const trafficCustom = document.getElementById('traffic-custom-wrapper');
+
+    if (expiresPreset && expiresCustom) {
+      expiresCustom.classList.toggle('d-none', expiresPreset.value !== 'custom');
+    }
+    if (trafficPreset && trafficCustom) {
+      trafficCustom.classList.toggle('d-none', trafficPreset.value !== 'custom');
+    }
+  }
+
+  document.getElementById('id_expires_preset')?.addEventListener('change', toggleCustomFields);
+  document.getElementById('id_traffic_limit_preset')?.addEventListener('change', toggleCustomFields);
+  toggleCustomFields();
 </script>
 {% endblock %}

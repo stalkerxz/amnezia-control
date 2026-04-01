@@ -1,11 +1,12 @@
 from cryptography.fernet import Fernet
 from audit.models import AuditLog
 from django.contrib.auth import get_user_model
-from django.test import TestCase, override_settings
+from django.test import SimpleTestCase, TestCase, override_settings
 from django.utils import timezone
 from servers.models import ProtocolProfile, Server, ServerProtocol
 from servers.services import ServerService
 
+from .forms import VPNClientCreateForm
 from .models import VPNClient
 from .services import AWG2Adapter, AdapterFactory, PeerState, VPNClientLimitsService, VPNClientService
 
@@ -466,3 +467,61 @@ class VPNClientLimitsTest(TestCase):
         client.refresh_from_db()
         self.assertTrue(client.runtime_peer_public_key)
         self.assertEqual(client.revisions.count(), 1)
+
+
+class VPNClientCreateFormTest(SimpleTestCase):
+    def test_expiration_preset_builds_expires_at(self):
+        form = VPNClientCreateForm(
+            data={
+                "name": "preset-exp",
+                "protocol_type": VPNClient.ProtocolType.AWG,
+                "expires_preset": "1w",
+                "traffic_limit_preset": VPNClientCreateForm.TRAFFIC_PRESET_UNLIMITED,
+            }
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        expires_at = form.cleaned_data["expires_at"]
+        self.assertIsNotNone(expires_at)
+        self.assertGreater(expires_at, timezone.now())
+
+    def test_custom_expiration_requires_datetime(self):
+        form = VPNClientCreateForm(
+            data={
+                "name": "custom-exp",
+                "protocol_type": VPNClient.ProtocolType.AWG,
+                "expires_preset": VPNClientCreateForm.EXPIRATION_PRESET_CUSTOM,
+                "traffic_limit_preset": VPNClientCreateForm.TRAFFIC_PRESET_UNLIMITED,
+            }
+        )
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("expires_at", form.errors)
+
+    def test_traffic_custom_mb_converted_to_bytes(self):
+        form = VPNClientCreateForm(
+            data={
+                "name": "traffic-custom",
+                "protocol_type": VPNClient.ProtocolType.AWG,
+                "expires_preset": VPNClientCreateForm.EXPIRATION_PRESET_UNLIMITED,
+                "traffic_limit_preset": VPNClientCreateForm.TRAFFIC_PRESET_CUSTOM,
+                "traffic_custom_value": "512",
+                "traffic_custom_unit": VPNClientCreateForm.TRAFFIC_UNIT_MB,
+            }
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.cleaned_data["traffic_limit_bytes"], 512 * 1024**2)
+
+    def test_traffic_preset_converted_to_bytes(self):
+        form = VPNClientCreateForm(
+            data={
+                "name": "traffic-preset",
+                "protocol_type": VPNClient.ProtocolType.AWG,
+                "expires_preset": VPNClientCreateForm.EXPIRATION_PRESET_UNLIMITED,
+                "traffic_limit_preset": "25gb",
+            }
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.cleaned_data["traffic_limit_bytes"], 25 * 1024**3)
