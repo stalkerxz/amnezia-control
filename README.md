@@ -71,6 +71,16 @@ make logs
 make down
 ```
 
+## Автоматическое применение лимитов клиентов
+В продакшене лимиты теперь запускаются автоматически через **Celery Beat**:
+- `worker` выполняет задачу `vpn.tasks.enforce_client_limits_task`;
+- `beat` планирует запуск этой задачи по расписанию из настроек Django.
+
+Расписание задается переменной окружения:
+- `LIMITS_ENFORCE_EVERY_MINUTES` (по умолчанию `5` минут).
+
+Для запуска с `docker compose` сервис `beat` уже добавлен в `docker-compose.yml`, отдельный cron/systemd для лимитов не требуется.
+
 
 ### Endpoint readiness flow
 Если сервер локальный (`127.0.0.1`/`localhost`) и runtime не дал публичный host, оператор должен один раз заполнить `public_endpoint_host` (и опционально `public_endpoint_port`) в Server через Django Admin. После этого экспорт конфигов выполняется без ручного редактирования endpoint.

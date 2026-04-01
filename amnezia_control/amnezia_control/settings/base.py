@@ -1,5 +1,6 @@
 from pathlib import Path
 import os
+from celery.schedules import crontab
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
@@ -103,6 +104,13 @@ CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", REDIS_URL)
 CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", REDIS_URL)
 CELERY_TASK_TIME_LIMIT = 120
 CELERY_TASK_SOFT_TIME_LIMIT = 90
+LIMITS_ENFORCE_EVERY_MINUTES = int(os.getenv("LIMITS_ENFORCE_EVERY_MINUTES", "5"))
+CELERY_BEAT_SCHEDULE = {
+    "vpn-client-limits-enforce": {
+        "task": "vpn.tasks.enforce_client_limits_task",
+        "schedule": crontab(minute=f"*/{max(1, LIMITS_ENFORCE_EVERY_MINUTES)}"),
+    }
+}
 
 CONFIG_ENCRYPTION_KEY = os.getenv("CONFIG_ENCRYPTION_KEY", "")
 

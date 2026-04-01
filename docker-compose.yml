@@ -49,5 +49,19 @@ services:
       - ./amnezia_control:/app
     command: ["bash", "-lc", "python manage.py wait_for_db && celery -A amnezia_control worker -l INFO"]
 
+  beat:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    env_file: .env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./amnezia_control:/app
+    command: ["bash", "-lc", "python manage.py wait_for_db && celery -A amnezia_control beat -l INFO"]
+
 volumes:
   postgres_data:
