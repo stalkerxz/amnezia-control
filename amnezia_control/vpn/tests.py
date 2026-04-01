@@ -422,6 +422,122 @@ class VPNClientFlowTest(TestCase):
         imported_client = VPNClient.objects.get(server=self.server, runtime_peer_public_key="imported-peer")
         self.assertEqual(imported_client.runtime_address, "10.66.0.33/32")
 
+    def test_new_client_skips_addresses_reserved_in_db_when_runtime_empty(self):
+        from unittest.mock import patch
+
+        self.awg_protocol.runtime_metadata["subnet"] = "10.66.0.0/29"
+        self.awg_protocol.runtime_metadata["interface_addresses"] = ["10.66.0.1/24"]
+        self.awg_protocol.save(update_fields=["runtime_metadata"])
+
+        profile = ProtocolProfile.objects.get(
+            server_protocol=self.awg_protocol,
+            protocol_type=ServerProtocol.ProtocolType.AWG,
+        )
+        VPNClient.objects.create(
+            server=self.server,
+            name="existing-active",
+            protocol_type=VPNClient.ProtocolType.AWG,
+            status=VPNClient.Status.ACTIVE,
+            profile=profile,
+            created_by=self.user,
+            runtime_address="10.66.0.2",
+        )
+        VPNClient.objects.create(
+            server=self.server,
+            name="existing-disabled",
+            protocol_type=VPNClient.ProtocolType.AWG,
+            status=VPNClient.Status.DISABLED,
+            profile=profile,
+            created_by=self.user,
+            runtime_address="10.66.0.3/32",
+        )
+        VPNClient.objects.create(
+            server=self.server,
+            name="existing-deleted",
+            protocol_type=VPNClient.ProtocolType.AWG,
+            status=VPNClient.Status.DELETED,
+            profile=profile,
+            created_by=self.user,
+            runtime_address="10.66.0.4",
+        )
+
+        class R:
+            def __init__(self, stdout):
+                self.stdout = stdout
+
+        def run_side_effect(*args, **kwargs):
+            action = args[2]
+            mapping = {
+                "awg.iface": R("awg0\n"),
+                "awg.genkey": R("new-private-key==\n"),
+                "awg.pubkey": R("new-public-key==\n"),
+                "awg.genpsk": R("new-psk==\n"),
+                "awg.add_peer": R(""),
+                "awg.server_pub": R("server-public-key==\n"),
+                "awg.list": R(""),
+            }
+            return mapping[action]
+
+        with patch("vpn.services.RuntimeCommandService.run", side_effect=run_side_effect):
+            client = VPNClientService.create_client(
+                server=self.server,
+                name="new-db-aware-client",
+                protocol_type=VPNClient.ProtocolType.AWG,
+                actor=self.user,
+            )
+
+        client.refresh_from_db()
+        self.assertEqual(client.runtime_address, "10.66.0.4")
+
+    def test_deleted_db_clients_do_not_block_address_reuse(self):
+        from unittest.mock import patch
+
+        self.awg_protocol.runtime_metadata["subnet"] = "10.66.0.0/29"
+        self.awg_protocol.runtime_metadata["interface_addresses"] = ["10.66.0.1/24"]
+        self.awg_protocol.save(update_fields=["runtime_metadata"])
+
+        profile = ProtocolProfile.objects.get(
+            server_protocol=self.awg_protocol,
+            protocol_type=ServerProtocol.ProtocolType.AWG,
+        )
+        VPNClient.objects.create(
+            server=self.server,
+            name="deleted-only",
+            protocol_type=VPNClient.ProtocolType.AWG,
+            status=VPNClient.Status.DELETED,
+            profile=profile,
+            created_by=self.user,
+            runtime_address="10.66.0.2",
+        )
+
+        class R:
+            def __init__(self, stdout):
+                self.stdout = stdout
+
+        def run_side_effect(*args, **kwargs):
+            action = args[2]
+            mapping = {
+                "awg.iface": R("awg0\n"),
+                "awg.genkey": R("new-private-key==\n"),
+                "awg.pubkey": R("new-public-key==\n"),
+                "awg.genpsk": R("new-psk==\n"),
+                "awg.add_peer": R(""),
+                "awg.server_pub": R("server-public-key==\n"),
+                "awg.list": R(""),
+            }
+            return mapping[action]
+
+        with patch("vpn.services.RuntimeCommandService.run", side_effect=run_side_effect):
+            client = VPNClientService.create_client(
+                server=self.server,
+                name="reuse-deleted-ip-client",
+                protocol_type=VPNClient.ProtocolType.AWG,
+                actor=self.user,
+            )
+
+        client.refresh_from_db()
+        self.assertEqual(client.runtime_address, "10.66.0.2")
+
 
 @override_settings(CONFIG_ENCRYPTION_KEY=Fernet.generate_key().decode())
 class VPNClientLimitsTest(TestCase):
