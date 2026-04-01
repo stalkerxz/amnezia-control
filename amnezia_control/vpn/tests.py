@@ -367,6 +367,61 @@ class VPNClientFlowTest(TestCase):
             client = VPNClientService.create_client(server=self.server, name="awg2-fallback", protocol_type=VPNClient.ProtocolType.AWG2, actor=self.user)
         self.assertTrue(client.runtime_address)
 
+    def test_new_client_uses_peer_address_not_server_interface_address(self):
+        from unittest.mock import patch
+
+        self.awg_protocol.runtime_metadata["subnet"] = "10.66.0.0/29"
+        self.awg_protocol.runtime_metadata["interface_addresses"] = ["10.66.0.1/24"]
+        self.awg_protocol.save(update_fields=["runtime_metadata"])
+
+        class R:
+            def __init__(self, stdout):
+                self.stdout = stdout
+
+        def run_side_effect(*args, **kwargs):
+            action = args[2]
+            mapping = {
+                "awg.iface": R("awg0\n"),
+                "awg.genkey": R("client-private-key==\n"),
+                "awg.pubkey": R("client-public-key==\n"),
+                "awg.genpsk": R("client-psk==\n"),
+                "awg.add_peer": R(""),
+                "awg.server_pub": R("server-public-key==\n"),
+                "awg.list": R(""),
+            }
+            return mapping[action]
+
+        with patch("vpn.services.RuntimeCommandService.run", side_effect=run_side_effect):
+            client = VPNClientService.create_client(server=self.server, name="new-client-peer-address", protocol_type=VPNClient.ProtocolType.AWG, actor=self.user)
+
+        client.refresh_from_db()
+        self.assertEqual(client.runtime_address, "10.66.0.2")
+        self.assertNotEqual(client.runtime_address, "10.66.0.1")
+        self.assertIn("Address = 10.66.0.2/32", VPNClientService.latest_config(client))
+        self.assertIn("Address = 10.66.0.2/32", VPNClientService.build_native_client_config(client))
+
+    def test_imported_peers_keep_allowed_ips_value(self):
+        from unittest.mock import patch
+
+        class R:
+            def __init__(self, stdout):
+                self.stdout = stdout
+
+        def run_side_effect(*args, **kwargs):
+            action = args[2]
+            mapping = {
+                "awg.list": R("imported-peer\tpsk\tendpoint\t10.66.0.33/32\t0\t0\t0\t25\n"),
+                "awg2.list": R(""),
+            }
+            return mapping[action]
+
+        with patch("vpn.services.RuntimeCommandService.run", side_effect=run_side_effect):
+            imported_count = VPNClientService.import_runtime_peers(server=self.server, actor=self.user)
+
+        self.assertEqual(imported_count, 1)
+        imported_client = VPNClient.objects.get(server=self.server, runtime_peer_public_key="imported-peer")
+        self.assertEqual(imported_client.runtime_address, "10.66.0.33/32")
+
 
 @override_settings(CONFIG_ENCRYPTION_KEY=Fernet.generate_key().decode())
 class VPNClientLimitsTest(TestCase):
