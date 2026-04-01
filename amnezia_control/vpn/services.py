@@ -214,6 +214,24 @@ class BaseProtocolAdapter:
                 except ValueError:
                     continue
 
+        interface_addresses = self.protocol.runtime_metadata.get("interface_addresses", [])
+        if isinstance(interface_addresses, str):
+            interface_addresses = [interface_addresses]
+        for token in interface_addresses:
+            value = str(token).strip()
+            if not value:
+                continue
+            try:
+                iface = ipaddress.ip_interface(value if "/" in value else f"{value}/32")
+                used.add(iface.ip)
+            except ValueError:
+                continue
+
+        if not interface_addresses:
+            first_host = next(subnet.hosts(), None)
+            if first_host:
+                used.add(first_host)
+
         for host in subnet.hosts():
             if host not in used:
                 return str(host)
