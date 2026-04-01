@@ -214,6 +214,25 @@ class BaseProtocolAdapter:
                 except ValueError:
                     continue
 
+        reserved_addresses = (
+            VPNClient.objects.filter(
+                server=self.protocol.server,
+                protocol_type=self.protocol_type,
+                status__in=(VPNClient.Status.ACTIVE, VPNClient.Status.DISABLED),
+            )
+            .exclude(runtime_address="")
+            .values_list("runtime_address", flat=True)
+        )
+        for address in reserved_addresses:
+            value = str(address).strip()
+            if not value:
+                continue
+            try:
+                iface = ipaddress.ip_interface(value if "/" in value else f"{value}/32")
+                used.add(iface.ip)
+            except ValueError:
+                continue
+
         interface_addresses = self.protocol.runtime_metadata.get("interface_addresses", [])
         if isinstance(interface_addresses, str):
             interface_addresses = [interface_addresses]
