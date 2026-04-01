@@ -60,12 +60,18 @@ def clients_list_view(request):
             clients = clients.filter(name__icontains=q)
         if protocol:
             clients = clients.filter(protocol_type=protocol)
-        if status:
+        if status == VPNClientListFilterForm.STATUS_ALL:
+            pass
+        elif status:
             clients = clients.filter(status=status)
+        else:
+            clients = clients.exclude(status=VPNClient.Status.DELETED)
         if source == "imported":
             clients = clients.filter(imported_from_runtime=True)
         elif source == "manual":
             clients = clients.filter(imported_from_runtime=False)
+    else:
+        clients = clients.exclude(status=VPNClient.Status.DELETED)
 
     client_rows = []
     for client in clients:
@@ -192,6 +198,7 @@ def clients_detail_view(request, pk: int):
             "reissue_blocked": reissue_blocked,
             "reissue_block_reason": reissue_block_reason,
             "limits_form": limits_form,
+            "is_deleted": client.status == VPNClient.Status.DELETED,
         },
     )
 
@@ -223,20 +230,25 @@ def client_action_view(request, pk: int, action: str):
     next_url = request.POST.get("next")
 
     try:
+        success_message = "Действие выполнено"
         if action == "disable":
             VPNClientService.set_status(client=client, status=VPNClient.Status.DISABLED, actor=request.user)
         elif action == "enable":
             VPNClientService.set_status(client=client, status=VPNClient.Status.ACTIVE, actor=request.user)
+            success_message = "Клиент восстановлен"
         elif action == "delete":
             VPNClientService.set_status(client=client, status=VPNClient.Status.DELETED, actor=request.user)
+            success_message = "Клиент помечен как удаленный и скрыт из основного списка"
         elif action == "reissue":
             VPNClientService.reissue_config(client=client, actor=request.user)
-        messages.success(request, "Действие выполнено")
+        messages.success(request, success_message)
     except Exception as exc:
         messages.error(request, f"Ошибка выполнения действия: {exc}")
 
     if next_url:
         return redirect(next_url)
+    if action == "delete":
+        return redirect("clients-list")
     return redirect("clients-detail", pk=client.id)
 
 
