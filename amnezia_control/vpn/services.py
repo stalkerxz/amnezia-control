@@ -226,14 +226,24 @@ class BaseProtocolAdapter:
         public_key = self._run(actor, f"{self.protocol_type}.pubkey", cmd, sensitive_output=True).stdout.strip()
         return private_key, public_key
 
+    def generate_preshared_key(self, actor):
+        return self._run(actor, f"{self.protocol_type}.genpsk", self._wg_cmd("genpsk"), sensitive_output=True).stdout.strip()
+
     def create_peer(self, actor):
         iface = self.interface_name(actor)
         private_key, public_key = self.generate_keypair(actor)
+        preshared_key = self.generate_preshared_key(actor)
         address = self._next_address(actor)
-        self._run(actor, f"{self.protocol_type}.add_peer", self._wg_cmd(f"set {iface} peer {public_key} allowed-ips {address}/32"))
+        quoted = shlex.quote(preshared_key)
+        add_peer_cmd = (
+            f"printf %s {quoted} | docker exec -i {self.container} {self.command_bin} "
+            f"set {iface} peer {public_key} preshared-key /dev/stdin allowed-ips {address}/32"
+        )
+        self._run(actor, f"{self.protocol_type}.add_peer", add_peer_cmd, sensitive_output=True)
         return {
             "private_key": private_key,
             "public_key": public_key,
+            "preshared_key": preshared_key,
             "address": address,
             "iface": iface,
             "server_public_key": self.server_public_key(actor, iface),
@@ -309,40 +319,66 @@ class VPNClientService:
         return f"{host}:{int(port)}"
 
     @staticmethod
-    def build_awg_legacy_client_config(*, private_key: str, address: str, endpoint: str, server_public_key: str) -> str:
+    def build_awg_legacy_client_config(*, private_key: str, address: str, endpoint: str, server_public_key: str, preshared_key: str = "") -> str:
+        peer_lines = [
+            "[Peer]",
+            f"PublicKey = {server_public_key}",
+        ]
+        if preshared_key:
+            peer_lines.append(f"PresharedKey = {preshared_key}")
+        peer_lines.extend(
+            [
+                f"Endpoint = {endpoint}",
+                "AllowedIPs = 0.0.0.0/0, ::/0",
+                "PersistentKeepalive = 25",
+            ]
+        )
         return (
             "[Interface]\n"
             f"PrivateKey = {private_key}\n"
             f"Address = {address}/32\n"
             "DNS = 1.1.1.1\n\n"
-            "[Peer]\n"
-            f"PublicKey = {server_public_key}\n"
-            f"Endpoint = {endpoint}\n"
-            "AllowedIPs = 0.0.0.0/0, ::/0\n"
-            "PersistentKeepalive = 25\n"
+            + "\n".join(peer_lines)
+            + "\n"
         )
 
     @staticmethod
-    def build_awg2_client_config(*, private_key: str, address: str, endpoint: str, server_public_key: str, awg2_metadata: dict) -> str:
+    def build_awg2_client_config(
+        *,
+        private_key: str,
+        address: str,
+        endpoint: str,
+        server_public_key: str,
+        awg2_metadata: dict,
+        preshared_key: str = "",
+    ) -> str:
         required = ("Jc", "Jmin", "Jmax", "S1", "S2", "S3", "S4", "H1", "H2", "H3", "H4")
         optional = ("I1", "I2", "I3", "I4", "I5")
         missing = [k for k in required if not awg2_metadata.get(k)]
         if missing:
             raise RuntimeError(f"AWG2 metadata is incomplete: missing {', '.join(missing)}. Run runtime sync and verify live AWG2 config.")
 
-        awg2_lines = [f"{k} = {awg2_metadata[k]}" for k in required]
-        awg2_lines.extend(f"{k} = {awg2_metadata[k]}" for k in optional if awg2_metadata.get(k))
+        peer_lines = [
+            "[Peer]",
+            f"PublicKey = {server_public_key}",
+        ]
+        if preshared_key:
+            peer_lines.append(f"PresharedKey = {preshared_key}")
+        peer_lines.extend(
+            [
+                f"Endpoint = {endpoint}",
+                "AllowedIPs = 0.0.0.0/0, ::/0",
+                "PersistentKeepalive = 25",
+            ]
+        )
+        peer_lines.extend(f"{k} = {awg2_metadata[k]}" for k in required)
+        peer_lines.extend(f"{k} = {awg2_metadata[k]}" for k in optional if awg2_metadata.get(k))
         return (
             "[Interface]\n"
             f"PrivateKey = {private_key}\n"
             f"Address = {address}/32\n"
             "DNS = 1.1.1.1\n\n"
-            "[Peer]\n"
-            f"PublicKey = {server_public_key}\n"
-            f"Endpoint = {endpoint}\n"
-            "AllowedIPs = 0.0.0.0/0, ::/0\n"
-            "PersistentKeepalive = 25\n"
-            + "\n".join(awg2_lines)
+            + "\n".join(peer_lines)
             + "\n"
         )
 
@@ -382,10 +418,14 @@ class VPNClientService:
             if value:
                 extra_values[key] = value
 
+        exported_address = interface.get("Address") or ""
+        if client.runtime_address:
+            exported_address = client.runtime_address if "/" in client.runtime_address else f"{client.runtime_address}/32"
+
         lines = [
             "[Interface]",
             f"PrivateKey = {interface['PrivateKey']}",
-            f"Address = {interface['Address']}",
+            f"Address = {exported_address}",
         ]
         if interface.get("DNS"):
             lines.append(f"DNS = {interface['DNS']}")
@@ -460,6 +500,7 @@ class VPNClientService:
                 address=generated["address"],
                 endpoint=endpoint,
                 server_public_key=generated["server_public_key"],
+                preshared_key=generated.get("preshared_key", ""),
             )
         else:
             config = VPNClientService.build_awg2_client_config(
@@ -468,6 +509,7 @@ class VPNClientService:
                 endpoint=endpoint,
                 server_public_key=generated["server_public_key"],
                 awg2_metadata=adapter.protocol.runtime_metadata.get("awg2_metadata", {}),
+                preshared_key=generated.get("preshared_key", ""),
             )
 
         rev = VPNClientService._store_revision(client, config)
