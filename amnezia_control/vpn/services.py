@@ -422,6 +422,30 @@ class VPNClientService:
 
     @staticmethod
     @transaction.atomic
+    def update_limits(*, client: VPNClient, expires_at, traffic_limit_bytes, actor):
+        old_expires_at = client.expires_at.isoformat() if client.expires_at else None
+        old_traffic_limit_bytes = client.traffic_limit_bytes
+
+        client.expires_at = expires_at
+        client.traffic_limit_bytes = traffic_limit_bytes
+        client.limit_state = VPNClientService.get_limit_state(client)
+        client.save(update_fields=["expires_at", "traffic_limit_bytes", "limit_state"])
+
+        AuditService.log(
+            actor,
+            "client.limits.update",
+            "VPNClient",
+            client.id,
+            {
+                "old_expires_at": old_expires_at,
+                "new_expires_at": client.expires_at.isoformat() if client.expires_at else None,
+                "old_traffic_limit_bytes": old_traffic_limit_bytes,
+                "new_traffic_limit_bytes": client.traffic_limit_bytes,
+            },
+        )
+
+    @staticmethod
+    @transaction.atomic
     def set_status(*, client: VPNClient, status: str, actor, disable_reason: str | None = None):
         if status in {VPNClient.Status.DISABLED, VPNClient.Status.DELETED} and client.runtime_peer_public_key:
             adapter = AdapterFactory.get_for_client(client)
