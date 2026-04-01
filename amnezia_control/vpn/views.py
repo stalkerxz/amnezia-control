@@ -163,7 +163,15 @@ def clients_detail_view(request, pk: int):
         missing_endpoint = True
         missing_awg2_metadata = client.protocol_type == VPNClient.ProtocolType.AWG2
 
-    limit_badge_class, limit_badge_label = _limit_state_badge(client.limit_state)
+    effective_limit_state = VPNClientService.get_limit_state(client)
+    limit_badge_class, limit_badge_label = _limit_state_badge(effective_limit_state)
+    reissue_blocked = effective_limit_state in {VPNClient.LimitState.EXPIRED, VPNClient.LimitState.TRAFFIC_EXCEEDED}
+    reissue_block_reason = ""
+    if effective_limit_state == VPNClient.LimitState.EXPIRED:
+        reissue_block_reason = "Переиздание недоступно: срок действия клиента истек."
+    elif effective_limit_state == VPNClient.LimitState.TRAFFIC_EXCEEDED:
+        reissue_block_reason = "Переиздание недоступно: превышен лимит трафика."
+
     return render(
         request,
         "vpn/clients_detail.html",
@@ -180,6 +188,8 @@ def clients_detail_view(request, pk: int):
             "traffic_usage_unavailable": bool(client.traffic_sync_error),
             "limit_badge_class": limit_badge_class,
             "limit_badge_label": limit_badge_label,
+            "reissue_blocked": reissue_blocked,
+            "reissue_block_reason": reissue_block_reason,
         },
     )
 

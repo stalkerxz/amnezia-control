@@ -43,6 +43,7 @@ class PeerState:
     allowed_ips: str
     transfer_rx: int = 0
     transfer_tx: int = 0
+    telemetry_available: bool = True
 
     @property
     def transfer_total(self) -> int:
@@ -144,7 +145,15 @@ class BaseProtocolAdapter:
                 continue
             if text.startswith("[") and text.endswith("]"):
                 if section.lower() == "[peer]" and current.get("PublicKey") and current.get("AllowedIPs"):
-                    peers.append(PeerState(public_key=current["PublicKey"], allowed_ips=current["AllowedIPs"], transfer_rx=0, transfer_tx=0))
+                    peers.append(
+                        PeerState(
+                            public_key=current["PublicKey"],
+                            allowed_ips=current["AllowedIPs"],
+                            transfer_rx=0,
+                            transfer_tx=0,
+                            telemetry_available=False,
+                        )
+                    )
                 section = text
                 current = {}
                 continue
@@ -153,7 +162,15 @@ class BaseProtocolAdapter:
             k, v = text.split("=", 1)
             current[k.strip()] = v.strip()
         if section.lower() == "[peer]" and current.get("PublicKey") and current.get("AllowedIPs"):
-            peers.append(PeerState(public_key=current["PublicKey"], allowed_ips=current["AllowedIPs"]))
+            peers.append(
+                PeerState(
+                    public_key=current["PublicKey"],
+                    allowed_ips=current["AllowedIPs"],
+                    transfer_rx=0,
+                    transfer_tx=0,
+                    telemetry_available=False,
+                )
+            )
         return peers
 
     def _list_peers_from_config(self, actor):
@@ -172,6 +189,8 @@ class BaseProtocolAdapter:
             return None
         if not peers:
             return {}
+        if any(not peer.telemetry_available for peer in peers):
+            return None
         return {peer.public_key: peer.transfer_total for peer in peers}
 
     def _next_address(self, actor) -> str:
@@ -366,6 +385,12 @@ class VPNClientService:
     @staticmethod
     @transaction.atomic
     def reissue_config(*, client: VPNClient, actor):
+        limit_state = VPNClientService.get_limit_state(client)
+        if limit_state == VPNClient.LimitState.EXPIRED:
+            raise RuntimeError("Переиздание запрещено: срок действия клиента истек.")
+        if limit_state == VPNClient.LimitState.TRAFFIC_EXCEEDED:
+            raise RuntimeError("Переиздание запрещено: превышен лимит трафика клиента.")
+
         adapter = AdapterFactory.get_for_client(client)
         if client.runtime_peer_public_key:
             adapter.remove_peer(actor, client.runtime_peer_public_key)
