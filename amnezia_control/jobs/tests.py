@@ -1,6 +1,5 @@
+from unittest import TestCase
 from unittest.mock import MagicMock, patch
-
-from django.test import TestCase
 
 from .executors import SafeSSHExecutor
 
@@ -38,3 +37,20 @@ class SSHExecutorTest(TestCase):
         executor = SafeSSHExecutor(host="127.0.0.1", username="u")
         with self.assertRaises(ValueError):
             executor._validate("printf %s bad$key | docker exec -i amnezia-awg2 wg pubkey")
+
+    def test_allow_wg_genpsk(self):
+        executor = SafeSSHExecutor(host="127.0.0.1", username="u")
+        executor._validate("docker exec amnezia-awg2 wg genpsk")
+
+    def test_allow_psk_set_pipeline(self):
+        executor = SafeSSHExecutor(host="127.0.0.1", username="u")
+        executor._validate(
+            "printf %s 'Abc+/=123' | docker exec -i amnezia-awg2 wg set wg0 peer QWERTY+/= preshared-key /dev/stdin allowed-ips 10.8.0.2/32"
+        )
+
+    def test_reject_psk_set_pipeline_with_unsafe_psk(self):
+        executor = SafeSSHExecutor(host="127.0.0.1", username="u")
+        with self.assertRaises(ValueError):
+            executor._validate(
+                "printf %s bad$key | docker exec -i amnezia-awg2 wg set wg0 peer QWERTY+/= preshared-key /dev/stdin allowed-ips 10.8.0.2/32"
+            )
