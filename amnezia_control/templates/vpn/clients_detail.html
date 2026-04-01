@@ -1,6 +1,6 @@
 {% extends 'partials/base.html' %}
 {% block content %}
-<div class="page-header mb-3">
+<div class="page-header page-header-compact mb-2">
   <p class="text-secondary small mb-1">Клиент #{{ client.id }}</p>
   <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
     <div>
@@ -24,7 +24,7 @@
 </div>
 
 {% if is_deleted %}
-<div class="alert alert-warning">Клиент помечен как удаленный (soft delete). Он скрыт из основного списка по умолчанию.</div>
+<div class="alert alert-warning py-2">Клиент помечен как удаленный (soft delete). Он скрыт из основного списка по умолчанию.</div>
 {% endif %}
 
 {% if missing_endpoint or missing_awg2_metadata or not revision %}
@@ -40,22 +40,22 @@
 </div>
 {% endif %}
 
-<div class="row g-3 mb-3">
-  <div class="col-xl-3 col-md-6"><div class="card stat-card h-100"><div class="card-body"><h2 class="h6">Runtime</h2><div class="small text-secondary mb-1">Сервер</div><div class="fw-semibold">{{ client.server.name }}</div><div class="small text-secondary mt-2">Address</div><code>{{ client.runtime_address|default:'-' }}</code></div></div></div>
-  <div class="col-xl-3 col-md-6"><div class="card stat-card h-100"><div class="card-body"><h2 class="h6">Ревизии</h2><div class="small text-secondary mb-1">Всего</div><div class="display-6">{{ revision_count }}</div>{% if revision %}<div class="small text-secondary">Последняя: #{{ revision.revision_number }}</div>{% endif %}</div></div></div>
-  <div class="col-xl-3 col-md-6"><div class="card stat-card h-100"><div class="card-body"><h2 class="h6">Лимиты</h2><div class="small text-secondary mb-1">Срок действия</div><div>{{ expires_display }}</div><div class="small text-secondary mt-2">Трафик</div><div>{% if client.traffic_limit_bytes %}{{ traffic_limit_display }}{% else %}Не задано{% endif %}</div></div></div></div>
-  <div class="col-xl-3 col-md-6"><div class="card stat-card h-100"><div class="card-body"><h2 class="h6">Подключение</h2><div class="small text-secondary mb-1">Peer key</div><code>{{ client.runtime_peer_public_key|default:'-' }}</code><button type="button" class="btn btn-xs btn-outline-secondary mt-2 js-copy" data-copy="{{ client.runtime_peer_public_key|default:'' }}">Копировать ключ</button></div></div></div>
+<div class="row g-2 mb-3">
+  <div class="col-xl-3 col-md-6"><div class="card stat-card stat-card-compact h-100"><div class="card-body"><h2 class="h6 mb-2">Runtime</h2><div class="small text-secondary mb-1">Сервер</div><div class="fw-semibold">{{ client.server.name }}</div><div class="small text-secondary mt-2">Адрес клиента</div><code>{{ runtime_address_display }}</code></div></div></div>
+  <div class="col-xl-3 col-md-6"><div class="card stat-card stat-card-compact h-100"><div class="card-body"><h2 class="h6 mb-2">Ревизии</h2><div class="small text-secondary mb-1">Всего</div><div class="h3 mb-1">{{ revision_count }}</div>{% if revision %}<div class="small text-secondary">Последняя: #{{ revision.revision_number }}</div>{% endif %}</div></div></div>
+  <div class="col-xl-3 col-md-6"><div class="card stat-card stat-card-compact h-100"><div class="card-body"><h2 class="h6 mb-2">Лимиты</h2><div class="small text-secondary mb-1">Срок действия</div><div>{{ expires_display }}</div><div class="small text-secondary mt-2">Трафик</div><div>{% if client.traffic_limit_bytes %}{{ traffic_limit_display }}{% else %}Не задано{% endif %}</div></div></div></div>
+  <div class="col-xl-3 col-md-6"><div class="card stat-card stat-card-compact h-100"><div class="card-body"><h2 class="h6 mb-2">Подключение</h2><div class="small text-secondary mb-1">Peer key</div><code>{{ client.runtime_peer_public_key|default:'-' }}</code><button type="button" class="btn btn-xs btn-outline-secondary mt-2 js-copy" data-copy="{{ client.runtime_peer_public_key|default:'' }}">Копировать ключ</button></div></div></div>
 </div>
 
-<div class="card mb-3"><div class="card-body">
-  <h2 class="h6">Лимиты и телеметрия</h2>
-  <div class="row g-3">
+<div class="card mb-3"><div class="card-body py-3">
+  <h2 class="h6 mb-2">Лимиты и телеметрия</h2>
+  <div class="row g-2">
     <div class="col-lg-4"><div class="small text-secondary">Ограничение по времени</div><div>{{ expires_display }}</div></div>
     <div class="col-lg-4"><div class="small text-secondary">Ограничение по трафику</div><div>{% if client.traffic_limit_bytes %}{{ traffic_limit_display }}{% else %}Не задано{% endif %}</div></div>
     <div class="col-lg-4"><div class="small text-secondary">Использовано / лимит</div><div>{% if client.traffic_limit_bytes %}{{ traffic_used_display }} / {{ traffic_limit_display }}{% else %}{{ traffic_used_display }}{% endif %}</div></div>
   </div>
-  <div class="small mt-3 text-secondary">
-    {% if traffic_usage_unavailable %}<span class="badge badge-soft badge-muted">Трафик недоступен</span> {{ client.traffic_sync_error }}
+  <div class="small mt-2 text-secondary telemetry-note">
+    {% if traffic_usage_unavailable %}<span class="badge badge-soft badge-muted">Телеметрия недоступна</span> {{ client.traffic_sync_error }}
     {% elif client.traffic_last_sync_at %}Синхронизация: {{ client.traffic_last_sync_at|date:'d.m.Y H:i' }}
     {% else %}Синхронизация: нет данных{% endif %}
   </div>

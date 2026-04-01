@@ -4,6 +4,7 @@ from django.db.models.functions import Coalesce
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
+import ipaddress
 
 from servers.models import Server
 from .forms import VPNClientCreateForm, VPNClientLimitsUpdateForm, VPNClientListFilterForm
@@ -38,6 +39,24 @@ def _fmt_bytes(value: int | None):
     if unit == "Б":
         return f"{int(size)} {unit}"
     return f"{size:.2f} {unit}"
+
+
+def _normalize_runtime_address(value: str) -> str:
+    if not value:
+        return "—"
+    normalized = []
+    for token in value.split(","):
+        part = token.strip()
+        if not part:
+            continue
+        if "/" in part:
+            normalized.append(part)
+            continue
+        try:
+            normalized.append(f"{ipaddress.ip_address(part)}/32")
+        except ValueError:
+            normalized.append(part)
+    return ", ".join(normalized) if normalized else "—"
 
 
 @login_required
@@ -84,6 +103,7 @@ def clients_list_view(request):
                 "expires_display": timezone.localtime(client.expires_at).strftime("%d.%m.%Y %H:%M") if client.expires_at else "—",
                 "traffic_used_display": _fmt_bytes(client.traffic_used_bytes),
                 "traffic_limit_display": _fmt_bytes(client.traffic_limit_bytes),
+                "runtime_address_display": _normalize_runtime_address(client.runtime_address),
             }
         )
 
@@ -193,6 +213,7 @@ def clients_detail_view(request, pk: int):
             "traffic_used_display": _fmt_bytes(client.traffic_used_bytes),
             "traffic_limit_display": _fmt_bytes(client.traffic_limit_bytes),
             "traffic_usage_unavailable": bool(client.traffic_sync_error),
+            "runtime_address_display": _normalize_runtime_address(client.runtime_address),
             "limit_badge_class": limit_badge_class,
             "limit_badge_label": limit_badge_label,
             "reissue_blocked": reissue_blocked,
