@@ -26,9 +26,11 @@ body.app-shell { background: var(--bg); color: var(--text); }
 .content { min-height: calc(100vh - 76px); }
 
 .page-header { padding-bottom: .25rem; border-bottom: 1px solid #253247; }
+.page-header-compact { padding-bottom: .15rem; margin-bottom: .6rem; }
 .card { background: var(--panel); border-color: var(--border); box-shadow: 0 3px 12px rgba(0, 0, 0, .15); }
 .card .card-title, .card h2, .card h3 { color: #d7e4fb; }
 .stat-card { background: var(--panel-2); }
+.stat-card-compact .card-body { padding: .8rem .85rem; }
 
 .table { --bs-table-bg: transparent; --bs-table-color: #e7eaf0; --bs-table-hover-bg: #1b283a; }
 .table thead th { color: #9fb0d2; text-transform: uppercase; font-size: .74rem; letter-spacing: .05em; border-bottom-color: var(--border); }
@@ -71,6 +73,21 @@ pre.log { background: #0f1520; color: #d7e2ff; padding: .75rem; border-radius: .
 .modal-content { background: #172334; border-color: var(--border); }
 .modal-header, .modal-footer { border-color: #2a3a52; }
 .client-actions { display: flex; flex-wrap: wrap; gap: .35rem; }
-.client-actions .btn { min-width: 74px; }
+.client-actions .btn { min-width: 64px; }
+.client-actions .dropdown-menu {
+  background: #182437;
+  border-color: var(--border);
+}
+.client-actions .dropdown-item {
+  color: #d6e2f8;
+  font-size: .88rem;
+}
+.client-actions .dropdown-item:hover,
+.client-actions .dropdown-item:focus {
+  background: #243552;
+  color: #fff;
+}
+.client-actions .dropdown-divider { border-color: #304461; }
+.telemetry-note { opacity: .88; }
 .pagination .page-link { background-color: var(--panel); border-color: var(--border); color: #c9d4ec; }
 .pagination .page-item.disabled .page-link { background-color: #141926; color: #6f7e9c; }

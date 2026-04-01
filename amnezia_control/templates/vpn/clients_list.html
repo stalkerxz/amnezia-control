@@ -60,7 +60,7 @@
         <th>ID</th>
         <th>Клиент</th>
         <th>Сервер</th>
-        <th>Состояние</th>
+        <th>Срок действия</th>
         <th>Источник</th>
         <th>Runtime</th>
         <th>Лимиты / трафик</th>
@@ -89,26 +89,45 @@
         <td>{{ row.expires_display }}</td>
         <td>{% if c.imported_from_runtime %}<span class="badge badge-soft badge-protocol-awg2">Импорт</span>{% else %}<span class="badge badge-soft badge-muted">Панель</span>{% endif %}</td>
         <td>
-          <code>{{ c.runtime_address|default:'—' }}</code>
-          <button type="button" class="btn btn-xs btn-outline-secondary ms-1 js-copy" data-copy="{{ c.runtime_address|default:'' }}">Копия</button>
+          <code>{{ row.runtime_address_display }}</code>
+          <button type="button" class="btn btn-xs btn-outline-secondary ms-1 js-copy" data-copy="{{ row.runtime_address_display|default:'' }}">Копия</button>
         </td>
         <td>
           <div>{% if c.traffic_limit_bytes %}{{ row.traffic_used_display }} / {{ row.traffic_limit_display }}{% else %}{{ row.traffic_used_display }}{% endif %}</div>
-          {% if c.traffic_sync_error %}<div class="small text-warning">{{ c.traffic_sync_error }}</div>{% endif %}
+          {% if c.traffic_sync_error %}<div class="small text-secondary">{{ c.traffic_sync_error }}</div>{% endif %}
         </td>
         <td>{{ c.updated_at|date:'d.m.Y H:i' }}</td>
         <td>
           <div class="client-actions justify-content-end">
-            <a class="btn btn-sm btn-outline-secondary" href="/clients/{{ c.id }}/">Открыть</a>
-            <a class="btn btn-sm btn-outline-primary" href="/clients/{{ c.id }}/download/">Config</a>
+            <a class="btn btn-sm btn-primary" href="/clients/{{ c.id }}/">Открыть</a>
+            <a class="btn btn-sm btn-outline-primary" href="/clients/{{ c.id }}/download/" title="Скачать конфиг">Config</a>
             <button class="btn btn-sm btn-outline-info js-open-qr-modal" type="button" data-client-id="{{ c.id }}" data-client-name="{{ c.name }}" data-bs-toggle="modal" data-bs-target="#clientQrModal">QR</button>
-            <form method="post" action="/clients/{{ c.id }}/action/reissue/" class="d-inline">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><button class="btn btn-sm btn-outline-dark">Переиздать</button></form>
-            {% if c.status == 'active' %}
-              <form method="post" action="/clients/{{ c.id }}/action/disable/" class="d-inline">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><button class="btn btn-sm btn-warning">Откл.</button></form>
-            {% else %}
-              <form method="post" action="/clients/{{ c.id }}/action/enable/" class="d-inline">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><button class="btn btn-sm btn-success">Вкл.</button></form>
-            {% endif %}
-            <button class="btn btn-sm btn-danger js-delete-client" data-action="/clients/{{ c.id }}/action/delete/" data-client-name="{{ c.name }}" data-next="{{ request.get_full_path }}" type="button">Удалить</button>
+            <div class="dropdown">
+              <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">Ещё</button>
+              <ul class="dropdown-menu dropdown-menu-end">
+                <li>
+                  <form method="post" action="/clients/{{ c.id }}/action/reissue/">{% csrf_token %}
+                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                    <button class="dropdown-item" type="submit">Переиздать</button>
+                  </form>
+                </li>
+                <li>
+                  {% if c.status == 'active' %}
+                  <form method="post" action="/clients/{{ c.id }}/action/disable/">{% csrf_token %}
+                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                    <button class="dropdown-item" type="submit">Отключить</button>
+                  </form>
+                  {% else %}
+                  <form method="post" action="/clients/{{ c.id }}/action/enable/">{% csrf_token %}
+                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                    <button class="dropdown-item" type="submit">Включить</button>
+                  </form>
+                  {% endif %}
+                </li>
+                <li><hr class="dropdown-divider"></li>
+                <li><button class="dropdown-item text-danger js-delete-client" data-action="/clients/{{ c.id }}/action/delete/" data-client-name="{{ c.name }}" data-next="{{ request.get_full_path }}" type="button">Удалить</button></li>
+              </ul>
+            </div>
           </div>
         </td>
       </tr>
