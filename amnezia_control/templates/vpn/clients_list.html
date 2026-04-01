@@ -45,7 +45,7 @@
   </div>
 </form>
 
-{% if clients %}
+{% if client_rows %}
 <div class="table-responsive card p-2">
   <table class="table table-hover align-middle mb-0">
     <thead>
@@ -57,12 +57,16 @@
         <th>Статус</th>
         <th>Источник</th>
         <th>Runtime адрес</th>
+        <th>Срок действия</th>
+        <th>Трафик</th>
+        <th>Лимиты</th>
         <th>Обновлено</th>
         <th class="text-end">Действия</th>
       </tr>
     </thead>
     <tbody>
-      {% for c in clients %}
+      {% for row in client_rows %}
+      {% with c=row.client %}
       <tr>
         <td class="text-muted">{{ c.id }}</td>
         <td><a href="/clients/{{ c.id }}/" class="fw-semibold text-decoration-none">{{ c.name }}</a></td>
@@ -71,6 +75,12 @@
         <td><span class="badge {% if c.status == 'active' %}text-bg-success{% elif c.status == 'disabled' %}text-bg-warning{% else %}text-bg-danger{% endif %}">{{ c.get_status_display }}</span></td>
         <td>{% if c.imported_from_runtime %}<span class="badge text-bg-info">Импорт</span>{% else %}<span class="badge text-bg-secondary">Панель</span>{% endif %}</td>
         <td><code>{{ c.runtime_address|default:'—' }}</code></td>
+        <td>{{ row.expires_display }}</td>
+        <td>
+          {% if c.traffic_limit_bytes %}{{ row.traffic_used_display }} / {{ row.traffic_limit_display }}{% else %}{{ row.traffic_used_display }}{% endif %}
+          {% if c.traffic_sync_error %}<div class="small text-secondary">{{ c.traffic_sync_error }}</div>{% endif %}
+        </td>
+        <td><span class="badge {{ row.limit_badge_class }}">{{ row.limit_badge_label }}</span></td>
         <td>{{ c.updated_at|date:'d.m.Y H:i' }}</td>
         <td>
           <div class="client-actions justify-content-end">
@@ -96,6 +106,7 @@
           </div>
         </td>
       </tr>
+      {% endwith %}
       {% endfor %}
     </tbody>
   </table>

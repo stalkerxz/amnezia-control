@@ -35,6 +35,7 @@
       <h2 class="h6">Статус и runtime</h2>
       <p>Протокол: <span class="badge {% if client.protocol_type == 'awg2' %}text-bg-info{% else %}text-bg-secondary{% endif %}">{{ client.protocol_type|upper }}</span></p>
       <p>Статус: <span class="badge {% if client.status == 'active' %}text-bg-success{% elif client.status == 'disabled' %}text-bg-warning{% else %}text-bg-danger{% endif %}">{{ client.status }}</span></p>
+      <p>Состояние лимитов: <span class="badge {{ limit_badge_class }}">{{ limit_badge_label }}</span></p>
       <p class="mb-1">Сервер: <strong>{{ client.server.name }}</strong></p>
       <p class="mb-1">Peer key: <code>{{ client.runtime_peer_public_key|default:'-' }}</code></p>
       <p class="mb-0">Address: <code>{{ client.runtime_address|default:'-' }}</code></p>
@@ -54,8 +55,45 @@
   </div>
 </div>
 
+
+<div class="card mb-3"><div class="card-body">
+  <h2 class="h6">Лимиты</h2>
+  <div class="row g-3">
+    <div class="col-lg-4">
+      <div class="small text-secondary">Ограничение по времени</div>
+      <div>{{ expires_display }}</div>
+      <div class="small mt-1">
+        {% if client.expires_at and client.limit_state == 'expired' %}<span class="badge text-bg-warning">Истек</span>{% elif client.expires_at %}<span class="badge text-bg-success">Активен</span>{% else %}<span class="badge text-bg-secondary">Не задан</span>{% endif %}
+      </div>
+    </div>
+    <div class="col-lg-4">
+      <div class="small text-secondary">Ограничение по трафику</div>
+      <div>{% if client.traffic_limit_bytes %}{{ traffic_limit_display }}{% else %}Не задано{% endif %}</div>
+      <div class="small mt-1">
+        {% if client.traffic_limit_bytes and client.limit_state == 'traffic_exceeded' %}<span class="badge text-bg-danger">Превышен</span>{% elif client.traffic_limit_bytes %}<span class="badge text-bg-success">Активен</span>{% else %}<span class="badge text-bg-secondary">Не задан</span>{% endif %}
+      </div>
+    </div>
+    <div class="col-lg-4">
+      <div class="small text-secondary">Использовано / лимит</div>
+      <div>{% if client.traffic_limit_bytes %}{{ traffic_used_display }} / {{ traffic_limit_display }}{% else %}{{ traffic_used_display }}{% endif %}</div>
+      <div class="small mt-1">
+        {% if traffic_usage_unavailable %}<span class="badge text-bg-secondary">Трафик недоступен</span> {{ client.traffic_sync_error }}
+        {% elif client.traffic_last_sync_at %}Синхронизация: {{ client.traffic_last_sync_at|date:'d.m.Y H:i' }}
+        {% else %}Синхронизация: нет данных{% endif %}
+      </div>
+    </div>
+  </div>
+  {% if client.disable_reason != 'none' %}
+    <div class="alert alert-warning mt-3 mb-0">Причина блокировки: <strong>{{ client.get_disable_reason_display }}</strong></div>
+  {% endif %}
+</div></div>
+
 <div class="d-flex gap-2 flex-wrap mb-3">
+{% if reissue_blocked %}
+<button class="btn btn-primary" disabled title="{{ reissue_block_reason }}">Переиздать конфиг</button>
+{% else %}
 <form method="post" action="/clients/{{ client.id }}/action/reissue/">{% csrf_token %}<button class="btn btn-primary">Переиздать конфиг</button></form>
+{% endif %}
 {% if client.status == 'active' %}
 <form method="post" action="/clients/{{ client.id }}/action/disable/">{% csrf_token %}<button class="btn btn-outline-warning">Отключить</button></form>
 {% else %}
@@ -63,6 +101,9 @@
 {% endif %}
 <form method="post" action="/clients/{{ client.id }}/action/delete/" onsubmit="return confirm('Удалить клиента?')">{% csrf_token %}<button class="btn btn-danger">Удалить</button></form>
 </div>
+{% if reissue_blocked %}
+<div class="alert alert-warning">{{ reissue_block_reason }}</div>
+{% endif %}
 
 {% if revision and qr_base64 %}
 <div class="card border-primary"><div class="card-body">

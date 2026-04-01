@@ -3,6 +3,7 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from django.db.models.functions import Coalesce
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
 
 from servers.models import Server
 from .forms import VPNClientCreateForm, VPNClientListFilterForm
@@ -12,6 +13,31 @@ from .services import VPNClientService
 
 def _admin_required(user):
     return user.is_authenticated and user.is_staff
+
+
+def _limit_state_badge(limit_state: str):
+    if limit_state == VPNClient.LimitState.EXPIRED:
+        return "text-bg-warning", "Истек"
+    if limit_state == VPNClient.LimitState.TRAFFIC_EXCEEDED:
+        return "text-bg-danger", "Трафик превышен"
+    return "text-bg-success", "Активен"
+
+
+def _fmt_bytes(value: int | None):
+    if value is None:
+        return "—"
+    units = ["Б", "КБ", "МБ", "ГБ", "ТБ"]
+    size = float(max(value, 0))
+    unit = units[0]
+    for u in units:
+        unit = u
+        if size < 1024.0:
+            break
+        if u != units[-1]:
+            size /= 1024.0
+    if unit == "Б":
+        return f"{int(size)} {unit}"
+    return f"{size:.2f} {unit}"
 
 
 @login_required
@@ -41,12 +67,26 @@ def clients_list_view(request):
         elif source == "manual":
             clients = clients.filter(imported_from_runtime=False)
 
+    client_rows = []
+    for client in clients:
+        badge_class, badge_label = _limit_state_badge(client.limit_state)
+        client_rows.append(
+            {
+                "client": client,
+                "limit_badge_class": badge_class,
+                "limit_badge_label": badge_label,
+                "expires_display": timezone.localtime(client.expires_at).strftime("%d.%m.%Y %H:%M") if client.expires_at else "—",
+                "traffic_used_display": _fmt_bytes(client.traffic_used_bytes),
+                "traffic_limit_display": _fmt_bytes(client.traffic_limit_bytes),
+            }
+        )
+
     server = Server.objects.filter(is_enabled=True).first()
     return render(
         request,
         "vpn/clients_list.html",
         {
-            "clients": clients,
+            "client_rows": client_rows,
             "filter_form": filter_form,
             "server": server,
         },
@@ -82,6 +122,8 @@ def clients_create_view(request):
                     server=server,
                     name=form.cleaned_data["name"],
                     protocol_type=form.cleaned_data["protocol_type"],
+                    expires_at=form.cleaned_data["expires_at"],
+                    traffic_limit_bytes=form.cleaned_data["traffic_limit_bytes"],
                     actor=request.user,
                 )
                 messages.success(request, "Клиент создан")
@@ -121,6 +163,15 @@ def clients_detail_view(request, pk: int):
         missing_endpoint = True
         missing_awg2_metadata = client.protocol_type == VPNClient.ProtocolType.AWG2
 
+    effective_limit_state = VPNClientService.get_limit_state(client)
+    limit_badge_class, limit_badge_label = _limit_state_badge(effective_limit_state)
+    reissue_blocked = effective_limit_state in {VPNClient.LimitState.EXPIRED, VPNClient.LimitState.TRAFFIC_EXCEEDED}
+    reissue_block_reason = ""
+    if effective_limit_state == VPNClient.LimitState.EXPIRED:
+        reissue_block_reason = "Переиздание недоступно: срок действия клиента истек."
+    elif effective_limit_state == VPNClient.LimitState.TRAFFIC_EXCEEDED:
+        reissue_block_reason = "Переиздание недоступно: превышен лимит трафика."
+
     return render(
         request,
         "vpn/clients_detail.html",
@@ -131,6 +182,14 @@ def clients_detail_view(request, pk: int):
             "qr_base64": qr_base64,
             "missing_endpoint": missing_endpoint,
             "missing_awg2_metadata": missing_awg2_metadata,
+            "expires_display": timezone.localtime(client.expires_at).strftime("%d.%m.%Y %H:%M") if client.expires_at else "Не задано",
+            "traffic_used_display": _fmt_bytes(client.traffic_used_bytes),
+            "traffic_limit_display": _fmt_bytes(client.traffic_limit_bytes),
+            "traffic_usage_unavailable": bool(client.traffic_sync_error),
+            "limit_badge_class": limit_badge_class,
+            "limit_badge_label": limit_badge_label,
+            "reissue_blocked": reissue_blocked,
+            "reissue_block_reason": reissue_block_reason,
         },
     )
 

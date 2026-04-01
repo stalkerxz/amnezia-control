@@ -13,6 +13,17 @@ class VPNClient(models.Model):
         AWG = "awg", "AmneziaWG"
         AWG2 = "awg2", "AWG2"
 
+    class LimitState(models.TextChoices):
+        ACTIVE = "active", "Активен"
+        EXPIRED = "expired", "Истек"
+        TRAFFIC_EXCEEDED = "traffic_exceeded", "Трафик превышен"
+
+    class DisableReason(models.TextChoices):
+        NONE = "none", "Нет"
+        MANUAL = "manual", "Вручную"
+        EXPIRED = "expired", "Истек срок"
+        TRAFFIC_EXCEEDED = "traffic_exceeded", "Превышен лимит трафика"
+
     server = models.ForeignKey(Server, on_delete=models.CASCADE, related_name="clients")
     name = models.CharField(max_length=120)
     protocol_type = models.CharField(max_length=16, choices=ProtocolType.choices)
@@ -23,6 +34,15 @@ class VPNClient(models.Model):
     runtime_peer_public_key = models.CharField(max_length=128, blank=True)
     runtime_address = models.CharField(max_length=64, blank=True)
     last_runtime_sync_at = models.DateTimeField(null=True, blank=True)
+
+    expires_at = models.DateTimeField(null=True, blank=True)
+    traffic_limit_bytes = models.BigIntegerField(null=True, blank=True)
+    traffic_used_bytes = models.BigIntegerField(default=0)
+    traffic_last_sync_at = models.DateTimeField(null=True, blank=True)
+    traffic_sync_error = models.CharField(max_length=160, blank=True)
+    limit_state = models.CharField(max_length=24, choices=LimitState.choices, default=LimitState.ACTIVE)
+    disable_reason = models.CharField(max_length=24, choices=DisableReason.choices, default=DisableReason.NONE)
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
