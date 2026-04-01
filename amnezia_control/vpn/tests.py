@@ -49,6 +49,7 @@ class VPNClientFlowTest(TestCase):
             "awg.pubkey": R("client-public-key==\n"),
             "awg.genpsk": R("client-psk==\n"),
             "awg.add_peer": R(""),
+            "awg.add_existing_peer": R(""),
             "awg.remove_peer": R(""),
             "awg.server_pub": R("server-public-key==\n"),
             "awg.list": R("peerkey\tpsk\tendpoint\t10.66.0.10/32\t0\t0\t0\t25\n"),
@@ -57,6 +58,7 @@ class VPNClientFlowTest(TestCase):
             "awg2.pubkey": R("client2-public-key==\n"),
             "awg2.genpsk": R("client2-psk==\n"),
             "awg2.add_peer": R(""),
+            "awg2.add_existing_peer": R(""),
             "awg2.remove_peer": R(""),
             "awg2.server_pub": R("server2-public-key==\n"),
             "awg2.list": R("peer2\tpsk\tendpoint\t10.77.0.10/32\t0\t0\t0\t25\n"),
@@ -484,6 +486,85 @@ class VPNClientLimitsTest(TestCase):
         self.assertEqual(client.status, VPNClient.Status.ACTIVE)
         self.assertEqual(client.disable_reason, VPNClient.DisableReason.NONE)
         self.assertEqual(client.limit_state, VPNClient.LimitState.ACTIVE)
+
+    def test_disable_then_enable_restores_same_runtime_identity_without_reissue(self):
+        from unittest.mock import patch
+
+        config = (
+            "[Interface]\n"
+            "PrivateKey = private\n"
+            "Address = 10.66.0.10/32\n\n"
+            "[Peer]\n"
+            "PublicKey = server\n"
+            "PresharedKey = psk-keep\n"
+            "Endpoint = vpn.example.com:51820\n"
+            "AllowedIPs = 0.0.0.0/0, ::/0\n"
+            "PersistentKeepalive = 25\n"
+        )
+        client = self._make_client(
+            name="disable-enable-restore",
+            status=VPNClient.Status.ACTIVE,
+            runtime_peer_public_key="peer-keep",
+            runtime_address="10.66.0.10",
+            disable_reason=VPNClient.DisableReason.NONE,
+        )
+        VPNClientService._store_revision(client, config)
+        initial_revision_count = client.revisions.count()
+        initial_key = client.runtime_peer_public_key
+        initial_address = client.runtime_address
+        initial_config = VPNClientService.latest_config(client)
+
+        class R:
+            def __init__(self, stdout):
+                self.stdout = stdout
+
+        def run_side_effect(*args, **kwargs):
+            action = args[2]
+            mapping = {
+                "awg.iface": R("awg0\n"),
+                "awg.remove_peer": R(""),
+                "awg.add_existing_peer": R(""),
+            }
+            return mapping[action]
+
+        with patch("vpn.services.RuntimeCommandService.run", side_effect=run_side_effect), patch(
+            "vpn.services.VPNClientService.reissue_config"
+        ) as reissue_mock:
+            VPNClientService.set_status(client=client, status=VPNClient.Status.DISABLED, actor=self.user)
+            client.refresh_from_db()
+            self.assertEqual(client.status, VPNClient.Status.DISABLED)
+
+            VPNClientService.set_status(client=client, status=VPNClient.Status.ACTIVE, actor=self.user)
+            reissue_mock.assert_not_called()
+
+        client.refresh_from_db()
+        self.assertEqual(client.status, VPNClient.Status.ACTIVE)
+        self.assertEqual(client.runtime_peer_public_key, initial_key)
+        self.assertEqual(client.runtime_address, initial_address)
+        self.assertEqual(client.revisions.count(), initial_revision_count)
+        self.assertEqual(VPNClientService.latest_config(client), initial_config)
+
+    def test_enable_without_revision_does_not_reissue_or_restore(self):
+        from unittest.mock import patch
+
+        client = self._make_client(
+            name="enable-no-revision",
+            status=VPNClient.Status.DISABLED,
+            runtime_peer_public_key="peer-no-revision",
+            runtime_address="10.66.0.20",
+            disable_reason=VPNClient.DisableReason.MANUAL,
+            limit_state=VPNClient.LimitState.ACTIVE,
+        )
+
+        with patch("vpn.services.RuntimeCommandService.run") as runtime_run, patch(
+            "vpn.services.VPNClientService.reissue_config"
+        ) as reissue_mock:
+            VPNClientService.set_status(client=client, status=VPNClient.Status.ACTIVE, actor=self.user)
+
+        client.refresh_from_db()
+        self.assertEqual(client.status, VPNClient.Status.ACTIVE)
+        reissue_mock.assert_not_called()
+        runtime_run.assert_not_called()
 
     def test_reactivate_with_violated_limit_logs_disabled_action(self):
         client = self._make_client(

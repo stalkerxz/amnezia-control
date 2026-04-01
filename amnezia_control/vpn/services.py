@@ -249,6 +249,22 @@ class BaseProtocolAdapter:
             "server_public_key": self.server_public_key(actor, iface),
         }
 
+    def add_existing_peer(self, actor, *, peer_public_key: str, allowed_ips: str, preshared_key: str = ""):
+        iface = self.interface_name(actor)
+        if preshared_key:
+            quoted = shlex.quote(preshared_key)
+            cmd = (
+                f"printf %s {quoted} | docker exec -i {self.container} {self.command_bin} "
+                f"set {iface} peer {peer_public_key} preshared-key /dev/stdin allowed-ips {allowed_ips}"
+            )
+            self._run(actor, f"{self.protocol_type}.add_existing_peer", cmd, sensitive_output=True)
+            return
+        self._run(
+            actor,
+            f"{self.protocol_type}.add_existing_peer",
+            self._wg_cmd(f"set {iface} peer {peer_public_key} allowed-ips {allowed_ips}"),
+        )
+
     def disable_peer(self, actor, peer_public_key: str):
         self.remove_peer(actor, peer_public_key)
 
@@ -456,6 +472,19 @@ class VPNClientService:
         return next_rev
 
     @staticmethod
+    def _restore_payload(client: VPNClient) -> dict[str, str] | None:
+        if not client.runtime_peer_public_key or not client.runtime_address or not client.revisions.exists():
+            return None
+
+        allowed_ips = client.runtime_address if "/" in client.runtime_address else f"{client.runtime_address}/32"
+        peer_section = VPNClientService._parse_config_sections(VPNClientService.latest_config(client)).get("Peer", {})
+        return {
+            "public_key": client.runtime_peer_public_key,
+            "allowed_ips": allowed_ips,
+            "preshared_key": peer_section.get("PresharedKey", ""),
+        }
+
+    @staticmethod
     @transaction.atomic
     def create_client(*, server, name: str, protocol_type: str, actor, expires_at=None, traffic_limit_bytes=None):
         profile = ProtocolProfile.objects.filter(
@@ -546,6 +575,7 @@ class VPNClientService:
     @staticmethod
     @transaction.atomic
     def set_status(*, client: VPNClient, status: str, actor, disable_reason: str | None = None):
+        previous_status = client.status
         if status in {VPNClient.Status.DISABLED, VPNClient.Status.DELETED} and client.runtime_peer_public_key:
             adapter = AdapterFactory.get_for_client(client)
             if status == VPNClient.Status.DISABLED:
@@ -568,6 +598,16 @@ class VPNClientService:
         elif status == VPNClient.Status.ACTIVE:
             resolved_state = VPNClientService.get_limit_state(client)
             if resolved_state == VPNClient.LimitState.ACTIVE:
+                if previous_status == VPNClient.Status.DISABLED:
+                    payload = VPNClientService._restore_payload(client)
+                    if payload:
+                        adapter = AdapterFactory.get_for_client(client)
+                        adapter.add_existing_peer(
+                            actor,
+                            peer_public_key=payload["public_key"],
+                            allowed_ips=payload["allowed_ips"],
+                            preshared_key=payload["preshared_key"],
+                        )
                 client.disable_reason = VPNClient.DisableReason.NONE
                 client.limit_state = VPNClient.LimitState.ACTIVE
                 update_fields.extend(["disable_reason", "limit_state"])
