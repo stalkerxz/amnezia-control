@@ -1,102 +1,65 @@
 {% extends 'partials/base.html' %}
 {% block content %}
-<h1 class="h3 mb-3">Клиент: {{ client.name }}</h1>
-{% if is_deleted %}
-<div class="alert alert-warning">
-  Клиент помечен как удаленный (soft delete). Он скрыт из основного списка по умолчанию.
+<div class="page-header mb-3">
+  <p class="text-secondary small mb-1">Клиент #{{ client.id }}</p>
+  <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+    <div>
+      <h1 class="h3 mb-2">{{ client.name }}</h1>
+      <div class="d-flex flex-wrap gap-1">
+        <span class="badge badge-soft {% if client.protocol_type == 'awg2' %}badge-protocol-awg2{% else %}badge-protocol-awg{% endif %}">{{ client.protocol_type|upper }}</span>
+        <span class="badge badge-soft {% if client.status == 'active' %}badge-ok{% elif client.status == 'disabled' %}badge-warn{% else %}badge-danger{% endif %}">{{ client.get_status_display }}</span>
+        <span class="badge {{ limit_badge_class }}">Лимиты: {{ limit_badge_label }}</span>
+      </div>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+      {% if revision %}
+      <a class="btn btn-primary" href="/clients/{{ client.id }}/download/native/">Скачать .conf (AmneziaWG)</a>
+      <a class="btn btn-outline-primary" href="/clients/{{ client.id }}/download/">Скачать .conf (AmneziaVPN)</a>
+      {% else %}
+      <button class="btn btn-primary" disabled>Скачать .conf (AmneziaWG)</button>
+      <button class="btn btn-outline-primary" disabled>Скачать .conf (AmneziaVPN)</button>
+      {% endif %}
+    </div>
+  </div>
 </div>
-{% endif %}
 
-<div class="mb-3">
-  {% if revision %}
-  <div class="d-flex gap-2 flex-wrap">
-    <a class="btn btn-primary btn-lg" href="/clients/{{ client.id }}/download/native/">Скачать .conf (AmneziaWG)</a>
-    <a class="btn btn-outline-primary btn-lg" href="/clients/{{ client.id }}/download/">Скачать .conf (AmneziaVPN)</a>
-  </div>
-  {% else %}
-  <div class="d-flex gap-2 flex-wrap">
-    <button class="btn btn-primary btn-lg" disabled>Скачать .conf (AmneziaWG)</button>
-    <button class="btn btn-outline-primary btn-lg" disabled>Скачать .conf (AmneziaVPN)</button>
-  </div>
-  {% endif %}
-</div>
+{% if is_deleted %}
+<div class="alert alert-warning">Клиент помечен как удаленный (soft delete). Он скрыт из основного списка по умолчанию.</div>
+{% endif %}
 
 {% if missing_endpoint or missing_awg2_metadata or not revision %}
 <div class="card border-warning mb-3">
   <div class="card-body">
     <h2 class="h6 text-warning-emphasis">Нужны действия перед выдачей/переизданием</h2>
     <ul class="mb-0">
-      {% if missing_endpoint %}
-      <li>Не найден публичный endpoint сервера (host/port). Заполните endpoint и выполните синхронизацию runtime.</li>
-      {% endif %}
-      {% if missing_awg2_metadata %}
-      <li>Отсутствуют обязательные AWG2-метаданные. Выполните синхронизацию runtime и проверьте live-конфиг AWG2.</li>
-      {% endif %}
-      {% if not revision %}
-      <li>Конфиг клиенту ещё не выдан. Нажмите «Переиздать», чтобы выпустить первую ревизию.</li>
-      {% endif %}
+      {% if missing_endpoint %}<li>Не найден публичный endpoint сервера (host/port). Заполните endpoint и выполните синхронизацию runtime.</li>{% endif %}
+      {% if missing_awg2_metadata %}<li>Отсутствуют обязательные AWG2-метаданные. Выполните синхронизацию runtime и проверьте live-конфиг AWG2.</li>{% endif %}
+      {% if not revision %}<li>Конфиг клиенту ещё не выдан. Нажмите «Переиздать», чтобы выпустить первую ревизию.</li>{% endif %}
     </ul>
   </div>
 </div>
 {% endif %}
 
 <div class="row g-3 mb-3">
-  <div class="col-lg-6">
-    <div class="card"><div class="card-body">
-      <h2 class="h6">Статус и runtime</h2>
-      <p>Протокол: <span class="badge {% if client.protocol_type == 'awg2' %}text-bg-info{% else %}text-bg-secondary{% endif %}">{{ client.protocol_type|upper }}</span></p>
-      <p>Статус: <span class="badge {% if client.status == 'active' %}text-bg-success{% elif client.status == 'disabled' %}text-bg-warning{% else %}text-bg-danger{% endif %}">{{ client.status }}</span></p>
-      <p>Состояние лимитов: <span class="badge {{ limit_badge_class }}">{{ limit_badge_label }}</span></p>
-      <p class="mb-1">Сервер: <strong>{{ client.server.name }}</strong></p>
-      <p class="mb-1">Peer key: <code>{{ client.runtime_peer_public_key|default:'-' }}</code></p>
-      <p class="mb-0">Address: <code>{{ client.runtime_address|default:'-' }}</code></p>
-    </div></div>
-  </div>
-  <div class="col-lg-6">
-    <div class="card"><div class="card-body">
-      <h2 class="h6">Ревизии конфига</h2>
-      <p class="mb-1">Всего ревизий: <strong>{{ revision_count }}</strong></p>
-      {% if revision %}
-        <p class="mb-1">Последняя ревизия: <strong>#{{ revision.revision_number }}</strong></p>
-        <p class="mb-0">Дата последней ревизии: <strong>{{ revision.created_at }}</strong></p>
-      {% else %}
-        <div class="empty-state">Конфиг пока не выпущен.</div>
-      {% endif %}
-    </div></div>
-  </div>
+  <div class="col-xl-3 col-md-6"><div class="card stat-card h-100"><div class="card-body"><h2 class="h6">Runtime</h2><div class="small text-secondary mb-1">Сервер</div><div class="fw-semibold">{{ client.server.name }}</div><div class="small text-secondary mt-2">Address</div><code>{{ client.runtime_address|default:'-' }}</code></div></div></div>
+  <div class="col-xl-3 col-md-6"><div class="card stat-card h-100"><div class="card-body"><h2 class="h6">Ревизии</h2><div class="small text-secondary mb-1">Всего</div><div class="display-6">{{ revision_count }}</div>{% if revision %}<div class="small text-secondary">Последняя: #{{ revision.revision_number }}</div>{% endif %}</div></div></div>
+  <div class="col-xl-3 col-md-6"><div class="card stat-card h-100"><div class="card-body"><h2 class="h6">Лимиты</h2><div class="small text-secondary mb-1">Срок действия</div><div>{{ expires_display }}</div><div class="small text-secondary mt-2">Трафик</div><div>{% if client.traffic_limit_bytes %}{{ traffic_limit_display }}{% else %}Не задано{% endif %}</div></div></div></div>
+  <div class="col-xl-3 col-md-6"><div class="card stat-card h-100"><div class="card-body"><h2 class="h6">Подключение</h2><div class="small text-secondary mb-1">Peer key</div><code>{{ client.runtime_peer_public_key|default:'-' }}</code><button type="button" class="btn btn-xs btn-outline-secondary mt-2 js-copy" data-copy="{{ client.runtime_peer_public_key|default:'' }}">Копировать ключ</button></div></div></div>
 </div>
 
-
 <div class="card mb-3"><div class="card-body">
-  <h2 class="h6">Лимиты</h2>
+  <h2 class="h6">Лимиты и телеметрия</h2>
   <div class="row g-3">
-    <div class="col-lg-4">
-      <div class="small text-secondary">Ограничение по времени</div>
-      <div>{{ expires_display }}</div>
-      <div class="small mt-1">
-        {% if client.expires_at and client.limit_state == 'expired' %}<span class="badge text-bg-warning">Истек</span>{% elif client.expires_at %}<span class="badge text-bg-success">Активен</span>{% else %}<span class="badge text-bg-secondary">Не задан</span>{% endif %}
-      </div>
-    </div>
-    <div class="col-lg-4">
-      <div class="small text-secondary">Ограничение по трафику</div>
-      <div>{% if client.traffic_limit_bytes %}{{ traffic_limit_display }}{% else %}Не задано{% endif %}</div>
-      <div class="small mt-1">
-        {% if client.traffic_limit_bytes and client.limit_state == 'traffic_exceeded' %}<span class="badge text-bg-danger">Превышен</span>{% elif client.traffic_limit_bytes %}<span class="badge text-bg-success">Активен</span>{% else %}<span class="badge text-bg-secondary">Не задан</span>{% endif %}
-      </div>
-    </div>
-    <div class="col-lg-4">
-      <div class="small text-secondary">Использовано / лимит</div>
-      <div>{% if client.traffic_limit_bytes %}{{ traffic_used_display }} / {{ traffic_limit_display }}{% else %}{{ traffic_used_display }}{% endif %}</div>
-      <div class="small mt-1">
-        {% if traffic_usage_unavailable %}<span class="badge text-bg-secondary">Трафик недоступен</span> {{ client.traffic_sync_error }}
-        {% elif client.traffic_last_sync_at %}Синхронизация: {{ client.traffic_last_sync_at|date:'d.m.Y H:i' }}
-        {% else %}Синхронизация: нет данных{% endif %}
-      </div>
-    </div>
+    <div class="col-lg-4"><div class="small text-secondary">Ограничение по времени</div><div>{{ expires_display }}</div></div>
+    <div class="col-lg-4"><div class="small text-secondary">Ограничение по трафику</div><div>{% if client.traffic_limit_bytes %}{{ traffic_limit_display }}{% else %}Не задано{% endif %}</div></div>
+    <div class="col-lg-4"><div class="small text-secondary">Использовано / лимит</div><div>{% if client.traffic_limit_bytes %}{{ traffic_used_display }} / {{ traffic_limit_display }}{% else %}{{ traffic_used_display }}{% endif %}</div></div>
   </div>
-  {% if client.disable_reason != 'none' %}
-    <div class="alert alert-warning mt-3 mb-0">Причина блокировки: <strong>{{ client.get_disable_reason_display }}</strong></div>
-  {% endif %}
+  <div class="small mt-3 text-secondary">
+    {% if traffic_usage_unavailable %}<span class="badge badge-soft badge-muted">Трафик недоступен</span> {{ client.traffic_sync_error }}
+    {% elif client.traffic_last_sync_at %}Синхронизация: {{ client.traffic_last_sync_at|date:'d.m.Y H:i' }}
+    {% else %}Синхронизация: нет данных{% endif %}
+  </div>
+  {% if client.disable_reason != 'none' %}<div class="alert alert-warning mt-3 mb-0">Причина блокировки: <strong>{{ client.get_disable_reason_display }}</strong></div>{% endif %}
 </div></div>
 
 <div class="card mb-3"><div class="card-body">
@@ -120,16 +83,11 @@
         {{ limits_form.traffic_limit_preset }}
         <div id="traffic-custom-wrapper" class="mt-2">
           <label class="form-label" for="{{ limits_form.traffic_custom_value.id_for_label }}">{{ limits_form.traffic_custom_value.label }}</label>
-          <div class="input-group">
-            {{ limits_form.traffic_custom_value }}
-            {{ limits_form.traffic_custom_unit }}
-          </div>
+          <div class="input-group">{{ limits_form.traffic_custom_value }}{{ limits_form.traffic_custom_unit }}</div>
         </div>
       </div>
     </div>
-    <div class="mt-3">
-      <button class="btn btn-outline-primary">Сохранить лимиты</button>
-    </div>
+    <div class="mt-3"><button class="btn btn-outline-primary">Сохранить лимиты</button></div>
   </form>
   {% endif %}
 </div></div>
@@ -150,31 +108,36 @@
 <form method="post" action="/clients/{{ client.id }}/action/enable/">{% csrf_token %}<button class="btn btn-outline-success">Включить</button></form>
 {% endif %}
 {% if not is_deleted %}
-<form method="post" action="/clients/{{ client.id }}/action/delete/" onsubmit="return confirm('Удалить клиента?')">{% csrf_token %}<button class="btn btn-danger">Удалить</button></form>
+<button class="btn btn-danger" type="button" data-bs-toggle="modal" data-bs-target="#deleteClientDetailModal">Удалить</button>
 {% endif %}
 </div>
-{% if reissue_blocked %}
-<div class="alert alert-warning">{{ reissue_block_reason }}</div>
-{% endif %}
+{% if reissue_blocked %}<div class="alert alert-warning">{{ reissue_block_reason }}</div>{% endif %}
 
 {% if revision and qr_base64 %}
-<div class="card border-primary"><div class="card-body">
-  <h2 class="h6">QR для подключения</h2>
-  <img src="data:image/png;base64,{{ qr_base64 }}" alt="QR" class="img-thumbnail" style="max-width:300px;">
-</div></div>
+<div class="card border-primary"><div class="card-body"><h2 class="h6">QR для подключения</h2><img src="data:image/png;base64,{{ qr_base64 }}" alt="QR" class="img-thumbnail" style="max-width:300px;"></div></div>
 {% endif %}
 
-<script>
-  const formClassMap = {
-    INPUT: 'form-control',
-    SELECT: 'form-select',
-  };
+<div class="modal fade" id="deleteClientDetailModal" tabindex="-1" aria-labelledby="deleteClientDetailModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title fs-5" id="deleteClientDetailModalLabel">Подтвердите удаление</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+      </div>
+      <div class="modal-body">Клиент <strong>{{ client.name }}</strong> будет помечен удалённым.</div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Отмена</button>
+        <form method="post" action="/clients/{{ client.id }}/action/delete/">{% csrf_token %}<button class="btn btn-danger">Удалить</button></form>
+      </div>
+    </div>
+  </div>
+</div>
 
+<script>
+  const formClassMap = { INPUT: 'form-control', SELECT: 'form-select' };
   document.querySelectorAll('input, select').forEach((el) => {
     const className = formClassMap[el.tagName];
-    if (className && !el.classList.contains(className)) {
-      el.classList.add(className);
-    }
+    if (className && !el.classList.contains(className)) el.classList.add(className);
   });
 
   function toggleCustomFields() {
@@ -182,17 +145,22 @@
     const expiresCustom = document.getElementById('expires-custom-wrapper');
     const trafficPreset = document.getElementById('id_traffic_limit_preset');
     const trafficCustom = document.getElementById('traffic-custom-wrapper');
-
-    if (expiresPreset && expiresCustom) {
-      expiresCustom.classList.toggle('d-none', expiresPreset.value !== 'custom');
-    }
-    if (trafficPreset && trafficCustom) {
-      trafficCustom.classList.toggle('d-none', trafficPreset.value !== 'custom');
-    }
+    if (expiresPreset && expiresCustom) expiresCustom.classList.toggle('d-none', expiresPreset.value !== 'custom');
+    if (trafficPreset && trafficCustom) trafficCustom.classList.toggle('d-none', trafficPreset.value !== 'custom');
   }
 
   document.getElementById('id_expires_preset')?.addEventListener('change', toggleCustomFields);
   document.getElementById('id_traffic_limit_preset')?.addEventListener('change', toggleCustomFields);
   toggleCustomFields();
+
+  document.querySelectorAll('.js-copy').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const text = btn.dataset.copy;
+      if (!text) return;
+      await navigator.clipboard.writeText(text);
+      btn.textContent = 'Скопировано';
+      setTimeout(() => btn.textContent = 'Копировать ключ', 1200);
+    });
+  });
 </script>
 {% endblock %}
