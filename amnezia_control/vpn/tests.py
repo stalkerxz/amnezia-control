@@ -1211,6 +1211,8 @@ class VPNClientBulkActionsAndQuickFiltersTest(TestCase):
 
         self.assertContains(response, 'id="bulkActionForm"')
         self.assertContains(response, 'id="bulkToolbar"')
+        self.assertContains(response, 'id="bulkLimitsBtn"')
+        self.assertContains(response, 'id="bulkLimitsModal"')
         self.assertContains(response, 'id="selectAllVisible"')
         self.assertContains(response, 'class="form-check-input js-client-checkbox"')
         self.assertContains(response, 'id="bulkSelectionContainer"')
@@ -1249,6 +1251,97 @@ class VPNClientBulkActionsAndQuickFiltersTest(TestCase):
         response = self.client.get("/clients/")
         self.assertNotContains(response, self.deleted_client.name)
         self.assertContains(response, self.active_client.name)
+
+    def test_bulk_update_expiration_limit(self):
+        before_request_time = timezone.now()
+        self.client.post(
+            "/clients/bulk-action/",
+            data={
+                "action": "limits",
+                "client_ids": [self.active_client.id, self.disabled_client.id],
+                "apply_expires": "set",
+                "expires_preset": "1w",
+                "apply_traffic": "keep",
+            },
+        )
+        self.active_client.refresh_from_db()
+        self.disabled_client.refresh_from_db()
+        self.assertIsNotNone(self.active_client.expires_at)
+        self.assertIsNotNone(self.disabled_client.expires_at)
+        self.assertGreaterEqual(self.active_client.expires_at, before_request_time + timezone.timedelta(days=6))
+
+    def test_bulk_update_traffic_limit(self):
+        self.client.post(
+            "/clients/bulk-action/",
+            data={
+                "action": "limits",
+                "client_ids": [self.active_client.id, self.expired_client.id],
+                "apply_expires": "keep",
+                "apply_traffic": "set",
+                "traffic_limit_preset": "10gb",
+            },
+        )
+        self.active_client.refresh_from_db()
+        self.expired_client.refresh_from_db()
+        self.assertEqual(self.active_client.traffic_limit_bytes, 10 * 1024**3)
+        self.assertEqual(self.expired_client.traffic_limit_bytes, 10 * 1024**3)
+
+    def test_bulk_remove_limits(self):
+        limit_time = timezone.now() + timezone.timedelta(days=3)
+        self.active_client.expires_at = limit_time
+        self.active_client.traffic_limit_bytes = 5 * 1024**3
+        self.active_client.save(update_fields=["expires_at", "traffic_limit_bytes"])
+        self.client.post(
+            "/clients/bulk-action/",
+            data={
+                "action": "limits",
+                "client_ids": [self.active_client.id],
+                "apply_expires": "clear",
+                "apply_traffic": "clear",
+            },
+        )
+        self.active_client.refresh_from_db()
+        self.assertIsNone(self.active_client.expires_at)
+        self.assertIsNone(self.active_client.traffic_limit_bytes)
+
+    def test_bulk_limits_skip_deleted_clients_by_default(self):
+        self.deleted_client.expires_at = timezone.now() + timezone.timedelta(days=1)
+        self.deleted_client.traffic_limit_bytes = 1024**3
+        self.deleted_client.save(update_fields=["expires_at", "traffic_limit_bytes"])
+        self.client.post(
+            "/clients/bulk-action/",
+            data={
+                "action": "limits",
+                "client_ids": [self.deleted_client.id, self.active_client.id],
+                "apply_expires": "set",
+                "expires_preset": "1m",
+                "apply_traffic": "set",
+                "traffic_limit_preset": "25gb",
+            },
+        )
+        self.deleted_client.refresh_from_db()
+        self.active_client.refresh_from_db()
+        self.assertEqual(self.deleted_client.traffic_limit_bytes, 1024**3)
+        self.assertEqual(self.active_client.traffic_limit_bytes, 25 * 1024**3)
+
+    def test_bulk_limits_submission_flow(self):
+        response = self.client.post(
+            "/clients/bulk-action/",
+            data={
+                "action": "limits",
+                "client_ids": [self.active_client.id, self.disabled_client.id],
+                "apply_expires": "set",
+                "expires_preset": "custom",
+                "expires_at": "2030-01-01T10:00",
+                "apply_traffic": "set",
+                "traffic_limit_preset": "custom",
+                "traffic_custom_value": "512",
+                "traffic_custom_unit": "mb",
+            },
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Лимиты обновлены для 2 клиент(ов)")
 
     def test_quick_filters_produce_correct_subsets(self):
         active_response = self.client.get("/clients/", data={"quick": "active"})

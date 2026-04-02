@@ -75,6 +75,7 @@
         <button type="button" class="btn btn-sm btn-outline-success js-bulk-action" data-action="enable" data-label="Включить" data-danger="0">Включить</button>
         <button type="button" class="btn btn-sm btn-outline-danger js-bulk-action" data-action="delete" data-label="Удалить" data-danger="1">Удалить</button>
         <button type="button" class="btn btn-sm btn-outline-primary js-bulk-action" data-action="reissue" data-label="Переиздать" data-danger="0">Переиздать</button>
+        <button type="button" class="btn btn-sm btn-primary" id="bulkLimitsBtn">Изменить лимиты</button>
       </div>
     </div>
   </div>
@@ -223,6 +224,91 @@
   </div>
 </div>
 
+<div class="modal fade" id="bulkLimitsModal" tabindex="-1" aria-labelledby="bulkLimitsModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form id="bulkLimitsForm" method="post" action="/clients/bulk-action/">
+        <div class="modal-header">
+          <h2 class="modal-title fs-5" id="bulkLimitsModalLabel">Массовое изменение лимитов</h2>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+        </div>
+        <div class="modal-body">
+          {% csrf_token %}
+          <input type="hidden" name="next" value="{{ request.get_full_path }}">
+          <input type="hidden" name="action" value="limits">
+          <div id="bulkLimitsSelectionContainer"></div>
+          <div class="alert alert-secondary small">
+            Изменение лимитов не переиздаёт конфиги клиентов.
+          </div>
+          <div class="mb-3">
+            <label for="bulkApplyExpires" class="form-label">Срок действия</label>
+            <select class="form-select" id="bulkApplyExpires" name="apply_expires">
+              <option value="keep" selected>Не изменять</option>
+              <option value="set">Установить срок</option>
+              <option value="clear">Снять ограничение</option>
+            </select>
+          </div>
+          <div class="row g-2 mb-3">
+            <div class="col-12">
+              <label for="bulkExpiresPreset" class="form-label">Пресет срока</label>
+              <select class="form-select" id="bulkExpiresPreset" name="expires_preset">
+                <option value="1d">1 день</option>
+                <option value="1w">1 неделя</option>
+                <option value="1m">1 месяц</option>
+                <option value="3m">3 месяца</option>
+                <option value="6m">6 месяцев</option>
+                <option value="1y">1 год</option>
+                <option value="custom">Свой срок</option>
+              </select>
+            </div>
+            <div class="col-12">
+              <label for="bulkExpiresAt" class="form-label">Свой срок (дата и время)</label>
+              <input class="form-control" type="datetime-local" id="bulkExpiresAt" name="expires_at">
+            </div>
+          </div>
+          <div class="mb-3">
+            <label for="bulkApplyTraffic" class="form-label">Лимит трафика</label>
+            <select class="form-select" id="bulkApplyTraffic" name="apply_traffic">
+              <option value="keep" selected>Не изменять</option>
+              <option value="set">Установить лимит</option>
+              <option value="clear">Снять ограничение</option>
+            </select>
+          </div>
+          <div class="row g-2">
+            <div class="col-12">
+              <label for="bulkTrafficPreset" class="form-label">Пресет трафика</label>
+              <select class="form-select" id="bulkTrafficPreset" name="traffic_limit_preset">
+                <option value="1gb">1 ГБ</option>
+                <option value="5gb">5 ГБ</option>
+                <option value="10gb">10 ГБ</option>
+                <option value="25gb">25 ГБ</option>
+                <option value="50gb">50 ГБ</option>
+                <option value="100gb">100 ГБ</option>
+                <option value="custom">Свой объём</option>
+              </select>
+            </div>
+            <div class="col-8">
+              <label for="bulkTrafficCustomValue" class="form-label">Свой объём</label>
+              <input class="form-control" type="number" min="1" id="bulkTrafficCustomValue" name="traffic_custom_value">
+            </div>
+            <div class="col-4">
+              <label for="bulkTrafficCustomUnit" class="form-label">Единица</label>
+              <select class="form-select" id="bulkTrafficCustomUnit" name="traffic_custom_unit">
+                <option value="mb">МБ</option>
+                <option value="gb" selected>ГБ</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Отмена</button>
+          <button type="submit" class="btn btn-primary">Применить лимиты</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
 <script>
   (() => {
     const modal = document.getElementById('clientQrModal');
@@ -298,22 +384,36 @@
     const clearSelectionBtn = document.getElementById('clearSelectionBtn');
     const bulkActionInput = document.getElementById('bulkActionInput');
     const bulkSelectionContainer = document.getElementById('bulkSelectionContainer');
+    const bulkLimitsSelectionContainer = document.getElementById('bulkLimitsSelectionContainer');
     const bulkConfirmModalEl = document.getElementById('bulkConfirmModal');
     const bulkConfirmText = document.getElementById('bulkConfirmText');
     const bulkConfirmSubmitBtn = document.getElementById('bulkConfirmSubmitBtn');
     const bulkConfirmModal = hasBootstrapModal && bulkConfirmModalEl ? new bootstrap.Modal(bulkConfirmModalEl) : null;
+    const bulkLimitsBtn = document.getElementById('bulkLimitsBtn');
+    const bulkLimitsModalEl = document.getElementById('bulkLimitsModal');
+    const bulkLimitsModal = hasBootstrapModal && bulkLimitsModalEl ? new bootstrap.Modal(bulkLimitsModalEl) : null;
     const checkboxes = Array.from(document.querySelectorAll('.js-client-checkbox'));
     const bulkActionButtons = Array.from(document.querySelectorAll('.js-bulk-action'));
 
     const getSelected = () => checkboxes.filter((cb) => cb.checked);
     const syncBulkSelectionInputs = () => {
       bulkSelectionContainer.innerHTML = '';
+      if (bulkLimitsSelectionContainer) {
+        bulkLimitsSelectionContainer.innerHTML = '';
+      }
       getSelected().forEach((cb) => {
         const input = document.createElement('input');
         input.type = 'hidden';
         input.name = 'client_ids';
         input.value = cb.value;
         bulkSelectionContainer.appendChild(input);
+        if (bulkLimitsSelectionContainer) {
+          const bulkLimitInput = document.createElement('input');
+          bulkLimitInput.type = 'hidden';
+          bulkLimitInput.name = 'client_ids';
+          bulkLimitInput.value = cb.value;
+          bulkLimitsSelectionContainer.appendChild(bulkLimitInput);
+        }
       });
     };
     const updateSelectionUi = () => {
@@ -375,6 +475,18 @@
         }
         syncBulkSelectionInputs();
         bulkForm.submit();
+      });
+    }
+
+    if (bulkLimitsBtn) {
+      bulkLimitsBtn.addEventListener('click', () => {
+        const selected = getSelected().length;
+        if (!selected) return;
+        syncBulkSelectionInputs();
+        if (bulkLimitsModal) {
+          bulkLimitsModal.show();
+          return;
+        }
       });
     }
 

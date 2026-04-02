@@ -84,42 +84,55 @@ class VPNClientCreateForm(forms.Form):
         initial=TRAFFIC_UNIT_GB,
     )
 
+    @classmethod
+    def resolve_expires_at(cls, *, expires_preset, custom_expires_at):
+        if expires_preset == cls.EXPIRATION_PRESET_CUSTOM:
+            if not custom_expires_at:
+                return None, "Укажите дату и время для собственного срока."
+            return custom_expires_at, None
+        if expires_preset == cls.EXPIRATION_PRESET_UNLIMITED:
+            return None, None
+        delta = cls.EXPIRATION_PRESET_TO_DELTA.get(expires_preset)
+        if delta is None:
+            return None, "Выберите корректный пресет срока действия."
+        return timezone.now() + delta, None
+
+    @classmethod
+    def resolve_traffic_limit_bytes(cls, *, traffic_preset, custom_traffic_value, custom_traffic_unit):
+        custom_traffic_unit = custom_traffic_unit or cls.TRAFFIC_UNIT_GB
+        if traffic_preset == cls.TRAFFIC_PRESET_CUSTOM:
+            if not custom_traffic_value:
+                return None, "traffic_custom_value", "Укажите значение лимита для своего объёма."
+            factor = cls.TRAFFIC_UNIT_FACTORS.get(custom_traffic_unit)
+            if factor is None:
+                return None, "traffic_custom_unit", "Выберите корректную единицу измерения."
+            return custom_traffic_value * factor, None, None
+        if traffic_preset == cls.TRAFFIC_PRESET_UNLIMITED:
+            return None, None, None
+        bytes_value = cls.TRAFFIC_PRESET_TO_BYTES.get(traffic_preset)
+        if bytes_value is None:
+            return None, "traffic_limit_preset", "Выберите корректный пресет лимита трафика."
+        return bytes_value, None, None
+
     def _clean_limits(self, cleaned_data):
         expires_preset = cleaned_data.get("expires_preset")
         custom_expires_at = cleaned_data.get("expires_at")
-        if expires_preset == self.EXPIRATION_PRESET_CUSTOM:
-            if not custom_expires_at:
-                self.add_error("expires_at", "Укажите дату и время для собственного срока.")
-            cleaned_data["expires_at"] = custom_expires_at
-        elif expires_preset == self.EXPIRATION_PRESET_UNLIMITED:
-            cleaned_data["expires_at"] = None
-        else:
-            delta = self.EXPIRATION_PRESET_TO_DELTA.get(expires_preset)
-            if delta is None:
-                self.add_error("expires_preset", "Выберите корректный пресет срока действия.")
-            else:
-                cleaned_data["expires_at"] = timezone.now() + delta
+        expires_at, expires_error = self.resolve_expires_at(expires_preset=expires_preset, custom_expires_at=custom_expires_at)
+        if expires_error:
+            self.add_error("expires_at" if expires_preset == self.EXPIRATION_PRESET_CUSTOM else "expires_preset", expires_error)
+        cleaned_data["expires_at"] = expires_at
 
         traffic_preset = cleaned_data.get("traffic_limit_preset")
         custom_traffic_value = cleaned_data.get("traffic_custom_value")
         custom_traffic_unit = cleaned_data.get("traffic_custom_unit") or self.TRAFFIC_UNIT_GB
-        if traffic_preset == self.TRAFFIC_PRESET_CUSTOM:
-            if not custom_traffic_value:
-                self.add_error("traffic_custom_value", "Укажите значение лимита для своего объёма.")
-            else:
-                factor = self.TRAFFIC_UNIT_FACTORS.get(custom_traffic_unit)
-                if factor is None:
-                    self.add_error("traffic_custom_unit", "Выберите корректную единицу измерения.")
-                else:
-                    cleaned_data["traffic_limit_bytes"] = custom_traffic_value * factor
-        elif traffic_preset == self.TRAFFIC_PRESET_UNLIMITED:
-            cleaned_data["traffic_limit_bytes"] = None
-        else:
-            bytes_value = self.TRAFFIC_PRESET_TO_BYTES.get(traffic_preset)
-            if bytes_value is None:
-                self.add_error("traffic_limit_preset", "Выберите корректный пресет лимита трафика.")
-            else:
-                cleaned_data["traffic_limit_bytes"] = bytes_value
+        traffic_limit_bytes, field_name, traffic_error = self.resolve_traffic_limit_bytes(
+            traffic_preset=traffic_preset,
+            custom_traffic_value=custom_traffic_value,
+            custom_traffic_unit=custom_traffic_unit,
+        )
+        if traffic_error:
+            self.add_error(field_name, traffic_error)
+        cleaned_data["traffic_limit_bytes"] = traffic_limit_bytes
 
         return cleaned_data
 
@@ -166,6 +179,93 @@ class VPNClientLimitsUpdateForm(VPNClientCreateForm):
     def clean(self):
         cleaned_data = forms.Form.clean(self)
         return self._clean_limits(cleaned_data)
+
+
+class VPNClientBulkLimitsUpdateForm(forms.Form):
+    APPLY_KEEP = "keep"
+    APPLY_SET = "set"
+    APPLY_CLEAR = "clear"
+
+    apply_expires = forms.ChoiceField(
+        required=False,
+        label="Срок действия",
+        choices=(
+            (APPLY_KEEP, "Не изменять"),
+            (APPLY_SET, "Установить срок"),
+            (APPLY_CLEAR, "Снять ограничение"),
+        ),
+        initial=APPLY_KEEP,
+    )
+    expires_preset = forms.ChoiceField(
+        required=False,
+        label="Пресет срока",
+        choices=VPNClientCreateForm.base_fields["expires_preset"].choices,
+        initial=VPNClientCreateForm.EXPIRATION_PRESET_UNLIMITED,
+    )
+    expires_at = forms.DateTimeField(
+        required=False,
+        label="Свой срок (дата и время)",
+        widget=forms.DateTimeInput(attrs={"type": "datetime-local"}),
+        input_formats=["%Y-%m-%dT%H:%M"],
+    )
+
+    apply_traffic = forms.ChoiceField(
+        required=False,
+        label="Лимит трафика",
+        choices=(
+            (APPLY_KEEP, "Не изменять"),
+            (APPLY_SET, "Установить лимит"),
+            (APPLY_CLEAR, "Снять ограничение"),
+        ),
+        initial=APPLY_KEEP,
+    )
+    traffic_limit_preset = forms.ChoiceField(
+        required=False,
+        label="Пресет трафика",
+        choices=VPNClientCreateForm.base_fields["traffic_limit_preset"].choices,
+        initial=VPNClientCreateForm.TRAFFIC_PRESET_UNLIMITED,
+    )
+    traffic_custom_value = forms.IntegerField(required=False, min_value=1, label="Свой объём")
+    traffic_custom_unit = forms.ChoiceField(
+        required=False,
+        label="Единица",
+        choices=VPNClientCreateForm.base_fields["traffic_custom_unit"].choices,
+        initial=VPNClientCreateForm.TRAFFIC_UNIT_GB,
+    )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        apply_expires = cleaned_data.get("apply_expires") or self.APPLY_KEEP
+        apply_traffic = cleaned_data.get("apply_traffic") or self.APPLY_KEEP
+
+        if apply_expires == self.APPLY_KEEP and apply_traffic == self.APPLY_KEEP:
+            raise forms.ValidationError("Выберите хотя бы одно изменение лимитов.")
+
+        if apply_expires == self.APPLY_SET:
+            expires_at, error = VPNClientCreateForm.resolve_expires_at(
+                expires_preset=cleaned_data.get("expires_preset"),
+                custom_expires_at=cleaned_data.get("expires_at"),
+            )
+            if error:
+                self.add_error(
+                    "expires_at"
+                    if cleaned_data.get("expires_preset") == VPNClientCreateForm.EXPIRATION_PRESET_CUSTOM
+                    else "expires_preset",
+                    error,
+                )
+            cleaned_data["resolved_expires_at"] = expires_at
+
+        if apply_traffic == self.APPLY_SET:
+            traffic_limit_bytes, field_name, error = VPNClientCreateForm.resolve_traffic_limit_bytes(
+                traffic_preset=cleaned_data.get("traffic_limit_preset"),
+                custom_traffic_value=cleaned_data.get("traffic_custom_value"),
+                custom_traffic_unit=cleaned_data.get("traffic_custom_unit"),
+            )
+            if error:
+                self.add_error(field_name, error)
+            cleaned_data["resolved_traffic_limit_bytes"] = traffic_limit_bytes
+
+        return cleaned_data
 
 
 class VPNClientListFilterForm(forms.Form):
