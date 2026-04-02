@@ -2,6 +2,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.db.models.functions import Coalesce
 from django.http import HttpResponse
+from django.urls import reverse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 import ipaddress
@@ -74,6 +75,7 @@ def clients_list_view(request):
         protocol = filter_form.cleaned_data["protocol"]
         status = filter_form.cleaned_data["status"]
         source = filter_form.cleaned_data["source"]
+        quick = filter_form.cleaned_data["quick"]
 
         if q:
             clients = clients.filter(name__icontains=q)
@@ -89,6 +91,17 @@ def clients_list_view(request):
             clients = clients.filter(imported_from_runtime=True)
         elif source == "manual":
             clients = clients.filter(imported_from_runtime=False)
+
+        if quick == VPNClientListFilterForm.QUICK_ACTIVE:
+            clients = clients.filter(status=VPNClient.Status.ACTIVE)
+        elif quick == VPNClientListFilterForm.QUICK_DISABLED:
+            clients = clients.filter(status=VPNClient.Status.DISABLED)
+        elif quick == VPNClientListFilterForm.QUICK_EXPIRED:
+            clients = clients.filter(limit_state=VPNClient.LimitState.EXPIRED).exclude(status=VPNClient.Status.DELETED)
+        elif quick == VPNClientListFilterForm.QUICK_TRAFFIC_EXCEEDED:
+            clients = clients.filter(limit_state=VPNClient.LimitState.TRAFFIC_EXCEEDED).exclude(status=VPNClient.Status.DELETED)
+        elif quick == VPNClientListFilterForm.QUICK_DELETED:
+            clients = clients.filter(status=VPNClient.Status.DELETED)
     else:
         clients = clients.exclude(status=VPNClient.Status.DELETED)
 
@@ -108,6 +121,27 @@ def clients_list_view(request):
         )
 
     server = Server.objects.filter(is_enabled=True).first()
+    quick_filters = [
+        (VPNClientListFilterForm.QUICK_ACTIVE, "Активные"),
+        (VPNClientListFilterForm.QUICK_DISABLED, "Отключённые"),
+        (VPNClientListFilterForm.QUICK_EXPIRED, "Просроченные"),
+        (VPNClientListFilterForm.QUICK_TRAFFIC_EXCEEDED, "Трафик превышен"),
+        (VPNClientListFilterForm.QUICK_DELETED, "Удалённые"),
+    ]
+    current_quick = filter_form.cleaned_data["quick"] if filter_form.is_valid() else ""
+    quick_filter_links = []
+    for key, label in quick_filters:
+        query = request.GET.copy()
+        query["quick"] = key
+        quick_filter_links.append(
+            {
+                "key": key,
+                "label": label,
+                "active": current_quick == key,
+                "url": f'{reverse("clients-list")}?{query.urlencode()}',
+            }
+        )
+
     return render(
         request,
         "vpn/clients_list.html",
@@ -115,6 +149,7 @@ def clients_list_view(request):
             "client_rows": client_rows,
             "filter_form": filter_form,
             "server": server,
+            "quick_filter_links": quick_filter_links,
         },
     )
 
@@ -271,6 +306,56 @@ def client_action_view(request, pk: int, action: str):
     if action == "delete":
         return redirect("clients-list")
     return redirect("clients-detail", pk=client.id)
+
+
+@login_required
+@user_passes_test(_admin_required)
+def clients_bulk_action_view(request):
+    if request.method != "POST":
+        return redirect("clients-list")
+
+    action = request.POST.get("action", "")
+    selected_ids = [int(value) for value in request.POST.getlist("client_ids") if str(value).isdigit()]
+    next_url = request.POST.get("next") or reverse("clients-list")
+
+    if not selected_ids:
+        messages.warning(request, "Выберите хотя бы одного клиента.")
+        return redirect(next_url)
+
+    clients = list(VPNClient.objects.filter(id__in=selected_ids))
+    if not clients:
+        messages.warning(request, "Выбранные клиенты не найдены.")
+        return redirect(next_url)
+
+    applied = 0
+    for client in clients:
+        try:
+            if action == "disable":
+                VPNClientService.set_status(client=client, status=VPNClient.Status.DISABLED, actor=request.user)
+            elif action == "enable":
+                VPNClientService.set_status(client=client, status=VPNClient.Status.ACTIVE, actor=request.user)
+            elif action == "delete":
+                VPNClientService.set_status(client=client, status=VPNClient.Status.DELETED, actor=request.user)
+            elif action == "reissue":
+                VPNClientService.reissue_config(client=client, actor=request.user)
+            else:
+                messages.error(request, "Неизвестное массовое действие.")
+                return redirect(next_url)
+            applied += 1
+        except Exception:
+            continue
+
+    action_labels = {
+        "disable": "отключено",
+        "enable": "включено",
+        "delete": "помечено удалёнными",
+        "reissue": "переиздано",
+    }
+    if applied:
+        messages.success(request, f"Массовое действие выполнено: {action_labels[action]} — {applied} шт.")
+    else:
+        messages.error(request, "Не удалось выполнить массовое действие для выбранных клиентов.")
+    return redirect(next_url)
 
 
 @login_required
