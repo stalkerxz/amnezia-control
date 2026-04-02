@@ -14,11 +14,13 @@ def _admin_required(user):
 
 def _health_label(status: str) -> str:
     labels = {
-        "healthy": "Проверка пройдена",
-        "unhealthy": "Обнаружены проблемы",
-        "unknown": "Не проверялось",
+        "healthy": "Здоров",
+        "degraded": "Ограниченно работоспособен",
+        "unhealthy": "Нездоров",
+        "not_checked": "Не проверялся",
+        "unknown": "Не проверялся",
     }
-    return labels.get(status or "unknown", "Не проверялось")
+    return labels.get(status or "not_checked", "Не проверялся")
 
 
 def _peer_source_view(peer_source: str):
@@ -35,9 +37,14 @@ def _peer_source_view(peer_source: str):
 @login_required
 @user_passes_test(_admin_required)
 def server_list_view(request):
+    servers_qs = Server.objects.prefetch_related("protocols").all()
     servers = [
-        {"obj": server, "health_label": _health_label(server.health_status)}
-        for server in Server.objects.all()
+        {
+            "obj": server,
+            "health_label": _health_label(server.health_status),
+            "health_reasons": ServerService.evaluate_health(server)["reasons"][:2],
+        }
+        for server in servers_qs
     ]
     return render(request, "servers/list.html", {"servers": servers})
 
@@ -71,9 +78,11 @@ def server_detail_view(request, pk: int):
             }
         )
 
+    health_eval = ServerService.evaluate_health(server)
     context = {
         "server": server,
         "server_health_label": _health_label(server.health_status),
+        "server_health_reasons": health_eval["reasons"],
         "protocol_rows": protocol_rows,
         "ready_protocols": ready_protocols,
         "total_protocols": len(protocols),
@@ -87,8 +96,13 @@ def server_detail_view(request, pk: int):
 def server_sync_runtime_view(request, pk: int):
     server = get_object_or_404(Server, pk=pk)
     if request.method == "POST":
-        ServerService.sync_runtime_state(server=server, actor=request.user)
-        messages.success(request, "Состояние контейнеров синхронизировано")
+        try:
+            ServerService.sync_runtime_state(server=server, actor=request.user)
+            server.refresh_from_db(fields=["health_status"])
+            messages.success(request, f"Состояние runtime синхронизировано. Итог здоровья: {_health_label(server.health_status)}.")
+        except Exception as exc:
+            ServerService.update_health(server, ServerService.HEALTH_UNHEALTHY)
+            messages.error(request, f"Синхронизация runtime не выполнена: {exc}")
     return redirect("servers-detail", pk=pk)
 
 

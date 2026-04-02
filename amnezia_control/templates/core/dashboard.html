@@ -6,6 +6,10 @@
 </div>
 <div class="row g-3 mb-4">
   <div class="col-xl-2 col-md-4"><div class="card stat-card stat-card-compact h-100"><div class="card-body"><div class="stat-label">Серверы</div><div class="stat-value">{{ servers_count }}</div></div></div></div>
+  <div class="col-xl-2 col-md-4"><div class="card stat-card stat-card-compact h-100"><div class="card-body"><div class="stat-label">Серверы: здоровы</div><div class="stat-value">{{ healthy_servers_count }}</div></div></div></div>
+  <div class="col-xl-2 col-md-4"><div class="card stat-card stat-card-compact h-100"><div class="card-body"><div class="stat-label">Серверы: ограничены</div><div class="stat-value">{{ degraded_servers_count }}</div></div></div></div>
+  <div class="col-xl-2 col-md-4"><div class="card stat-card stat-card-compact h-100"><div class="card-body"><div class="stat-label">Серверы: проблемы</div><div class="stat-value">{{ unhealthy_servers_count }}</div></div></div></div>
+  <div class="col-xl-2 col-md-4"><div class="card stat-card stat-card-compact h-100"><div class="card-body"><div class="stat-label">Серверы: не проверялись</div><div class="stat-value">{{ not_checked_servers_count }}</div></div></div></div>
   <div class="col-xl-2 col-md-4"><div class="card stat-card stat-card-compact h-100"><div class="card-body"><div class="stat-label">Клиентов всего</div><div class="stat-value">{{ clients_total_count }}</div></div></div></div>
   <div class="col-xl-2 col-md-4"><div class="card stat-card stat-card-compact h-100"><div class="card-body"><div class="stat-label">Активные</div><div class="stat-value">{{ active_clients_count }}</div></div></div></div>
   <div class="col-xl-2 col-md-4"><div class="card stat-card stat-card-compact h-100"><div class="card-body"><div class="stat-label">Отключённые</div><div class="stat-value">{{ disabled_clients_count }}</div></div></div></div>

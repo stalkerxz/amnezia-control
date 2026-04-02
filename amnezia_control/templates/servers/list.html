@@ -19,9 +19,12 @@
         <td><a href="/servers/{{ s.obj.id }}/" class="fw-semibold text-decoration-none">{{ s.obj.name }}</a></td>
         <td class="text-break-soft"><code>{{ s.obj.ssh_username }}@{{ s.obj.host }}:{{ s.obj.port }}</code></td>
         <td>
-          <span class="badge status-badge {% if s.obj.health_status == 'healthy' %}status-success{% elif s.obj.health_status == 'unhealthy' %}status-danger{% else %}status-neutral{% endif %}">
+          <span class="badge status-badge {% if s.obj.health_status == 'healthy' %}status-success{% elif s.obj.health_status == 'degraded' %}status-warning{% elif s.obj.health_status == 'unhealthy' %}status-danger{% else %}status-neutral{% endif %}">
             {{ s.health_label }}
           </span>
+          {% if s.health_reasons %}
+          <div class="small text-secondary mt-1">{{ s.health_reasons.0 }}</div>
+          {% endif %}
         </td>
         <td>{{ s.obj.last_runtime_sync_at|default:'—' }}</td>
       </tr>

@@ -136,4 +136,108 @@ class ServerDetailViewTest(TestCase):
         self.assertContains(response, "Публичный endpoint")
         self.assertContains(response, "Ключевые действия оператора")
         self.assertContains(response, "Диагностика протоколов и готовности")
-        self.assertContains(response, "Не проверялось")
+        self.assertContains(response, "Не проверялся")
+
+
+class ServerHealthEvaluationTest(TestCase):
+    def setUp(self):
+        self.server = Server.objects.create(
+            name="health-srv",
+            public_endpoint_host="vpn.example.com",
+            public_endpoint_port=51820,
+        )
+
+    def test_not_checked_state(self):
+        result = ServerService.evaluate_health(self.server)
+        self.assertEqual(result["status"], ServerService.HEALTH_NOT_CHECKED)
+
+    def test_healthy_state(self):
+        self.server.last_runtime_sync_at = self.server.created_at
+        self.server.save(update_fields=["last_runtime_sync_at"])
+        ServerProtocol.objects.create(
+            server=self.server,
+            protocol_type=ServerProtocol.ProtocolType.AWG,
+            container_name="amnezia-awg",
+            container_status="running",
+            runtime_metadata={"subnet_ready": True, "endpoint_host_ready": True, "endpoint_port_ready": True},
+        )
+        ServerProtocol.objects.create(
+            server=self.server,
+            protocol_type=ServerProtocol.ProtocolType.AWG2,
+            container_name="amnezia-awg2",
+            container_status="running",
+            runtime_metadata={
+                "subnet_ready": True,
+                "endpoint_host_ready": True,
+                "endpoint_port_ready": True,
+                "awg2_metadata_ready": True,
+                "peer_source": "runtime wg dump",
+            },
+        )
+        result = ServerService.evaluate_health(self.server)
+        self.assertEqual(result["status"], ServerService.HEALTH_HEALTHY)
+
+    def test_degraded_state_awg2_fallback(self):
+        self.server.last_runtime_sync_at = self.server.created_at
+        self.server.save(update_fields=["last_runtime_sync_at"])
+        ServerProtocol.objects.create(
+            server=self.server,
+            protocol_type=ServerProtocol.ProtocolType.AWG,
+            container_name="amnezia-awg",
+            container_status="running",
+            runtime_metadata={"subnet_ready": True, "endpoint_host_ready": True, "endpoint_port_ready": True},
+        )
+        ServerProtocol.objects.create(
+            server=self.server,
+            protocol_type=ServerProtocol.ProtocolType.AWG2,
+            container_name="amnezia-awg2",
+            container_status="running",
+            runtime_metadata={
+                "subnet_ready": True,
+                "endpoint_host_ready": True,
+                "endpoint_port_ready": True,
+                "awg2_metadata_ready": True,
+                "peer_source": "config file fallback (degraded telemetry)",
+            },
+        )
+        result = ServerService.evaluate_health(self.server)
+        self.assertEqual(result["status"], ServerService.HEALTH_DEGRADED)
+        self.assertTrue(any("fallback" in reason for reason in result["reasons"]))
+
+    def test_unhealthy_state(self):
+        self.server.last_runtime_sync_at = self.server.created_at
+        self.server.save(update_fields=["last_runtime_sync_at"])
+        ServerProtocol.objects.create(
+            server=self.server,
+            protocol_type=ServerProtocol.ProtocolType.AWG,
+            container_name="amnezia-awg",
+            container_status="missing",
+            runtime_metadata={},
+        )
+        ServerProtocol.objects.create(
+            server=self.server,
+            protocol_type=ServerProtocol.ProtocolType.AWG2,
+            container_name="amnezia-awg2",
+            container_status="exited",
+            runtime_metadata={"subnet_ready": False, "endpoint_host_ready": False, "endpoint_port_ready": False},
+        )
+        result = ServerService.evaluate_health(self.server)
+        self.assertEqual(result["status"], ServerService.HEALTH_UNHEALTHY)
+
+
+class ServerListHealthLabelRenderingTest(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user("admin2", password="123", is_staff=True)
+
+    def test_server_list_renders_health_labels(self):
+        Server.objects.create(name="srv-ok", health_status=ServerService.HEALTH_HEALTHY)
+        Server.objects.create(name="srv-degraded", health_status=ServerService.HEALTH_DEGRADED)
+        Server.objects.create(name="srv-bad", health_status=ServerService.HEALTH_UNHEALTHY)
+        Server.objects.create(name="srv-nc", health_status=ServerService.HEALTH_NOT_CHECKED)
+
+        self.client.force_login(self.user)
+        response = self.client.get(reverse("servers-list"))
+        self.assertContains(response, "Здоров")
+        self.assertContains(response, "Ограниченно работоспособен")
+        self.assertContains(response, "Нездоров")
+        self.assertContains(response, "Не проверялся")

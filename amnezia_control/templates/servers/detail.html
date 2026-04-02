@@ -59,7 +59,7 @@
     <div class="card stat-card stat-card-compact h-100">
       <div class="card-body">
         <div class="stat-label">Состояние проверки</div>
-        <span class="badge status-badge {% if server.health_status == 'healthy' %}status-success{% elif server.health_status == 'unhealthy' %}status-danger{% else %}status-neutral{% endif %}">
+        <span class="badge status-badge {% if server.health_status == 'healthy' %}status-success{% elif server.health_status == 'degraded' %}status-warning{% elif server.health_status == 'unhealthy' %}status-danger{% else %}status-neutral{% endif %}">
           {{ server_health_label }}
         </span>
       </div>
@@ -69,6 +69,14 @@
 
 <div class="card mb-3">
   <div class="card-body">
+    <h2 class="h6 mb-2">Почему такой статус здоровья</h2>
+    <ul class="small text-secondary mb-3">
+      {% for reason in server_health_reasons %}
+      <li>{{ reason }}</li>
+      {% empty %}
+      <li>Нет данных о проверке. Запустите синхронизацию runtime.</li>
+      {% endfor %}
+    </ul>
     <h2 class="h6 mb-3">Ключевые действия оператора</h2>
     <div class="d-flex flex-wrap gap-2 mb-3">
       <form method="post" action="{% url 'servers-sync-runtime' pk=server.id %}">

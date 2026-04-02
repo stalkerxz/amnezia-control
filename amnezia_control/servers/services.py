@@ -18,6 +18,10 @@ class ServerService:
     }
     AWG2_REQUIRED_KEYS = ["Jc", "Jmin", "Jmax", "S1", "S2", "S3", "S4", "H1", "H2", "H3", "H4"]
     AWG2_OPTIONAL_KEYS = ["I1", "I2", "I3", "I4", "I5"]
+    HEALTH_NOT_CHECKED = "not_checked"
+    HEALTH_HEALTHY = "healthy"
+    HEALTH_DEGRADED = "degraded"
+    HEALTH_UNHEALTHY = "unhealthy"
 
     @staticmethod
     def update_health(server: Server, status: str) -> Server:
@@ -28,6 +32,88 @@ class ServerService:
     @staticmethod
     def refresh_health_with_job(server: Server, actor):
         return JobService.create_job(server=server, actor=actor, action="server.health_check", payload={"server_id": server.id})
+
+    @classmethod
+    def evaluate_health(cls, server: Server) -> dict:
+        if not server.last_runtime_sync_at:
+            return {
+                "status": cls.HEALTH_NOT_CHECKED,
+                "reasons": ["Проверка не запускалась. Выполните синхронизацию runtime."],
+            }
+
+        protocols = list(server.protocols.all())
+        protocol_map = {protocol.protocol_type: protocol for protocol in protocols}
+
+        reasons = []
+        blocking_issues = []
+        degraded_issues = []
+        usable_protocols = 0
+
+        for protocol_type, container_name in cls.CONTAINERS.items():
+            protocol = protocol_map.get(protocol_type)
+            if not protocol:
+                blocking_issues.append(f"{protocol_type.upper()}: протокол не обнаружен после синхронизации")
+                continue
+
+            metadata = protocol.runtime_metadata or {}
+            status = (protocol.container_status or "").lower().strip()
+            running = status == "running"
+            subnet_ready = bool(metadata.get("subnet_ready"))
+            endpoint_host_ready = bool(metadata.get("endpoint_host_ready"))
+            endpoint_port_ready = bool(metadata.get("endpoint_port_ready"))
+            protocol_ready = running and subnet_ready and endpoint_host_ready and endpoint_port_ready
+
+            if status == "missing":
+                blocking_issues.append(f"{protocol_type.upper()}: контейнер {container_name} отсутствует")
+                continue
+            if not running:
+                blocking_issues.append(f"{protocol_type.upper()}: контейнер не запущен (статус: {status or 'unknown'})")
+            if not subnet_ready:
+                blocking_issues.append(f"{protocol_type.upper()}: не определена подсеть")
+            if not endpoint_host_ready:
+                blocking_issues.append(f"{protocol_type.upper()}: не готов endpoint host")
+            if not endpoint_port_ready:
+                blocking_issues.append(f"{protocol_type.upper()}: не готов endpoint port")
+
+            if protocol_type == ServerProtocol.ProtocolType.AWG2:
+                awg2_metadata_ready = metadata.get("awg2_metadata_ready", True)
+                if not awg2_metadata_ready:
+                    missing = ", ".join(metadata.get("awg2_missing_keys", [])) or "обязательные параметры"
+                    blocking_issues.append(f"AWG2: отсутствуют обязательные параметры ({missing})")
+
+                peer_source = (metadata.get("peer_source", "") or "").lower()
+                if "degraded telemetry" in peer_source or "fallback" in peer_source:
+                    degraded_issues.append("AWG2: runtime-телеметрия недоступна, используется fallback из конфигурации")
+
+            if protocol_ready:
+                if protocol_type != ServerProtocol.ProtocolType.AWG2 or metadata.get("awg2_metadata_ready", True):
+                    usable_protocols += 1
+
+        if not usable_protocols:
+            reasons.extend(blocking_issues or ["Нет рабочего протокольного пути для клиентов"])
+            return {
+                "status": cls.HEALTH_UNHEALTHY,
+                "reasons": reasons,
+            }
+
+        if blocking_issues or degraded_issues:
+            reasons.extend(blocking_issues)
+            reasons.extend(degraded_issues)
+            return {
+                "status": cls.HEALTH_DEGRADED,
+                "reasons": reasons,
+            }
+
+        return {
+            "status": cls.HEALTH_HEALTHY,
+            "reasons": ["SSH-команды, контейнеры и базовая готовность протоколов подтверждены."],
+        }
+
+    @classmethod
+    def evaluate_and_update_health(cls, server: Server) -> dict:
+        result = cls.evaluate_health(server)
+        cls.update_health(server, result["status"])
+        return result
 
     @staticmethod
     def _parse_udp_port(inspect_data):
@@ -254,5 +340,6 @@ class ServerService:
 
         server.last_runtime_sync_at = timezone.now()
         server.save(update_fields=["last_runtime_sync_at"])
+        cls.evaluate_and_update_health(server)
         AuditService.log(actor, "server.runtime.sync", "Server", server.id)
         return server
