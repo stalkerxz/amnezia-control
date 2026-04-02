@@ -2,7 +2,7 @@
 {% block content %}
 <div class="page-header d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
   <div>
-    <p class="text-secondary small mb-1">Операторская · Сервер</p>
+    <p class="page-kicker">Операторская · Сервер</p>
     <h1 class="h3 mb-1">Контур сервера: {{ server.name }}</h1>
     <p class="text-secondary mb-0">Контроль готовности runtime, диагностика протоколов и запуск рабочих действий оператора.</p>
   </div>
@@ -23,26 +23,26 @@
   <div class="col-xl-2 col-md-4">
     <div class="card stat-card stat-card-compact h-100">
       <div class="card-body">
-        <div class="text-secondary small text-uppercase">Сервер</div>
-        <div class="fw-semibold">{{ server.name }}</div>
+        <div class="stat-label">Сервер</div>
+        <div class="stat-value">{{ server.name }}</div>
       </div>
     </div>
   </div>
   <div class="col-xl-3 col-md-4">
     <div class="card stat-card stat-card-compact h-100">
       <div class="card-body">
-        <div class="text-secondary small text-uppercase">Публичный endpoint</div>
-        <div class="fw-semibold"><code>{{ endpoint_display }}</code></div>
+        <div class="stat-label">Публичный endpoint</div>
+        <div class="stat-value"><code>{{ endpoint_display }}</code></div>
       </div>
     </div>
   </div>
   <div class="col-xl-3 col-md-4">
     <div class="card stat-card stat-card-compact h-100">
       <div class="card-body">
-        <div class="text-secondary small text-uppercase">Протоколы / контейнеры</div>
+        <div class="stat-label">Протоколы / контейнеры</div>
         <div>
-          <span class="badge badge-soft badge-ok">{{ ready_protocols }} готово</span>
-          <span class="badge badge-soft badge-muted">из {{ total_protocols }}</span>
+          <span class="badge status-badge status-success">{{ ready_protocols }} готово</span>
+          <span class="badge status-badge status-neutral">из {{ total_protocols }}</span>
         </div>
       </div>
     </div>
@@ -50,16 +50,16 @@
   <div class="col-xl-2 col-md-6">
     <div class="card stat-card stat-card-compact h-100">
       <div class="card-body">
-        <div class="text-secondary small text-uppercase">Runtime sync</div>
-        <div class="fw-semibold">{{ server.last_runtime_sync_at|date:'d.m.Y H:i'|default:'—' }}</div>
+        <div class="stat-label">Runtime sync</div>
+        <div class="stat-value">{{ server.last_runtime_sync_at|date:'d.m.Y H:i'|default:'—' }}</div>
       </div>
     </div>
   </div>
   <div class="col-xl-2 col-md-6">
     <div class="card stat-card stat-card-compact h-100">
       <div class="card-body">
-        <div class="text-secondary small text-uppercase">Health</div>
-        <span class="badge badge-soft {% if server.health_status == 'healthy' %}badge-ok{% elif server.health_status == 'unhealthy' %}badge-danger{% else %}badge-muted{% endif %}">
+        <div class="stat-label">Health</div>
+        <span class="badge status-badge {% if server.health_status == 'healthy' %}status-success{% elif server.health_status == 'unhealthy' %}status-danger{% else %}status-neutral{% endif %}">
           {{ server_health_label }}
         </span>
       </div>
@@ -125,17 +125,17 @@
         </td>
         <td>
           {% if p.runtime_metadata.subnet_ready %}
-          <span class="badge badge-soft badge-ok">{{ p.runtime_metadata.subnet }}</span>
+          <span class="badge status-badge status-success">{{ p.runtime_metadata.subnet }}</span>
           {% else %}
-          <span class="badge badge-soft badge-warn">Subnet не обнаружен</span>
+          <span class="badge status-badge status-warning">Subnet не обнаружен</span>
           {% endif %}
         </td>
         <td>
           <div><code>{{ p.runtime_metadata.public_host|default:'—' }}:{{ p.runtime_metadata.endpoint_port|default:'—' }}</code></div>
           {% if p.runtime_metadata.endpoint_host_ready and p.runtime_metadata.endpoint_port_ready %}
-            <span class="badge badge-soft badge-ok mt-1">Endpoint готов</span>
+            <span class="badge status-badge status-success mt-1">Endpoint готов</span>
           {% else %}
-            <span class="badge badge-soft badge-warn mt-1">Endpoint неполный</span>
+            <span class="badge status-badge status-warning mt-1">Endpoint неполный</span>
           {% endif %}
         </td>
         <td>
@@ -148,13 +148,13 @@
         <td>
           {% if p.protocol_type == 'awg2' %}
             {% if p.runtime_metadata.awg2_missing_keys %}
-              <span class="badge badge-soft badge-danger mb-1">Missing required</span>
+              <span class="badge status-badge status-danger mb-1">Missing required</span>
               <div><code>{{ p.runtime_metadata.awg2_missing_keys|join:', ' }}</code></div>
             {% elif p.runtime_metadata.awg2_optional_missing_keys %}
-              <span class="badge badge-soft badge-warn mb-1">Missing optional</span>
+              <span class="badge status-badge status-warning mb-1">Missing optional</span>
               <div><code>{{ p.runtime_metadata.awg2_optional_missing_keys|join:', ' }}</code></div>
             {% else %}
-              <span class="badge badge-soft badge-ok">Проверка ключей пройдена</span>
+              <span class="badge status-badge status-success">Проверка ключей пройдена</span>
             {% endif %}
           {% else %}
             <span class="text-secondary">Не применяется</span>
@@ -162,9 +162,9 @@
         </td>
         <td class="text-end">
           {% if p.runtime_metadata.subnet_ready and p.runtime_metadata.endpoint_host_ready and p.runtime_metadata.endpoint_port_ready %}
-          <span class="badge badge-soft badge-ok">Ready</span>
+          <span class="badge status-badge status-success">Ready</span>
           {% else %}
-          <span class="badge badge-soft badge-warn">Требует внимания</span>
+          <span class="badge status-badge status-warning">Требует внимания</span>
           {% endif %}
         </td>
       </tr>

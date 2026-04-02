@@ -2,7 +2,7 @@
 {% block content %}
 <div class="page-header d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
   <div>
-    <p class="text-secondary small mb-1">Операторская · Audit</p>
+    <p class="page-kicker">Операторская · Audit</p>
     <h1 class="h3 mb-1">Журнал аудита</h1>
     <p class="text-secondary mb-0">Просмотр действий, сущностей и деталей изменений с быстрым разбором payload.</p>
   </div>
@@ -48,7 +48,7 @@
       <code>{{ l.action }}</code>
       <div class="small text-secondary">{{ l.entity_type }}</div>
     </td>
-    <td><span class="badge badge-soft badge-muted">{{ l.entity_type }}</span> <span class="text-secondary">#{{ l.entity_id }}</span></td>
+    <td><span class="badge status-badge status-neutral">{{ l.entity_type }}</span> <span class="text-secondary">#{{ l.entity_id }}</span></td>
     <td class="text-end">
       <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#audit-details-{{ l.id }}" type="button">Показать</button>
     </td>

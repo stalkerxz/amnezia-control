@@ -1,12 +1,15 @@
 {% extends 'partials/base.html' %}
 {% block content %}
-<h1 class="h3 mb-4">Операционный дашборд</h1>
+<div class="page-header">
+  <p class="page-kicker">Операторская · Обзор</p>
+  <h1 class="h3 mb-1">Операционный дашборд</h1>
+</div>
 <div class="row g-3 mb-4">
-  <div class="col-xl-2 col-md-4"><div class="card card-body"><small class="text-secondary">Серверы</small><div class="h4 mb-0">{{ servers_count }}</div></div></div>
-  <div class="col-xl-2 col-md-4"><div class="card card-body"><small class="text-secondary">Активные клиенты</small><div class="h4 mb-0">{{ active_clients_count }}</div></div></div>
-  <div class="col-xl-2 col-md-4"><div class="card card-body"><small class="text-secondary">AWG</small><div class="h4 mb-0">{% if awg_available %}<span class="badge text-bg-success">Доступен</span>{% else %}<span class="badge text-bg-danger">Нет</span>{% endif %}</div></div></div>
-  <div class="col-xl-2 col-md-4"><div class="card card-body"><small class="text-secondary">AWG2</small><div class="h4 mb-0">{% if awg2_available %}<span class="badge text-bg-success">Доступен</span>{% else %}<span class="badge text-bg-danger">Нет</span>{% endif %}</div></div></div>
-  <div class="col-xl-4 col-md-8"><div class="card card-body"><small class="text-secondary">Последняя runtime sync</small><div class="h6 mb-0">{{ last_runtime_sync|default:'Не запускалась' }}</div></div></div>
+  <div class="col-xl-2 col-md-4"><div class="card stat-card stat-card-compact h-100"><div class="card-body"><div class="stat-label">Серверы</div><div class="stat-value">{{ servers_count }}</div></div></div></div>
+  <div class="col-xl-2 col-md-4"><div class="card stat-card stat-card-compact h-100"><div class="card-body"><div class="stat-label">Активные клиенты</div><div class="stat-value">{{ active_clients_count }}</div></div></div></div>
+  <div class="col-xl-2 col-md-4"><div class="card stat-card stat-card-compact h-100"><div class="card-body"><div class="stat-label">AWG</div><div>{% if awg_available %}<span class="badge status-badge status-success">Доступен</span>{% else %}<span class="badge status-badge status-danger">Нет</span>{% endif %}</div></div></div></div>
+  <div class="col-xl-2 col-md-4"><div class="card stat-card stat-card-compact h-100"><div class="card-body"><div class="stat-label">AWG2</div><div>{% if awg2_available %}<span class="badge status-badge status-success">Доступен</span>{% else %}<span class="badge status-badge status-danger">Нет</span>{% endif %}</div></div></div></div>
+  <div class="col-xl-4 col-md-8"><div class="card stat-card stat-card-compact h-100"><div class="card-body"><div class="stat-label">Последняя runtime sync</div><div class="stat-value">{{ last_runtime_sync|default:'Не запускалась' }}</div></div></div></div>
 </div>
 
 <div class="row g-3">
@@ -15,7 +18,7 @@
       <h2 class="h6">Последние задания</h2>
       <table class="table table-sm align-middle"><tr><th>ID</th><th>Действие</th><th>Статус</th></tr>
       {% for job in jobs_recent %}
-      <tr><td><a href="/jobs/{{ job.id }}/">#{{ job.id }}</a></td><td>{{ job.action }}</td><td><span class="badge {% if job.status == 'success' %}text-bg-success{% elif job.status == 'failed' %}text-bg-danger{% elif job.status == 'running' %}text-bg-warning{% else %}text-bg-secondary{% endif %}">{{ job.status }}</span></td></tr>
+      <tr><td><a href="/jobs/{{ job.id }}/">#{{ job.id }}</a></td><td>{{ job.action }}</td><td><span class="badge status-badge {% if job.status == 'success' %}status-success{% elif job.status == 'failed' %}status-danger{% elif job.status == 'running' %}status-warning{% else %}status-neutral{% endif %}">{{ job.status }}</span></td></tr>
       {% empty %}<tr><td colspan="3"><div class="empty-state">Заданий пока нет.</div></td></tr>{% endfor %}
       </table>
     </div></div>

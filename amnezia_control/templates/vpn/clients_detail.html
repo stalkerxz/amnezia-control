@@ -1,15 +1,15 @@
 {% extends 'partials/base.html' %}
 {% block content %}
 <div class="page-header page-header-compact mb-3">
-  <p class="text-secondary small mb-1">Клиент #{{ client.id }} · Сервер: {{ client.server.name }}</p>
+  <p class="page-kicker">Клиент #{{ client.id }} · Сервер: {{ client.server.name }}</p>
   <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
     <div>
       <h1 class="h3 mb-2">{{ client.name }}</h1>
       <div class="d-flex flex-wrap gap-1">
         <span class="badge badge-soft {% if client.protocol_type == 'awg2' %}badge-protocol-awg2{% else %}badge-protocol-awg{% endif %}">{{ client.protocol_type|upper }}</span>
-        <span class="badge badge-soft {% if client.status == 'active' %}badge-ok{% elif client.status == 'disabled' %}badge-warn{% else %}badge-danger{% endif %}">{{ client.get_status_display }}</span>
+        <span class="badge status-badge {% if client.status == 'active' %}status-success{% elif client.status == 'disabled' %}status-warning{% else %}status-danger{% endif %}">{{ client.get_status_display }}</span>
         <span class="badge {{ limit_badge_class }}">Лимиты: {{ limit_badge_label }}</span>
-        <span class="badge badge-soft badge-muted">{% if client.imported_from_runtime %}Импортирован{% else %}Создан в панели{% endif %}</span>
+        <span class="badge status-badge {% if client.imported_from_runtime %}status-info{% else %}status-neutral{% endif %}">{% if client.imported_from_runtime %}Импортирован{% else %}Создан в панели{% endif %}</span>
       </div>
     </div>
     <div class="d-flex gap-2 flex-wrap">
@@ -79,7 +79,7 @@
     <div class="col-lg-4"><div class="small text-secondary">Использовано / лимит</div><div>{% if client.traffic_limit_bytes %}{{ traffic_used_display }} / {{ traffic_limit_display }}{% else %}{{ traffic_used_display }}{% endif %}</div></div>
   </div>
   <div class="small mt-2 text-secondary telemetry-note">
-    {% if traffic_usage_unavailable %}<span class="badge badge-soft badge-muted">{{ telemetry.badge_label|default:'Телеметрия недоступна' }}</span> {{ telemetry.details }}
+    {% if traffic_usage_unavailable %}<span class="badge status-badge status-neutral">{{ telemetry.badge_label|default:'Телеметрия недоступна' }}</span> {{ telemetry.details }}
     {% elif client.traffic_last_sync_at %}Синхронизация: {{ client.traffic_last_sync_at|date:'d.m.Y H:i' }}
     {% else %}Синхронизация: нет данных{% endif %}
   </div>
