@@ -21,6 +21,17 @@ def _health_label(status: str) -> str:
     return labels.get(status or "unknown", "Не проверялось")
 
 
+def _peer_source_view(peer_source: str):
+    source = (peer_source or "").strip()
+    if source == "runtime wg dump":
+        return "Runtime-опрос", ""
+    if source == "config file fallback (degraded telemetry)":
+        return "Runtime-опрос недоступен", "Используется fallback. Peers читаются из конфигурации."
+    if not source:
+        return "Нет данных", ""
+    return "Служебный источник", source
+
+
 @login_required
 @user_passes_test(_admin_required)
 def server_list_view(request):
@@ -49,10 +60,21 @@ def server_detail_view(request, pk: int):
     elif server.public_endpoint_host:
         endpoint_display = server.public_endpoint_host
 
+    protocol_rows = []
+    for protocol in protocols:
+        peer_source_label, peer_source_hint = _peer_source_view((protocol.runtime_metadata or {}).get("peer_source", ""))
+        protocol_rows.append(
+            {
+                "protocol": protocol,
+                "peer_source_label": peer_source_label,
+                "peer_source_hint": peer_source_hint,
+            }
+        )
+
     context = {
         "server": server,
         "server_health_label": _health_label(server.health_status),
-        "protocols": protocols,
+        "protocol_rows": protocol_rows,
         "ready_protocols": ready_protocols,
         "total_protocols": len(protocols),
         "endpoint_display": endpoint_display,

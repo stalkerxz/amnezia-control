@@ -135,5 +135,5 @@ class ServerDetailViewTest(TestCase):
         self.assertContains(response, "Контур сервера")
         self.assertContains(response, "Публичный endpoint")
         self.assertContains(response, "Ключевые действия оператора")
-        self.assertContains(response, "Диагностика протоколов и readiness")
+        self.assertContains(response, "Диагностика протоколов и готовности")
         self.assertContains(response, "Не проверялось")
