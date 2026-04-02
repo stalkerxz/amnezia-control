@@ -17,7 +17,7 @@
     <nav class="nav flex-column gap-1">
       <a class="nav-link {% if request.path|slice:':9' == '/clients/' %}active{% endif %}" href="/clients/">Клиенты</a>
       <a class="nav-link {% if request.path|slice:':9' == '/servers/' %}active{% endif %}" href="/servers/">Сервер</a>
-      <a class="nav-link {% if request.path|slice:':6' == '/jobs/' %}active{% endif %}" href="/jobs/">Jobs</a>
+      <a class="nav-link {% if request.path|slice:':6' == '/jobs/' %}active{% endif %}" href="/jobs/">Задания</a>
       <a class="nav-link {% if request.path|slice:':7' == '/audit/' %}active{% endif %}" href="/audit/">Audit</a>
       <a class="nav-link disabled" href="#" aria-disabled="true">Настройки</a>
     </nav>

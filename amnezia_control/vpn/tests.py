@@ -1378,10 +1378,10 @@ class VPNClientDegradedTelemetryWordingTest(TestCase):
         )
 
         detail_response = self.client.get(f"/clients/{vpn_client.id}/")
-        self.assertContains(detail_response, "Fallback-режим")
-        self.assertContains(detail_response, "AWG2 работает через config fallback")
+        self.assertContains(detail_response, "Runtime-опрос недоступен")
+        self.assertContains(detail_response, "Используется fallback. Peers читаются из конфигурации")
         self.assertNotContains(detail_response, "проверьте синхронизацию runtime")
 
         list_response = self.client.get("/clients/")
-        self.assertContains(list_response, "Fallback-телеметрия")
-        self.assertContains(list_response, "счётчики трафика недоступны в режиме fallback")
+        self.assertContains(list_response, "Fallback-режим")
+        self.assertContains(list_response, "live-счётчики трафика сейчас недоступны")

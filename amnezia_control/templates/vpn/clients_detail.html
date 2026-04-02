@@ -62,7 +62,7 @@
     <div class="col-lg-4"><div class="small text-secondary">Статус</div><div>{{ client.get_status_display }}</div></div>
     <div class="col-lg-4"><div class="small text-secondary">Состояние лимитов</div><div>{{ limit_badge_label }}</div></div>
     <div class="col-lg-4"><div class="small text-secondary">Runtime-адрес</div><code>{{ runtime_address_display }}</code></div>
-    <div class="col-lg-4"><div class="small text-secondary">Runtime peer public key</div><code>{{ client.runtime_peer_public_key|default:'—' }}</code></div>
+    <div class="col-lg-4"><div class="small text-secondary">Публичный ключ peer (runtime)</div><code>{{ client.runtime_peer_public_key|default:'—' }}</code></div>
     <div class="col-lg-4"><div class="small text-secondary">Последний runtime sync</div><div>{% if client.last_runtime_sync_at %}{{ client.last_runtime_sync_at|date:'d.m.Y H:i' }}{% else %}Нет данных{% endif %}</div></div>
     <div class="col-lg-4"><div class="small text-secondary">Sync трафика</div><div><span class="{{ telemetry.status_class }}">{{ telemetry.status_label }}</span></div></div>
     <div class="col-lg-8"><div class="small text-secondary">Детали синхронизации трафика</div><div>{{ telemetry.details }}</div></div>

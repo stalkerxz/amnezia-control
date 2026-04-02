@@ -74,10 +74,10 @@ def _telemetry_view_state(*, client: VPNClient, peer_source: str):
         return {
             "is_unavailable": True,
             "is_degraded": True,
-            "status_label": "Fallback-режим",
+            "status_label": "Runtime-опрос недоступен",
             "status_class": "text-warning",
-            "details": "AWG2 работает через config fallback. Live-телеметрия недоступна, счётчики трафика недоступны в режиме fallback.",
-            "badge_label": "Fallback-телеметрия",
+            "details": "Используется fallback. Peers читаются из конфигурации, поэтому live-счётчики трафика сейчас недоступны.",
+            "badge_label": "Fallback-режим",
         }
     if client.traffic_sync_error:
         return {
@@ -304,7 +304,7 @@ def clients_detail_view(request, pk: int):
     if not client.runtime_peer_public_key:
         warning_items.append("В runtime не найден public key peer-клиента.")
     if telemetry_state["is_degraded"]:
-        warning_items.append("AWG2 работает через config fallback: live-телеметрия трафика недоступна.")
+        warning_items.append("Runtime-опрос недоступен. Используется fallback, peers читаются из конфигурации.")
     elif client.traffic_sync_error:
         warning_items.append("Телеметрия трафика недоступна.")
     if not revision:

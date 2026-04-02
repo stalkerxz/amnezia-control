@@ -6,10 +6,17 @@
 </div>
 <div class="row g-3 mb-4">
   <div class="col-xl-2 col-md-4"><div class="card stat-card stat-card-compact h-100"><div class="card-body"><div class="stat-label">Серверы</div><div class="stat-value">{{ servers_count }}</div></div></div></div>
-  <div class="col-xl-2 col-md-4"><div class="card stat-card stat-card-compact h-100"><div class="card-body"><div class="stat-label">Активные клиенты</div><div class="stat-value">{{ active_clients_count }}</div></div></div></div>
-  <div class="col-xl-2 col-md-4"><div class="card stat-card stat-card-compact h-100"><div class="card-body"><div class="stat-label">AWG</div><div>{% if awg_available %}<span class="badge status-badge status-success">Доступен</span>{% else %}<span class="badge status-badge status-danger">Нет</span>{% endif %}</div></div></div></div>
-  <div class="col-xl-2 col-md-4"><div class="card stat-card stat-card-compact h-100"><div class="card-body"><div class="stat-label">AWG2</div><div>{% if awg2_available %}<span class="badge status-badge status-success">Доступен</span>{% else %}<span class="badge status-badge status-danger">Нет</span>{% endif %}</div></div></div></div>
-  <div class="col-xl-4 col-md-8"><div class="card stat-card stat-card-compact h-100"><div class="card-body"><div class="stat-label">Последняя runtime sync</div><div class="stat-value">{{ last_runtime_sync|default:'Не запускалась' }}</div></div></div></div>
+  <div class="col-xl-2 col-md-4"><div class="card stat-card stat-card-compact h-100"><div class="card-body"><div class="stat-label">Клиентов всего</div><div class="stat-value">{{ clients_total_count }}</div></div></div></div>
+  <div class="col-xl-2 col-md-4"><div class="card stat-card stat-card-compact h-100"><div class="card-body"><div class="stat-label">Активные</div><div class="stat-value">{{ active_clients_count }}</div></div></div></div>
+  <div class="col-xl-2 col-md-4"><div class="card stat-card stat-card-compact h-100"><div class="card-body"><div class="stat-label">Отключённые</div><div class="stat-value">{{ disabled_clients_count }}</div></div></div></div>
+  <div class="col-xl-2 col-md-4"><div class="card stat-card stat-card-compact h-100"><div class="card-body"><div class="stat-label">Истёк срок</div><div class="stat-value">{{ expired_clients_count }}</div></div></div></div>
+  <div class="col-xl-2 col-md-4"><div class="card stat-card stat-card-compact h-100"><div class="card-body"><div class="stat-label">Трафик превышен</div><div class="stat-value">{{ traffic_exceeded_clients_count }}</div></div></div></div>
+  <div class="col-xl-2 col-md-4"><div class="card stat-card stat-card-compact h-100"><div class="card-body"><div class="stat-label">Удалённые</div><div class="stat-value">{{ deleted_clients_count }}</div></div></div></div>
+  <div class="col-xl-2 col-md-4"><div class="card stat-card stat-card-compact h-100"><div class="card-body"><div class="stat-label">Ошибки задач (24ч)</div><div class="stat-value">{{ failed_jobs_recent_count }}</div></div></div></div>
+  <div class="col-xl-2 col-md-4"><div class="card stat-card stat-card-compact h-100"><div class="card-body"><div class="stat-label">Fallback-телеметрия</div><div class="stat-value">{{ degraded_clients_count }}</div></div></div></div>
+  <div class="col-xl-2 col-md-4"><div class="card stat-card stat-card-compact h-100"><div class="card-body"><div class="stat-label">AmneziaWG</div><div>{% if awg_available %}<span class="badge status-badge status-success">Доступен</span>{% else %}<span class="badge status-badge status-danger">Не включён</span>{% endif %}</div></div></div></div>
+  <div class="col-xl-2 col-md-4"><div class="card stat-card stat-card-compact h-100"><div class="card-body"><div class="stat-label">AWG2</div><div>{% if awg2_available %}<span class="badge status-badge status-success">Доступен</span>{% else %}<span class="badge status-badge status-danger">Не включён</span>{% endif %}</div></div></div></div>
+  <div class="col-xl-4 col-md-8"><div class="card stat-card stat-card-compact h-100"><div class="card-body"><div class="stat-label">Последняя синхронизация runtime</div><div class="stat-value">{{ last_runtime_sync|default:'Не запускалась' }}</div></div></div></div>
 </div>
 
 <div class="row g-3">
@@ -17,8 +24,17 @@
     <div class="card"><div class="card-body">
       <h2 class="h6">Последние задания</h2>
       <table class="table table-sm align-middle"><tr><th>ID</th><th>Действие</th><th>Статус</th></tr>
-      {% for job in jobs_recent %}
-      <tr><td><a href="/jobs/{{ job.id }}/">#{{ job.id }}</a></td><td>{{ job.action }}</td><td><span class="badge status-badge {% if job.status == 'success' %}status-success{% elif job.status == 'failed' %}status-danger{% elif job.status == 'running' %}status-warning{% else %}status-neutral{% endif %}">{{ job.status }}</span></td></tr>
+      {% for row in jobs_recent_rows %}
+      <tr>
+        <td><a href="/jobs/{{ row.job.id }}/">#{{ row.job.id }}</a></td>
+        <td>
+          <div class="fw-semibold">{{ row.action_label }}</div>
+          {% if row.has_warning %}
+            <div class="small text-warning">Есть предупреждение: {{ row.warning_hint|default:'нужна проверка деталей задания' }}</div>
+          {% endif %}
+        </td>
+        <td><span class="badge status-badge {% if row.job.status == 'success' %}{% if row.has_warning %}status-warning{% else %}status-success{% endif %}{% elif row.job.status == 'failed' %}status-danger{% elif row.job.status == 'running' %}status-warning{% else %}status-neutral{% endif %}">{% if row.job.status == 'success' and row.has_warning %}Успех с предупреждением{% elif row.job.status == 'success' %}Успех{% elif row.job.status == 'failed' %}Ошибка{% elif row.job.status == 'running' %}Выполняется{% else %}Ожидает{% endif %}</span></td>
+      </tr>
       {% empty %}<tr><td colspan="3"><div class="empty-state">Заданий пока нет.</div></td></tr>{% endfor %}
       </table>
     </div></div>
@@ -27,8 +43,14 @@
     <div class="card"><div class="card-body">
       <h2 class="h6">Последние действия аудита</h2>
       <ul class="list-group list-group-flush">
-        {% for log in audit_recent %}
-          <li class="list-group-item bg-transparent px-0"><small class="text-secondary">{{ log.created_at }}</small><br>{{ log.action }}</li>
+        {% for row in audit_recent_rows %}
+          <li class="list-group-item bg-transparent px-0">
+            <div class="small text-secondary">{{ row.log.created_at|date:'d.m.Y H:i' }}</div>
+            <div>{{ row.action_label }}</div>
+            <div class="small text-secondary">
+              {% if row.log.actor %}Оператор: {{ row.log.actor.username }}{% else %}Система{% endif %}
+            </div>
+          </li>
         {% empty %}
           <li class="list-group-item bg-transparent px-0"><div class="empty-state">Записей аудита пока нет.</div></li>
         {% endfor %}
