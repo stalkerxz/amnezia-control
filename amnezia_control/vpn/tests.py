@@ -1346,3 +1346,42 @@ class VPNClientDetailDiagnosticsViewTest(TestCase):
         response = self.client.get(f"/clients/{vpn_client.id}/")
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Для клиента отсутствует выпущенная ревизия конфига.")
+
+
+@override_settings(CONFIG_ENCRYPTION_KEY=Fernet.generate_key().decode())
+class VPNClientDegradedTelemetryWordingTest(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user("admin-degraded", password="123", is_staff=True)
+        self.client.force_login(self.user)
+        self.server = Server.objects.create(name="degraded-server", public_endpoint_host="vpn.example.com")
+        self.protocol = ServerProtocol.objects.create(
+            server=self.server,
+            protocol_type=ServerProtocol.ProtocolType.AWG2,
+            runtime_metadata={"peer_source": "config file fallback (degraded telemetry)"},
+        )
+        self.profile = ProtocolProfile.objects.create(
+            server_protocol=self.protocol,
+            name="degraded-profile",
+            protocol_type=ServerProtocol.ProtocolType.AWG2,
+            config_template="[Interface]",
+        )
+
+    def test_awg2_fallback_wording_is_calm_in_client_views(self):
+        vpn_client = VPNClient.objects.create(
+            server=self.server,
+            name="degraded-client",
+            protocol_type=VPNClient.ProtocolType.AWG2,
+            profile=self.profile,
+            created_by=self.user,
+            runtime_peer_public_key="peer-key",
+            traffic_sync_error="Счетчики трафика недоступны",
+        )
+
+        detail_response = self.client.get(f"/clients/{vpn_client.id}/")
+        self.assertContains(detail_response, "Fallback-режим")
+        self.assertContains(detail_response, "AWG2 работает через config fallback")
+        self.assertNotContains(detail_response, "проверьте синхронизацию runtime")
+
+        list_response = self.client.get("/clients/")
+        self.assertContains(list_response, "Fallback-телеметрия")
+        self.assertContains(list_response, "счётчики трафика недоступны в режиме fallback")

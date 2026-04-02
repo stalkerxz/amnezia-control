@@ -12,10 +12,23 @@ def _admin_required(user):
     return user.is_authenticated and user.is_staff
 
 
+def _health_label(status: str) -> str:
+    labels = {
+        "healthy": "Проверка пройдена",
+        "unhealthy": "Обнаружены проблемы",
+        "unknown": "Не проверялось",
+    }
+    return labels.get(status or "unknown", "Не проверялось")
+
+
 @login_required
 @user_passes_test(_admin_required)
 def server_list_view(request):
-    return render(request, "servers/list.html", {"servers": Server.objects.all()})
+    servers = [
+        {"obj": server, "health_label": _health_label(server.health_status)}
+        for server in Server.objects.all()
+    ]
+    return render(request, "servers/list.html", {"servers": servers})
 
 
 @login_required
@@ -38,6 +51,7 @@ def server_detail_view(request, pk: int):
 
     context = {
         "server": server,
+        "server_health_label": _health_label(server.health_status),
         "protocols": protocols,
         "ready_protocols": ready_protocols,
         "total_protocols": len(protocols),
