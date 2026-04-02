@@ -1,6 +1,13 @@
 from unittest import TestCase
 from unittest.mock import MagicMock, patch
 
+from django.contrib.auth import get_user_model
+from django.test import TestCase as DjangoTestCase
+from django.urls import reverse
+
+from servers.models import Server
+
+from .models import Job
 from .executors import SafeSSHExecutor
 
 
@@ -54,3 +61,24 @@ class SSHExecutorTest(TestCase):
             executor._validate(
                 "printf %s bad$key | docker exec -i amnezia-awg2 wg set wg0 peer QWERTY+/= preshared-key /dev/stdin allowed-ips 10.8.0.2/32"
             )
+
+
+class JobsListViewTest(DjangoTestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user("admin", password="123", is_staff=True)
+        self.server = Server.objects.create(name="srv-1")
+        Job.objects.create(server=self.server, actor=self.user, action="server.sync_runtime", status=Job.Status.RUNNING)
+
+    def test_jobs_list_renders_filters_and_quick_view(self):
+        self.client.force_login(self.user)
+        response = self.client.get(reverse("jobs-list"))
+        self.assertContains(response, "Операционные задания")
+        self.assertContains(response, "Создано с даты")
+        self.assertContains(response, "Быстрый просмотр")
+
+    def test_jobs_list_filters_by_status(self):
+        Job.objects.create(server=self.server, actor=self.user, action="vpn.client.create", status=Job.Status.SUCCESS)
+        self.client.force_login(self.user)
+        response = self.client.get(reverse("jobs-list"), {"status": Job.Status.RUNNING})
+        self.assertContains(response, "server.sync_runtime")
+        self.assertNotContains(response, "vpn.client.create")

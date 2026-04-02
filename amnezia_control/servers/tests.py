@@ -2,8 +2,9 @@ from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
+from django.urls import reverse
 
-from .models import Server
+from .models import Server, ServerProtocol
 from .services import ServerService
 
 
@@ -111,3 +112,27 @@ class RuntimeDetectionTest(TestCase):
         awg2 = self.server.protocols.get(protocol_type="awg2")
         self.assertEqual(awg2.runtime_metadata["peer_source"], "config file fallback")
         self.assertEqual(awg2.runtime_metadata["peer_count"], 1)
+
+
+class ServerDetailViewTest(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user("admin", password="123", is_staff=True)
+        self.server = Server.objects.create(
+            name="dc-1",
+            public_endpoint_host="vpn.example.com",
+            public_endpoint_port=51820,
+            health_status="unknown",
+        )
+        ServerProtocol.objects.create(
+            server=self.server,
+            protocol_type=ServerProtocol.ProtocolType.AWG,
+            runtime_metadata={"endpoint_host_ready": True, "endpoint_port_ready": True, "subnet_ready": True},
+        )
+
+    def test_server_detail_renders_operator_summary(self):
+        self.client.force_login(self.user)
+        response = self.client.get(reverse("servers-detail", kwargs={"pk": self.server.id}))
+        self.assertContains(response, "Контур сервера")
+        self.assertContains(response, "Публичный endpoint")
+        self.assertContains(response, "Ключевые действия оператора")
+        self.assertContains(response, "Диагностика протоколов и readiness")

@@ -22,7 +22,28 @@ def server_list_view(request):
 @user_passes_test(_admin_required)
 def server_detail_view(request, pk: int):
     server = get_object_or_404(Server, pk=pk)
-    return render(request, "servers/detail.html", {"server": server, "protocols": server.protocols.all()})
+    protocols = list(server.protocols.all().order_by("protocol_type"))
+    ready_protocols = sum(
+        1
+        for protocol in protocols
+        if protocol.runtime_metadata.get("endpoint_host_ready")
+        and protocol.runtime_metadata.get("endpoint_port_ready")
+        and protocol.runtime_metadata.get("subnet_ready")
+    )
+    endpoint_display = "—"
+    if server.public_endpoint_host and server.public_endpoint_port:
+        endpoint_display = f"{server.public_endpoint_host}:{server.public_endpoint_port}"
+    elif server.public_endpoint_host:
+        endpoint_display = server.public_endpoint_host
+
+    context = {
+        "server": server,
+        "protocols": protocols,
+        "ready_protocols": ready_protocols,
+        "total_protocols": len(protocols),
+        "endpoint_display": endpoint_display,
+    }
+    return render(request, "servers/detail.html", context)
 
 
 @login_required
