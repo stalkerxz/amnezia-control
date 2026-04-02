@@ -3,6 +3,7 @@ from audit.models import AuditLog
 from django.contrib.auth import get_user_model
 from django.test import SimpleTestCase, TestCase, override_settings
 from django.utils import timezone
+from jobs.models import Job
 from servers.models import ProtocolProfile, Server, ServerProtocol
 from servers.services import ServerService
 
@@ -1240,3 +1241,79 @@ class VPNClientBulkActionsAndQuickFiltersTest(TestCase):
         deleted_response = self.client.get("/clients/", data={"quick": "deleted"})
         self.assertContains(deleted_response, self.deleted_client.name)
         self.assertNotContains(deleted_response, self.active_client.name)
+
+
+@override_settings(CONFIG_ENCRYPTION_KEY=Fernet.generate_key().decode())
+class VPNClientDetailDiagnosticsViewTest(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user("admin-detail", password="123", is_staff=True)
+        self.client.force_login(self.user)
+        self.server = Server.objects.create(name="detail-server", public_endpoint_host="vpn.example.com")
+        self.protocol = ServerProtocol.objects.create(
+            server=self.server,
+            protocol_type=ServerProtocol.ProtocolType.AWG,
+            container_name="amnezia-awg",
+            enabled=True,
+            runtime_metadata={"udp_port": 51820, "subnet": "10.66.0.0/24"},
+        )
+        self.profile = ProtocolProfile.objects.create(
+            server_protocol=self.protocol,
+            name="detail-profile",
+            protocol_type=ServerProtocol.ProtocolType.AWG,
+            config_template="[Interface]",
+        )
+
+    def test_detail_page_renders_diagnostics_warning_and_activity_sections(self):
+        vpn_client = VPNClient.objects.create(
+            server=self.server,
+            name="diag-client",
+            protocol_type=VPNClient.ProtocolType.AWG,
+            profile=self.profile,
+            created_by=self.user,
+            status=VPNClient.Status.DELETED,
+            limit_state=VPNClient.LimitState.EXPIRED,
+            imported_from_runtime=True,
+            runtime_address="10.66.0.10",
+            runtime_peer_public_key="",
+            traffic_sync_error="Счетчики трафика недоступны",
+        )
+        AuditLog.objects.create(
+            actor=self.user,
+            action="client.disabled",
+            entity_type="VPNClient",
+            entity_id=str(vpn_client.id),
+            details={"reason": "expired"},
+        )
+        Job.objects.create(
+            server=self.server,
+            actor=self.user,
+            action="vpn.client.sync",
+            payload={"command": "sync diag-client"},
+            status=Job.Status.SUCCESS,
+        )
+
+        response = self.client.get(f"/clients/{vpn_client.id}/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Диагностика клиента")
+        self.assertContains(response, "Требуется внимание оператора")
+        self.assertContains(response, "Недавняя активность")
+        self.assertContains(response, "Последние действия в аудите по клиенту")
+        self.assertContains(response, "Последние jobs по серверу/клиенту")
+        self.assertContains(response, "Опасные действия")
+
+    def test_detail_page_shows_no_revision_warning(self):
+        vpn_client = VPNClient.objects.create(
+            server=self.server,
+            name="no-revision-client",
+            protocol_type=VPNClient.ProtocolType.AWG,
+            profile=self.profile,
+            created_by=self.user,
+            status=VPNClient.Status.ACTIVE,
+            limit_state=VPNClient.LimitState.ACTIVE,
+            imported_from_runtime=False,
+            runtime_peer_public_key="peer-key-1",
+        )
+
+        response = self.client.get(f"/clients/{vpn_client.id}/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Для клиента отсутствует выпущенная ревизия конфига.")

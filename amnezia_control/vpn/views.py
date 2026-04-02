@@ -1,5 +1,6 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, user_passes_test
+from django.db.models import Q
 from django.db.models.functions import Coalesce
 from django.http import HttpResponse
 from django.urls import reverse
@@ -7,6 +8,8 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 import ipaddress
 
+from audit.models import AuditLog
+from jobs.models import Job
 from servers.models import Server
 from .forms import VPNClientCreateForm, VPNClientLimitsUpdateForm, VPNClientListFilterForm
 from .models import VPNClient
@@ -234,6 +237,37 @@ def clients_detail_view(request, pk: int):
     elif effective_limit_state == VPNClient.LimitState.TRAFFIC_EXCEEDED:
         reissue_block_reason = "Переиздание недоступно: превышен лимит трафика."
 
+    warning_items = []
+    if effective_limit_state == VPNClient.LimitState.EXPIRED:
+        warning_items.append("Срок действия клиента истёк.")
+    if effective_limit_state == VPNClient.LimitState.TRAFFIC_EXCEEDED:
+        warning_items.append("Клиент превысил лимит трафика.")
+    if client.status == VPNClient.Status.DELETED:
+        warning_items.append("Клиент находится в состоянии «Удалён» (soft delete).")
+    if not client.runtime_peer_public_key:
+        warning_items.append("В runtime не найден public key peer-клиента.")
+    if client.traffic_sync_error:
+        warning_items.append("Телеметрия трафика недоступна: проверьте синхронизацию runtime.")
+    if not revision:
+        warning_items.append("Для клиента отсутствует выпущенная ревизия конфига.")
+
+    recent_audit_logs = AuditLog.objects.select_related("actor").filter(entity_type="VPNClient", entity_id=str(client.id)).order_by("-created_at")[:5]
+
+    client_job_filters = Q(action__icontains="client")
+    if client.runtime_peer_public_key:
+        client_job_filters |= Q(payload__command__icontains=client.runtime_peer_public_key)
+    if client.runtime_address:
+        client_job_filters |= Q(payload__command__icontains=client.runtime_address)
+
+    recent_jobs = list(
+        Job.objects.select_related("server", "actor")
+        .filter(server=client.server)
+        .filter(client_job_filters)
+        .order_by("-created_at")[:5]
+    )
+    if not recent_jobs:
+        recent_jobs = list(Job.objects.select_related("server", "actor").filter(server=client.server).order_by("-created_at")[:5])
+
     return render(
         request,
         "vpn/clients_detail.html",
@@ -255,6 +289,9 @@ def clients_detail_view(request, pk: int):
             "reissue_block_reason": reissue_block_reason,
             "limits_form": limits_form,
             "is_deleted": client.status == VPNClient.Status.DELETED,
+            "warning_items": warning_items,
+            "recent_audit_logs": recent_audit_logs,
+            "recent_jobs": recent_jobs,
         },
     )
 
