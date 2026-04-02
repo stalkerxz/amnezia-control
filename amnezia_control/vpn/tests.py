@@ -9,7 +9,7 @@ from servers.services import ServerService
 
 from .forms import VPNClientCreateForm, VPNClientLimitsUpdateForm
 from .models import VPNClient
-from .services import AWG2Adapter, AdapterFactory, PeerState, VPNClientLimitsService, VPNClientService
+from .services import AWG2Adapter, AdapterFactory, PeerState, RuntimeCommandService, VPNClientLimitsService, VPNClientService
 
 
 @override_settings(CONFIG_ENCRYPTION_KEY=Fernet.generate_key().decode())
@@ -367,6 +367,35 @@ class VPNClientFlowTest(TestCase):
         with patch("vpn.services.RuntimeCommandService.run", side_effect=run_side_effect):
             client = VPNClientService.create_client(server=self.server, name="awg2-fallback", protocol_type=VPNClient.ProtocolType.AWG2, actor=self.user)
         self.assertTrue(client.runtime_address)
+
+    def test_awg2_expected_runtime_dump_failure_is_recorded_as_warning_success_job(self):
+        from unittest.mock import patch
+
+        class Result:
+            def __init__(self, stdout="", stderr="", exit_code=0):
+                self.stdout = stdout
+                self.stderr = stderr
+                self.exit_code = exit_code
+
+        class FakeExecutor:
+            @staticmethod
+            def run(command):
+                return Result(stderr="Unable to access interface: Protocol not supported", exit_code=1)
+
+        with patch.object(RuntimeCommandService, "executor_for_server", return_value=FakeExecutor()):
+            result = RuntimeCommandService.run_with_expected_failure(
+                self.server,
+                self.user,
+                "awg2.list",
+                "docker exec amnezia-awg2 wg show dump",
+                expected_error_patterns=RuntimeCommandService.AWG2_EXPECTED_RUNTIME_DUMP_ERRORS,
+                fallback_message="AWG2 runtime telemetry unavailable: using config fallback (degraded mode).",
+            )
+
+        self.assertIsNone(result)
+        job = Job.objects.filter(action="awg2.list").latest("id")
+        self.assertEqual(job.status, Job.Status.SUCCESS)
+        self.assertEqual(job.events.latest("id").level, "warning")
 
     def test_new_client_uses_peer_address_not_server_interface_address(self):
         from unittest.mock import patch
