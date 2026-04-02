@@ -1,19 +1,38 @@
 {% extends 'partials/base.html' %}
 {% block content %}
-<h1 class="h3 mb-3">Серверы</h1>
+<div class="page-header d-flex justify-content-between align-items-start gap-3 flex-wrap">
+  <div>
+    <p class="page-kicker">Операторская · Сервер</p>
+    <h1 class="h3 mb-1">Серверы</h1>
+    <p class="text-secondary mb-0">Состояние контура, синхронизация runtime и готовность к операциям.</p>
+  </div>
+</div>
 {% if servers %}
-<table class="table table-hover align-middle">
-  <tr><th>Имя</th><th>SSH</th><th>Здоровье</th><th>Последняя sync</th></tr>
-  {% for s in servers %}
-  <tr>
-    <td><a href="/servers/{{ s.obj.id }}/">{{ s.obj.name }}</a></td>
-    <td>{{ s.obj.ssh_username }}@{{ s.obj.host }}:{{ s.obj.port }}</td>
-    <td><span class="badge text-bg-secondary">{{ s.health_label }}</span></td>
-    <td>{{ s.obj.last_runtime_sync_at|default:'—' }}</td>
-  </tr>
-  {% endfor %}
-</table>
+<div class="table-responsive card p-2">
+  <table class="table table-hover align-middle mb-0">
+    <thead>
+      <tr><th>Имя</th><th>SSH</th><th>Здоровье</th><th>Последняя sync</th></tr>
+    </thead>
+    <tbody>
+      {% for s in servers %}
+      <tr>
+        <td><a href="/servers/{{ s.obj.id }}/" class="fw-semibold text-decoration-none">{{ s.obj.name }}</a></td>
+        <td class="text-break-soft"><code>{{ s.obj.ssh_username }}@{{ s.obj.host }}:{{ s.obj.port }}</code></td>
+        <td>
+          <span class="badge status-badge {% if s.obj.health_status == 'healthy' %}status-success{% elif s.obj.health_status == 'unhealthy' %}status-danger{% else %}status-neutral{% endif %}">
+            {{ s.health_label }}
+          </span>
+        </td>
+        <td>{{ s.obj.last_runtime_sync_at|default:'—' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
 {% else %}
-<div class="empty-state">Серверы еще не добавлены.</div>
+<div class="empty-state">
+  <h2 class="h6 mb-2">Серверы ещё не добавлены</h2>
+  <p class="mb-0">После добавления сервера здесь появится его состояние и история синхронизации runtime.</p>
+</div>
 {% endif %}
 {% endblock %}

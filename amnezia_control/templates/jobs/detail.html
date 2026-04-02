@@ -1,6 +1,9 @@
 {% extends 'partials/base.html' %}
 {% block content %}
-<h1 class="h3">Задание #{{ job.id }}</h1>
+<div class="page-header">
+  <p class="page-kicker">Операторская · Jobs</p>
+  <h1 class="h3 mb-1">Задание #{{ job.id }}</h1>
+</div>
 
 {% if job.status == 'failed' %}
 <div class="alert alert-danger" role="alert">Задание завершилось с ошибкой. Проверьте stderr, exit code и payload ниже.</div>
@@ -16,7 +19,7 @@
   </div>
   <div class="col-lg-4">
     <div class="card"><div class="card-body">
-      <p class="mb-1">Статус: <span class="badge {% if job.status == 'success' %}text-bg-success{% elif job.status == 'failed' %}text-bg-danger{% elif job.status == 'running' %}text-bg-warning{% else %}text-bg-secondary{% endif %}">{{ job.status }}</span></p>
+      <p class="mb-1">Статус: <span class="badge status-badge {% if job.status == 'success' %}status-success{% elif job.status == 'failed' %}status-danger{% elif job.status == 'running' %}status-warning{% else %}status-neutral{% endif %}">{{ job.status }}</span></p>
       <p class="mb-1">Создано: {{ job.created_at }}</p>
       <p class="mb-1">Запуск: {{ job.started_at|default:'—' }}</p>
       <p class="mb-0">Завершено: {{ job.finished_at|default:'—' }}</p>
@@ -34,7 +37,7 @@
 {% for e in events %}
 <tr class="{% if e.level == 'error' %}table-danger{% elif e.level == 'warning' %}table-warning{% elif e.exit_code %}table-danger{% endif %}">
   <td>{{ e.created_at }}</td>
-  <td><span class="badge {% if e.level == 'error' %}text-bg-danger{% elif e.level == 'warning' %}text-bg-warning{% else %}text-bg-secondary{% endif %}">{{ e.level }}</span></td>
+  <td><span class="badge status-badge {% if e.level == 'error' %}status-danger{% elif e.level == 'warning' %}status-warning{% else %}status-neutral{% endif %}">{{ e.level }}</span></td>
   <td>{{ e.message }}</td>
   <td>{{ e.exit_code|default:'—' }}</td>
   <td>{% if e.stdout %}<pre class="log mb-0">{{ e.stdout }}</pre>{% else %}—{% endif %}</td>

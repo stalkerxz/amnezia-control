@@ -2,7 +2,7 @@
 {% block content %}
 <div class="page-header d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
   <div>
-    <p class="text-secondary small mb-1">Операторская · Jobs</p>
+    <p class="page-kicker">Операторская · Jobs</p>
     <h1 class="h3 mb-1">Операционные задания</h1>
     <p class="text-secondary mb-0">Мониторинг статусов и быстрый просмотр payload/stdout/stderr без ухода со списка.</p>
   </div>
@@ -47,7 +47,7 @@
   <td>{{ j.server.name }}</td>
   <td>{% if j.actor %}{{ j.actor.username }}{% else %}<span class="text-secondary">система</span>{% endif %}</td>
   <td>
-    <span class="badge badge-soft {% if j.status == 'success' %}badge-ok{% elif j.status == 'failed' %}badge-danger{% elif j.status == 'running' %}badge-warn{% else %}badge-muted{% endif %}">
+    <span class="badge status-badge {% if j.status == 'success' %}status-success{% elif j.status == 'failed' %}status-danger{% elif j.status == 'running' %}status-warning{% else %}status-neutral{% endif %}">
       {{ j.get_status_display }}
     </span>
   </td>
