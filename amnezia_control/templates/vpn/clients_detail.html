@@ -64,8 +64,8 @@
     <div class="col-lg-4"><div class="small text-secondary">Runtime-адрес</div><code>{{ runtime_address_display }}</code></div>
     <div class="col-lg-4"><div class="small text-secondary">Runtime peer public key</div><code>{{ client.runtime_peer_public_key|default:'—' }}</code></div>
     <div class="col-lg-4"><div class="small text-secondary">Последний runtime sync</div><div>{% if client.last_runtime_sync_at %}{{ client.last_runtime_sync_at|date:'d.m.Y H:i' }}{% else %}Нет данных{% endif %}</div></div>
-    <div class="col-lg-4"><div class="small text-secondary">Sync трафика</div><div>{% if client.traffic_sync_error %}<span class="text-danger">Ошибка</span>{% elif client.traffic_last_sync_at %}<span class="text-success">Успешно</span>{% else %}<span class="text-secondary">Нет данных</span>{% endif %}</div></div>
-    <div class="col-lg-8"><div class="small text-secondary">Детали синхронизации трафика</div><div>{% if client.traffic_sync_error %}{{ client.traffic_sync_error }}{% elif client.traffic_last_sync_at %}{{ client.traffic_last_sync_at|date:'d.m.Y H:i' }}{% else %}Данные ещё не синхронизированы{% endif %}</div></div>
+    <div class="col-lg-4"><div class="small text-secondary">Sync трафика</div><div><span class="{{ telemetry.status_class }}">{{ telemetry.status_label }}</span></div></div>
+    <div class="col-lg-8"><div class="small text-secondary">Детали синхронизации трафика</div><div>{{ telemetry.details }}</div></div>
     <div class="col-lg-4"><div class="small text-secondary">Источник клиента</div><div>{% if client.imported_from_runtime %}Импортирован из runtime{% else %}Создан в панели{% endif %}</div></div>
     <div class="col-lg-4"><div class="small text-secondary">Наличие ревизии конфига</div><div>{% if revision %}Да{% else %}Нет{% endif %}</div></div>
   </div>
@@ -79,7 +79,7 @@
     <div class="col-lg-4"><div class="small text-secondary">Использовано / лимит</div><div>{% if client.traffic_limit_bytes %}{{ traffic_used_display }} / {{ traffic_limit_display }}{% else %}{{ traffic_used_display }}{% endif %}</div></div>
   </div>
   <div class="small mt-2 text-secondary telemetry-note">
-    {% if traffic_usage_unavailable %}<span class="badge badge-soft badge-muted">Телеметрия недоступна</span> {{ client.traffic_sync_error }}
+    {% if traffic_usage_unavailable %}<span class="badge badge-soft badge-muted">{{ telemetry.badge_label|default:'Телеметрия недоступна' }}</span> {{ telemetry.details }}
     {% elif client.traffic_last_sync_at %}Синхронизация: {{ client.traffic_last_sync_at|date:'d.m.Y H:i' }}
     {% else %}Синхронизация: нет данных{% endif %}
   </div>

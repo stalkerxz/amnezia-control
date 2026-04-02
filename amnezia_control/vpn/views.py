@@ -10,7 +10,7 @@ import ipaddress
 
 from audit.models import AuditLog
 from jobs.models import Job
-from servers.models import Server
+from servers.models import Server, ServerProtocol
 from .forms import VPNClientCreateForm, VPNClientLimitsUpdateForm, VPNClientListFilterForm
 from .models import VPNClient
 from .services import VPNClientService
@@ -63,6 +63,50 @@ def _normalize_runtime_address(value: str) -> str:
     return ", ".join(normalized) if normalized else "—"
 
 
+def _is_awg2_degraded_telemetry(peer_source: str) -> bool:
+    source = (peer_source or "").lower()
+    return "config file fallback" in source and "degraded telemetry" in source
+
+
+def _telemetry_view_state(*, client: VPNClient, peer_source: str):
+    degraded_awg2 = client.protocol_type == VPNClient.ProtocolType.AWG2 and _is_awg2_degraded_telemetry(peer_source)
+    if degraded_awg2:
+        return {
+            "is_unavailable": True,
+            "is_degraded": True,
+            "status_label": "Fallback-режим",
+            "status_class": "text-warning",
+            "details": "AWG2 работает через config fallback. Live-телеметрия недоступна, счётчики трафика недоступны в режиме fallback.",
+            "badge_label": "Fallback-телеметрия",
+        }
+    if client.traffic_sync_error:
+        return {
+            "is_unavailable": True,
+            "is_degraded": False,
+            "status_label": "Ошибка",
+            "status_class": "text-danger",
+            "details": client.traffic_sync_error,
+            "badge_label": "Телеметрия недоступна",
+        }
+    if client.traffic_last_sync_at:
+        return {
+            "is_unavailable": False,
+            "is_degraded": False,
+            "status_label": "Успешно",
+            "status_class": "text-success",
+            "details": timezone.localtime(client.traffic_last_sync_at).strftime("%d.%m.%Y %H:%M"),
+            "badge_label": "",
+        }
+    return {
+        "is_unavailable": False,
+        "is_degraded": False,
+        "status_label": "Нет данных",
+        "status_class": "text-secondary",
+        "details": "Данные ещё не синхронизированы",
+        "badge_label": "",
+    }
+
+
 @login_required
 @user_passes_test(_admin_required)
 def clients_list_view(request):
@@ -108,9 +152,16 @@ def clients_list_view(request):
     else:
         clients = clients.exclude(status=VPNClient.Status.DELETED)
 
+    protocol_map = {
+        (protocol.server_id, protocol.protocol_type): protocol
+        for protocol in ServerProtocol.objects.filter(server_id__in={client.server_id for client in clients})
+    }
+
     client_rows = []
     for client in clients:
         badge_class, badge_label = _limit_state_badge(client.limit_state)
+        protocol = protocol_map.get((client.server_id, client.protocol_type))
+        telemetry_state = _telemetry_view_state(client=client, peer_source=(protocol.runtime_metadata or {}).get("peer_source", "") if protocol else "")
         client_rows.append(
             {
                 "client": client,
@@ -120,6 +171,7 @@ def clients_list_view(request):
                 "traffic_used_display": _fmt_bytes(client.traffic_used_bytes),
                 "traffic_limit_display": _fmt_bytes(client.traffic_limit_bytes),
                 "runtime_address_display": _normalize_runtime_address(client.runtime_address),
+                "telemetry": telemetry_state,
             }
         )
 
@@ -228,6 +280,11 @@ def clients_detail_view(request, pk: int):
         missing_endpoint = True
         missing_awg2_metadata = client.protocol_type == VPNClient.ProtocolType.AWG2
 
+    telemetry_state = _telemetry_view_state(
+        client=client,
+        peer_source=(protocol.runtime_metadata or {}).get("peer_source", "") if protocol else "",
+    )
+
     effective_limit_state = VPNClientService.get_limit_state(client)
     limit_badge_class, limit_badge_label = _limit_state_badge(effective_limit_state)
     reissue_blocked = effective_limit_state in {VPNClient.LimitState.EXPIRED, VPNClient.LimitState.TRAFFIC_EXCEEDED}
@@ -246,8 +303,10 @@ def clients_detail_view(request, pk: int):
         warning_items.append("Клиент находится в состоянии «Удалён» (soft delete).")
     if not client.runtime_peer_public_key:
         warning_items.append("В runtime не найден public key peer-клиента.")
-    if client.traffic_sync_error:
-        warning_items.append("Телеметрия трафика недоступна: проверьте синхронизацию runtime.")
+    if telemetry_state["is_degraded"]:
+        warning_items.append("AWG2 работает через config fallback: live-телеметрия трафика недоступна.")
+    elif client.traffic_sync_error:
+        warning_items.append("Телеметрия трафика недоступна.")
     if not revision:
         warning_items.append("Для клиента отсутствует выпущенная ревизия конфига.")
 
@@ -281,7 +340,8 @@ def clients_detail_view(request, pk: int):
             "expires_display": timezone.localtime(client.expires_at).strftime("%d.%m.%Y %H:%M") if client.expires_at else "Не задано",
             "traffic_used_display": _fmt_bytes(client.traffic_used_bytes),
             "traffic_limit_display": _fmt_bytes(client.traffic_limit_bytes),
-            "traffic_usage_unavailable": bool(client.traffic_sync_error),
+            "traffic_usage_unavailable": telemetry_state["is_unavailable"],
+            "telemetry": telemetry_state,
             "runtime_address_display": _normalize_runtime_address(client.runtime_address),
             "limit_badge_class": limit_badge_class,
             "limit_badge_label": limit_badge_label,

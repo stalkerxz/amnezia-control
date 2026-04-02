@@ -60,7 +60,7 @@
       <div class="card-body">
         <div class="text-secondary small text-uppercase">Health</div>
         <span class="badge badge-soft {% if server.health_status == 'healthy' %}badge-ok{% elif server.health_status == 'unhealthy' %}badge-danger{% else %}badge-muted{% endif %}">
-          {{ server.health_status|default:'unknown' }}
+          {{ server_health_label }}
         </span>
       </div>
     </div>
@@ -140,6 +140,9 @@
         </td>
         <td>
           <code>{{ p.runtime_metadata.peer_source|default:'—' }}</code>
+          {% if p.runtime_metadata.peer_source == 'config file fallback (degraded telemetry)' %}
+          <div class="small text-secondary">Peers читаются из config; live-счётчики трафика в этом режиме недоступны.</div>
+          {% endif %}
           <div class="small text-secondary">Config: {{ p.runtime_metadata.config_path|default:"—" }}</div>
         </td>
         <td>

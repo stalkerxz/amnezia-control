@@ -97,7 +97,7 @@
     <tbody>
       {% for row in client_rows %}
       {% with c=row.client %}
-      <tr class="{% if c.limit_state == 'expired' %}row-expired{% elif c.limit_state == 'traffic_exceeded' %}row-danger{% elif c.status == 'deleted' %}row-deleted{% elif c.traffic_sync_error %}row-warning{% endif %}">
+      <tr class="{% if c.limit_state == 'expired' %}row-expired{% elif c.limit_state == 'traffic_exceeded' %}row-danger{% elif c.status == 'deleted' %}row-deleted{% elif row.telemetry.is_unavailable %}row-warning{% endif %}">
         <td><input class="form-check-input js-client-checkbox" type="checkbox" name="client_ids" value="{{ c.id }}" aria-label="Выбрать клиента {{ c.name }}"></td>
         <td class="text-muted">#{{ c.id }}</td>
         <td>
@@ -109,7 +109,7 @@
             {% if c.limit_state == 'expired' %}<span class="badge badge-soft badge-warn">Истёк</span>{% endif %}
             {% if c.limit_state == 'traffic_exceeded' %}<span class="badge badge-soft badge-danger">Трафик превышен</span>{% endif %}
             {% if c.status == 'deleted' %}<span class="badge badge-soft badge-danger">Удалён</span>{% endif %}
-            {% if c.traffic_sync_error %}<span class="badge badge-soft badge-muted">Телеметрия недоступна</span>{% endif %}
+            {% if row.telemetry.badge_label %}<span class="badge badge-soft badge-muted">{{ row.telemetry.badge_label }}</span>{% endif %}
           </div>
         </td>
         <td>{{ c.server.name|default:'—' }}</td>
@@ -121,7 +121,7 @@
         </td>
         <td>
           <div>{% if c.traffic_limit_bytes %}{{ row.traffic_used_display }} / {{ row.traffic_limit_display }}{% else %}{{ row.traffic_used_display }}{% endif %}</div>
-          {% if c.traffic_sync_error %}<div class="small text-secondary">{{ c.traffic_sync_error }}</div>{% endif %}
+          {% if row.telemetry.is_unavailable %}<div class="small text-secondary">{{ row.telemetry.details }}</div>{% endif %}
         </td>
         <td>{{ c.updated_at|date:'d.m.Y H:i' }}</td>
         <td>
