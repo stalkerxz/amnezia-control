@@ -50,39 +50,13 @@
       <button class="btn btn-primary w-100" type="submit">Применить</button>
     </div>
   </div>
-  <div class="mt-3 d-flex flex-wrap gap-2">
-    {% for item in quick_filter_links %}
-      <a href="{{ item.url }}" class="btn btn-sm {% if item.active %}btn-primary{% else %}btn-outline-secondary{% endif %}">{{ item.label }}</a>
-    {% endfor %}
-  </div>
 </form>
 
 {% if client_rows %}
-<form id="bulkActionForm" method="post" action="/clients/bulk-action/" class="d-none">
-  {% csrf_token %}
-  <input type="hidden" name="next" value="{{ request.get_full_path }}">
-  <input type="hidden" name="action" id="bulkActionInput" value="">
-  <div id="bulkSelectionContainer"></div>
-</form>
-  <div id="bulkToolbar" class="card card-body mb-2 d-none">
-    <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">
-      <div>
-        Выбрано клиентов: <strong id="selectedCount">0</strong>
-        <button type="button" class="btn btn-sm btn-link p-0 ms-2 text-decoration-none" id="clearSelectionBtn">Снять выделение</button>
-      </div>
-      <div class="d-flex gap-2">
-        <button type="button" class="btn btn-sm btn-outline-secondary js-bulk-action" data-action="disable" data-label="Отключить" data-danger="0">Отключить</button>
-        <button type="button" class="btn btn-sm btn-outline-success js-bulk-action" data-action="enable" data-label="Включить" data-danger="0">Включить</button>
-        <button type="button" class="btn btn-sm btn-outline-danger js-bulk-action" data-action="delete" data-label="Удалить" data-danger="1">Удалить</button>
-        <button type="button" class="btn btn-sm btn-outline-primary js-bulk-action" data-action="reissue" data-label="Переиздать" data-danger="0">Переиздать</button>
-      </div>
-    </div>
-  </div>
-  <div class="table-responsive card p-2 clients-table-wrap">
+<div class="table-responsive card p-2 clients-table-wrap">
   <table class="table table-hover align-middle mb-0 clients-table">
     <thead>
       <tr>
-        <th><input class="form-check-input" type="checkbox" id="selectAllVisible" aria-label="Выбрать все видимые"></th>
         <th>ID</th>
         <th>Клиент</th>
         <th>Сервер</th>
@@ -98,7 +72,6 @@
       {% for row in client_rows %}
       {% with c=row.client %}
       <tr class="{% if c.limit_state == 'expired' %}row-expired{% elif c.limit_state == 'traffic_exceeded' %}row-danger{% elif c.status == 'deleted' %}row-deleted{% elif c.traffic_sync_error %}row-warning{% endif %}">
-        <td><input class="form-check-input js-client-checkbox" type="checkbox" name="client_ids" value="{{ c.id }}" aria-label="Выбрать клиента {{ c.name }}"></td>
         <td class="text-muted">#{{ c.id }}</td>
         <td>
           <a href="/clients/{{ c.id }}/" class="fw-semibold text-decoration-none d-block mb-1">{{ c.name }}</a>
@@ -205,24 +178,6 @@
   </div>
 </div>
 
-<div class="modal fade" id="bulkConfirmModal" tabindex="-1" aria-labelledby="bulkConfirmModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h2 class="modal-title fs-5" id="bulkConfirmModalLabel">Подтверждение массового действия</h2>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
-      </div>
-      <div class="modal-body" id="bulkConfirmText">
-        Будет выполнено действие для выбранных клиентов.
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Отмена</button>
-        <button type="button" class="btn btn-primary" id="bulkConfirmSubmitBtn">Подтвердить</button>
-      </div>
-    </div>
-  </div>
-</div>
-
 <script>
   (() => {
     const modal = document.getElementById('clientQrModal');
@@ -278,88 +233,6 @@
         }
       });
     });
-
-    const bulkForm = document.getElementById('bulkActionForm');
-    if (!bulkForm) return;
-
-    const bulkToolbar = document.getElementById('bulkToolbar');
-    const selectAllVisible = document.getElementById('selectAllVisible');
-    const selectedCount = document.getElementById('selectedCount');
-    const clearSelectionBtn = document.getElementById('clearSelectionBtn');
-    const bulkActionInput = document.getElementById('bulkActionInput');
-    const bulkSelectionContainer = document.getElementById('bulkSelectionContainer');
-    const bulkConfirmModalEl = document.getElementById('bulkConfirmModal');
-    const bulkConfirmText = document.getElementById('bulkConfirmText');
-    const bulkConfirmSubmitBtn = document.getElementById('bulkConfirmSubmitBtn');
-    const bulkConfirmModal = new bootstrap.Modal(bulkConfirmModalEl);
-    const checkboxes = Array.from(document.querySelectorAll('.js-client-checkbox'));
-
-    const getSelected = () => checkboxes.filter((cb) => cb.checked);
-    const updateSelectionUi = () => {
-      const selected = getSelected().length;
-      selectedCount.textContent = String(selected);
-      bulkToolbar.classList.toggle('d-none', selected === 0);
-      if (selectAllVisible) {
-        selectAllVisible.checked = selected > 0 && selected === checkboxes.length;
-        selectAllVisible.indeterminate = selected > 0 && selected < checkboxes.length;
-      }
-    };
-
-    if (selectAllVisible) {
-      selectAllVisible.addEventListener('change', () => {
-        checkboxes.forEach((cb) => cb.checked = selectAllVisible.checked);
-        updateSelectionUi();
-      });
-    }
-
-    checkboxes.forEach((cb) => cb.addEventListener('change', updateSelectionUi));
-    clearSelectionBtn.addEventListener('click', () => {
-      checkboxes.forEach((cb) => cb.checked = false);
-      updateSelectionUi();
-    });
-
-    document.querySelectorAll('.js-bulk-action').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const selected = getSelected().length;
-        if (!selected) return;
-        const action = btn.dataset.action;
-        const label = btn.dataset.label;
-        const isDanger = btn.dataset.danger === '1';
-        bulkActionInput.value = action;
-
-        if (isDanger) {
-          bulkConfirmText.textContent = `Действие «${label}» будет применено к ${selected} клиент(ам). Удаление выполнится как мягкое удаление.`;
-          bulkConfirmSubmitBtn.className = 'btn btn-danger';
-          bulkConfirmSubmitBtn.textContent = `${label} (${selected})`;
-          bulkConfirmModal.show();
-          return;
-        }
-        bulkSelectionContainer.innerHTML = '';
-        getSelected().forEach((cb) => {
-          const input = document.createElement('input');
-          input.type = 'hidden';
-          input.name = 'client_ids';
-          input.value = cb.value;
-          bulkSelectionContainer.appendChild(input);
-        });
-        bulkForm.submit();
-      });
-    });
-
-    bulkConfirmSubmitBtn.addEventListener('click', () => {
-      bulkConfirmModal.hide();
-      bulkSelectionContainer.innerHTML = '';
-      getSelected().forEach((cb) => {
-        const input = document.createElement('input');
-        input.type = 'hidden';
-        input.name = 'client_ids';
-        input.value = cb.value;
-        bulkSelectionContainer.appendChild(input);
-      });
-      bulkForm.submit();
-    });
-
-    updateSelectionUi();
   })();
 </script>
 {% endblock %}

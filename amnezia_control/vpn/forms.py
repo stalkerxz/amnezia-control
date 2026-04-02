@@ -171,12 +171,6 @@ class VPNClientLimitsUpdateForm(VPNClientCreateForm):
 class VPNClientListFilterForm(forms.Form):
     STATUS_ALL = "__all__"
 
-    QUICK_ACTIVE = "active"
-    QUICK_DISABLED = "disabled"
-    QUICK_EXPIRED = "expired"
-    QUICK_TRAFFIC_EXCEEDED = "traffic_exceeded"
-    QUICK_DELETED = "deleted"
-
     q = forms.CharField(required=False, label="Поиск", max_length=120)
     protocol = forms.ChoiceField(
         required=False,
@@ -199,17 +193,5 @@ class VPNClientListFilterForm(forms.Form):
             ("", "Все"),
             ("imported", "Импорт"),
             ("manual", "Панель"),
-        ),
-    )
-    quick = forms.ChoiceField(
-        required=False,
-        label="Быстрый фильтр",
-        choices=(
-            ("", "Все"),
-            (QUICK_ACTIVE, "Активные"),
-            (QUICK_DISABLED, "Отключённые"),
-            (QUICK_EXPIRED, "Просроченные"),
-            (QUICK_TRAFFIC_EXCEEDED, "Трафик превышен"),
-            (QUICK_DELETED, "Удалённые"),
         ),
     )
