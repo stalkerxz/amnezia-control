@@ -32,9 +32,9 @@
 {% if events %}
 <table class="table table-sm align-middle"><tr><th>Время</th><th>Уровень</th><th>Сообщение</th><th>Exit code</th><th>stdout</th><th>stderr</th></tr>
 {% for e in events %}
-<tr class="{% if e.level == 'error' or e.exit_code %}table-danger{% endif %}">
+<tr class="{% if e.level == 'error' %}table-danger{% elif e.level == 'warning' %}table-warning{% elif e.exit_code %}table-danger{% endif %}">
   <td>{{ e.created_at }}</td>
-  <td><span class="badge {% if e.level == 'error' %}text-bg-danger{% else %}text-bg-secondary{% endif %}">{{ e.level }}</span></td>
+  <td><span class="badge {% if e.level == 'error' %}text-bg-danger{% elif e.level == 'warning' %}text-bg-warning{% else %}text-bg-secondary{% endif %}">{{ e.level }}</span></td>
   <td>{{ e.message }}</td>
   <td>{{ e.exit_code|default:'—' }}</td>
   <td>{% if e.stdout %}<pre class="log mb-0">{{ e.stdout }}</pre>{% else %}—{% endif %}</td>

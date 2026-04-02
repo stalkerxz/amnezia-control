@@ -51,6 +51,11 @@ class PeerState:
 
 
 class RuntimeCommandService:
+    AWG2_EXPECTED_RUNTIME_DUMP_ERRORS = (
+        "unable to access interface: protocol not supported",
+        "protocol not supported",
+    )
+
     @staticmethod
     def executor_for_server(server: Server):
         return SafeSSHExecutor(
@@ -74,6 +79,42 @@ class RuntimeCommandService:
             level="info" if result.exit_code == 0 else "error",
         )
         JobService.mark_done(job, ok=result.exit_code == 0)
+        if result.exit_code != 0:
+            raise RuntimeError(result.stderr or f"command failed: {action}")
+        return result
+
+    @classmethod
+    def run_with_expected_failure(
+        cls,
+        server: Server,
+        actor,
+        action: str,
+        command: str,
+        *,
+        expected_error_patterns: tuple[str, ...],
+        fallback_message: str,
+        sensitive_output: bool = False,
+    ):
+        job = JobService.create_job(server=server, actor=actor, action=action, payload={"command": command if not sensitive_output else "[REDACTED]"})
+        JobService.mark_running(job)
+        result = cls.executor_for_server(server).run(command)
+        stderr_text = result.stderr or ""
+        matched_expected_error = result.exit_code != 0 and any(
+            pattern.lower() in stderr_text.lower() for pattern in expected_error_patterns
+        )
+        level = "warning" if matched_expected_error else ("info" if result.exit_code == 0 else "error")
+        message = fallback_message if matched_expected_error else f"Executed {action}"
+        JobService.event(
+            job,
+            message,
+            stdout="" if sensitive_output else result.stdout,
+            stderr="" if sensitive_output else result.stderr,
+            exit_code=result.exit_code,
+            level=level,
+        )
+        JobService.mark_done(job, ok=result.exit_code == 0 or matched_expected_error)
+        if matched_expected_error:
+            return None
         if result.exit_code != 0:
             raise RuntimeError(result.stderr or f"command failed: {action}")
         return result
@@ -110,7 +151,20 @@ class BaseProtocolAdapter:
 
     def list_peers(self, actor):
         try:
-            out = self._run(actor, f"{self.protocol_type}.list", self._wg_cmd("show dump")).stdout
+            if self.protocol_type == VPNClient.ProtocolType.AWG2:
+                runtime_result = RuntimeCommandService.run_with_expected_failure(
+                    self.server,
+                    actor,
+                    f"{self.protocol_type}.list",
+                    self._wg_cmd("show dump"),
+                    expected_error_patterns=RuntimeCommandService.AWG2_EXPECTED_RUNTIME_DUMP_ERRORS,
+                    fallback_message="AWG2 runtime telemetry unavailable: using config fallback (degraded mode).",
+                )
+                if runtime_result is None:
+                    return self._list_peers_from_config(actor)
+                out = runtime_result.stdout
+            else:
+                out = self._run(actor, f"{self.protocol_type}.list", self._wg_cmd("show dump")).stdout
             peers = []
             for line in out.splitlines():
                 cols = line.split("\t")

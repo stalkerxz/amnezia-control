@@ -110,7 +110,7 @@ class RuntimeDetectionTest(TestCase):
         run_mock.side_effect = side_effect
         ServerService.sync_runtime_state(server=self.server, actor=self.user)
         awg2 = self.server.protocols.get(protocol_type="awg2")
-        self.assertEqual(awg2.runtime_metadata["peer_source"], "config file fallback")
+        self.assertEqual(awg2.runtime_metadata["peer_source"], "config file fallback (degraded telemetry)")
         self.assertEqual(awg2.runtime_metadata["peer_count"], 1)
 
 

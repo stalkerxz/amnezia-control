@@ -175,9 +175,24 @@ class ServerService:
                 if container_name in running_names:
                     try:
                         iface = RuntimeCommandService.run(server, actor, f"runtime.iface.{protocol_type}", f"docker exec {container_name} wg show interfaces").stdout.strip().split()[0]
-                        dump = RuntimeCommandService.run(server, actor, f"runtime.peers.{protocol_type}", f"docker exec {container_name} wg show dump").stdout
-                        peer_count = sum(1 for line in dump.splitlines() if len(line.split("\t")) >= 8)
-                        peer_source = "runtime wg dump"
+                        if protocol_type == ServerProtocol.ProtocolType.AWG2:
+                            dump_result = RuntimeCommandService.run_with_expected_failure(
+                                server,
+                                actor,
+                                f"runtime.peers.{protocol_type}",
+                                f"docker exec {container_name} wg show dump",
+                                expected_error_patterns=RuntimeCommandService.AWG2_EXPECTED_RUNTIME_DUMP_ERRORS,
+                                fallback_message="AWG2 runtime telemetry unavailable: using config fallback (degraded mode).",
+                            )
+                            if dump_result is None:
+                                peer_source = "runtime telemetry unavailable; config fallback"
+                            else:
+                                peer_count = sum(1 for line in dump_result.stdout.splitlines() if len(line.split("\t")) >= 8)
+                                peer_source = "runtime wg dump"
+                        else:
+                            dump = RuntimeCommandService.run(server, actor, f"runtime.peers.{protocol_type}", f"docker exec {container_name} wg show dump").stdout
+                            peer_count = sum(1 for line in dump.splitlines() if len(line.split("\t")) >= 8)
+                            peer_source = "runtime wg dump"
                     except Exception:
                         iface = ""
                         peer_count = 0
@@ -194,7 +209,7 @@ class ServerService:
                     if protocol_type == ServerProtocol.ProtocolType.AWG2 and raw_iface_conf:
                         if peer_source != "runtime wg dump":
                             peer_count = len(cls._parse_peers_from_config_text(raw_iface_conf))
-                            peer_source = "config file fallback"
+                            peer_source = "config file fallback (degraded telemetry)"
 
                 subnet, listen_port = cls._parse_interface_metadata(raw_iface_conf)
                 awg2_meta, awg2_required_missing, awg2_optional_missing = ({}, [], [])
