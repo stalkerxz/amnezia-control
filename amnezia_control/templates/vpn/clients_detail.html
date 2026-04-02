@@ -1,7 +1,7 @@
 {% extends 'partials/base.html' %}
 {% block content %}
-<div class="page-header page-header-compact mb-2">
-  <p class="text-secondary small mb-1">Клиент #{{ client.id }}</p>
+<div class="page-header page-header-compact mb-3">
+  <p class="text-secondary small mb-1">Клиент #{{ client.id }} · Сервер: {{ client.server.name }}</p>
   <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
     <div>
       <h1 class="h3 mb-2">{{ client.name }}</h1>
@@ -9,6 +9,7 @@
         <span class="badge badge-soft {% if client.protocol_type == 'awg2' %}badge-protocol-awg2{% else %}badge-protocol-awg{% endif %}">{{ client.protocol_type|upper }}</span>
         <span class="badge badge-soft {% if client.status == 'active' %}badge-ok{% elif client.status == 'disabled' %}badge-warn{% else %}badge-danger{% endif %}">{{ client.get_status_display }}</span>
         <span class="badge {{ limit_badge_class }}">Лимиты: {{ limit_badge_label }}</span>
+        <span class="badge badge-soft badge-muted">{% if client.imported_from_runtime %}Импортирован{% else %}Создан в панели{% endif %}</span>
       </div>
     </div>
     <div class="d-flex gap-2 flex-wrap">
@@ -23,8 +24,15 @@
   </div>
 </div>
 
-{% if is_deleted %}
-<div class="alert alert-warning py-2">Клиент помечен как удаленный (soft delete). Он скрыт из основного списка по умолчанию.</div>
+{% if warning_items %}
+<div class="alert alert-warning mb-3">
+  <h2 class="h6 mb-2">Требуется внимание оператора</h2>
+  <ul class="mb-0">
+    {% for warning in warning_items %}
+    <li>{{ warning }}</li>
+    {% endfor %}
+  </ul>
+</div>
 {% endif %}
 
 {% if missing_endpoint or missing_awg2_metadata or not revision %}
@@ -41,11 +49,27 @@
 {% endif %}
 
 <div class="row g-2 mb-3">
-  <div class="col-xl-3 col-md-6"><div class="card stat-card stat-card-compact h-100"><div class="card-body"><h2 class="h6 mb-2">Runtime</h2><div class="small text-secondary mb-1">Сервер</div><div class="fw-semibold">{{ client.server.name }}</div><div class="small text-secondary mt-2">Адрес клиента</div><code>{{ runtime_address_display }}</code></div></div></div>
-  <div class="col-xl-3 col-md-6"><div class="card stat-card stat-card-compact h-100"><div class="card-body"><h2 class="h6 mb-2">Ревизии</h2><div class="small text-secondary mb-1">Всего</div><div class="h3 mb-1">{{ revision_count }}</div>{% if revision %}<div class="small text-secondary">Последняя: #{{ revision.revision_number }}</div>{% endif %}</div></div></div>
+  <div class="col-xl-3 col-md-6"><div class="card stat-card stat-card-compact h-100"><div class="card-body"><h2 class="h6 mb-2">Сервер</h2><div class="small text-secondary mb-1">Связан с</div><div class="fw-semibold">{{ client.server.name }}</div><div class="small text-secondary mt-2">Последний runtime sync</div><div>{% if client.last_runtime_sync_at %}{{ client.last_runtime_sync_at|date:'d.m.Y H:i' }}{% else %}Нет данных{% endif %}</div></div></div></div>
+  <div class="col-xl-3 col-md-6"><div class="card stat-card stat-card-compact h-100"><div class="card-body"><h2 class="h6 mb-2">Ревизии</h2><div class="small text-secondary mb-1">Всего</div><div class="h3 mb-1">{{ revision_count }}</div><div class="small text-secondary">{% if revision %}Последняя: #{{ revision.revision_number }}{% else %}Отсутствуют{% endif %}</div></div></div></div>
   <div class="col-xl-3 col-md-6"><div class="card stat-card stat-card-compact h-100"><div class="card-body"><h2 class="h6 mb-2">Лимиты</h2><div class="small text-secondary mb-1">Срок действия</div><div>{{ expires_display }}</div><div class="small text-secondary mt-2">Трафик</div><div>{% if client.traffic_limit_bytes %}{{ traffic_limit_display }}{% else %}Не задано{% endif %}</div></div></div></div>
-  <div class="col-xl-3 col-md-6"><div class="card stat-card stat-card-compact h-100"><div class="card-body"><h2 class="h6 mb-2">Подключение</h2><div class="small text-secondary mb-1">Peer key</div><code>{{ client.runtime_peer_public_key|default:'-' }}</code><button type="button" class="btn btn-xs btn-outline-secondary mt-2 js-copy" data-copy="{{ client.runtime_peer_public_key|default:'' }}">Копировать ключ</button></div></div></div>
+  <div class="col-xl-3 col-md-6"><div class="card stat-card stat-card-compact h-100"><div class="card-body"><h2 class="h6 mb-2">Runtime peer</h2><div class="small text-secondary mb-1">Peer key</div><code>{{ client.runtime_peer_public_key|default:'-' }}</code><button type="button" class="btn btn-xs btn-outline-secondary mt-2 js-copy" data-copy="{{ client.runtime_peer_public_key|default:'' }}">Копировать ключ</button></div></div></div>
 </div>
+
+<div class="card mb-3"><div class="card-body py-3">
+  <h2 class="h6 mb-3">Диагностика клиента</h2>
+  <div class="row g-2">
+    <div class="col-lg-4"><div class="small text-secondary">Протокол</div><div>{{ client.protocol_type|upper }}</div></div>
+    <div class="col-lg-4"><div class="small text-secondary">Статус</div><div>{{ client.get_status_display }}</div></div>
+    <div class="col-lg-4"><div class="small text-secondary">Состояние лимитов</div><div>{{ limit_badge_label }}</div></div>
+    <div class="col-lg-4"><div class="small text-secondary">Runtime-адрес</div><code>{{ runtime_address_display }}</code></div>
+    <div class="col-lg-4"><div class="small text-secondary">Runtime peer public key</div><code>{{ client.runtime_peer_public_key|default:'—' }}</code></div>
+    <div class="col-lg-4"><div class="small text-secondary">Последний runtime sync</div><div>{% if client.last_runtime_sync_at %}{{ client.last_runtime_sync_at|date:'d.m.Y H:i' }}{% else %}Нет данных{% endif %}</div></div>
+    <div class="col-lg-4"><div class="small text-secondary">Sync трафика</div><div>{% if client.traffic_sync_error %}<span class="text-danger">Ошибка</span>{% elif client.traffic_last_sync_at %}<span class="text-success">Успешно</span>{% else %}<span class="text-secondary">Нет данных</span>{% endif %}</div></div>
+    <div class="col-lg-8"><div class="small text-secondary">Детали синхронизации трафика</div><div>{% if client.traffic_sync_error %}{{ client.traffic_sync_error }}{% elif client.traffic_last_sync_at %}{{ client.traffic_last_sync_at|date:'d.m.Y H:i' }}{% else %}Данные ещё не синхронизированы{% endif %}</div></div>
+    <div class="col-lg-4"><div class="small text-secondary">Источник клиента</div><div>{% if client.imported_from_runtime %}Импортирован из runtime{% else %}Создан в панели{% endif %}</div></div>
+    <div class="col-lg-4"><div class="small text-secondary">Наличие ревизии конфига</div><div>{% if revision %}Да{% else %}Нет{% endif %}</div></div>
+  </div>
+</div></div>
 
 <div class="card mb-3"><div class="card-body py-3">
   <h2 class="h6 mb-2">Лимиты и телеметрия</h2>
@@ -92,30 +116,93 @@
   {% endif %}
 </div></div>
 
-<div class="d-flex gap-2 flex-wrap mb-3">
-{% if is_deleted %}
-<button class="btn btn-primary" disabled>Переиздать конфиг</button>
-{% elif reissue_blocked %}
-<button class="btn btn-primary" disabled title="{{ reissue_block_reason }}">Переиздать конфиг</button>
-{% else %}
-<form method="post" action="/clients/{{ client.id }}/action/reissue/">{% csrf_token %}<button class="btn btn-primary">Переиздать конфиг</button></form>
-{% endif %}
-{% if client.status == 'active' %}
-<form method="post" action="/clients/{{ client.id }}/action/disable/">{% csrf_token %}<button class="btn btn-outline-warning">Отключить</button></form>
-{% elif is_deleted %}
-<form method="post" action="/clients/{{ client.id }}/action/enable/">{% csrf_token %}<button class="btn btn-outline-success">Восстановить</button></form>
-{% else %}
-<form method="post" action="/clients/{{ client.id }}/action/enable/">{% csrf_token %}<button class="btn btn-outline-success">Включить</button></form>
-{% endif %}
-{% if not is_deleted %}
-<button class="btn btn-danger" type="button" data-bs-toggle="modal" data-bs-target="#deleteClientDetailModal">Удалить</button>
-{% endif %}
-</div>
-{% if reissue_blocked %}<div class="alert alert-warning">{{ reissue_block_reason }}</div>{% endif %}
+<div class="card mb-3"><div class="card-body">
+  <h2 class="h6 mb-3">Операции и экспорт</h2>
+  <div class="d-flex gap-2 flex-wrap">
+    {% if is_deleted %}
+    <button class="btn btn-primary" disabled title="Переиздание недоступно для удалённого клиента">Переиздать конфиг</button>
+    {% elif reissue_blocked %}
+    <button class="btn btn-primary" disabled title="{{ reissue_block_reason }}">Переиздать конфиг</button>
+    {% else %}
+    <form method="post" action="/clients/{{ client.id }}/action/reissue/">{% csrf_token %}<button class="btn btn-primary">Переиздать конфиг</button></form>
+    {% endif %}
+
+    {% if client.status == 'active' %}
+    <form method="post" action="/clients/{{ client.id }}/action/disable/">{% csrf_token %}<button class="btn btn-outline-warning">Отключить клиента</button></form>
+    {% elif is_deleted %}
+    <form method="post" action="/clients/{{ client.id }}/action/enable/">{% csrf_token %}<button class="btn btn-outline-success">Восстановить клиента</button></form>
+    {% else %}
+    <form method="post" action="/clients/{{ client.id }}/action/enable/">{% csrf_token %}<button class="btn btn-outline-success">Включить клиента</button></form>
+    {% endif %}
+
+    {% if not is_deleted %}
+    <button class="btn btn-danger" type="button" data-bs-toggle="modal" data-bs-target="#deleteClientDetailModal">Удалить клиента</button>
+    {% endif %}
+
+    {% if revision and qr_base64 %}
+    <a class="btn btn-outline-primary" href="#qr-card">Показать QR</a>
+    {% endif %}
+  </div>
+  {% if reissue_blocked %}<div class="alert alert-warning mt-3 mb-0">{{ reissue_block_reason }}</div>{% endif %}
+</div></div>
 
 {% if revision and qr_base64 %}
-<div class="card border-primary"><div class="card-body"><h2 class="h6">QR для подключения</h2><img src="data:image/png;base64,{{ qr_base64 }}" alt="QR" class="img-thumbnail" style="max-width:300px;"></div></div>
+<div class="card border-primary mb-3" id="qr-card"><div class="card-body"><h2 class="h6">QR для подключения</h2><img src="data:image/png;base64,{{ qr_base64 }}" alt="QR" class="img-thumbnail" style="max-width:300px;"></div></div>
 {% endif %}
+
+<div class="card mb-3"><div class="card-body">
+  <h2 class="h6 mb-3">Недавняя активность</h2>
+  <div class="row g-3">
+    <div class="col-lg-6">
+      <h3 class="h6">Последние действия в аудите по клиенту</h3>
+      {% if recent_audit_logs %}
+      <div class="table-responsive">
+        <table class="table table-sm mb-0">
+          <thead><tr><th>Когда</th><th>Действие</th><th>Кто</th></tr></thead>
+          <tbody>
+            {% for log in recent_audit_logs %}
+            <tr>
+              <td>{{ log.created_at|date:'d.m.Y H:i' }}</td>
+              <td><code>{{ log.action }}</code></td>
+              <td>{% if log.actor %}{{ log.actor.username }}{% else %}<span class="text-secondary">система</span>{% endif %}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="small text-secondary mb-0">По этому клиенту пока нет записей аудита.</p>
+      {% endif %}
+    </div>
+    <div class="col-lg-6">
+      <h3 class="h6">Последние jobs по серверу/клиенту</h3>
+      {% if recent_jobs %}
+      <div class="table-responsive">
+        <table class="table table-sm mb-0">
+          <thead><tr><th>ID</th><th>Действие</th><th>Статус</th><th>Когда</th></tr></thead>
+          <tbody>
+            {% for job in recent_jobs %}
+            <tr>
+              <td><a href="/jobs/{{ job.id }}/">#{{ job.id }}</a></td>
+              <td><code>{{ job.action }}</code></td>
+              <td>{{ job.get_status_display }}</td>
+              <td>{{ job.created_at|date:'d.m.Y H:i' }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="small text-secondary mb-0">Подходящих задач пока нет.</p>
+      {% endif %}
+    </div>
+  </div>
+</div></div>
+
+<div class="card border-danger mb-3"><div class="card-body">
+  <h2 class="h6 text-danger mb-2">Опасные действия</h2>
+  <p class="small text-secondary mb-0">Удаление помечает клиента как удалённого (soft delete) и скрывает из основного списка.</p>
+</div></div>
 
 <div class="modal fade" id="deleteClientDetailModal" tabindex="-1" aria-labelledby="deleteClientDetailModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
