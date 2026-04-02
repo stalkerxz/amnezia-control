@@ -11,7 +11,7 @@ import ipaddress
 from audit.models import AuditLog
 from jobs.models import Job
 from servers.models import Server, ServerProtocol
-from .forms import VPNClientCreateForm, VPNClientLimitsUpdateForm, VPNClientListFilterForm
+from .forms import VPNClientBulkLimitsUpdateForm, VPNClientCreateForm, VPNClientLimitsUpdateForm, VPNClientListFilterForm
 from .models import VPNClient
 from .services import VPNClientService
 
@@ -422,6 +422,55 @@ def clients_bulk_action_view(request):
     clients = list(VPNClient.objects.filter(id__in=selected_ids))
     if not clients:
         messages.warning(request, "Выбранные клиенты не найдены.")
+        return redirect(next_url)
+
+    if action == "limits":
+        form = VPNClientBulkLimitsUpdateForm(request.POST)
+        if not form.is_valid():
+            messages.error(request, "Проверьте форму массового изменения лимитов.")
+            return redirect(next_url)
+
+        apply_expires = form.cleaned_data["apply_expires"]
+        apply_traffic = form.cleaned_data["apply_traffic"]
+        resolved_expires_at = form.cleaned_data.get("resolved_expires_at")
+        resolved_traffic_limit_bytes = form.cleaned_data.get("resolved_traffic_limit_bytes")
+
+        updated = 0
+        skipped_deleted = 0
+        for client in clients:
+            if client.status == VPNClient.Status.DELETED:
+                skipped_deleted += 1
+                continue
+            try:
+                VPNClientService.update_limits(
+                    client=client,
+                    expires_at=(
+                        resolved_expires_at
+                        if apply_expires == VPNClientBulkLimitsUpdateForm.APPLY_SET
+                        else None
+                        if apply_expires == VPNClientBulkLimitsUpdateForm.APPLY_CLEAR
+                        else client.expires_at
+                    ),
+                    traffic_limit_bytes=(
+                        resolved_traffic_limit_bytes
+                        if apply_traffic == VPNClientBulkLimitsUpdateForm.APPLY_SET
+                        else None
+                        if apply_traffic == VPNClientBulkLimitsUpdateForm.APPLY_CLEAR
+                        else client.traffic_limit_bytes
+                    ),
+                    actor=request.user,
+                )
+                updated += 1
+            except Exception:
+                continue
+
+        if updated:
+            msg = f"Лимиты обновлены для {updated} клиент(ов) без переиздания конфига."
+            if skipped_deleted:
+                msg += f" Удалённые пропущены: {skipped_deleted}."
+            messages.success(request, msg)
+        else:
+            messages.error(request, "Не удалось обновить лимиты для выбранных клиентов.")
         return redirect(next_url)
 
     applied = 0
