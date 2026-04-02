@@ -228,6 +228,7 @@
     const modal = document.getElementById('clientQrModal');
     const body = document.getElementById('clientQrModalBody');
     const title = document.getElementById('clientQrModalLabel');
+    const hasBootstrapModal = typeof bootstrap !== 'undefined' && typeof bootstrap.Modal === 'function';
 
     document.querySelectorAll('.js-open-qr-modal').forEach((btn) => {
       btn.addEventListener('click', async () => {
@@ -246,11 +247,14 @@
       });
     });
 
-    modal.addEventListener('hidden.bs.modal', () => {
-      body.innerHTML = '<div class="text-secondary">Загрузка…</div>';
-    });
+    if (modal) {
+      modal.addEventListener('hidden.bs.modal', () => {
+        body.innerHTML = '<div class="text-secondary">Загрузка…</div>';
+      });
+    }
 
-    const deleteModal = new bootstrap.Modal(document.getElementById('deleteClientModal'));
+    const deleteModalEl = document.getElementById('deleteClientModal');
+    const deleteModal = hasBootstrapModal && deleteModalEl ? new bootstrap.Modal(deleteModalEl) : null;
     const deleteForm = document.getElementById('deleteClientForm');
     const deleteName = document.getElementById('deleteClientName');
     const deleteNext = document.getElementById('deleteClientNext');
@@ -260,7 +264,13 @@
         deleteForm.action = btn.dataset.action;
         deleteName.textContent = btn.dataset.clientName;
         deleteNext.value = btn.dataset.next || '{{ request.get_full_path }}';
-        deleteModal.show();
+        if (deleteModal) {
+          deleteModal.show();
+          return;
+        }
+        if (window.confirm(`Удалить клиента ${btn.dataset.clientName}? Клиент будет помечен удалённым.`)) {
+          deleteForm.submit();
+        }
       });
     });
 
@@ -291,14 +301,26 @@
     const bulkConfirmModalEl = document.getElementById('bulkConfirmModal');
     const bulkConfirmText = document.getElementById('bulkConfirmText');
     const bulkConfirmSubmitBtn = document.getElementById('bulkConfirmSubmitBtn');
-    const bulkConfirmModal = new bootstrap.Modal(bulkConfirmModalEl);
+    const bulkConfirmModal = hasBootstrapModal && bulkConfirmModalEl ? new bootstrap.Modal(bulkConfirmModalEl) : null;
     const checkboxes = Array.from(document.querySelectorAll('.js-client-checkbox'));
+    const bulkActionButtons = Array.from(document.querySelectorAll('.js-bulk-action'));
 
     const getSelected = () => checkboxes.filter((cb) => cb.checked);
+    const syncBulkSelectionInputs = () => {
+      bulkSelectionContainer.innerHTML = '';
+      getSelected().forEach((cb) => {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'client_ids';
+        input.value = cb.value;
+        bulkSelectionContainer.appendChild(input);
+      });
+    };
     const updateSelectionUi = () => {
       const selected = getSelected().length;
       selectedCount.textContent = String(selected);
       bulkToolbar.classList.toggle('d-none', selected === 0);
+      bulkActionButtons.forEach((btn) => btn.disabled = selected === 0);
       if (selectAllVisible) {
         selectAllVisible.checked = selected > 0 && selected === checkboxes.length;
         selectAllVisible.indeterminate = selected > 0 && selected < checkboxes.length;
@@ -318,7 +340,7 @@
       updateSelectionUi();
     });
 
-    document.querySelectorAll('.js-bulk-action').forEach((btn) => {
+    bulkActionButtons.forEach((btn) => {
       btn.addEventListener('click', () => {
         const selected = getSelected().length;
         if (!selected) return;
@@ -328,36 +350,33 @@
         bulkActionInput.value = action;
 
         if (isDanger) {
+          if (!bulkConfirmModal) {
+            if (window.confirm(`Действие «${label}» будет применено к ${selected} клиент(ам). Удаление выполнится как мягкое удаление.`)) {
+              syncBulkSelectionInputs();
+              bulkForm.submit();
+            }
+            return;
+          }
           bulkConfirmText.textContent = `Действие «${label}» будет применено к ${selected} клиент(ам). Удаление выполнится как мягкое удаление.`;
           bulkConfirmSubmitBtn.className = 'btn btn-danger';
           bulkConfirmSubmitBtn.textContent = `${label} (${selected})`;
           bulkConfirmModal.show();
           return;
         }
-        bulkSelectionContainer.innerHTML = '';
-        getSelected().forEach((cb) => {
-          const input = document.createElement('input');
-          input.type = 'hidden';
-          input.name = 'client_ids';
-          input.value = cb.value;
-          bulkSelectionContainer.appendChild(input);
-        });
+        syncBulkSelectionInputs();
         bulkForm.submit();
       });
     });
 
-    bulkConfirmSubmitBtn.addEventListener('click', () => {
-      bulkConfirmModal.hide();
-      bulkSelectionContainer.innerHTML = '';
-      getSelected().forEach((cb) => {
-        const input = document.createElement('input');
-        input.type = 'hidden';
-        input.name = 'client_ids';
-        input.value = cb.value;
-        bulkSelectionContainer.appendChild(input);
+    if (bulkConfirmSubmitBtn) {
+      bulkConfirmSubmitBtn.addEventListener('click', () => {
+        if (bulkConfirmModal) {
+          bulkConfirmModal.hide();
+        }
+        syncBulkSelectionInputs();
+        bulkForm.submit();
       });
-      bulkForm.submit();
-    });
+    }
 
     updateSelectionUi();
   })();

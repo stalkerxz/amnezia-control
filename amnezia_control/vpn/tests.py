@@ -1176,6 +1176,15 @@ class VPNClientBulkActionsAndQuickFiltersTest(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Массовое действие выполнено")
 
+    def test_clients_list_contains_bulk_toolbar_controls(self):
+        response = self.client.get("/clients/")
+
+        self.assertContains(response, 'id="bulkActionForm"')
+        self.assertContains(response, 'id="bulkToolbar"')
+        self.assertContains(response, 'id="selectAllVisible"')
+        self.assertContains(response, 'class="form-check-input js-client-checkbox"')
+        self.assertContains(response, 'id="bulkSelectionContainer"')
+
     def test_bulk_disable(self):
         self.client.post(
             "/clients/bulk-action/",
