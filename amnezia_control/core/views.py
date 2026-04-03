@@ -8,6 +8,7 @@ from django.utils import timezone
 from audit.models import AuditLog
 from jobs.models import Job, JobEvent
 from servers.models import Server, ServerProtocol
+from servers.services import ServerService
 from vpn.models import VPNClient
 
 
@@ -44,6 +45,8 @@ def _audit_action_label(action: str) -> str:
 @login_required
 @user_passes_test(_admin_required)
 def dashboard_view(request):
+    servers = list(Server.objects.prefetch_related("protocols").all())
+    server_health_states = [ServerService.evaluate_health(server)["status"] for server in servers]
     protocols = list(ServerProtocol.objects.all())
     protocol_map = {(protocol.server_id, protocol.protocol_type): protocol for protocol in protocols}
     clients = list(VPNClient.objects.select_related("server").all())
@@ -87,7 +90,11 @@ def dashboard_view(request):
     ]
 
     context = {
-        "servers_count": Server.objects.count(),
+        "servers_count": len(servers),
+        "healthy_servers_count": sum(1 for state in server_health_states if state == ServerService.HEALTH_HEALTHY),
+        "degraded_servers_count": sum(1 for state in server_health_states if state == ServerService.HEALTH_DEGRADED),
+        "unhealthy_servers_count": sum(1 for state in server_health_states if state == ServerService.HEALTH_UNHEALTHY),
+        "not_checked_servers_count": sum(1 for state in server_health_states if state == ServerService.HEALTH_NOT_CHECKED),
         "clients_total_count": len(clients),
         "active_clients_count": sum(1 for client in clients if client.status == VPNClient.Status.ACTIVE),
         "disabled_clients_count": sum(1 for client in clients if client.status == VPNClient.Status.DISABLED),
