@@ -388,7 +388,18 @@ def client_action_view(request, pk: int, action: str):
             VPNClientService.set_status(client=client, status=VPNClient.Status.DISABLED, actor=request.user)
         elif action == "enable":
             VPNClientService.set_status(client=client, status=VPNClient.Status.ACTIVE, actor=request.user)
-            success_message = "Клиент восстановлен"
+            success_message = "Клиент включен"
+        elif action == "restore":
+            if client.status != VPNClient.Status.DELETED:
+                messages.warning(request, "Восстановление доступно только для удалённых клиентов.")
+                return redirect("clients-detail", pk=client.id)
+            VPNClientService.set_status(
+                client=client,
+                status=VPNClient.Status.DISABLED,
+                actor=request.user,
+                disable_reason=VPNClient.DisableReason.MANUAL,
+            )
+            success_message = "Клиент восстановлен в состояние «Отключён»"
         elif action == "delete":
             VPNClientService.set_status(client=client, status=VPNClient.Status.DELETED, actor=request.user)
             success_message = "Клиент помечен как удаленный и скрыт из основного списка"
@@ -474,12 +485,24 @@ def clients_bulk_action_view(request):
         return redirect(next_url)
 
     applied = 0
+    skipped = 0
+    failed = 0
     for client in clients:
         try:
             if action == "disable":
                 VPNClientService.set_status(client=client, status=VPNClient.Status.DISABLED, actor=request.user)
             elif action == "enable":
                 VPNClientService.set_status(client=client, status=VPNClient.Status.ACTIVE, actor=request.user)
+            elif action == "restore":
+                if client.status != VPNClient.Status.DELETED:
+                    skipped += 1
+                    continue
+                VPNClientService.set_status(
+                    client=client,
+                    status=VPNClient.Status.DISABLED,
+                    actor=request.user,
+                    disable_reason=VPNClient.DisableReason.MANUAL,
+                )
             elif action == "delete":
                 VPNClientService.set_status(client=client, status=VPNClient.Status.DELETED, actor=request.user)
             elif action == "reissue":
@@ -489,18 +512,28 @@ def clients_bulk_action_view(request):
                 return redirect(next_url)
             applied += 1
         except Exception:
+            failed += 1
             continue
 
     action_labels = {
         "disable": "отключено",
         "enable": "включено",
+        "restore": "восстановлено",
         "delete": "помечено удалёнными",
         "reissue": "переиздано",
     }
     if applied:
-        messages.success(request, f"Массовое действие выполнено: {action_labels[action]} — {applied} шт.")
+        message = f"Массовое действие выполнено: {action_labels[action]} — {applied} шт."
+        if action == "restore" and skipped:
+            message += f" Пропущены не удалённые: {skipped}."
+        if failed:
+            message += f" Ошибки восстановления: {failed}." if action == "restore" else f" Ошибки: {failed}."
+        messages.success(request, message)
     else:
-        messages.error(request, "Не удалось выполнить массовое действие для выбранных клиентов.")
+        if action == "restore" and skipped:
+            messages.warning(request, f"Нечего восстанавливать: выбраны только не удалённые клиенты ({skipped}).")
+        else:
+            messages.error(request, "Не удалось выполнить массовое действие для выбранных клиентов.")
     return redirect(next_url)
 
 

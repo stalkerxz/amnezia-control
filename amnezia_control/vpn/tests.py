@@ -1130,6 +1130,17 @@ class VPNClientSoftDeleteVisibilityTest(TestCase):
         self.assertContains(response, "Клиент помечен как удаленный и скрыт из основного списка")
         self.assertNotContains(response, self.active_client.name)
 
+    def test_single_restore_from_deleted_changes_status_to_disabled(self):
+        response = self.client.post(
+            f"/clients/{self.deleted_client.id}/action/restore/",
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.deleted_client.refresh_from_db()
+        self.assertEqual(self.deleted_client.status, VPNClient.Status.DISABLED)
+        self.assertContains(response, "Клиент восстановлен в состояние «Отключён»")
+
 
 @override_settings(CONFIG_ENCRYPTION_KEY=Fernet.generate_key().decode())
 class VPNClientBulkActionsAndQuickFiltersTest(TestCase):
@@ -1216,6 +1227,7 @@ class VPNClientBulkActionsAndQuickFiltersTest(TestCase):
         self.assertContains(response, 'id="selectAllVisible"')
         self.assertContains(response, 'class="form-check-input js-client-checkbox"')
         self.assertContains(response, 'id="bulkSelectionContainer"')
+        self.assertContains(response, 'data-action="restore"')
 
     def test_bulk_disable(self):
         self.client.post(
@@ -1246,6 +1258,29 @@ class VPNClientBulkActionsAndQuickFiltersTest(TestCase):
         self.assertEqual(self.disabled_client.status, VPNClient.Status.DELETED)
         self.assertTrue(VPNClient.objects.filter(pk=self.active_client.pk).exists())
         self.assertTrue(VPNClient.objects.filter(pk=self.disabled_client.pk).exists())
+
+    def test_bulk_restore_only_deleted_clients(self):
+        response = self.client.post(
+            "/clients/bulk-action/",
+            data={"action": "restore", "client_ids": [self.deleted_client.id, self.active_client.id]},
+            follow=True,
+        )
+        self.deleted_client.refresh_from_db()
+        self.active_client.refresh_from_db()
+        self.assertEqual(self.deleted_client.status, VPNClient.Status.DISABLED)
+        self.assertEqual(self.active_client.status, VPNClient.Status.ACTIVE)
+        self.assertContains(response, "восстановлено — 1 шт.")
+        self.assertContains(response, "Пропущены не удалённые: 1.")
+
+    def test_restored_client_returns_to_normal_list(self):
+        self.client.post(
+            "/clients/bulk-action/",
+            data={"action": "restore", "client_ids": [self.deleted_client.id]},
+        )
+        default_response = self.client.get("/clients/")
+        deleted_response = self.client.get("/clients/", data={"quick": "deleted"})
+        self.assertContains(default_response, self.deleted_client.name)
+        self.assertNotContains(deleted_response, self.deleted_client.name)
 
     def test_default_list_still_hides_deleted_clients(self):
         response = self.client.get("/clients/")
