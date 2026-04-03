@@ -26,6 +26,13 @@
       <label class="form-label" for="id_created_from">Дата с</label>
       <input class="form-control" type="date" id="id_created_from" name="created_from" value="{{ created_from }}">
     </div>
+    <div class="col-xl-2 col-lg-4">
+      <label class="form-label" for="id_operator_scope">Операторы</label>
+      <select class="form-select" id="id_operator_scope" name="operator_scope">
+        <option value="all" {% if operator_scope != 'mine' %}selected{% endif %}>Все</option>
+        <option value="mine" {% if operator_scope == 'mine' %}selected{% endif %}>Мои</option>
+      </select>
+    </div>
     <div class="col-xl-1 col-lg-6">
       <button class="btn btn-primary w-100" type="submit">Применить</button>
     </div>
@@ -43,7 +50,14 @@
   {% with l=row.log %}
   <tr>
     <td>{{ l.created_at|date:'d.m.Y H:i:s' }}</td>
-    <td>{% if l.actor %}{{ l.actor.username }}{% else %}<span class="text-secondary">system</span>{% endif %}</td>
+    <td>
+      {% if l.actor %}
+        {{ l.actor.username }}
+        {% if l.actor_id == request.user.id %}<span class="badge status-badge status-success">Моё</span>{% else %}<span class="badge status-badge status-neutral">Другой админ</span>{% endif %}
+      {% else %}
+        <span class="text-secondary">система</span>
+      {% endif %}
+    </td>
     <td>
       <code>{{ l.action }}</code>
       <div class="small text-secondary">{{ l.entity_type }}</div>
@@ -72,11 +86,11 @@
 <nav class="mt-3" aria-label="Навигация по журналу аудита">
   <ul class="pagination pagination-sm mb-0">
     <li class="page-item {% if not page_obj.has_previous %}disabled{% endif %}">
-      <a class="page-link" href="?q={{ q|urlencode }}&entity_type={{ entity_type_filter|urlencode }}&created_from={{ created_from|urlencode }}&page={% if page_obj.has_previous %}{{ page_obj.previous_page_number }}{% else %}1{% endif %}">Назад</a>
+      <a class="page-link" href="?q={{ q|urlencode }}&entity_type={{ entity_type_filter|urlencode }}&created_from={{ created_from|urlencode }}&operator_scope={{ operator_scope|urlencode }}&page={% if page_obj.has_previous %}{{ page_obj.previous_page_number }}{% else %}1{% endif %}">Назад</a>
     </li>
     <li class="page-item disabled"><span class="page-link">Стр. {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span></li>
     <li class="page-item {% if not page_obj.has_next %}disabled{% endif %}">
-      <a class="page-link" href="?q={{ q|urlencode }}&entity_type={{ entity_type_filter|urlencode }}&created_from={{ created_from|urlencode }}&page={% if page_obj.has_next %}{{ page_obj.next_page_number }}{% else %}{{ page_obj.paginator.num_pages }}{% endif %}">Вперёд</a>
+      <a class="page-link" href="?q={{ q|urlencode }}&entity_type={{ entity_type_filter|urlencode }}&created_from={{ created_from|urlencode }}&operator_scope={{ operator_scope|urlencode }}&page={% if page_obj.has_next %}{{ page_obj.next_page_number }}{% else %}{{ page_obj.paginator.num_pages }}{% endif %}">Вперёд</a>
     </li>
   </ul>
 </nav>

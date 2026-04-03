@@ -46,6 +46,14 @@
         {% endfor %}
       </select>
     </div>
+    <div class="col-xl-2 col-md-4">
+      <label class="form-label" for="id_operator_scope">Операторы</label>
+      <select class="form-select" id="id_operator_scope" name="operator_scope">
+        {% for value, label in filter_form.fields.operator_scope.choices %}
+          <option value="{{ value }}" {% if filter_form.operator_scope.value|default:'all' == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
     <div class="col-xl-2">
       <button class="btn btn-primary w-100" type="submit">Применить</button>
     </div>
@@ -90,6 +98,7 @@
         <th>Сервер</th>
         <th>Срок действия</th>
         <th>Источник</th>
+        <th>Создал / Последнее действие</th>
         <th>Runtime</th>
         <th>Лимиты / трафик</th>
         <th>Обновлено</th>
@@ -117,6 +126,26 @@
         <td>{{ c.server.name|default:'—' }}</td>
         <td>{{ row.expires_display }}</td>
         <td>{% if c.imported_from_runtime %}<span class="badge status-badge status-info">Импорт</span>{% else %}<span class="badge status-badge status-neutral">Панель</span>{% endif %}</td>
+        <td>
+          <div class="small">
+            <span class="text-secondary">Создал:</span>
+            {% if c.created_by %}
+              {{ c.created_by.username }}
+              {% if c.created_by_id == request.user.id %}<span class="badge status-badge status-success">Мой</span>{% else %}<span class="badge status-badge status-neutral">Другой админ</span>{% endif %}
+            {% else %}
+              <span class="text-secondary">система</span>
+            {% endif %}
+          </div>
+          <div class="small mt-1">
+            <span class="text-secondary">Последнее действие:</span>
+            {% if row.latest_audit_log %}
+              <code>{{ row.latest_audit_log.action }}</code>,
+              {% if row.latest_audit_log.actor %}{{ row.latest_audit_log.actor.username }}{% else %}система{% endif %}
+            {% else %}
+              <span class="text-secondary">нет данных</span>
+            {% endif %}
+          </div>
+        </td>
         <td>
           <code>{{ row.runtime_address_display }}</code>
           <button type="button" class="btn btn-xs btn-outline-secondary ms-1 js-copy" data-copy="{{ row.runtime_address_display|default:'' }}">Копия</button>

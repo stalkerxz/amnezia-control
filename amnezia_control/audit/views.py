@@ -18,7 +18,8 @@ def audit_list_view(request):
     q = request.GET.get("q", "").strip()
     entity_type = request.GET.get("entity_type", "").strip()
     created_from = request.GET.get("created_from", "").strip()
-    logs = AuditLog.objects.all()
+    operator_scope = request.GET.get("operator_scope", "all").strip() or "all"
+    logs = AuditLog.objects.select_related("actor").all()
     if q:
         logs = logs.filter(action__icontains=q)
     if entity_type:
@@ -26,6 +27,8 @@ def audit_list_view(request):
     parsed_created_from = parse_date(created_from) if created_from else None
     if parsed_created_from:
         logs = logs.filter(created_at__date__gte=parsed_created_from)
+    if operator_scope == "mine":
+        logs = logs.filter(actor=request.user)
 
     paginator = Paginator(logs, 100)
     page_obj = paginator.get_page(request.GET.get("page"))
@@ -46,6 +49,7 @@ def audit_list_view(request):
             "q": q,
             "entity_type_filter": entity_type,
             "created_from": created_from,
+            "operator_scope": operator_scope,
             "entity_type_choices": entity_type_choices,
             "page_obj": page_obj,
         },

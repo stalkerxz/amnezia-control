@@ -8,6 +8,7 @@ from .models import AuditLog
 class AuditListViewTest(TestCase):
     def setUp(self):
         self.user = get_user_model().objects.create_user("admin", password="123", is_staff=True)
+        self.other = get_user_model().objects.create_user("other-admin", password="123", is_staff=True)
         AuditLog.objects.create(
             actor=self.user,
             action="vpn.client.reissue",
@@ -16,7 +17,7 @@ class AuditListViewTest(TestCase):
             details={"client": "operator-laptop"},
         )
         AuditLog.objects.create(
-            actor=self.user,
+            actor=self.other,
             action="server.sync_runtime",
             entity_type="server",
             entity_id="1",
@@ -35,3 +36,15 @@ class AuditListViewTest(TestCase):
         response = self.client.get(reverse("audit-list"), {"entity_type": "vpn_client"})
         self.assertContains(response, "vpn.client.reissue")
         self.assertNotContains(response, "server.sync_runtime")
+
+    def test_audit_list_filters_by_my_actions(self):
+        self.client.force_login(self.user)
+        response = self.client.get(reverse("audit-list"), {"operator_scope": "mine"})
+        self.assertContains(response, "vpn.client.reissue")
+        self.assertNotContains(response, "server.sync_runtime")
+
+    def test_audit_list_shows_operator_labels(self):
+        self.client.force_login(self.user)
+        response = self.client.get(reverse("audit-list"))
+        self.assertContains(response, "Моё")
+        self.assertContains(response, "Другой админ")
