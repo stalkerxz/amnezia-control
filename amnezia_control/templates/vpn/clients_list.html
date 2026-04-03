@@ -73,6 +73,7 @@
       <div class="d-flex gap-2">
         <button type="button" class="btn btn-sm btn-outline-secondary js-bulk-action" data-action="disable" data-label="Отключить" data-danger="0">Отключить</button>
         <button type="button" class="btn btn-sm btn-outline-success js-bulk-action" data-action="enable" data-label="Включить" data-danger="0">Включить</button>
+        <button type="button" class="btn btn-sm btn-outline-info js-bulk-action" data-action="restore" data-label="Восстановить" data-danger="0">Восстановить</button>
         <button type="button" class="btn btn-sm btn-outline-danger js-bulk-action" data-action="delete" data-label="Удалить" data-danger="1">Удалить</button>
         <button type="button" class="btn btn-sm btn-outline-primary js-bulk-action" data-action="reissue" data-label="Переиздать" data-danger="0">Переиздать</button>
         <button type="button" class="btn btn-sm btn-primary" id="bulkLimitsBtn">Изменить лимиты</button>
@@ -99,7 +100,7 @@
       {% for row in client_rows %}
       {% with c=row.client %}
       <tr class="{% if c.limit_state == 'expired' %}row-expired{% elif c.limit_state == 'traffic_exceeded' %}row-danger{% elif c.status == 'deleted' %}row-deleted{% elif row.telemetry.is_unavailable %}row-warning{% endif %}">
-        <td><input class="form-check-input js-client-checkbox" type="checkbox" name="client_ids" value="{{ c.id }}" aria-label="Выбрать клиента {{ c.name }}"></td>
+        <td><input class="form-check-input js-client-checkbox" type="checkbox" name="client_ids" value="{{ c.id }}" data-status="{{ c.status }}" aria-label="Выбрать клиента {{ c.name }}"></td>
         <td class="text-muted">#{{ c.id }}</td>
         <td>
           <a href="/clients/{{ c.id }}/" class="fw-semibold text-decoration-none d-block mb-1">{{ c.name }}</a>
@@ -128,6 +129,12 @@
         <td>
           <div class="client-actions justify-content-end">
             <a class="btn btn-sm btn-primary" href="/clients/{{ c.id }}/">Открыть</a>
+            {% if c.status == 'deleted' %}
+            <form method="post" action="/clients/{{ c.id }}/action/restore/">{% csrf_token %}
+              <input type="hidden" name="next" value="{{ request.get_full_path }}">
+              <button class="btn btn-sm btn-success" type="submit">Восстановить</button>
+            </form>
+            {% endif %}
             <a class="btn btn-sm btn-outline-primary" href="/clients/{{ c.id }}/download/" title="Скачать конфиг">Config</a>
             <button class="btn btn-sm btn-outline-info js-open-qr-modal" type="button" data-client-id="{{ c.id }}" data-client-name="{{ c.name }}" data-bs-toggle="modal" data-bs-target="#clientQrModal">QR</button>
             <div class="dropdown">
@@ -144,6 +151,11 @@
                   <form method="post" action="/clients/{{ c.id }}/action/disable/">{% csrf_token %}
                     <input type="hidden" name="next" value="{{ request.get_full_path }}">
                     <button class="dropdown-item" type="submit">Отключить</button>
+                  </form>
+                  {% elif c.status == 'deleted' %}
+                  <form method="post" action="/clients/{{ c.id }}/action/restore/">{% csrf_token %}
+                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                    <button class="dropdown-item text-info" type="submit">Восстановить</button>
                   </form>
                   {% else %}
                   <form method="post" action="/clients/{{ c.id }}/action/enable/">{% csrf_token %}
@@ -394,6 +406,7 @@
     const bulkLimitsModal = hasBootstrapModal && bulkLimitsModalEl ? new bootstrap.Modal(bulkLimitsModalEl) : null;
     const checkboxes = Array.from(document.querySelectorAll('.js-client-checkbox'));
     const bulkActionButtons = Array.from(document.querySelectorAll('.js-bulk-action'));
+    const bulkRestoreButton = bulkActionButtons.find((btn) => btn.dataset.action === 'restore');
 
     const getSelected = () => checkboxes.filter((cb) => cb.checked);
     const syncBulkSelectionInputs = () => {
@@ -417,10 +430,16 @@
       });
     };
     const updateSelectionUi = () => {
-      const selected = getSelected().length;
+      const selectedItems = getSelected();
+      const selected = selectedItems.length;
+      const selectedDeleted = selectedItems.filter((cb) => cb.dataset.status === 'deleted').length;
       selectedCount.textContent = String(selected);
       bulkToolbar.classList.toggle('d-none', selected === 0);
       bulkActionButtons.forEach((btn) => btn.disabled = selected === 0);
+      if (bulkRestoreButton) {
+        bulkRestoreButton.disabled = selectedDeleted === 0;
+        bulkRestoreButton.title = selectedDeleted === 0 ? 'Выберите удалённых клиентов для восстановления' : '';
+      }
       if (selectAllVisible) {
         selectAllVisible.checked = selected > 0 && selected === checkboxes.length;
         selectAllVisible.indeterminate = selected > 0 && selected < checkboxes.length;

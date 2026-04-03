@@ -118,6 +118,11 @@
 
 <div class="card mb-3"><div class="card-body">
   <h2 class="h6 mb-3">Операции и экспорт</h2>
+  {% if is_deleted %}
+  <div class="alert alert-info py-2 mb-3">
+    Клиент удалён (soft delete). Доступно восстановление в состояние <strong>«Отключён»</strong>.
+  </div>
+  {% endif %}
   <div class="d-flex gap-2 flex-wrap">
     {% if is_deleted %}
     <button class="btn btn-primary" disabled title="Переиздание недоступно для удалённого клиента">Переиздать конфиг</button>
@@ -130,7 +135,7 @@
     {% if client.status == 'active' %}
     <form method="post" action="/clients/{{ client.id }}/action/disable/">{% csrf_token %}<button class="btn btn-outline-warning">Отключить клиента</button></form>
     {% elif is_deleted %}
-    <form method="post" action="/clients/{{ client.id }}/action/enable/">{% csrf_token %}<button class="btn btn-outline-success">Восстановить клиента</button></form>
+    <form method="post" action="/clients/{{ client.id }}/action/restore/">{% csrf_token %}<button class="btn btn-success">Восстановить клиента</button></form>
     {% else %}
     <form method="post" action="/clients/{{ client.id }}/action/enable/">{% csrf_token %}<button class="btn btn-outline-success">Включить клиента</button></form>
     {% endif %}
