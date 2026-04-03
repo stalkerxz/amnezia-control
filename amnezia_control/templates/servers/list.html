@@ -7,6 +7,11 @@
     <p class="text-secondary mb-0">Состояние контура, синхронизация runtime и готовность к операциям.</p>
   </div>
 </div>
+<div class="mb-3 d-flex flex-wrap gap-2">
+  {% for item in health_filters %}
+    <a href="{{ item.url }}" class="badge status-badge {% if item.active %}status-success{% else %}status-neutral{% endif %} text-decoration-none">{{ item.label }}</a>
+  {% endfor %}
+</div>
 {% if servers %}
 <div class="table-responsive card p-2">
   <table class="table table-hover align-middle mb-0">

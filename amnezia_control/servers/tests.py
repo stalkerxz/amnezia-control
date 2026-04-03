@@ -241,3 +241,12 @@ class ServerListHealthLabelRenderingTest(TestCase):
         self.assertContains(response, "Ограниченно работоспособен")
         self.assertContains(response, "Нездоров")
         self.assertContains(response, "Не проверялся")
+
+    def test_server_list_applies_health_filter(self):
+        Server.objects.create(name="srv-ok", health_status=ServerService.HEALTH_HEALTHY)
+        Server.objects.create(name="srv-degraded", health_status=ServerService.HEALTH_DEGRADED)
+
+        self.client.force_login(self.user)
+        response = self.client.get(f"{reverse('servers-list')}?health=degraded")
+        self.assertContains(response, "srv-degraded")
+        self.assertNotContains(response, "srv-ok")

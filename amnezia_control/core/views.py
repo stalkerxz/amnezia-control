@@ -2,6 +2,7 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from django.db.models import Max
 from django.db.models import Prefetch
 from django.http import JsonResponse
+from django.urls import reverse
 from django.shortcuts import render
 from django.utils import timezone
 
@@ -89,37 +90,90 @@ def dashboard_view(request):
         for log in AuditLog.objects.select_related("actor").order_by("-created_at")[:10]
     ]
 
+    failed_jobs_created_from = (timezone.localdate() - timezone.timedelta(days=1)).isoformat()
+
+    attention_items = [
+        {
+            "title": "Серверы: ограниченно работоспособны",
+            "count": sum(1 for state in server_health_states if state == ServerService.HEALTH_DEGRADED),
+            "url": f"{reverse('servers-list')}?health=degraded",
+            "tone": "warning",
+        },
+        {
+            "title": "Серверы: проблемы",
+            "count": sum(1 for state in server_health_states if state == ServerService.HEALTH_UNHEALTHY),
+            "url": f"{reverse('servers-list')}?health=unhealthy",
+            "tone": "danger",
+        },
+        {
+            "title": "Клиенты: срок действия истёк",
+            "count": sum(
+                1
+                for client in clients
+                if client.limit_state == VPNClient.LimitState.EXPIRED and client.status != VPNClient.Status.DELETED
+            ),
+            "url": f"{reverse('clients-list')}?quick=expired",
+            "tone": "warning",
+        },
+        {
+            "title": "Клиенты: превышен лимит трафика",
+            "count": sum(
+                1
+                for client in clients
+                if client.limit_state == VPNClient.LimitState.TRAFFIC_EXCEEDED and client.status != VPNClient.Status.DELETED
+            ),
+            "url": f"{reverse('clients-list')}?quick=traffic_exceeded",
+            "tone": "danger",
+        },
+        {
+            "title": "Ошибки задач за последние 24 часа",
+            "count": Job.objects.filter(
+                status=Job.Status.FAILED, created_at__gte=timezone.now() - timezone.timedelta(hours=24)
+            ).count(),
+            "url": f"{reverse('jobs-list')}?status=failed&created_from={failed_jobs_created_from}",
+            "tone": "danger",
+        },
+        {
+            "title": "Клиенты в soft delete",
+            "count": sum(1 for client in clients if client.status == VPNClient.Status.DELETED),
+            "url": f"{reverse('clients-list')}?quick=deleted",
+            "tone": "neutral",
+        },
+    ]
+
+    current_limitations = []
+    if degraded_clients_count:
+        current_limitations.append(f"AWG2 fallback-телеметрия используется для {degraded_clients_count} клиент(ов).")
+    not_checked_servers_count = sum(1 for state in server_health_states if state == ServerService.HEALTH_NOT_CHECKED)
+    if not_checked_servers_count:
+        current_limitations.append(f"Не проверены серверы: {not_checked_servers_count}.")
+    degraded_servers_count = sum(1 for state in server_health_states if state == ServerService.HEALTH_DEGRADED)
+    if degraded_servers_count:
+        current_limitations.append(f"Есть деградированные серверы: {degraded_servers_count}.")
+
     context = {
         "servers_count": len(servers),
         "healthy_servers_count": sum(1 for state in server_health_states if state == ServerService.HEALTH_HEALTHY),
-        "degraded_servers_count": sum(1 for state in server_health_states if state == ServerService.HEALTH_DEGRADED),
+        "degraded_servers_count": degraded_servers_count,
         "unhealthy_servers_count": sum(1 for state in server_health_states if state == ServerService.HEALTH_UNHEALTHY),
-        "not_checked_servers_count": sum(1 for state in server_health_states if state == ServerService.HEALTH_NOT_CHECKED),
+        "not_checked_servers_count": not_checked_servers_count,
         "clients_total_count": len(clients),
         "active_clients_count": sum(1 for client in clients if client.status == VPNClient.Status.ACTIVE),
         "disabled_clients_count": sum(1 for client in clients if client.status == VPNClient.Status.DISABLED),
-        "deleted_clients_count": sum(1 for client in clients if client.status == VPNClient.Status.DELETED),
-        "expired_clients_count": sum(
-            1
-            for client in clients
-            if client.limit_state == VPNClient.LimitState.EXPIRED and client.status != VPNClient.Status.DELETED
-        ),
-        "traffic_exceeded_clients_count": sum(
-            1
-            for client in clients
-            if client.limit_state == VPNClient.LimitState.TRAFFIC_EXCEEDED and client.status != VPNClient.Status.DELETED
-        ),
+        "deleted_clients_count": attention_items[5]["count"],
+        "expired_clients_count": attention_items[2]["count"],
+        "traffic_exceeded_clients_count": attention_items[3]["count"],
         "degraded_clients_count": degraded_clients_count,
         "awg_available": any(protocol.protocol_type == ServerProtocol.ProtocolType.AWG and protocol.enabled for protocol in protocols),
         "awg2_available": any(
             protocol.protocol_type == ServerProtocol.ProtocolType.AWG2 and protocol.enabled for protocol in protocols
         ),
         "last_runtime_sync": Server.objects.aggregate(last=Max("last_runtime_sync_at")).get("last"),
-        "failed_jobs_recent_count": Job.objects.filter(
-            status=Job.Status.FAILED, created_at__gte=timezone.now() - timezone.timedelta(hours=24)
-        ).count(),
+        "failed_jobs_recent_count": attention_items[4]["count"],
         "jobs_recent_rows": jobs_recent_rows,
         "audit_recent_rows": audit_recent_rows,
+        "attention_items": attention_items,
+        "current_limitations": current_limitations,
     }
     return render(request, "core/dashboard.html", context)
 
