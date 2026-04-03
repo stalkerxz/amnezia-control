@@ -66,6 +66,7 @@ class SSHExecutorTest(TestCase):
 class JobsListViewTest(DjangoTestCase):
     def setUp(self):
         self.user = get_user_model().objects.create_user("admin", password="123", is_staff=True)
+        self.other = get_user_model().objects.create_user("other-admin", password="123", is_staff=True)
         self.server = Server.objects.create(name="srv-1")
         Job.objects.create(server=self.server, actor=self.user, action="server.sync_runtime", status=Job.Status.RUNNING)
 
@@ -107,3 +108,16 @@ class JobsListViewTest(DjangoTestCase):
         response = self.client.get(reverse("jobs-list"), {"signal": "degraded_success"})
         self.assertContains(response, f"/jobs/{degraded_job.id}/")
         self.assertNotContains(response, f"/jobs/{regular_warning_job.id}/")
+
+    def test_jobs_list_filters_by_my_jobs(self):
+        Job.objects.create(server=self.server, actor=self.other, action="vpn.client.delete", status=Job.Status.SUCCESS)
+        self.client.force_login(self.user)
+        response = self.client.get(reverse("jobs-list"), {"operator_scope": "mine"})
+        self.assertContains(response, "server.sync_runtime")
+        self.assertNotContains(response, "vpn.client.delete")
+
+    def test_jobs_list_shows_operator_context_labels(self):
+        self.client.force_login(self.user)
+        response = self.client.get(reverse("jobs-list"))
+        self.assertContains(response, "Инициатор")
+        self.assertContains(response, "Мой")

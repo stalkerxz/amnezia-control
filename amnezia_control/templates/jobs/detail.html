@@ -18,7 +18,14 @@
     <div class="card"><div class="card-body">
       <p class="mb-1">Действие: <code>{{ job.action }}</code></p>
       <p class="mb-1">Сервер: <strong>{{ job.server.name }}</strong></p>
-      <p class="mb-0">Инициатор: {% if job.actor %}<strong>{{ job.actor.username }}</strong>{% else %}<span class="text-secondary">система</span>{% endif %}</p>
+      <p class="mb-0">Инициатор:
+        {% if job.actor %}
+          <strong>{{ job.actor.username }}</strong>
+          {% if job.actor_id == request.user.id %}<span class="badge status-badge status-success">Мой</span>{% else %}<span class="badge status-badge status-neutral">Другой админ</span>{% endif %}
+        {% else %}
+          <span class="text-secondary">система</span>
+        {% endif %}
+      </p>
     </div></div>
   </div>
   <div class="col-lg-4">

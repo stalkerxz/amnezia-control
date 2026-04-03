@@ -270,6 +270,8 @@ class VPNClientBulkLimitsUpdateForm(forms.Form):
 
 class VPNClientListFilterForm(forms.Form):
     STATUS_ALL = "__all__"
+    OPERATOR_SCOPE_ALL = "all"
+    OPERATOR_SCOPE_MINE = "mine"
 
     QUICK_ACTIVE = "active"
     QUICK_DISABLED = "disabled"
@@ -300,6 +302,15 @@ class VPNClientListFilterForm(forms.Form):
             ("imported", "Импорт"),
             ("manual", "Панель"),
         ),
+    )
+    operator_scope = forms.ChoiceField(
+        required=False,
+        label="Операторы",
+        choices=(
+            (OPERATOR_SCOPE_ALL, "Все"),
+            (OPERATOR_SCOPE_MINE, "Мои"),
+        ),
+        initial=OPERATOR_SCOPE_ALL,
     )
     quick = forms.ChoiceField(
         required=False,

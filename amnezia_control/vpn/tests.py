@@ -1513,3 +1513,61 @@ class VPNClientDegradedTelemetryWordingTest(TestCase):
         list_response = self.client.get("/clients/")
         self.assertContains(list_response, "Fallback-режим")
         self.assertContains(list_response, "live-счётчики трафика сейчас недоступны")
+
+
+@override_settings(CONFIG_ENCRYPTION_KEY=Fernet.generate_key().decode())
+class VPNClientOperatorVisibilityTest(TestCase):
+    def setUp(self):
+        self.me = get_user_model().objects.create_user("me-admin", password="123", is_staff=True)
+        self.other = get_user_model().objects.create_user("other-admin", password="123", is_staff=True)
+        self.client.force_login(self.me)
+        self.server = Server.objects.create(name="operator-server")
+        self.protocol = ServerProtocol.objects.create(
+            server=self.server,
+            protocol_type=ServerProtocol.ProtocolType.AWG,
+            runtime_metadata={"udp_port": 51820, "subnet": "10.66.0.0/24"},
+        )
+        self.profile = ProtocolProfile.objects.create(
+            server_protocol=self.protocol,
+            name="operator-profile",
+            protocol_type=ServerProtocol.ProtocolType.AWG,
+            config_template="[Interface]",
+        )
+        self.my_client = VPNClient.objects.create(
+            server=self.server,
+            name="mine-client",
+            protocol_type=VPNClient.ProtocolType.AWG,
+            profile=self.profile,
+            created_by=self.me,
+        )
+        self.other_client = VPNClient.objects.create(
+            server=self.server,
+            name="other-client",
+            protocol_type=VPNClient.ProtocolType.AWG,
+            profile=self.profile,
+            created_by=self.other,
+        )
+        AuditLog.objects.create(
+            actor=self.other,
+            action="vpn.client.disable",
+            entity_type="VPNClient",
+            entity_id=str(self.my_client.id),
+            details={"reason": "manual"},
+        )
+
+    def test_clients_list_filters_mine_only(self):
+        response = self.client.get("/clients/", {"operator_scope": "mine"})
+        self.assertContains(response, "mine-client")
+        self.assertNotContains(response, "other-client")
+
+    def test_clients_list_shows_creator_and_last_operator_action(self):
+        response = self.client.get("/clients/")
+        self.assertContains(response, "Создал:")
+        self.assertContains(response, "Последнее действие:")
+        self.assertContains(response, "vpn.client.disable")
+
+    def test_client_detail_shows_operator_summary(self):
+        response = self.client.get(f"/clients/{self.my_client.id}/")
+        self.assertContains(response, "Оператор")
+        self.assertContains(response, "Создал")
+        self.assertContains(response, "Последнее действие")

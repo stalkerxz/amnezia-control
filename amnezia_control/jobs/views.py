@@ -20,11 +20,14 @@ def jobs_list_view(request):
     status = request.GET.get("status", "").strip()
     signal = request.GET.get("signal", "").strip()
     action = request.GET.get("action", "").strip()
+    operator_scope = request.GET.get("operator_scope", "all").strip() or "all"
     created_from = request.GET.get("created_from", "").strip()
     if status:
         jobs_qs = jobs_qs.filter(status=status)
     if action:
         jobs_qs = jobs_qs.filter(action__icontains=action)
+    if operator_scope == "mine":
+        jobs_qs = jobs_qs.filter(actor=request.user)
     parsed_created_from = parse_date(created_from) if created_from else None
     if parsed_created_from:
         jobs_qs = jobs_qs.filter(created_at__date__gte=parsed_created_from)
@@ -60,6 +63,7 @@ def jobs_list_view(request):
             "status_filter": status,
             "signal_filter": signal,
             "action_filter": action,
+            "operator_scope": operator_scope,
             "created_from": created_from,
             "status_choices": Job.Status.choices,
         },

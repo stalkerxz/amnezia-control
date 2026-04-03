@@ -112,7 +112,7 @@ def _telemetry_view_state(*, client: VPNClient, peer_source: str):
 def clients_list_view(request):
     filter_form = VPNClientListFilterForm(request.GET or None)
     clients = (
-        VPNClient.objects.select_related("server")
+        VPNClient.objects.select_related("server", "created_by")
         .annotate(updated_at=Coalesce("last_runtime_sync_at", "created_at"))
         .order_by("-id")
     )
@@ -123,6 +123,7 @@ def clients_list_view(request):
         status = filter_form.cleaned_data["status"]
         source = filter_form.cleaned_data["source"]
         quick = filter_form.cleaned_data["quick"]
+        operator_scope = filter_form.cleaned_data["operator_scope"] or VPNClientListFilterForm.OPERATOR_SCOPE_ALL
 
         if q:
             clients = clients.filter(name__icontains=q)
@@ -138,6 +139,8 @@ def clients_list_view(request):
             clients = clients.filter(imported_from_runtime=True)
         elif source == "manual":
             clients = clients.filter(imported_from_runtime=False)
+        if operator_scope == VPNClientListFilterForm.OPERATOR_SCOPE_MINE:
+            clients = clients.filter(created_by=request.user)
 
         if quick == VPNClientListFilterForm.QUICK_ACTIVE:
             clients = clients.filter(status=VPNClient.Status.ACTIVE)
@@ -157,6 +160,16 @@ def clients_list_view(request):
         for protocol in ServerProtocol.objects.filter(server_id__in={client.server_id for client in clients})
     }
 
+    client_ids = [str(client.id) for client in clients]
+    recent_client_logs = (
+        AuditLog.objects.select_related("actor")
+        .filter(entity_type="VPNClient", entity_id__in=client_ids)
+        .order_by("entity_id", "-created_at")
+    )
+    latest_log_by_client_id = {}
+    for log in recent_client_logs:
+        latest_log_by_client_id.setdefault(log.entity_id, log)
+
     client_rows = []
     for client in clients:
         badge_class, badge_label = _limit_state_badge(client.limit_state)
@@ -165,6 +178,7 @@ def clients_list_view(request):
         client_rows.append(
             {
                 "client": client,
+                "latest_audit_log": latest_log_by_client_id.get(str(client.id)),
                 "limit_badge_class": badge_class,
                 "limit_badge_label": badge_label,
                 "expires_display": timezone.localtime(client.expires_at).strftime("%d.%m.%Y %H:%M") if client.expires_at else "—",
@@ -311,6 +325,7 @@ def clients_detail_view(request, pk: int):
         warning_items.append("Для клиента отсутствует выпущенная ревизия конфига.")
 
     recent_audit_logs = AuditLog.objects.select_related("actor").filter(entity_type="VPNClient", entity_id=str(client.id)).order_by("-created_at")[:5]
+    latest_operator_action = recent_audit_logs[0] if recent_audit_logs else None
 
     client_job_filters = Q(action__icontains="client")
     if client.runtime_peer_public_key:
@@ -351,6 +366,7 @@ def clients_detail_view(request, pk: int):
             "is_deleted": client.status == VPNClient.Status.DELETED,
             "warning_items": warning_items,
             "recent_audit_logs": recent_audit_logs,
+            "latest_operator_action": latest_operator_action,
             "recent_jobs": recent_jobs,
         },
     )
