@@ -8,6 +8,7 @@ from django.utils import timezone
 
 from audit.models import AuditLog
 from jobs.models import Job, JobEvent
+from jobs.services import classify_job_signal
 from servers.models import Server, ServerProtocol
 from servers.services import ServerService
 from vpn.models import VPNClient
@@ -71,13 +72,13 @@ def dashboard_view(request):
     jobs_recent_rows = []
     for job in jobs_recent:
         events = list(job.events.all())
-        has_warning = any(event.level == "warning" for event in events)
+        job_signal = classify_job_signal(job, events)
         warning_event = next((event for event in events if event.level == "warning"), None)
         jobs_recent_rows.append(
             {
                 "job": job,
                 "action_label": _job_action_label(job.action),
-                "has_warning": has_warning,
+                "job_signal": job_signal,
                 "warning_hint": warning_event.message if warning_event else "",
             }
         )
@@ -91,6 +92,22 @@ def dashboard_view(request):
     ]
 
     failed_jobs_created_from = (timezone.localdate() - timezone.timedelta(days=1)).isoformat()
+    jobs_last_24h = list(
+        Job.objects.prefetch_related(Prefetch("events", queryset=JobEvent.objects.order_by("-created_at"))).filter(
+            created_at__gte=timezone.now() - timezone.timedelta(hours=24)
+        )
+    )
+    failed_jobs_recent_count = 0
+    warning_jobs_recent_count = 0
+    degraded_jobs_recent_count = 0
+    for job in jobs_last_24h:
+        signal = classify_job_signal(job, list(job.events.all()))
+        if signal == "failed":
+            failed_jobs_recent_count += 1
+        elif signal == "warning":
+            warning_jobs_recent_count += 1
+        elif signal == "degraded_success":
+            degraded_jobs_recent_count += 1
 
     attention_items = [
         {
@@ -127,9 +144,7 @@ def dashboard_view(request):
         },
         {
             "title": "Ошибки задач за последние 24 часа",
-            "count": Job.objects.filter(
-                status=Job.Status.FAILED, created_at__gte=timezone.now() - timezone.timedelta(hours=24)
-            ).count(),
+            "count": failed_jobs_recent_count,
             "url": f"{reverse('jobs-list')}?status=failed&created_from={failed_jobs_created_from}",
             "tone": "danger",
         },
@@ -169,7 +184,9 @@ def dashboard_view(request):
             protocol.protocol_type == ServerProtocol.ProtocolType.AWG2 and protocol.enabled for protocol in protocols
         ),
         "last_runtime_sync": Server.objects.aggregate(last=Max("last_runtime_sync_at")).get("last"),
-        "failed_jobs_recent_count": attention_items[4]["count"],
+        "failed_jobs_recent_count": failed_jobs_recent_count,
+        "warning_jobs_recent_count": warning_jobs_recent_count,
+        "degraded_jobs_recent_count": degraded_jobs_recent_count,
         "jobs_recent_rows": jobs_recent_rows,
         "audit_recent_rows": audit_recent_rows,
         "attention_items": attention_items,

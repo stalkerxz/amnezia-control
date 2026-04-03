@@ -7,7 +7,7 @@ from django.urls import reverse
 
 from servers.models import Server
 
-from .models import Job
+from .models import Job, JobEvent
 from .executors import SafeSSHExecutor
 
 
@@ -82,3 +82,28 @@ class JobsListViewTest(DjangoTestCase):
         response = self.client.get(reverse("jobs-list"), {"status": Job.Status.RUNNING})
         self.assertContains(response, "server.sync_runtime")
         self.assertNotContains(response, "vpn.client.create")
+
+    def test_jobs_list_filters_by_failed_signal(self):
+        warning_job = Job.objects.create(server=self.server, actor=self.user, action="vpn.client.create", status=Job.Status.SUCCESS)
+        JobEvent.objects.create(job=warning_job, level="warning", message="warning")
+        failed_job = Job.objects.create(server=self.server, actor=self.user, action="vpn.client.delete", status=Job.Status.FAILED)
+
+        self.client.force_login(self.user)
+        response = self.client.get(reverse("jobs-list"), {"signal": "failed"})
+        self.assertContains(response, f"/jobs/{failed_job.id}/")
+        self.assertNotContains(response, f"/jobs/{warning_job.id}/")
+
+    def test_jobs_list_filters_by_degraded_success_signal(self):
+        degraded_job = Job.objects.create(server=self.server, actor=self.user, action="vpn.client.reissue", status=Job.Status.SUCCESS)
+        JobEvent.objects.create(
+            job=degraded_job,
+            level="warning",
+            message="AWG2 runtime telemetry unavailable: using config fallback (degraded mode).",
+        )
+        regular_warning_job = Job.objects.create(server=self.server, actor=self.user, action="vpn.client.create", status=Job.Status.SUCCESS)
+        JobEvent.objects.create(job=regular_warning_job, level="warning", message="Проверьте вручную")
+
+        self.client.force_login(self.user)
+        response = self.client.get(reverse("jobs-list"), {"signal": "degraded_success"})
+        self.assertContains(response, f"/jobs/{degraded_job.id}/")
+        self.assertNotContains(response, f"/jobs/{regular_warning_job.id}/")

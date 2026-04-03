@@ -1,6 +1,7 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from jobs.models import Job, JobEvent
 from servers.models import ProtocolProfile, Server, ServerProtocol
@@ -65,3 +66,31 @@ class DashboardViewTest(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Успех с предупреждением")
         self.assertContains(response, "Синхронизация состояния сервера")
+
+    def test_dashboard_job_counters_split_failed_warning_and_degraded(self):
+        failed_job = Job.objects.create(server=self.server, actor=self.user, action="server.sync_runtime", status=Job.Status.FAILED)
+        warning_job = Job.objects.create(server=self.server, actor=self.user, action="server.sync_runtime", status=Job.Status.SUCCESS)
+        degraded_job = Job.objects.create(server=self.server, actor=self.user, action="server.sync_runtime", status=Job.Status.SUCCESS)
+        stale_failed_job = Job.objects.create(server=self.server, actor=self.user, action="server.sync_runtime", status=Job.Status.FAILED)
+
+        JobEvent.objects.create(job=warning_job, level="warning", message="Нужно проверить результат")
+        JobEvent.objects.create(
+            job=degraded_job,
+            level="warning",
+            message="AWG2 runtime telemetry unavailable: using config fallback (degraded mode).",
+        )
+
+        Job.objects.filter(id=stale_failed_job.id).update(created_at=timezone.now() - timezone.timedelta(hours=30))
+
+        response = self.client.get(reverse("dashboard"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Ошибки задач (24ч)")
+        self.assertContains(response, "Предупреждения задач (24ч)")
+        self.assertContains(response, "Успех с деградацией (24ч)")
+        self.assertContains(response, "/jobs/?signal=failed")
+        self.assertContains(response, "/jobs/?signal=warning")
+        self.assertContains(response, "/jobs/?signal=degraded_success")
+
+        self.assertEqual(response.context["failed_jobs_recent_count"], 1)
+        self.assertEqual(response.context["warning_jobs_recent_count"], 1)
+        self.assertEqual(response.context["degraded_jobs_recent_count"], 1)
