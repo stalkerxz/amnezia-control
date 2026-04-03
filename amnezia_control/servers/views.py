@@ -38,6 +38,17 @@ def _peer_source_view(peer_source: str):
 @user_passes_test(_admin_required)
 def server_list_view(request):
     servers_qs = Server.objects.prefetch_related("protocols").all()
+    health_filter = request.GET.get("health", "").strip()
+    if health_filter in {
+        ServerService.HEALTH_HEALTHY,
+        ServerService.HEALTH_DEGRADED,
+        ServerService.HEALTH_UNHEALTHY,
+        ServerService.HEALTH_NOT_CHECKED,
+    }:
+        servers_qs = servers_qs.filter(health_status=health_filter)
+    else:
+        health_filter = ""
+
     servers = [
         {
             "obj": server,
@@ -46,7 +57,22 @@ def server_list_view(request):
         }
         for server in servers_qs
     ]
-    return render(request, "servers/list.html", {"servers": servers})
+    health_filters = [
+        {"key": "", "label": "Все"},
+        {"key": ServerService.HEALTH_HEALTHY, "label": "Здоровы"},
+        {"key": ServerService.HEALTH_DEGRADED, "label": "Ограничены"},
+        {"key": ServerService.HEALTH_UNHEALTHY, "label": "Проблемы"},
+        {"key": ServerService.HEALTH_NOT_CHECKED, "label": "Не проверялись"},
+    ]
+    for item in health_filters:
+        item["active"] = item["key"] == health_filter
+        item["url"] = "/servers/" if not item["key"] else f"/servers/?health={item['key']}"
+
+    return render(
+        request,
+        "servers/list.html",
+        {"servers": servers, "health_filters": health_filters, "health_filter": health_filter},
+    )
 
 
 @login_required

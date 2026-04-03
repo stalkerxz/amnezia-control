@@ -50,6 +50,10 @@ class DashboardViewTest(TestCase):
         self.assertContains(response, "Истёк срок")
         self.assertContains(response, "Трафик превышен")
         self.assertContains(response, "Fallback-телеметрия")
+        self.assertContains(response, "Требует внимания")
+        self.assertContains(response, "/servers/?health=degraded")
+        self.assertContains(response, "/clients/?quick=expired")
+        self.assertContains(response, "Текущие ограничения")
         self.assertContains(response, ">5<", html=False)
         self.assertContains(response, ">1<", html=False)
 
