@@ -5,8 +5,12 @@
   <h1 class="h3 mb-1">Задание #{{ job.id }}</h1>
 </div>
 
-{% if job.status == 'failed' %}
-<div class="alert alert-danger" role="alert">Задание завершилось с ошибкой. Проверьте stderr, exit code и payload ниже.</div>
+{% if job_signal == 'failed' %}
+<div class="alert alert-danger" role="alert">Задание завершилось с ошибкой. Это реальный сбой выполнения: проверьте stderr, exit code и payload ниже.</div>
+{% elif job_signal == 'degraded_success' %}
+<div class="alert alert-warning" role="alert">Задание выполнено успешно, но использован деградированный fallback-путь.</div>
+{% elif job_signal == 'warning' %}
+<div class="alert alert-warning" role="alert">Задание выполнено успешно, но с предупреждением. Проверьте события ниже.</div>
 {% endif %}
 
 <div class="row g-3 mb-3">
@@ -19,7 +23,12 @@
   </div>
   <div class="col-lg-4">
     <div class="card"><div class="card-body">
-      <p class="mb-1">Статус: <span class="badge status-badge {% if job.status == 'success' %}status-success{% elif job.status == 'failed' %}status-danger{% elif job.status == 'running' %}status-warning{% else %}status-neutral{% endif %}">{{ job.status }}</span></p>
+      <p class="mb-1">Операционный сигнал:
+        <span class="badge status-badge {% if job_signal == 'failed' %}status-danger{% elif job_signal == 'warning' or job_signal == 'degraded_success' %}status-warning{% elif job_signal == 'success' %}status-success{% else %}status-neutral{% endif %}">
+          {% if job_signal == 'failed' %}Ошибка{% elif job_signal == 'warning' %}Успех с предупреждением{% elif job_signal == 'degraded_success' %}Успех с деградацией{% elif job_signal == 'success' %}Успех{% else %}В процессе{% endif %}
+        </span>
+      </p>
+      <p class="mb-1">Технический статус: <span class="badge status-badge {% if job.status == 'success' %}status-success{% elif job.status == 'failed' %}status-danger{% elif job.status == 'running' %}status-warning{% else %}status-neutral{% endif %}">{{ job.status }}</span></p>
       <p class="mb-1">Создано: {{ job.created_at }}</p>
       <p class="mb-1">Запуск: {{ job.started_at|default:'—' }}</p>
       <p class="mb-0">Завершено: {{ job.finished_at|default:'—' }}</p>

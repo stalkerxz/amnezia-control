@@ -2,6 +2,43 @@ from django.utils import timezone
 from .models import Job, JobEvent
 
 
+DEGRADED_MARKERS = (
+    "degraded",
+    "fallback",
+    "runtime telemetry unavailable",
+    "config file fallback",
+)
+
+
+def _contains_degraded_marker(text: str) -> bool:
+    normalized = (text or "").lower()
+    return any(marker in normalized for marker in DEGRADED_MARKERS)
+
+
+def classify_job_signal(job: Job, events: list[JobEvent] | None = None) -> str:
+    ordered_events = events if events is not None else list(job.events.all())
+    has_warning = any(event.level == "warning" for event in ordered_events)
+    has_degraded_warning = any(
+        event.level == "warning"
+        and (
+            _contains_degraded_marker(event.message)
+            or _contains_degraded_marker(event.stdout)
+            or _contains_degraded_marker(event.stderr)
+        )
+        for event in ordered_events
+    )
+
+    if job.status == Job.Status.FAILED:
+        return "failed"
+    if has_degraded_warning and job.status == Job.Status.SUCCESS:
+        return "degraded_success"
+    if has_warning:
+        return "warning"
+    if job.status == Job.Status.SUCCESS:
+        return "success"
+    return "in_progress"
+
+
 class JobService:
     @staticmethod
     def create_job(server, actor, action: str, payload: dict | None = None) -> Job:

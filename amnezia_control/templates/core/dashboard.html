@@ -79,7 +79,9 @@
   <div class="col-xl-3 col-md-6"><a href="/clients/?quick=expired" class="card stat-card stat-card-compact h-100 text-decoration-none"><div class="card-body"><div class="stat-label">Истёк срок</div><div class="stat-value text-warning">{{ expired_clients_count }}</div></div></a></div>
   <div class="col-xl-3 col-md-6"><a href="/clients/?quick=traffic_exceeded" class="card stat-card stat-card-compact h-100 text-decoration-none"><div class="card-body"><div class="stat-label">Трафик превышен</div><div class="stat-value text-danger">{{ traffic_exceeded_clients_count }}</div></div></a></div>
   <div class="col-xl-3 col-md-6"><a href="/clients/?quick=deleted" class="card stat-card stat-card-compact h-100 text-decoration-none"><div class="card-body"><div class="stat-label">Удалённые</div><div class="stat-value text-secondary">{{ deleted_clients_count }}</div></div></a></div>
-  <div class="col-xl-3 col-md-6"><a href="/jobs/?status=failed" class="card stat-card stat-card-compact h-100 text-decoration-none"><div class="card-body"><div class="stat-label">Ошибки задач (24ч)</div><div class="stat-value text-danger">{{ failed_jobs_recent_count }}</div></div></a></div>
+  <div class="col-xl-3 col-md-6"><a href="/jobs/?signal=failed" class="card stat-card stat-card-compact h-100 text-decoration-none"><div class="card-body"><div class="stat-label">Ошибки задач (24ч)</div><div class="stat-value text-danger">{{ failed_jobs_recent_count }}</div></div></a></div>
+  <div class="col-xl-3 col-md-6"><a href="/jobs/?signal=warning" class="card stat-card stat-card-compact h-100 text-decoration-none"><div class="card-body"><div class="stat-label">Предупреждения задач (24ч)</div><div class="stat-value text-warning">{{ warning_jobs_recent_count }}</div></div></a></div>
+  <div class="col-xl-3 col-md-6"><a href="/jobs/?signal=degraded_success" class="card stat-card stat-card-compact h-100 text-decoration-none"><div class="card-body"><div class="stat-label">Успех с деградацией (24ч)</div><div class="stat-value text-warning">{{ degraded_jobs_recent_count }}</div></div></a></div>
   <div class="col-xl-3 col-md-6"><div class="card stat-card stat-card-compact h-100"><div class="card-body"><div class="stat-label">Fallback-телеметрия</div><div class="stat-value text-warning">{{ degraded_clients_count }}</div></div></div></div>
   <div class="col-xl-3 col-md-6"><div class="card stat-card stat-card-compact h-100"><div class="card-body"><div class="stat-label">Последняя синхронизация runtime</div><div class="small">{{ last_runtime_sync|default:'Не запускалась' }}</div></div></div></div>
 </div>
@@ -124,11 +126,11 @@
         <td><a href="/jobs/{{ row.job.id }}/">#{{ row.job.id }}</a></td>
         <td>
           <div class="fw-semibold">{{ row.action_label }}</div>
-          {% if row.has_warning %}
+          {% if row.job_signal == 'warning' or row.job_signal == 'degraded_success' %}
             <div class="small text-warning">Есть предупреждение: {{ row.warning_hint|default:'нужна проверка деталей задания' }}</div>
           {% endif %}
         </td>
-        <td><span class="badge status-badge {% if row.job.status == 'success' %}{% if row.has_warning %}status-warning{% else %}status-success{% endif %}{% elif row.job.status == 'failed' %}status-danger{% elif row.job.status == 'running' %}status-warning{% else %}status-neutral{% endif %}">{% if row.job.status == 'success' and row.has_warning %}Успех с предупреждением{% elif row.job.status == 'success' %}Успех{% elif row.job.status == 'failed' %}Ошибка{% elif row.job.status == 'running' %}Выполняется{% else %}Ожидает{% endif %}</span></td>
+        <td><span class="badge status-badge {% if row.job_signal == 'failed' %}status-danger{% elif row.job_signal == 'warning' or row.job_signal == 'degraded_success' %}status-warning{% elif row.job_signal == 'success' %}status-success{% else %}status-neutral{% endif %}">{% if row.job_signal == 'failed' %}Ошибка{% elif row.job_signal == 'warning' %}Успех с предупреждением{% elif row.job_signal == 'degraded_success' %}Успех с деградацией{% elif row.job_signal == 'success' %}Успех{% elif row.job.status == 'running' %}Выполняется{% else %}Ожидает{% endif %}</span></td>
       </tr>
       {% empty %}<tr><td colspan="3"><div class="empty-state">Заданий пока нет.</div></td></tr>{% endfor %}
       </table>
