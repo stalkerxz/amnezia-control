@@ -180,22 +180,42 @@ class BaseProtocolAdapter:
             else:
                 out = self._run(actor, f"{self.protocol_type}.list", self._wg_cmd("show dump")).stdout
             peers = []
+            runtime_interface = (self.protocol.runtime_metadata.get("interface") or "awg0").strip()
+
             for line in out.splitlines():
-                cols = line.split("\t")
-                if len(cols) >= 8:
-                    public_key = cols[0].strip()
-                    allowed_ips = cols[3].strip()
-                    transfer_rx = int(cols[5].strip()) if len(cols) > 5 and cols[5].strip().isdigit() else 0
-                    transfer_tx = int(cols[6].strip()) if len(cols) > 6 and cols[6].strip().isdigit() else 0
-                    if public_key:
-                        peers.append(
-                            PeerState(
-                                public_key=public_key,
-                                allowed_ips=allowed_ips,
-                                transfer_rx=transfer_rx,
-                                transfer_tx=transfer_tx,
-                            )
+                cols = [c.strip() for c in line.split("\t")]
+
+                # `wg show dump`:
+                #   public_key, preshared_key, endpoint, allowed_ips, latest_handshake, transfer_rx, transfer_tx, persistent_keepalive
+                #
+                # `wg show all dump`:
+                #   interface, public_key, preshared_key, endpoint, allowed_ips, latest_handshake, transfer_rx, transfer_tx, persistent_keepalive
+                #
+                # AWG2 in this environment returns live telemetry via `wg show all dump`,
+                # so support both layouts here.
+
+                if len(cols) >= 9 and cols[0] == runtime_interface:
+                    public_key = cols[1]
+                    allowed_ips = cols[4]
+                    transfer_rx = int(cols[6]) if cols[6].isdigit() else 0
+                    transfer_tx = int(cols[7]) if cols[7].isdigit() else 0
+                elif len(cols) >= 8:
+                    public_key = cols[0]
+                    allowed_ips = cols[3]
+                    transfer_rx = int(cols[5]) if cols[5].isdigit() else 0
+                    transfer_tx = int(cols[6]) if cols[6].isdigit() else 0
+                else:
+                    continue
+
+                if public_key:
+                    peers.append(
+                        PeerState(
+                            public_key=public_key,
+                            allowed_ips=allowed_ips,
+                            transfer_rx=transfer_rx,
+                            transfer_tx=transfer_tx,
                         )
+                    )
             return peers
         except RuntimeError:
             if self.protocol_type != VPNClient.ProtocolType.AWG2:
