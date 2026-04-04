@@ -89,7 +89,33 @@ class RuntimeDetectionTest(TestCase):
         self.assertEqual(awg2.runtime_metadata["peer_source"], "runtime wg dump")
 
     @patch("servers.services.RuntimeCommandService.run")
-    def test_sync_runtime_state_awg2_uses_config_peer_fallback_when_dump_fails(self, run_mock):
+    def test_sync_runtime_state_awg2_uses_show_dump_when_show_all_fails(self, run_mock):
+        class Result:
+            def __init__(self, stdout):
+                self.stdout = stdout
+
+        def side_effect(*args, **kwargs):
+            action = args[2]
+            mapping = {
+                "runtime.ps_all": Result("amnezia-awg2\n"),
+                "runtime.ps_running": Result("amnezia-awg2\n"),
+                "runtime.inspect.awg2": Result('[{"State":{"Status":"running"},"NetworkSettings":{"Ports":{"51830/udp":[{"HostIp":"198.51.100.20","HostPort":"51830"}]}},"Config":{"Image":"awg2","Env":["AWG2_S1=6","AWG2_S2=7","AWG2_S3=8","AWG2_S4=9","AWG2_JC=10","AWG2_JMIN=11","AWG2_JMAX=12","AWG2_H1=13","AWG2_H2=14","AWG2_H3=15","AWG2_H4=16"]},"Mounts":[]}]'),
+                "runtime.iface.awg2": Result("wg0\n"),
+                "runtime.peers.awg2": Result("wg0\tprivate\tpub\t51830\npk1\tpsk\tep\t10.8.1.10/32\t0\t1\t2\t25\n"),
+                "runtime.conf.awg2": Result("[Interface]\nAddress = 10.8.1.0/24\nListenPort = 49561\n[Peer]\nPublicKey = pk1\nAllowedIPs = 10.8.1.10/32\n"),
+            }
+            if action == "runtime.peers.awg2.all":
+                raise RuntimeError("Unable to access interface: Protocol not supported")
+            return mapping[action]
+
+        run_mock.side_effect = side_effect
+        ServerService.sync_runtime_state(server=self.server, actor=self.user)
+        awg2 = self.server.protocols.get(protocol_type="awg2")
+        self.assertEqual(awg2.runtime_metadata["peer_source"], "runtime wg dump")
+        self.assertEqual(awg2.runtime_metadata["peer_count"], 1)
+
+    @patch("servers.services.RuntimeCommandService.run")
+    def test_sync_runtime_state_awg2_uses_config_peer_fallback_when_runtime_commands_fail(self, run_mock):
         class Result:
             def __init__(self, stdout):
                 self.stdout = stdout
@@ -103,7 +129,7 @@ class RuntimeDetectionTest(TestCase):
                 "runtime.iface.awg2": Result("wg0\n"),
                 "runtime.conf.awg2": Result("[Interface]\nAddress = 10.8.1.0/24\nListenPort = 49561\n[Peer]\nPublicKey = pk1\nAllowedIPs = 10.8.1.10/32\n"),
             }
-            if action == "runtime.peers.awg2":
+            if action in {"runtime.peers.awg2.all", "runtime.peers.awg2"}:
                 raise RuntimeError("Unable to access interface: Protocol not supported")
             return mapping[action]
 
