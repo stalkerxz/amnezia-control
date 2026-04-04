@@ -1,13 +1,74 @@
 {% extends 'partials/base.html' %}
 {% block content %}
-<div class="row justify-content-center">
-  <div class="col-md-5">
-    <h1 class="h3 mb-3">Вход в панель</h1>
-    <form method="post" class="card card-body">
-      {% csrf_token %}
-      {{ form.as_p }}
-      <button class="btn btn-primary" type="submit">Войти</button>
-    </form>
+<div class="login-shell py-4 py-md-5">
+  <div class="login-card card shadow-lg border-0 mx-auto">
+    <div class="card-body p-4 p-md-5">
+      <div class="login-brand mb-4">
+        <p class="login-kicker mb-2">Операторская панель</p>
+        <h1 class="h3 mb-2">amnezia-control</h1>
+        <p class="login-subtitle mb-0">Безопасное управление клиентами, серверами и операционными задачами.</p>
+      </div>
+
+      {% if form.non_field_errors %}
+        <div class="login-error-block mb-3" role="alert">
+          {% for error in form.non_field_errors %}
+            <div>{{ error }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      <form method="post" novalidate>
+        {% csrf_token %}
+
+        <div class="mb-3">
+          <label class="form-label" for="id_username">Логин</label>
+          <input
+            class="form-control form-control-lg{% if form.username.errors %} is-invalid{% endif %}"
+            type="text"
+            name="username"
+            id="id_username"
+            value="{{ form.username.value|default:'' }}"
+            autocomplete="username"
+            required
+            autofocus
+          >
+          {% for error in form.username.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+        </div>
+
+        <div class="mb-4">
+          <label class="form-label" for="id_password">Пароль</label>
+          <div class="input-group input-group-lg login-password-group">
+            <input
+              class="form-control{% if form.password.errors %} is-invalid{% endif %}"
+              type="password"
+              name="password"
+              id="id_password"
+              autocomplete="current-password"
+              required
+            >
+            <button class="btn btn-outline-secondary" type="button" id="togglePasswordBtn" aria-label="Показать пароль">Показать</button>
+            {% for error in form.password.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+          </div>
+        </div>
+
+        <button class="btn btn-primary btn-lg w-100 login-submit" type="submit">Войти в панель</button>
+      </form>
+    </div>
   </div>
 </div>
+
+<script>
+  (function () {
+    const passwordInput = document.getElementById('id_password');
+    const toggleButton = document.getElementById('togglePasswordBtn');
+    if (!passwordInput || !toggleButton) return;
+
+    toggleButton.addEventListener('click', function () {
+      const isHidden = passwordInput.type === 'password';
+      passwordInput.type = isHidden ? 'text' : 'password';
+      toggleButton.textContent = isHidden ? 'Скрыть' : 'Показать';
+      toggleButton.setAttribute('aria-label', isHidden ? 'Скрыть пароль' : 'Показать пароль');
+    });
+  })();
+</script>
 {% endblock %}

@@ -94,3 +94,13 @@ class DashboardViewTest(TestCase):
         self.assertEqual(response.context["failed_jobs_recent_count"], 1)
         self.assertEqual(response.context["warning_jobs_recent_count"], 1)
         self.assertEqual(response.context["degraded_jobs_recent_count"], 1)
+
+
+class LoginTemplateViewTest(TestCase):
+    def test_login_page_renders_polished_layout_elements(self):
+        response = self.client.get(reverse("login"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "amnezia-control")
+        self.assertContains(response, "Безопасное управление клиентами")
+        self.assertContains(response, "id=\"togglePasswordBtn\"", html=False)
