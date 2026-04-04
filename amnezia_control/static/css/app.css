@@ -135,66 +135,157 @@ pre.log { background: #0f1520; color: #d7e2ff; padding: .75rem; border-radius: .
 
 .app-auth-shell {
   background:
-    radial-gradient(circle at 15% 15%, rgba(77, 134, 255, .18), transparent 46%),
-    radial-gradient(circle at 85% 80%, rgba(42, 78, 145, .12), transparent 48%),
-    linear-gradient(180deg, #0c1118 0%, #0b1017 100%);
+    radial-gradient(circle at 18% 12%, rgba(86, 132, 222, .2), transparent 42%),
+    radial-gradient(circle at 82% 82%, rgba(45, 77, 128, .15), transparent 45%),
+    linear-gradient(180deg, #0c1118 0%, #0a0f16 100%);
 }
 
-.login-shell {
+.auth-shell {
   min-height: calc(100vh - 3rem);
   display: flex;
   align-items: center;
   justify-content: center;
+  padding-inline: .6rem;
 }
 
-.login-card {
-  width: min(100%, 520px);
-  background: linear-gradient(180deg, rgba(23, 33, 47, .94) 0%, rgba(20, 29, 42, .98) 100%);
-  border: 1px solid #2d3d54;
+.auth-card {
+  width: min(100%, 560px);
+  border-radius: 1rem;
+  background: linear-gradient(180deg, rgba(23, 34, 49, .96) 0%, rgba(17, 26, 38, .98) 100%);
+  border: 1px solid #30445f;
+  box-shadow: 0 22px 45px rgba(2, 8, 16, .42), inset 0 1px 0 rgba(255, 255, 255, .03);
 }
 
-.login-kicker {
-  color: #95a8ca;
+.auth-card-body {
+  padding: 2rem 2rem 1.6rem;
+}
+
+.auth-header {
+  margin-bottom: 1.35rem;
+}
+
+.auth-brand {
+  color: #9eb2d7;
   text-transform: uppercase;
-  letter-spacing: .09em;
-  font-size: .72rem;
-}
-
-.login-subtitle {
-  color: #9fb0cc;
-  max-width: 42ch;
-  font-size: .93rem;
-}
-
-.login-submit {
+  letter-spacing: .1em;
+  font-size: .71rem;
   font-weight: 600;
-  letter-spacing: .01em;
-  min-height: 48px;
 }
 
-.login-password-group .btn {
-  min-width: 102px;
+.auth-title {
+  font-size: clamp(1.45rem, 2vw, 1.75rem);
+  line-height: 1.24;
+  color: #edf3ff;
+  font-weight: 650;
 }
 
-.login-error-block {
-  border: 1px solid #7c3742;
-  border-radius: .7rem;
-  background: rgba(74, 26, 34, .85);
+.auth-subtitle {
+  color: #9eb1d2;
+  max-width: 42ch;
+  font-size: .94rem;
+  line-height: 1.45;
+}
+
+.auth-label {
+  color: #c2cee4;
+  font-weight: 500;
+  margin-bottom: .45rem;
+}
+
+.auth-input {
+  min-height: 50px;
+  padding: .72rem .95rem;
+  border-radius: .72rem !important;
+  border-color: #3a4f6d;
+  background-color: #101925;
+}
+
+.auth-input:hover {
+  border-color: #4a638a;
+}
+
+.auth-input:focus {
+  border-color: #5a82cf;
+  box-shadow: 0 0 0 .24rem rgba(84, 127, 212, .24);
+}
+
+.auth-input.is-invalid {
+  border-color: #ab5562;
+}
+
+.auth-password-group .auth-password-toggle {
+  min-width: 104px;
+  border-top-right-radius: .72rem;
+  border-bottom-right-radius: .72rem;
+}
+
+.auth-submit {
+  min-height: 50px;
+  font-weight: 620;
+  letter-spacing: .012em;
+}
+
+.auth-submit:disabled,
+.auth-submit.disabled {
+  opacity: .65;
+  cursor: not-allowed;
+}
+
+.auth-alert {
+  border: 1px solid transparent;
+  border-radius: .75rem;
+  padding: .78rem .92rem;
+  font-size: .9rem;
+}
+
+.auth-alert-danger {
+  border-color: #7b3742;
+  background: rgba(75, 26, 34, .82);
   color: #ffd7de;
-  padding: .78rem .9rem;
+}
+
+.auth-redirect {
+  border: 1px solid #334967;
+  border-radius: .75rem;
+  padding: .68rem .82rem;
+  color: #c2d3f0;
+  background: rgba(25, 39, 58, .68);
+  font-size: .86rem;
+}
+
+.auth-note {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #2d3f58;
+  color: #8ea3c7;
+  font-size: .82rem;
+  line-height: 1.4;
+}
+
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #e7edf9;
+  -webkit-box-shadow: 0 0 0 1000px #101925 inset;
+  transition: background-color 5000s ease-in-out 0s;
 }
 
 @media (max-width: 767.98px) {
-  .login-card .card-body {
-    padding: 1.3rem !important;
+  .auth-card-body {
+    padding: 1.25rem 1.1rem 1.1rem;
   }
 
-  .login-subtitle {
-    font-size: .88rem;
+  .auth-title {
+    font-size: 1.32rem;
   }
 
-  .login-password-group .btn {
+  .auth-subtitle {
+    font-size: .875rem;
+  }
+
+  .auth-password-group .auth-password-toggle {
     min-width: 88px;
+    font-size: .84rem;
   }
 }
 

@@ -1,29 +1,39 @@
 {% extends 'partials/base.html' %}
+{% block title %}Вход в панель · amnezia-control{% endblock %}
 {% block content %}
-<div class="login-shell py-4 py-md-5">
-  <div class="login-card card shadow-lg border-0 mx-auto">
-    <div class="card-body p-4 p-md-5">
-      <div class="login-brand mb-4">
-        <p class="login-kicker mb-2">Операторская панель</p>
-        <h1 class="h3 mb-2">amnezia-control</h1>
-        <p class="login-subtitle mb-0">Безопасное управление клиентами, серверами и операционными задачами.</p>
-      </div>
+<section class="auth-shell py-4 py-md-5">
+  <div class="auth-card card border-0 shadow-lg mx-auto">
+    <div class="card-body auth-card-body">
+      <header class="auth-header">
+        <p class="auth-brand mb-2">amnezia-control</p>
+        <h1 class="auth-title mb-2">Вход в панель</h1>
+        <p class="auth-subtitle mb-0">
+          Используйте учётную запись администратора для доступа к панели управления.
+        </p>
+      </header>
+
+      {% if next %}
+        <div class="auth-redirect mb-3" role="status">
+          После входа вы будете перенаправлены на запрошенную страницу.
+        </div>
+      {% endif %}
 
       {% if form.non_field_errors %}
-        <div class="login-error-block mb-3" role="alert">
+        <div class="auth-alert auth-alert-danger mb-3" role="alert">
           {% for error in form.non_field_errors %}
             <div>{{ error }}</div>
           {% endfor %}
         </div>
       {% endif %}
 
-      <form method="post" novalidate>
+      <form method="post" novalidate class="auth-form" aria-label="Форма входа">
         {% csrf_token %}
+        {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
 
-        <div class="mb-3">
-          <label class="form-label" for="id_username">Логин</label>
+        <div class="auth-field mb-3">
+          <label class="form-label auth-label" for="id_username">Логин</label>
           <input
-            class="form-control form-control-lg{% if form.username.errors %} is-invalid{% endif %}"
+            class="form-control form-control-lg auth-input{% if form.username.errors %} is-invalid{% endif %}"
             type="text"
             name="username"
             id="id_username"
@@ -35,27 +45,31 @@
           {% for error in form.username.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
         </div>
 
-        <div class="mb-4">
-          <label class="form-label" for="id_password">Пароль</label>
-          <div class="input-group input-group-lg login-password-group">
+        <div class="auth-field mb-4">
+          <label class="form-label auth-label" for="id_password">Пароль</label>
+          <div class="input-group input-group-lg auth-password-group">
             <input
-              class="form-control{% if form.password.errors %} is-invalid{% endif %}"
+              class="form-control auth-input{% if form.password.errors %} is-invalid{% endif %}"
               type="password"
               name="password"
               id="id_password"
               autocomplete="current-password"
               required
             >
-            <button class="btn btn-outline-secondary" type="button" id="togglePasswordBtn" aria-label="Показать пароль">Показать</button>
+            <button class="btn btn-outline-secondary auth-password-toggle" type="button" id="togglePasswordBtn" aria-label="Показать пароль">Показать</button>
             {% for error in form.password.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
           </div>
         </div>
 
-        <button class="btn btn-primary btn-lg w-100 login-submit" type="submit">Войти в панель</button>
+        <button class="btn btn-primary btn-lg w-100 auth-submit" type="submit">Войти в панель</button>
       </form>
+
+      <p class="auth-note mb-0">
+        Доступ только для авторизованных операторов. Все действия фиксируются в журнале аудита.
+      </p>
     </div>
   </div>
-</div>
+</section>
 
 <script>
   (function () {
