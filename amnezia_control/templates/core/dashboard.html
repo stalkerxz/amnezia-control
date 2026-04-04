@@ -5,9 +5,9 @@
   <h1 class="h3 mb-1">Операционный дашборд</h1>
 </div>
 
-<div class="row g-3 mb-4">
+<div class="row g-3 mb-4 section-stack">
   <div class="col-lg-6">
-    <div class="card h-100">
+    <div class="card panel-card h-100">
       <div class="card-body">
         <div class="d-flex justify-content-between align-items-center mb-3">
           <h2 class="h6 mb-0">Сводка по здоровью серверов</h2>
@@ -15,7 +15,7 @@
         </div>
         <div class="row g-2">
           <div class="col-6">
-            <a class="card stat-card stat-card-compact h-100 text-decoration-none" href="/servers/?health=healthy">
+            <a class="card stat-card metric-card stat-card-compact h-100 text-decoration-none" href="/servers/?health=healthy">
               <div class="card-body">
                 <div class="stat-label">Здоровы</div>
                 <div class="stat-value text-success">{{ healthy_servers_count }}</div>
@@ -23,7 +23,7 @@
             </a>
           </div>
           <div class="col-6">
-            <a class="card stat-card stat-card-compact h-100 text-decoration-none" href="/servers/?health=degraded">
+            <a class="card stat-card metric-card stat-card-compact h-100 text-decoration-none" href="/servers/?health=degraded">
               <div class="card-body">
                 <div class="stat-label">Ограничены</div>
                 <div class="stat-value text-warning">{{ degraded_servers_count }}</div>
@@ -31,7 +31,7 @@
             </a>
           </div>
           <div class="col-6">
-            <a class="card stat-card stat-card-compact h-100 text-decoration-none" href="/servers/?health=unhealthy">
+            <a class="card stat-card metric-card stat-card-compact h-100 text-decoration-none" href="/servers/?health=unhealthy">
               <div class="card-body">
                 <div class="stat-label">Проблемы</div>
                 <div class="stat-value text-danger">{{ unhealthy_servers_count }}</div>
@@ -39,7 +39,7 @@
             </a>
           </div>
           <div class="col-6">
-            <a class="card stat-card stat-card-compact h-100 text-decoration-none" href="/servers/?health=not_checked">
+            <a class="card stat-card metric-card stat-card-compact h-100 text-decoration-none" href="/servers/?health=not_checked">
               <div class="card-body">
                 <div class="stat-label">Не проверялись</div>
                 <div class="stat-value text-secondary">{{ not_checked_servers_count }}</div>
@@ -52,13 +52,13 @@
   </div>
 
   <div class="col-lg-6">
-    <div class="card h-100">
+    <div class="card panel-card h-100">
       <div class="card-body">
         <div class="d-flex justify-content-between align-items-center mb-3">
           <h2 class="h6 mb-0">Требует внимания</h2>
           <span class="small text-secondary">Приоритеты оператора</span>
         </div>
-        <ul class="list-group list-group-flush">
+        <ul class="list-group list-group-flush section-stack">
           {% for item in attention_items %}
             <li class="list-group-item bg-transparent px-0 d-flex justify-content-between align-items-center">
               <a href="{{ item.url }}" class="text-decoration-none">{{ item.title }}</a>
@@ -74,21 +74,21 @@
 </div>
 
 <div class="row g-3 mb-4">
-  <div class="col-xl-3 col-md-6"><div class="card stat-card stat-card-compact h-100"><div class="card-body"><div class="stat-label">Клиентов всего</div><div class="stat-value">{{ clients_total_count }}</div></div></div></div>
-  <div class="col-xl-3 col-md-6"><div class="card stat-card stat-card-compact h-100"><div class="card-body"><div class="stat-label">Активные</div><div class="stat-value">{{ active_clients_count }}</div></div></div></div>
-  <div class="col-xl-3 col-md-6"><a href="/clients/?quick=expired" class="card stat-card stat-card-compact h-100 text-decoration-none"><div class="card-body"><div class="stat-label">Истёк срок</div><div class="stat-value text-warning">{{ expired_clients_count }}</div></div></a></div>
-  <div class="col-xl-3 col-md-6"><a href="/clients/?quick=traffic_exceeded" class="card stat-card stat-card-compact h-100 text-decoration-none"><div class="card-body"><div class="stat-label">Трафик превышен</div><div class="stat-value text-danger">{{ traffic_exceeded_clients_count }}</div></div></a></div>
-  <div class="col-xl-3 col-md-6"><a href="/clients/?quick=deleted" class="card stat-card stat-card-compact h-100 text-decoration-none"><div class="card-body"><div class="stat-label">Удалённые</div><div class="stat-value text-secondary">{{ deleted_clients_count }}</div></div></a></div>
-  <div class="col-xl-3 col-md-6"><a href="/jobs/?signal=failed" class="card stat-card stat-card-compact h-100 text-decoration-none"><div class="card-body"><div class="stat-label">Ошибки задач (24ч)</div><div class="stat-value text-danger">{{ failed_jobs_recent_count }}</div></div></a></div>
-  <div class="col-xl-3 col-md-6"><a href="/jobs/?signal=warning" class="card stat-card stat-card-compact h-100 text-decoration-none"><div class="card-body"><div class="stat-label">Предупреждения задач (24ч)</div><div class="stat-value text-warning">{{ warning_jobs_recent_count }}</div></div></a></div>
-  <div class="col-xl-3 col-md-6"><a href="/jobs/?signal=degraded_success" class="card stat-card stat-card-compact h-100 text-decoration-none"><div class="card-body"><div class="stat-label">Успех с деградацией (24ч)</div><div class="stat-value text-warning">{{ degraded_jobs_recent_count }}</div></div></a></div>
-  <div class="col-xl-3 col-md-6"><div class="card stat-card stat-card-compact h-100"><div class="card-body"><div class="stat-label">Fallback-телеметрия</div><div class="stat-value text-warning">{{ degraded_clients_count }}</div></div></div></div>
-  <div class="col-xl-3 col-md-6"><div class="card stat-card stat-card-compact h-100"><div class="card-body"><div class="stat-label">Последняя синхронизация runtime</div><div class="small">{{ last_runtime_sync|default:'Не запускалась' }}</div></div></div></div>
+  <div class="col-xl-3 col-md-6"><div class="card stat-card metric-card stat-card-compact h-100"><div class="card-body"><div class="stat-label">Клиентов всего</div><div class="stat-value">{{ clients_total_count }}</div></div></div></div>
+  <div class="col-xl-3 col-md-6"><div class="card stat-card metric-card stat-card-compact h-100"><div class="card-body"><div class="stat-label">Активные</div><div class="stat-value">{{ active_clients_count }}</div></div></div></div>
+  <div class="col-xl-3 col-md-6"><a href="/clients/?quick=expired" class="card stat-card metric-card stat-card-compact h-100 text-decoration-none"><div class="card-body"><div class="stat-label">Истёк срок</div><div class="stat-value text-warning">{{ expired_clients_count }}</div></div></a></div>
+  <div class="col-xl-3 col-md-6"><a href="/clients/?quick=traffic_exceeded" class="card stat-card metric-card stat-card-compact h-100 text-decoration-none"><div class="card-body"><div class="stat-label">Трафик превышен</div><div class="stat-value text-danger">{{ traffic_exceeded_clients_count }}</div></div></a></div>
+  <div class="col-xl-3 col-md-6"><a href="/clients/?quick=deleted" class="card stat-card metric-card stat-card-compact h-100 text-decoration-none"><div class="card-body"><div class="stat-label">Удалённые</div><div class="stat-value text-secondary">{{ deleted_clients_count }}</div></div></a></div>
+  <div class="col-xl-3 col-md-6"><a href="/jobs/?signal=failed" class="card stat-card metric-card stat-card-compact h-100 text-decoration-none"><div class="card-body"><div class="stat-label">Ошибки задач (24ч)</div><div class="stat-value text-danger">{{ failed_jobs_recent_count }}</div></div></a></div>
+  <div class="col-xl-3 col-md-6"><a href="/jobs/?signal=warning" class="card stat-card metric-card stat-card-compact h-100 text-decoration-none"><div class="card-body"><div class="stat-label">Предупреждения задач (24ч)</div><div class="stat-value text-warning">{{ warning_jobs_recent_count }}</div></div></a></div>
+  <div class="col-xl-3 col-md-6"><a href="/jobs/?signal=degraded_success" class="card stat-card metric-card stat-card-compact h-100 text-decoration-none"><div class="card-body"><div class="stat-label">Успех с деградацией (24ч)</div><div class="stat-value text-warning">{{ degraded_jobs_recent_count }}</div></div></a></div>
+  <div class="col-xl-3 col-md-6"><div class="card stat-card metric-card stat-card-compact h-100"><div class="card-body"><div class="stat-label">Fallback-телеметрия</div><div class="stat-value text-warning">{{ degraded_clients_count }}</div></div></div></div>
+  <div class="col-xl-3 col-md-6"><div class="card stat-card metric-card stat-card-compact h-100"><div class="card-body"><div class="stat-label">Последняя синхронизация runtime</div><div class="small">{{ last_runtime_sync|default:'Не запускалась' }}</div></div></div></div>
 </div>
 
 <div class="row g-3 mb-4">
   <div class="col-lg-6">
-    <div class="card h-100"><div class="card-body">
+    <div class="card panel-card h-100"><div class="card-body">
       <h2 class="h6">Протоколы и доступность</h2>
       <div class="d-flex flex-wrap gap-2 mb-2">
         {% if awg_available %}<span class="badge status-badge status-success">AmneziaWG доступен</span>{% else %}<span class="badge status-badge status-danger">AmneziaWG не включён</span>{% endif %}
@@ -98,7 +98,7 @@
     </div></div>
   </div>
   <div class="col-lg-6">
-    <div class="card h-100"><div class="card-body">
+    <div class="card panel-card h-100"><div class="card-body">
       <h2 class="h6">Текущие ограничения</h2>
       {% if current_limitations %}
         <ul class="small mb-0">
@@ -120,7 +120,7 @@
         <h2 class="h6 mb-0">Последние задания</h2>
         <a class="small text-decoration-none" href="/jobs/">К списку задач</a>
       </div>
-      <table class="table table-sm align-middle"><tr><th>ID</th><th>Действие</th><th>Статус</th></tr>
+      <div class="table-shell"><table class="table table-sm align-middle mb-0"><tr><th>ID</th><th>Действие</th><th>Статус</th></tr>
       {% for row in jobs_recent_rows %}
       <tr>
         <td><a href="/jobs/{{ row.job.id }}/">#{{ row.job.id }}</a></td>
@@ -133,7 +133,7 @@
         <td><span class="badge status-badge {% if row.job_signal == 'failed' %}status-danger{% elif row.job_signal == 'warning' or row.job_signal == 'degraded_success' %}status-warning{% elif row.job_signal == 'success' %}status-success{% else %}status-neutral{% endif %}">{% if row.job_signal == 'failed' %}Ошибка{% elif row.job_signal == 'warning' %}Успех с предупреждением{% elif row.job_signal == 'degraded_success' %}Успех с деградацией{% elif row.job_signal == 'success' %}Успех{% elif row.job.status == 'running' %}Выполняется{% else %}Ожидает{% endif %}</span></td>
       </tr>
       {% empty %}<tr><td colspan="3"><div class="empty-state">Заданий пока нет.</div></td></tr>{% endfor %}
-      </table>
+      </table></div>
     </div></div>
   </div>
   <div class="col-lg-5">
