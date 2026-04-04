@@ -397,6 +397,91 @@ class VPNClientFlowTest(TestCase):
         self.assertEqual(job.status, Job.Status.SUCCESS)
         self.assertEqual(job.events.latest("id").level, "warning")
 
+    def test_awg2_list_peers_prefers_show_all_dump_runtime_telemetry(self):
+        from unittest.mock import patch
+
+        class Result:
+            def __init__(self, stdout="", stderr="", exit_code=0):
+                self.stdout = stdout
+                self.stderr = stderr
+                self.exit_code = exit_code
+
+        class FakeExecutor:
+            commands = []
+
+            @classmethod
+            def run(cls, command):
+                cls.commands.append(command)
+                if "show all dump" in command:
+                    return Result("wg0\tprivate\tpub\t51830\npk1\tpsk\tep\t10.77.0.10/32\t0\t1\t2\t25\n")
+                raise AssertionError("show dump should not be called when show all dump succeeds")
+
+        adapter = AdapterFactory.get_for_server(self.server, VPNClient.ProtocolType.AWG2)
+        with patch.object(RuntimeCommandService, "executor_for_server", return_value=FakeExecutor()):
+            peers = adapter.list_peers(self.user)
+
+        self.assertEqual(len(peers), 1)
+        self.assertTrue(peers[0].telemetry_available)
+        self.assertEqual(peers[0].transfer_rx, 1)
+        self.assertEqual(peers[0].transfer_tx, 2)
+        self.assertEqual(sum("show all dump" in command for command in FakeExecutor.commands), 1)
+        self.assertEqual(sum("show dump" in command and "show all dump" not in command for command in FakeExecutor.commands), 0)
+
+    def test_awg2_list_peers_falls_back_to_show_dump_when_show_all_fails(self):
+        from unittest.mock import patch
+
+        class Result:
+            def __init__(self, stdout="", stderr="", exit_code=0):
+                self.stdout = stdout
+                self.stderr = stderr
+                self.exit_code = exit_code
+
+        class FakeExecutor:
+            @staticmethod
+            def run(command):
+                if "show all dump" in command:
+                    return Result(stderr="Unable to access interface: Protocol not supported", exit_code=1)
+                if "show dump" in command:
+                    return Result("wg0\tprivate\tpub\t51830\npk1\tpsk\tep\t10.77.0.10/32\t0\t3\t4\t25\n")
+                raise AssertionError(f"unexpected command: {command}")
+
+        adapter = AdapterFactory.get_for_server(self.server, VPNClient.ProtocolType.AWG2)
+        with patch.object(RuntimeCommandService, "executor_for_server", return_value=FakeExecutor()):
+            peers = adapter.list_peers(self.user)
+
+        self.assertEqual(len(peers), 1)
+        self.assertTrue(peers[0].telemetry_available)
+        self.assertEqual(peers[0].transfer_rx, 3)
+        self.assertEqual(peers[0].transfer_tx, 4)
+
+    def test_awg2_list_peers_uses_config_fallback_when_runtime_dumps_fail(self):
+        from unittest.mock import patch
+
+        class Result:
+            def __init__(self, stdout="", stderr="", exit_code=0):
+                self.stdout = stdout
+                self.stderr = stderr
+                self.exit_code = exit_code
+
+        class FakeExecutor:
+            @staticmethod
+            def run(command):
+                if "show all dump" in command or command.endswith(" show dump"):
+                    return Result(stderr="Unable to access interface: Protocol not supported", exit_code=1)
+                raise AssertionError(f"unexpected command: {command}")
+
+        adapter = AdapterFactory.get_for_server(self.server, VPNClient.ProtocolType.AWG2)
+        with patch.object(RuntimeCommandService, "executor_for_server", return_value=FakeExecutor()):
+            with patch.object(
+                adapter,
+                "_list_peers_from_config",
+                return_value=[PeerState(public_key="pk1", allowed_ips="10.77.0.10/32", telemetry_available=False)],
+            ):
+                peers = adapter.list_peers(self.user)
+
+        self.assertEqual(len(peers), 1)
+        self.assertFalse(peers[0].telemetry_available)
+
     def test_new_client_uses_peer_address_not_server_interface_address(self):
         from unittest.mock import patch
 

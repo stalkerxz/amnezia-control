@@ -93,6 +93,7 @@ class RuntimeCommandService:
         *,
         expected_error_patterns: tuple[str, ...],
         fallback_message: str,
+        warn_on_expected_failure: bool = True,
         sensitive_output: bool = False,
     ):
         job = JobService.create_job(server=server, actor=actor, action=action, payload={"command": command if not sensitive_output else "[REDACTED]"})
@@ -102,8 +103,11 @@ class RuntimeCommandService:
         matched_expected_error = result.exit_code != 0 and any(
             pattern.lower() in stderr_text.lower() for pattern in expected_error_patterns
         )
-        level = "warning" if matched_expected_error else ("info" if result.exit_code == 0 else "error")
-        message = fallback_message if matched_expected_error else f"Executed {action}"
+        level = (
+            "warning" if matched_expected_error and warn_on_expected_failure
+            else ("info" if result.exit_code == 0 or matched_expected_error else "error")
+        )
+        message = fallback_message if matched_expected_error and warn_on_expected_failure else f"Executed {action}"
         JobService.event(
             job,
             message,
@@ -155,13 +159,23 @@ class BaseProtocolAdapter:
                 runtime_result = RuntimeCommandService.run_with_expected_failure(
                     self.server,
                     actor,
-                    f"{self.protocol_type}.list",
-                    self._wg_cmd("show dump"),
+                    f"{self.protocol_type}.list_all",
+                    self._wg_cmd("show all dump"),
                     expected_error_patterns=RuntimeCommandService.AWG2_EXPECTED_RUNTIME_DUMP_ERRORS,
                     fallback_message="AWG2 runtime telemetry unavailable: using config fallback (degraded mode).",
+                    warn_on_expected_failure=False,
                 )
                 if runtime_result is None:
-                    return self._list_peers_from_config(actor)
+                    runtime_result = RuntimeCommandService.run_with_expected_failure(
+                        self.server,
+                        actor,
+                        f"{self.protocol_type}.list",
+                        self._wg_cmd("show dump"),
+                        expected_error_patterns=RuntimeCommandService.AWG2_EXPECTED_RUNTIME_DUMP_ERRORS,
+                        fallback_message="AWG2 runtime telemetry unavailable: using config fallback (degraded mode).",
+                    )
+                    if runtime_result is None:
+                        return self._list_peers_from_config(actor)
                 out = runtime_result.stdout
             else:
                 out = self._run(actor, f"{self.protocol_type}.list", self._wg_cmd("show dump")).stdout

@@ -265,13 +265,26 @@ class ServerService:
                             dump_result = RuntimeCommandService.run_with_expected_failure(
                                 server,
                                 actor,
-                                f"runtime.peers.{protocol_type}",
-                                f"docker exec {container_name} wg show dump",
+                                f"runtime.peers.{protocol_type}.all",
+                                f"docker exec {container_name} wg show all dump",
                                 expected_error_patterns=RuntimeCommandService.AWG2_EXPECTED_RUNTIME_DUMP_ERRORS,
                                 fallback_message="AWG2 runtime telemetry unavailable: using config fallback (degraded mode).",
+                                warn_on_expected_failure=False,
                             )
                             if dump_result is None:
-                                peer_source = "runtime telemetry unavailable; config fallback"
+                                dump_result = RuntimeCommandService.run_with_expected_failure(
+                                    server,
+                                    actor,
+                                    f"runtime.peers.{protocol_type}",
+                                    f"docker exec {container_name} wg show dump",
+                                    expected_error_patterns=RuntimeCommandService.AWG2_EXPECTED_RUNTIME_DUMP_ERRORS,
+                                    fallback_message="AWG2 runtime telemetry unavailable: using config fallback (degraded mode).",
+                                )
+                                if dump_result is None:
+                                    peer_source = "runtime telemetry unavailable; config fallback"
+                                else:
+                                    peer_count = sum(1 for line in dump_result.stdout.splitlines() if len(line.split("\t")) >= 8)
+                                    peer_source = "runtime wg dump"
                             else:
                                 peer_count = sum(1 for line in dump_result.stdout.splitlines() if len(line.split("\t")) >= 8)
                                 peer_source = "runtime wg dump"
