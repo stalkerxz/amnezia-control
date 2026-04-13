@@ -170,10 +170,14 @@
               <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">Ещё</button>
               <ul class="dropdown-menu dropdown-menu-end">
                 <li>
+                  {% if row.reissue_blocked %}
+                  <button class="dropdown-item text-secondary" type="button" disabled title="{{ row.reissue_block_reason }}">Переиздать (недоступно)</button>
+                  {% else %}
                   <form method="post" action="/clients/{{ c.id }}/action/reissue/">{% csrf_token %}
                     <input type="hidden" name="next" value="{{ request.get_full_path }}">
                     <button class="dropdown-item" type="submit">Переиздать</button>
                   </form>
+                  {% endif %}
                 </li>
                 <li>
                   {% if c.status == 'active' %}
