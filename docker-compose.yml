@@ -1,5 +1,6 @@
 services:
   db:
+    restart: unless-stopped
     image: postgres:16
     env_file: .env
     volumes:
@@ -12,6 +13,7 @@ services:
       start_period: 10s
 
   redis:
+    restart: unless-stopped
     image: redis:7-alpine
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -21,6 +23,7 @@ services:
       start_period: 5s
 
   web:
+    restart: unless-stopped
     build:
       context: .
       dockerfile: Dockerfile.web
@@ -36,6 +39,7 @@ services:
       - "127.0.0.1:${APP_PORT:-8090}:8000"
 
   worker:
+    restart: unless-stopped
     build:
       context: .
       dockerfile: Dockerfile.worker
@@ -50,6 +54,7 @@ services:
     command: ["bash", "-lc", "python manage.py wait_for_db && celery -A amnezia_control worker -l INFO"]
 
   beat:
+    restart: unless-stopped
     build:
       context: .
       dockerfile: Dockerfile.worker
