@@ -13,7 +13,7 @@ from jobs.models import Job
 from servers.models import Server, ServerProtocol
 from .forms import VPNClientBulkLimitsUpdateForm, VPNClientCreateForm, VPNClientLimitsUpdateForm, VPNClientListFilterForm
 from .models import VPNClient
-from .services import VPNClientService
+from .services import VPNClientPolicyService, VPNClientService
 
 
 def _admin_required(user):
@@ -175,6 +175,7 @@ def clients_list_view(request):
         badge_class, badge_label = _limit_state_badge(client.limit_state)
         protocol = protocol_map.get((client.server_id, client.protocol_type))
         telemetry_state = _telemetry_view_state(client=client, peer_source=(protocol.runtime_metadata or {}).get("peer_source", "") if protocol else "")
+        reissue_block_reason = VPNClientPolicyService.reissue_block_reason(client)
         client_rows.append(
             {
                 "client": client,
@@ -186,6 +187,8 @@ def clients_list_view(request):
                 "traffic_limit_display": _fmt_bytes(client.traffic_limit_bytes),
                 "runtime_address_display": _normalize_runtime_address(client.runtime_address),
                 "telemetry": telemetry_state,
+                "reissue_blocked": bool(reissue_block_reason),
+                "reissue_block_reason": reissue_block_reason,
             }
         )
 
@@ -301,12 +304,8 @@ def clients_detail_view(request, pk: int):
 
     effective_limit_state = VPNClientService.get_limit_state(client)
     limit_badge_class, limit_badge_label = _limit_state_badge(effective_limit_state)
-    reissue_blocked = effective_limit_state in {VPNClient.LimitState.EXPIRED, VPNClient.LimitState.TRAFFIC_EXCEEDED}
-    reissue_block_reason = ""
-    if effective_limit_state == VPNClient.LimitState.EXPIRED:
-        reissue_block_reason = "Переиздание недоступно: срок действия клиента истек."
-    elif effective_limit_state == VPNClient.LimitState.TRAFFIC_EXCEEDED:
-        reissue_block_reason = "Переиздание недоступно: превышен лимит трафика."
+    reissue_block_reason = VPNClientPolicyService.reissue_block_reason(client)
+    reissue_blocked = bool(reissue_block_reason)
 
     warning_items = []
     if effective_limit_state == VPNClient.LimitState.EXPIRED:

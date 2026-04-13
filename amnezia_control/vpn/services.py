@@ -39,11 +39,21 @@ class ConfigCryptoService:
 
 @dataclass
 class PeerState:
+    TELEMETRY_AVAILABLE = "telemetry_available"
+    TELEMETRY_UNAVAILABLE = "telemetry_unavailable"
+
     public_key: str
     allowed_ips: str
     transfer_rx: int = 0
     transfer_tx: int = 0
-    telemetry_available: bool = True
+    telemetry_state: str = TELEMETRY_AVAILABLE
+    telemetry_available: bool | None = None
+
+    def __post_init__(self):
+        if self.telemetry_available is None:
+            self.telemetry_available = self.telemetry_state == self.TELEMETRY_AVAILABLE
+        else:
+            self.telemetry_state = self.TELEMETRY_AVAILABLE if self.telemetry_available else self.TELEMETRY_UNAVAILABLE
 
     @property
     def transfer_total(self) -> int:
@@ -153,74 +163,86 @@ class BaseProtocolAdapter:
     def server_public_key(self, actor, iface: str) -> str:
         return self._run(actor, f"{self.protocol_type}.server_pub", self._wg_cmd(f"show {iface} public-key")).stdout.strip()
 
-    def list_peers(self, actor):
+    def _parse_runtime_dump_peers(self, out: str):
+        peers = []
+        runtime_interface = (self.protocol.runtime_metadata.get("interface") or "awg0").strip()
+        for line in out.splitlines():
+            cols = [c.strip() for c in line.split("\t")]
+
+            # `wg show dump`:
+            #   public_key, preshared_key, endpoint, allowed_ips, latest_handshake, transfer_rx, transfer_tx, persistent_keepalive
+            #
+            # `wg show all dump`:
+            #   interface, public_key, preshared_key, endpoint, allowed_ips, latest_handshake, transfer_rx, transfer_tx, persistent_keepalive
+            #
+            # AWG2 in this environment returns live telemetry via `wg show all dump`,
+            # so support both layouts here.
+
+            if len(cols) >= 9 and cols[0] == runtime_interface:
+                public_key = cols[1]
+                allowed_ips = cols[4]
+                transfer_rx = int(cols[6]) if cols[6].isdigit() else 0
+                transfer_tx = int(cols[7]) if cols[7].isdigit() else 0
+            elif len(cols) >= 8:
+                public_key = cols[0]
+                allowed_ips = cols[3]
+                transfer_rx = int(cols[5]) if cols[5].isdigit() else 0
+                transfer_tx = int(cols[6]) if cols[6].isdigit() else 0
+            else:
+                continue
+
+            if public_key:
+                peers.append(
+                    PeerState(
+                        public_key=public_key,
+                        allowed_ips=allowed_ips,
+                        transfer_rx=transfer_rx,
+                        transfer_tx=transfer_tx,
+                        telemetry_state=PeerState.TELEMETRY_AVAILABLE,
+                    )
+                )
+        return peers
+
+    def _awg2_runtime_peers(self, actor):
+        runtime_result = RuntimeCommandService.run_with_expected_failure(
+            self.server,
+            actor,
+            f"{self.protocol_type}.list_all",
+            self._wg_cmd("show all dump"),
+            expected_error_patterns=RuntimeCommandService.AWG2_EXPECTED_RUNTIME_DUMP_ERRORS,
+            fallback_message="AWG2 runtime telemetry unavailable: using config fallback (degraded mode).",
+            warn_on_expected_failure=False,
+        )
+        if runtime_result is None:
+            runtime_result = RuntimeCommandService.run_with_expected_failure(
+                self.server,
+                actor,
+                f"{self.protocol_type}.list",
+                self._wg_cmd("show dump"),
+                expected_error_patterns=RuntimeCommandService.AWG2_EXPECTED_RUNTIME_DUMP_ERRORS,
+                fallback_message="AWG2 runtime telemetry unavailable: using config fallback (degraded mode).",
+            )
+        if runtime_result is None:
+            return None
+        return self._parse_runtime_dump_peers(runtime_result.stdout)
+
+    def discover_peers(self, actor):
         try:
             if self.protocol_type == VPNClient.ProtocolType.AWG2:
-                runtime_result = RuntimeCommandService.run_with_expected_failure(
-                    self.server,
-                    actor,
-                    f"{self.protocol_type}.list_all",
-                    self._wg_cmd("show all dump"),
-                    expected_error_patterns=RuntimeCommandService.AWG2_EXPECTED_RUNTIME_DUMP_ERRORS,
-                    fallback_message="AWG2 runtime telemetry unavailable: using config fallback (degraded mode).",
-                    warn_on_expected_failure=False,
-                )
-                if runtime_result is None:
-                    runtime_result = RuntimeCommandService.run_with_expected_failure(
-                        self.server,
-                        actor,
-                        f"{self.protocol_type}.list",
-                        self._wg_cmd("show dump"),
-                        expected_error_patterns=RuntimeCommandService.AWG2_EXPECTED_RUNTIME_DUMP_ERRORS,
-                        fallback_message="AWG2 runtime telemetry unavailable: using config fallback (degraded mode).",
-                    )
-                    if runtime_result is None:
-                        return self._list_peers_from_config(actor)
-                out = runtime_result.stdout
+                peers = self._awg2_runtime_peers(actor)
+                if peers is None:
+                    return self._list_peers_from_config(actor)
+                return peers
             else:
                 out = self._run(actor, f"{self.protocol_type}.list", self._wg_cmd("show dump")).stdout
-            peers = []
-            runtime_interface = (self.protocol.runtime_metadata.get("interface") or "awg0").strip()
-
-            for line in out.splitlines():
-                cols = [c.strip() for c in line.split("\t")]
-
-                # `wg show dump`:
-                #   public_key, preshared_key, endpoint, allowed_ips, latest_handshake, transfer_rx, transfer_tx, persistent_keepalive
-                #
-                # `wg show all dump`:
-                #   interface, public_key, preshared_key, endpoint, allowed_ips, latest_handshake, transfer_rx, transfer_tx, persistent_keepalive
-                #
-                # AWG2 in this environment returns live telemetry via `wg show all dump`,
-                # so support both layouts here.
-
-                if len(cols) >= 9 and cols[0] == runtime_interface:
-                    public_key = cols[1]
-                    allowed_ips = cols[4]
-                    transfer_rx = int(cols[6]) if cols[6].isdigit() else 0
-                    transfer_tx = int(cols[7]) if cols[7].isdigit() else 0
-                elif len(cols) >= 8:
-                    public_key = cols[0]
-                    allowed_ips = cols[3]
-                    transfer_rx = int(cols[5]) if cols[5].isdigit() else 0
-                    transfer_tx = int(cols[6]) if cols[6].isdigit() else 0
-                else:
-                    continue
-
-                if public_key:
-                    peers.append(
-                        PeerState(
-                            public_key=public_key,
-                            allowed_ips=allowed_ips,
-                            transfer_rx=transfer_rx,
-                            transfer_tx=transfer_tx,
-                        )
-                    )
-            return peers
+            return self._parse_runtime_dump_peers(out)
         except RuntimeError:
             if self.protocol_type != VPNClient.ProtocolType.AWG2:
                 raise
             return self._list_peers_from_config(actor)
+
+    def list_peers(self, actor):
+        return self.discover_peers(actor)
 
     @staticmethod
     def _parse_peers_from_config_text(raw_conf: str):
@@ -239,7 +261,7 @@ class BaseProtocolAdapter:
                             allowed_ips=current["AllowedIPs"],
                             transfer_rx=0,
                             transfer_tx=0,
-                            telemetry_available=False,
+                            telemetry_state=PeerState.TELEMETRY_UNAVAILABLE,
                         )
                     )
                 section = text
@@ -256,7 +278,7 @@ class BaseProtocolAdapter:
                     allowed_ips=current["AllowedIPs"],
                     transfer_rx=0,
                     transfer_tx=0,
-                    telemetry_available=False,
+                    telemetry_state=PeerState.TELEMETRY_UNAVAILABLE,
                 )
             )
         return peers
@@ -270,7 +292,13 @@ class BaseProtocolAdapter:
 
     def peer_transfer_map(self, actor) -> dict[str, int] | None:
         try:
-            peers = self.list_peers(actor)
+            if self.protocol_type == VPNClient.ProtocolType.AWG2:
+                peers = self._awg2_runtime_peers(actor)
+                if peers is None:
+                    return None
+            else:
+                out = self._run(actor, f"{self.protocol_type}.list", self._wg_cmd("show dump")).stdout
+                peers = self._parse_runtime_dump_peers(out)
         except Exception:
             return None
         if peers is None:
@@ -420,6 +448,31 @@ class AdapterFactory:
         if protocol_type == VPNClient.ProtocolType.AWG2:
             return AWG2Adapter(server)
         raise ValueError("Unsupported protocol")
+
+
+class VPNClientPolicyService:
+    REISSUE_BLOCK_REASONS = {
+        VPNClient.LimitState.EXPIRED: "Переиздание запрещено: срок действия клиента истек.",
+        VPNClient.LimitState.TRAFFIC_EXCEEDED: "Переиздание запрещено: превышен лимит трафика клиента.",
+    }
+
+    @classmethod
+    def limit_state(cls, client: VPNClient, now=None):
+        return VPNClientService.get_limit_state(client, now=now)
+
+    @classmethod
+    def reissue_block_reason(cls, client: VPNClient):
+        return cls.REISSUE_BLOCK_REASONS.get(cls.limit_state(client), "")
+
+    @classmethod
+    def can_reissue(cls, client: VPNClient):
+        return cls.reissue_block_reason(client) == ""
+
+    @classmethod
+    def assert_reissue_allowed(cls, client: VPNClient):
+        reason = cls.reissue_block_reason(client)
+        if reason:
+            raise RuntimeError(reason)
 
 
 class VPNClientService:
@@ -636,11 +689,7 @@ class VPNClientService:
     @staticmethod
     @transaction.atomic
     def reissue_config(*, client: VPNClient, actor):
-        limit_state = VPNClientService.get_limit_state(client)
-        if limit_state == VPNClient.LimitState.EXPIRED:
-            raise RuntimeError("Переиздание запрещено: срок действия клиента истек.")
-        if limit_state == VPNClient.LimitState.TRAFFIC_EXCEEDED:
-            raise RuntimeError("Переиздание запрещено: превышен лимит трафика клиента.")
+        VPNClientPolicyService.assert_reissue_allowed(client)
 
         adapter = AdapterFactory.get_for_client(client)
         if client.runtime_peer_public_key:
