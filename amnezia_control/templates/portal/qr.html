@@ -6,6 +6,7 @@
   <div class="card panel-card">
     <div class="card-body text-center">
       <h1 class="h5 mb-3">QR для {{ client.name }}</h1>
+      {% if access.expires_at %}<p class="small text-secondary">Ссылка действует до {{ access.expires_at|date:'d.m.Y H:i' }}</p>{% endif %}
       {% if qr_base64 %}
       <img src="data:image/png;base64,{{ qr_base64 }}" alt="QR" class="img-fluid img-thumbnail" style="max-width: 320px;">
       {% else %}

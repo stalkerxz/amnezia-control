@@ -124,7 +124,8 @@
     {% if portal_access_enabled %}<span class="badge status-badge status-success">активен</span>{% else %}<span class="badge status-badge status-neutral">не выдан</span>{% endif %}
   </div>
   {% if portal_access %}
-  <div class="small text-secondary mb-3">Последний доступ: {% if portal_access.last_access_at %}{{ portal_access.last_access_at|date:'d.m.Y H:i' }}{% else %}ещё не открывали{% endif %}</div>
+  <div class="small text-secondary mb-1">Последний доступ: {% if portal_access.last_access_at %}{{ portal_access.last_access_at|date:'d.m.Y H:i' }}{% else %}ещё не открывали{% endif %}</div>
+  <div class="small text-secondary mb-3">Действует до: {% if portal_access.expires_at %}{{ portal_access.expires_at|date:'d.m.Y H:i' }}{% else %}не ограничено{% endif %}</div>
   {% endif %}
   <div class="d-flex gap-2 flex-wrap">
     <form method="post" action="/clients/{{ client.id }}/action/portal_issue/">{% csrf_token %}<button class="btn btn-outline-primary">Сгенерировать/обновить ссылку</button></form>

@@ -35,7 +35,8 @@
         <div class="col-sm-6"><div class="small text-secondary">Лимит трафика</div><div>{{ traffic_limit_display }}</div></div>
         <div class="col-sm-6"><div class="small text-secondary">Использовано трафика</div><div>{{ traffic_used_display }}</div></div>
         <div class="col-sm-6"><div class="small text-secondary">Последняя синхронизация трафика</div><div>{% if client.traffic_last_sync_at %}{{ client.traffic_last_sync_at|date:'d.m.Y H:i' }}{% else %}Нет данных{% endif %}</div></div>
-        <div class="col-sm-6"><div class="small text-secondary">Portal last access</div><div>{% if access.last_access_at %}{{ access.last_access_at|date:'d.m.Y H:i' }}{% else %}Первое посещение{% endif %}</div></div>
+        <div class="col-sm-6"><div class="small text-secondary">Последний вход по ссылке</div><div>{% if access.last_access_at %}{{ access.last_access_at|date:'d.m.Y H:i' }}{% else %}Первое посещение{% endif %}</div></div>
+        <div class="col-sm-6"><div class="small text-secondary">Срок действия ссылки</div><div>{% if access.expires_at %}{{ access.expires_at|date:'d.m.Y H:i' }}{% else %}Не ограничен{% endif %}</div></div>
       </div>
     </div>
   </div>
