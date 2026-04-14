@@ -2,7 +2,7 @@
 {% block title %}Кабинет клиента · {{ client.name }}{% endblock %}
 {% block content %}
 <div class="container px-0" style="max-width: 820px;">
-  <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+  <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-4">
     <div>
       <p class="text-secondary mb-1">Кабинет клиента</p>
       <h1 class="h3 mb-0">{{ client.name }}</h1>
@@ -13,22 +13,60 @@
     </div>
   </div>
 
+  <div class="card panel-card mb-3 border-0 shadow-sm">
+    <div class="card-body py-3">
+      <h2 class="h6 mb-3">Обзор доступа</h2>
+      <div class="row g-3">
+        <div class="col-md-4">
+          <div class="small text-secondary mb-1">Состояние доступа</div>
+          {% if blocked %}
+            <span class="badge text-bg-warning">Ограничен</span>
+          {% else %}
+            <span class="badge text-bg-success">Активен</span>
+          {% endif %}
+          <div class="small text-secondary mt-2">{{ client.get_status_display }} · {{ client.get_limit_state_display }}</div>
+        </div>
+        <div class="col-md-4">
+          <div class="small text-secondary mb-1">Доступ до</div>
+          <div class="fw-semibold">
+            {% if client.expires_at %}
+              {{ client.expires_at|date:'d.m.Y H:i' }}
+            {% else %}
+              Без ограничения
+            {% endif %}
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="small text-secondary mb-1">Трафик</div>
+          <div class="fw-semibold">{{ traffic_used_display }} / {{ traffic_limit_display }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   {% if status_block %}
   <div class="card panel-card mb-3 border-{{ status_block.variant }}">
     <div class="card-body py-3">
       <div class="d-flex justify-content-between align-items-start gap-2">
         <div>
-          <h2 class="h6 mb-1">Текущий статус</h2>
+          <h2 class="h6 mb-1">Результат по заявке</h2>
           <div class="fw-semibold">{{ status_block.title }}</div>
         </div>
         <span class="badge text-bg-{{ status_block.variant }}">{{ status_block.badge }}</span>
       </div>
       <p class="small text-secondary mt-2 mb-0">{{ status_block.text }}</p>
+      {% if status_block.expires_at %}
+      <div class="mt-2">
+        <span class="badge text-bg-light border">Новый срок доступа: {{ status_block.expires_at|date:'d.m.Y H:i' }}</span>
+      </div>
+      {% endif %}
       {% if status_block.updated_at %}
-      <div class="small text-secondary mt-1">Обновлено: {{ status_block.updated_at|date:'d.m.Y H:i' }}</div>
+      <div class="small text-secondary mt-2">Обновлено: {{ status_block.updated_at|date:'d.m.Y H:i' }}</div>
       {% endif %}
       {% if status_block.operator_note %}
-      <div class="mt-2 small"><strong>Комментарий оператора:</strong> {{ status_block.operator_note }}</div>
+      <div class="small mt-2 p-2 rounded bg-light">
+        <span class="text-secondary">Комментарий оператора:</span> {{ status_block.operator_note }}
+      </div>
       {% endif %}
     </div>
   </div>
@@ -75,11 +113,6 @@
     <div class="card-body">
       <div class="row g-3">
         <div class="col-sm-6"><div class="small text-secondary">Протокол</div><div>{{ client.protocol_type|upper }}</div></div>
-        <div class="col-sm-6"><div class="small text-secondary">Статус</div><div>{{ client.get_status_display }}</div></div>
-        <div class="col-sm-6"><div class="small text-secondary">Доступ до</div><div>{% if client.expires_at %}{{ client.expires_at|date:'d.m.Y H:i' }}{% else %}Без ограничения{% endif %}</div></div>
-        <div class="col-sm-6"><div class="small text-secondary">Состояние доступа</div><div>{{ client.get_limit_state_display }}</div></div>
-        <div class="col-sm-6"><div class="small text-secondary">Пакет трафика</div><div>{{ traffic_limit_display }}</div></div>
-        <div class="col-sm-6"><div class="small text-secondary">Использовано</div><div>{{ traffic_used_display }}</div></div>
         <div class="col-sm-6"><div class="small text-secondary">Обновление данных</div><div>{% if client.traffic_last_sync_at %}{{ client.traffic_last_sync_at|date:'d.m.Y H:i' }}{% else %}Пока нет данных{% endif %}</div></div>
         <div class="col-sm-6"><div class="small text-secondary">Последнее открытие кабинета</div><div>{% if access.last_access_at %}{{ access.last_access_at|date:'d.m.Y H:i' }}{% else %}Первое посещение{% endif %}</div></div>
         <div class="col-sm-6"><div class="small text-secondary">Срок действия ссылки кабинета</div><div>{% if access.expires_at %}{{ access.expires_at|date:'d.m.Y H:i' }}{% else %}Не ограничен{% endif %}</div></div>

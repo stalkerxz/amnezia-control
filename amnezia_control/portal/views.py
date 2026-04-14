@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from django.contrib import messages
 from django.http import HttpResponse
 from django.shortcuts import redirect, render
@@ -106,19 +108,18 @@ def _build_portal_status_block(*, open_renewal_request, latest_renewal_request):
 
 def _build_portal_history(*, access, client, limit: int = 8):
     timeline = []
+    seen = set()
 
     def push(when, title: str, text: str):
         if not when:
             return
-        timeline.append({"at": when, "title": title, "text": text})
+        dedupe_key = (title, text.strip(), when.replace(second=0, microsecond=0))
+        if dedupe_key in seen:
+            return
+        seen.add(dedupe_key)
+        timeline.append({"at": when, "title": title, "text": text.strip()})
 
     push(access.created_at, "Доступ к кабинету выдан", "Ссылка на кабинет клиента была выпущена.")
-    push(access.last_access_at, "Кабинет открыт", "Вы вошли в кабинет по персональной ссылке.")
-    push(
-        access.last_selfservice_reissue_at,
-        "Конфигурация переиздана",
-        "Вы самостоятельно переиздали конфигурацию. Предыдущая версия больше не действует.",
-    )
 
     audit_actions = {
         "portal.renewal.request": "Заявка на продление отправлена",
@@ -126,7 +127,6 @@ def _build_portal_history(*, access, client, limit: int = 8):
         "portal.renewal.done": "Заявка выполнена",
         "portal.renewal.extend_and_close": "Заявка выполнена",
         "portal.renewal.dismissed": "Заявка отклонена",
-        "portal.renewal.note_updated": "Комментарий по заявке обновлён",
         "portal.config.reissue": "Конфигурация переиздана",
     }
 
@@ -139,7 +139,8 @@ def _build_portal_history(*, access, client, limit: int = 8):
         if not title:
             continue
         text = ""
-        operator_note = (event.details or {}).get("operator_note") or ""
+        event_details = event.details or {}
+        operator_note = event_details.get("operator_note") or ""
         if operator_note.strip():
             text = f"Комментарий оператора: {operator_note.strip()}"
         elif event.action == "portal.renewal.request":
@@ -148,6 +149,15 @@ def _build_portal_history(*, access, client, limit: int = 8):
             text = "Оператор начал обработку вашего обращения."
         elif event.action in {"portal.renewal.done", "portal.renewal.extend_and_close"}:
             text = "Продление по заявке завершено."
+            new_expires_at = event_details.get("new_expires_at")
+            if new_expires_at:
+                try:
+                    parsed = datetime.fromisoformat(new_expires_at)
+                    if timezone.is_naive(parsed):
+                        parsed = timezone.make_aware(parsed, timezone=timezone.get_current_timezone())
+                    text = f"Доступ продлён до {timezone.localtime(parsed).strftime('%d.%m.%Y %H:%M')}."
+                except ValueError:
+                    text = "Продление по заявке завершено."
         elif event.action == "portal.renewal.dismissed":
             text = "По заявке принято решение об отклонении."
         elif event.action == "portal.config.reissue":
@@ -173,6 +183,8 @@ def portal_home_view(request, token: str):
         open_renewal_request=open_renewal_request,
         latest_renewal_request=latest_renewal_request,
     )
+    if status_block and latest_renewal_request and latest_renewal_request.status == ClientRenewalRequest.Status.DONE and client.expires_at:
+        status_block["expires_at"] = client.expires_at
     history_items = _build_portal_history(access=access, client=client)
     can_selfservice_reissue, reissue_block_message = PortalReissuePolicyService.can_selfservice_reissue(access=access)
     return render(
