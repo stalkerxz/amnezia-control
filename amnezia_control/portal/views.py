@@ -8,13 +8,11 @@ from django.views.decorators.http import require_http_methods
 
 from audit.models import AuditLog
 from audit.services import AuditService
+from core.services import get_portal_renewal_cooldown_hours
 from vpn.models import VPNClient
 from vpn.services import VPNClientService
 
 from .services import PortalAccessService, PortalResolveReason
-
-RENEWAL_COOLDOWN_HOURS = 24
-
 
 def _fmt_bytes(value: int | None):
     if value is None:
@@ -120,7 +118,7 @@ def portal_request_renewal_view(request, token: str):
         return error_response
 
     client = access.client
-    cooldown_started_at = timezone.now() - timedelta(hours=RENEWAL_COOLDOWN_HOURS)
+    cooldown_started_at = timezone.now() - timedelta(hours=get_portal_renewal_cooldown_hours())
     has_recent_request = AuditLog.objects.filter(
         action="portal.renewal.request",
         entity_type="VPNClient",

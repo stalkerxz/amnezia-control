@@ -7,6 +7,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from audit.models import AuditLog
+from core.models import SystemSettings
 from servers.models import ProtocolProfile, Server, ServerProtocol
 from vpn.models import VPNClient
 from vpn.services import VPNClientService
@@ -120,3 +121,28 @@ class PortalFlowTests(TestCase):
             1,
         )
         self.assertContains(response, "Заявка уже была отправлена недавно")
+
+    def test_portal_link_lifetime_uses_system_settings(self):
+        SystemSettings.get_solo().portal_link_lifetime_days = 10
+        SystemSettings.get_solo().save(update_fields=["portal_link_lifetime_days"])
+
+        self._issue_token()
+        access = ClientPortalAccess.objects.get(client=self.client_obj)
+        self.assertGreaterEqual(access.expires_at, timezone.now() + timedelta(days=9, hours=23))
+
+    def test_renewal_cooldown_uses_system_settings(self):
+        settings_obj = SystemSettings.get_solo()
+        settings_obj.portal_renewal_cooldown_hours = 1
+        settings_obj.save(update_fields=["portal_renewal_cooldown_hours"])
+
+        token = self._issue_token()
+        self.client.post(reverse("portal-request-renewal", kwargs={"token": token}), follow=True)
+        log = AuditLog.objects.filter(action="portal.renewal.request", entity_id=str(self.client_obj.id)).first()
+        AuditLog.objects.filter(id=log.id).update(created_at=timezone.now() - timedelta(hours=2))
+
+        self.client.post(reverse("portal-request-renewal", kwargs={"token": token}), follow=True)
+
+        self.assertEqual(
+            AuditLog.objects.filter(action="portal.renewal.request", entity_type="VPNClient", entity_id=str(self.client_obj.id)).count(),
+            2,
+        )

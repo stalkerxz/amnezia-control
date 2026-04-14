@@ -19,7 +19,7 @@
       <a class="nav-link {% if request.path|slice:':9' == '/servers/' %}active{% endif %}" href="/servers/">Сервер</a>
       <a class="nav-link {% if request.path|slice:':6' == '/jobs/' %}active{% endif %}" href="/jobs/">Задания</a>
       <a class="nav-link {% if request.path|slice:':7' == '/audit/' %}active{% endif %}" href="/audit/">Audit</a>
-      <a class="nav-link disabled" href="#" aria-disabled="true">Настройки</a>
+      <a class="nav-link {% if request.path|slice:':10' == '/settings/' %}active{% endif %}" href="/settings/">Настройки</a>
     </nav>
     <hr class="my-4 sidebar-divider">
     <div class="sidebar-section sidebar-section-muted mb-2">Техническое</div>

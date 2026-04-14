@@ -1,0 +1,64 @@
+{% extends 'partials/base.html' %}
+
+{% block title %}Настройки · amnezia-control{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-4">
+  <div>
+    <h1 class="h3 mb-1">Настройки</h1>
+    <div class="text-secondary">Операторские параметры и техническая информация.</div>
+  </div>
+</div>
+
+<div class="row g-4">
+  <div class="col-xl-7">
+    <div class="card shadow-sm border-0 h-100">
+      <div class="card-body">
+        <h2 class="h5 mb-3">Редактируемые параметры</h2>
+        <form method="post" class="row g-3">
+          {% csrf_token %}
+          <div class="col-12">
+            <label class="form-label" for="id_portal_link_lifetime_days">{{ form.portal_link_lifetime_days.label }}</label>
+            {{ form.portal_link_lifetime_days }}
+          </div>
+          <div class="col-12">
+            <label class="form-label" for="id_portal_renewal_cooldown_hours">{{ form.portal_renewal_cooldown_hours.label }}</label>
+            {{ form.portal_renewal_cooldown_hours }}
+          </div>
+          <div class="col-12">
+            <button type="submit" class="btn btn-primary">Сохранить</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-xl-5">
+    <div class="card shadow-sm border-0 mb-4">
+      <div class="card-body">
+        <h2 class="h5 mb-3">Read-only параметры</h2>
+        <dl class="row mb-0">
+          <dt class="col-8">Интервал enforcement лимитов</dt>
+          <dd class="col-4 text-end">{{ limits_enforce_every_minutes }} мин</dd>
+        </dl>
+      </div>
+    </div>
+
+    <div class="card shadow-sm border-0">
+      <div class="card-body">
+        <h2 class="h5 mb-3">Окружение</h2>
+        <dl class="row mb-0 small">
+          <dt class="col-6">Timezone</dt>
+          <dd class="col-6 text-end">{{ timezone_name }}</dd>
+          <dt class="col-6">DEBUG</dt>
+          <dd class="col-6 text-end">{% if debug_enabled %}on{% else %}off{% endif %}</dd>
+          <dt class="col-6">Версия приложения</dt>
+          <dd class="col-6 text-end">{{ app_version }}</dd>
+          <dt class="col-6">Python</dt>
+          <dd class="col-6 text-end">{{ python_version }}</dd>
+        </dl>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
