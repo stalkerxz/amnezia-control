@@ -4,3 +4,5 @@ __pycache__/
 .venv/
 staticfiles/
 *.sqlite3
+amnezia_control/celerybeat-schedule
+docker-compose.yml.bak.*
