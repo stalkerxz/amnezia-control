@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.utils.translation import gettext_lazy as _
 
 from .models import ClientPortalAccess
 
@@ -30,8 +31,8 @@ class ClientPortalAccessAdmin(admin.ModelAdmin):
     )
     ordering = ("-created_at",)
     fieldsets = (
-        ("Доступ", {"fields": ("client", "enabled", "created_at", "expires_at", "last_access_at", "revoked_at")}),
-        ("Токен (только для аудита)", {"fields": ("token_hash_short", "token_hash", "token_encrypted")}),
+        (_("Доступ"), {"fields": ("client", "enabled", "created_at", "expires_at", "last_access_at", "revoked_at")}),
+        (_("Токен (только для аудита)"), {"fields": ("token_hash_short", "token_hash", "token_encrypted")}),
     )
 
     def token_hash_short(self, obj):
@@ -40,4 +41,4 @@ class ClientPortalAccessAdmin(admin.ModelAdmin):
             return value
         return f"{value[:8]}…{value[-8:]}"
 
-    token_hash_short.short_description = "Token hash"
+    token_hash_short.short_description = _("Хэш токена")

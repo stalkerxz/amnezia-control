@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.utils.translation import gettext_lazy as _
 from .models import ClientConfigRevision, VPNClient
 
 
@@ -31,16 +32,16 @@ class VPNClientAdmin(admin.ModelAdmin):
     )
     ordering = ("-created_at",)
     fieldsets = (
-        ("Базовые", {"fields": ("server", "name", "protocol_type", "profile", "created_by")}),
-        ("Статус", {"fields": ("status", "limit_state", "disable_reason")}),
+        (_("Базовые"), {"fields": ("server", "name", "protocol_type", "profile", "created_by")}),
+        (_("Статус"), {"fields": ("status", "limit_state", "disable_reason")}),
         (
-            "Лимиты",
+            _("Лимиты"),
             {
                 "fields": ("expires_at", "traffic_limit_bytes", "traffic_used_bytes", "traffic_last_sync_at", "traffic_sync_error")
             },
         ),
-        ("Runtime", {"fields": ("imported_from_runtime", "runtime_peer_public_key", "runtime_address", "last_runtime_sync_at")}),
-        ("Техническое", {"fields": ("created_at",)}),
+        (_("Рантайм"), {"fields": ("imported_from_runtime", "runtime_peer_public_key", "runtime_address", "last_runtime_sync_at")}),
+        (_("Техническое"), {"fields": ("created_at",)}),
     )
 
 

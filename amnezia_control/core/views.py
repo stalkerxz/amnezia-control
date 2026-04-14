@@ -8,6 +8,7 @@ from django.db.models import Prefetch
 from django.http import JsonResponse
 from django.urls import reverse
 from django.shortcuts import redirect, render
+from django.utils.translation import gettext as _
 from django.utils import timezone
 
 from audit.models import AuditLog
@@ -225,7 +226,7 @@ def settings_view(request):
         form = SystemSettingsForm(request.POST, instance=system_settings)
         if form.is_valid():
             form.save()
-            messages.success(request, "Настройки сохранены.")
+            messages.success(request, _("Настройки сохранены."))
             return redirect("settings")
     else:
         form = SystemSettingsForm(instance=system_settings)

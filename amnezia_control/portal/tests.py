@@ -146,3 +146,13 @@ class PortalFlowTests(TestCase):
             AuditLog.objects.filter(action="portal.renewal.request", entity_type="VPNClient", entity_id=str(self.client_obj.id)).count(),
             2,
         )
+
+    def test_portal_hides_technical_traffic_error_details(self):
+        token = self._issue_token()
+        self.client_obj.traffic_sync_error = "Peer отсутствует в runtime"
+        self.client_obj.save(update_fields=["traffic_sync_error"])
+
+        response = self.client.get(reverse("portal-home", kwargs={"token": token}))
+
+        self.assertContains(response, "Статистика трафика временно недоступна")
+        self.assertNotContains(response, "Peer отсутствует в runtime")

@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.utils.translation import gettext_lazy as _
 
 from .models import Job, JobEvent
 
@@ -21,9 +22,9 @@ class JobAdmin(admin.ModelAdmin):
     ordering = ("-created_at",)
     inlines = (JobEventInline,)
     fieldsets = (
-        ("Задача", {"fields": ("action", "status", "server", "actor")}),
-        ("Payload", {"fields": ("payload",)}),
-        ("Время", {"fields": ("created_at", "started_at", "finished_at")}),
+        (_("Задача"), {"fields": ("action", "status", "server", "actor")}),
+        (_("Параметры задачи"), {"fields": ("payload",)}),
+        (_("Время"), {"fields": ("created_at", "started_at", "finished_at")}),
     )
 
 
@@ -36,6 +37,6 @@ class JobEventAdmin(admin.ModelAdmin):
     readonly_fields = ("created_at",)
     ordering = ("-created_at",)
     fieldsets = (
-        ("Событие", {"fields": ("job", "level", "message", "exit_code", "created_at")}),
-        ("Потоки", {"fields": ("stdout", "stderr")}),
+        (_("Событие"), {"fields": ("job", "level", "message", "exit_code", "created_at")}),
+        (_("Потоки"), {"fields": ("stdout", "stderr")}),
     )

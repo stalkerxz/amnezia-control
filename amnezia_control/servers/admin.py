@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.utils.translation import gettext_lazy as _
 
 from .models import ProtocolProfile, Server, ServerProtocol
 
@@ -22,10 +23,10 @@ class ServerAdmin(admin.ModelAdmin):
     readonly_fields = ("last_runtime_sync_at", "created_at", "updated_at")
     ordering = ("name",)
     fieldsets = (
-        ("Подключение", {"fields": ("name", "host", "port", "ssh_username", "ssh_private_key_path")}),
-        ("Публичный endpoint", {"fields": ("public_endpoint_host", "public_endpoint_port")}),
-        ("Состояние", {"fields": ("is_enabled", "health_status", "last_runtime_sync_at")}),
-        ("Техническое", {"fields": ("created_at", "updated_at")}),
+        (_("Подключение"), {"fields": ("name", "host", "port", "ssh_username", "ssh_private_key_path")}),
+        (_("Публичная точка доступа"), {"fields": ("public_endpoint_host", "public_endpoint_port")}),
+        (_("Состояние"), {"fields": ("is_enabled", "health_status", "last_runtime_sync_at")}),
+        (_("Техническое"), {"fields": ("created_at", "updated_at")}),
     )
 
 
@@ -46,9 +47,9 @@ class ServerProtocolAdmin(admin.ModelAdmin):
     readonly_fields = ("runtime_metadata", "last_sync_at")
     ordering = ("server__name", "protocol_type")
     fieldsets = (
-        ("Базовые", {"fields": ("server", "protocol_type", "enabled")}),
-        ("Контейнер", {"fields": ("container_name", "container_status", "last_sync_at")}),
-        ("Runtime metadata", {"fields": ("runtime_metadata",)}),
+        (_("Базовые"), {"fields": ("server", "protocol_type", "enabled")}),
+        (_("Контейнер"), {"fields": ("container_name", "container_status", "last_sync_at")}),
+        (_("Метаданные рантайма"), {"fields": ("runtime_metadata",)}),
     )
 
 
@@ -61,7 +62,7 @@ class ProtocolProfileAdmin(admin.ModelAdmin):
     readonly_fields = ("created_at",)
     ordering = ("-created_at",)
     fieldsets = (
-        ("Профиль", {"fields": ("name", "server_protocol", "protocol_type", "status")}),
-        ("Шаблон", {"fields": ("config_template",)}),
-        ("Техническое", {"fields": ("created_at",)}),
+        (_("Профиль"), {"fields": ("name", "server_protocol", "protocol_type", "status")}),
+        (_("Шаблон"), {"fields": ("config_template",)}),
+        (_("Техническое"), {"fields": ("created_at",)}),
     )

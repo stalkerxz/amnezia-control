@@ -9,6 +9,7 @@ urlpatterns = [
     path("logout/", auth_views.LogoutView.as_view(), name="logout"),
     path("", dashboard_view, name="dashboard"),
     path("settings/", settings_view, name="settings"),
+    path("i18n/", include("django.conf.urls.i18n")),
     path("health/", health_view, name="health"),
     path("servers/", include("servers.urls")),
     path("clients/", include("vpn.urls")),

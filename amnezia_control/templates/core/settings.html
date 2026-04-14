@@ -1,3 +1,4 @@
+{% load i18n %}
 {% extends 'partials/base.html' %}
 
 {% block title %}Настройки · amnezia-control{% endblock %}
@@ -5,8 +6,8 @@
 {% block content %}
 <div class="d-flex align-items-center justify-content-between mb-4">
   <div>
-    <h1 class="h3 mb-1">Настройки</h1>
-    <div class="text-secondary">Операторские параметры и техническая информация.</div>
+    <h1 class="h3 mb-1">{% trans "Настройки" %}</h1>
+    <div class="text-secondary">{% trans "Операторские параметры и техническая информация." %}</div>
   </div>
 </div>
 
@@ -14,7 +15,7 @@
   <div class="col-xl-7">
     <div class="card shadow-sm border-0 h-100">
       <div class="card-body">
-        <h2 class="h5 mb-3">Редактируемые параметры</h2>
+        <h2 class="h5 mb-3">{% trans "Редактируемые параметры" %}</h2>
         <form method="post" class="row g-3">
           {% csrf_token %}
           <div class="col-12">
@@ -26,7 +27,7 @@
             {{ form.portal_renewal_cooldown_hours }}
           </div>
           <div class="col-12">
-            <button type="submit" class="btn btn-primary">Сохранить</button>
+            <button type="submit" class="btn btn-primary">{% trans "Сохранить" %}</button>
           </div>
         </form>
       </div>
@@ -36,25 +37,48 @@
   <div class="col-xl-5">
     <div class="card shadow-sm border-0 mb-4">
       <div class="card-body">
-        <h2 class="h5 mb-3">Read-only параметры</h2>
+        <h2 class="h5 mb-3">{% trans "Параметры только для чтения" %}</h2>
         <dl class="row mb-0">
-          <dt class="col-8">Интервал enforcement лимитов</dt>
-          <dd class="col-4 text-end">{{ limits_enforce_every_minutes }} мин</dd>
+          <dt class="col-8">{% trans "Интервал проверки лимитов" %}</dt>
+          <dd class="col-4 text-end">{{ limits_enforce_every_minutes }} {% trans "мин" %}</dd>
         </dl>
+      </div>
+    </div>
+
+    <div class="card shadow-sm border-0 mb-4">
+      <div class="card-body">
+        <h2 class="h5 mb-3">{% trans "Язык интерфейса" %}</h2>
+        <form method="post" action="{% url 'set_language' %}" class="row g-2 align-items-end">
+          {% csrf_token %}
+          <input type="hidden" name="next" value="{{ request.path }}">
+          <div class="col-8">
+            {% get_current_language as LANGUAGE_CODE %}
+            {% get_available_languages as LANGUAGES %}
+            <label class="form-label" for="id_language">{% trans "Язык" %}</label>
+            <select class="form-select" id="id_language" name="language">
+              {% for lang_code, lang_name in LANGUAGES %}
+                <option value="{{ lang_code }}" {% if lang_code == LANGUAGE_CODE %}selected{% endif %}>{{ lang_name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-4">
+            <button type="submit" class="btn btn-outline-primary w-100">{% trans "Применить" %}</button>
+          </div>
+        </form>
       </div>
     </div>
 
     <div class="card shadow-sm border-0">
       <div class="card-body">
-        <h2 class="h5 mb-3">Окружение</h2>
+        <h2 class="h5 mb-3">{% trans "Окружение" %}</h2>
         <dl class="row mb-0 small">
-          <dt class="col-6">Timezone</dt>
+          <dt class="col-6">{% trans "Часовой пояс" %}</dt>
           <dd class="col-6 text-end">{{ timezone_name }}</dd>
-          <dt class="col-6">DEBUG</dt>
-          <dd class="col-6 text-end">{% if debug_enabled %}on{% else %}off{% endif %}</dd>
-          <dt class="col-6">Версия приложения</dt>
+          <dt class="col-6">{% trans "Режим отладки" %}</dt>
+          <dd class="col-6 text-end">{% if debug_enabled %}{% trans "вкл" %}{% else %}{% trans "выкл" %}{% endif %}</dd>
+          <dt class="col-6">{% trans "Версия приложения" %}</dt>
           <dd class="col-6 text-end">{{ app_version }}</dd>
-          <dt class="col-6">Python</dt>
+          <dt class="col-6">{% trans "Версия Python" %}</dt>
           <dd class="col-6 text-end">{{ python_version }}</dd>
         </dl>
       </div>
