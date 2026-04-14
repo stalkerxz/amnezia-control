@@ -72,7 +72,7 @@
   <td>
     {% if j.actor %}
       {{ j.actor.username }}
-      {% if j.actor_id == request.user.id %}<span class="badge status-badge status-success">Мой</span>{% else %}<span class="badge status-badge status-neutral">Другой админ</span>{% endif %}
+      {% if j.actor_id == request.user.id %}<span class="badge status-badge status-success">Мой</span>{% else %}<span class="badge status-badge status-neutral">Другой оператор</span>{% endif %}
     {% else %}
       <span class="text-secondary">система</span>
     {% endif %}

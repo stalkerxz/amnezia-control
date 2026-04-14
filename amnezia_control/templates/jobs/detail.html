@@ -21,7 +21,7 @@
       <p class="mb-0">Инициатор:
         {% if job.actor %}
           <strong>{{ job.actor.username }}</strong>
-          {% if job.actor_id == request.user.id %}<span class="badge status-badge status-success">Мой</span>{% else %}<span class="badge status-badge status-neutral">Другой админ</span>{% endif %}
+          {% if job.actor_id == request.user.id %}<span class="badge status-badge status-success">Мой</span>{% else %}<span class="badge status-badge status-neutral">Другой оператор</span>{% endif %}
         {% else %}
           <span class="text-secondary">система</span>
         {% endif %}

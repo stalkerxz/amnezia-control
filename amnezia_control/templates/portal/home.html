@@ -8,8 +8,8 @@
       <h1 class="h3 mb-0">{{ client.name }}</h1>
     </div>
     <div class="d-flex gap-2 flex-wrap">
-      <a href="/portal/{{ token }}/config/" class="btn btn-primary">Скачать конфиг</a>
-      <a href="/portal/{{ token }}/qr/" class="btn btn-outline-primary">Показать QR</a>
+      <a href="/portal/{{ token }}/config/" class="btn btn-primary">Скачать конфигурацию</a>
+      <a href="/portal/{{ token }}/qr/" class="btn btn-outline-primary">Показать QR-код</a>
     </div>
   </div>
 
@@ -30,25 +30,54 @@
       <div class="row g-3">
         <div class="col-sm-6"><div class="small text-secondary">Протокол</div><div>{{ client.protocol_type|upper }}</div></div>
         <div class="col-sm-6"><div class="small text-secondary">Статус</div><div>{{ client.get_status_display }}</div></div>
-        <div class="col-sm-6"><div class="small text-secondary">Истекает</div><div>{% if client.expires_at %}{{ client.expires_at|date:'d.m.Y H:i' }}{% else %}Не задано{% endif %}</div></div>
-        <div class="col-sm-6"><div class="small text-secondary">Состояние лимитов</div><div>{{ client.get_limit_state_display }}</div></div>
-        <div class="col-sm-6"><div class="small text-secondary">Лимит трафика</div><div>{{ traffic_limit_display }}</div></div>
-        <div class="col-sm-6"><div class="small text-secondary">Использовано трафика</div><div>{{ traffic_used_display }}</div></div>
-        <div class="col-sm-6"><div class="small text-secondary">Последняя синхронизация трафика</div><div>{% if client.traffic_last_sync_at %}{{ client.traffic_last_sync_at|date:'d.m.Y H:i' }}{% else %}Нет данных{% endif %}</div></div>
-        <div class="col-sm-6"><div class="small text-secondary">Последний вход по ссылке</div><div>{% if access.last_access_at %}{{ access.last_access_at|date:'d.m.Y H:i' }}{% else %}Первое посещение{% endif %}</div></div>
-        <div class="col-sm-6"><div class="small text-secondary">Срок действия ссылки</div><div>{% if access.expires_at %}{{ access.expires_at|date:'d.m.Y H:i' }}{% else %}Не ограничен{% endif %}</div></div>
+        <div class="col-sm-6"><div class="small text-secondary">Доступ до</div><div>{% if client.expires_at %}{{ client.expires_at|date:'d.m.Y H:i' }}{% else %}Без ограничения{% endif %}</div></div>
+        <div class="col-sm-6"><div class="small text-secondary">Состояние доступа</div><div>{{ client.get_limit_state_display }}</div></div>
+        <div class="col-sm-6"><div class="small text-secondary">Пакет трафика</div><div>{{ traffic_limit_display }}</div></div>
+        <div class="col-sm-6"><div class="small text-secondary">Использовано</div><div>{{ traffic_used_display }}</div></div>
+        <div class="col-sm-6"><div class="small text-secondary">Обновление данных</div><div>{% if client.traffic_last_sync_at %}{{ client.traffic_last_sync_at|date:'d.m.Y H:i' }}{% else %}Пока нет данных{% endif %}</div></div>
+        <div class="col-sm-6"><div class="small text-secondary">Последнее открытие кабинета</div><div>{% if access.last_access_at %}{{ access.last_access_at|date:'d.m.Y H:i' }}{% else %}Первое посещение{% endif %}</div></div>
+        <div class="col-sm-6"><div class="small text-secondary">Срок действия ссылки кабинета</div><div>{% if access.expires_at %}{{ access.expires_at|date:'d.m.Y H:i' }}{% else %}Не ограничен{% endif %}</div></div>
       </div>
     </div>
   </div>
 
   <div class="card panel-card">
     <div class="card-body">
-      <h2 class="h6">Запросить продление</h2>
-      <p class="small text-secondary">Оператор получит заявку в журнале аудита.</p>
+      <h2 class="h6">Продление доступа</h2>
+      {% if open_renewal_request %}
+      <div class="alert alert-info mb-3">
+        {% if open_renewal_request.status == 'new' %}
+          <strong>Заявка отправлена.</strong> Оператор скоро возьмёт её в работу.
+        {% else %}
+          <strong>Заявка в работе.</strong> Ожидайте, пожалуйста, ответ оператора.
+        {% endif %}
+      </div>
+      {% elif latest_renewal_request %}
+      <div class="alert {% if latest_renewal_request.status == 'done' %}alert-success{% else %}alert-secondary{% endif %} mb-3">
+        {% if latest_renewal_request.status == 'done' %}
+          <strong>Последняя заявка выполнена.</strong>
+        {% elif latest_renewal_request.status == 'dismissed' %}
+          <strong>Последняя заявка отклонена.</strong>
+        {% endif %}
+        {% if latest_renewal_request.processed_at %}
+          <span class="d-block small mt-1">Статус обновлён {{ latest_renewal_request.processed_at|date:'d.m.Y H:i' }}.</span>
+        {% endif %}
+        {% if latest_renewal_request.operator_note %}
+          <span class="d-block small mt-1">Комментарий оператора: {{ latest_renewal_request.operator_note }}</span>
+        {% endif %}
+      </div>
+      <p class="small text-secondary">При необходимости вы можете отправить новую заявку.</p>
       <form method="post" action="/portal/{{ token }}/request-renewal/">
         {% csrf_token %}
-        <button class="btn btn-outline-warning">Отправить запрос на продление</button>
+        <button class="btn btn-outline-warning">Отправить новую заявку</button>
       </form>
+      {% else %}
+      <p class="small text-secondary">Если нужен новый срок доступа, отправьте заявку оператору.</p>
+      <form method="post" action="/portal/{{ token }}/request-renewal/">
+        {% csrf_token %}
+        <button class="btn btn-outline-warning">Отправить заявку на продление</button>
+      </form>
+      {% endif %}
     </div>
   </div>
 </div>

@@ -16,7 +16,8 @@
     <a class="brand d-block mb-4" href="/">amnezia-control</a>
     <div class="sidebar-section mb-2">{% trans "Навигация" %}</div>
     <nav class="nav flex-column gap-1">
-      <a class="nav-link {% if request.path|slice:':9' == '/clients/' %}active{% endif %}" href="/clients/">Клиенты</a>
+      <a class="nav-link {% if request.path|slice:':9' == '/clients/' and request.path|slice:':26' != '/clients/renewal-requests/' %}active{% endif %}" href="/clients/">Клиенты</a>
+      <a class="nav-link {% if request.path|slice:':26' == '/clients/renewal-requests/' %}active{% endif %}" href="/clients/renewal-requests/">Продления</a>
       <a class="nav-link {% if request.path|slice:':9' == '/servers/' %}active{% endif %}" href="/servers/">Сервер</a>
       <a class="nav-link {% if request.path|slice:':6' == '/jobs/' %}active{% endif %}" href="/jobs/">Задания</a>
       <a class="nav-link {% if request.path|slice:':7' == '/audit/' %}active{% endif %}" href="/audit/">{% trans "Аудит" %}</a>
@@ -25,7 +26,7 @@
     <hr class="my-4 sidebar-divider">
     <div class="sidebar-section sidebar-section-muted mb-2">{% trans "Техническое" %}</div>
     <nav class="nav flex-column gap-1 sidebar-nav-aux">
-      <a class="nav-link" href="/admin/">{% trans "Админ-панель Django" %}</a>
+      <a class="nav-link" href="/admin/">{% trans "Администрирование Django" %}</a>
       <a class="nav-link nav-link-danger" href="/logout/">{% trans "Выход" %}</a>
     </nav>
   </aside>

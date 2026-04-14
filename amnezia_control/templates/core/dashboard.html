@@ -82,8 +82,8 @@
   <div class="col-xl-3 col-md-6"><a href="/jobs/?signal=failed" class="card stat-card metric-card stat-card-compact h-100 text-decoration-none"><div class="card-body"><div class="stat-label">Ошибки задач (24ч)</div><div class="stat-value text-danger">{{ failed_jobs_recent_count }}</div></div></a></div>
   <div class="col-xl-3 col-md-6"><a href="/jobs/?signal=warning" class="card stat-card metric-card stat-card-compact h-100 text-decoration-none"><div class="card-body"><div class="stat-label">Предупреждения задач (24ч)</div><div class="stat-value text-warning">{{ warning_jobs_recent_count }}</div></div></a></div>
   <div class="col-xl-3 col-md-6"><a href="/jobs/?signal=degraded_success" class="card stat-card metric-card stat-card-compact h-100 text-decoration-none"><div class="card-body"><div class="stat-label">Успех с деградацией (24ч)</div><div class="stat-value text-warning">{{ degraded_jobs_recent_count }}</div></div></a></div>
-  <div class="col-xl-3 col-md-6"><div class="card stat-card metric-card stat-card-compact h-100"><div class="card-body"><div class="stat-label">Fallback-телеметрия</div><div class="stat-value text-warning">{{ degraded_clients_count }}</div></div></div></div>
-  <div class="col-xl-3 col-md-6"><div class="card stat-card metric-card stat-card-compact h-100"><div class="card-body"><div class="stat-label">Последняя синхронизация runtime</div><div class="small">{{ last_runtime_sync|default:'Не запускалась' }}</div></div></div></div>
+  <div class="col-xl-3 col-md-6"><div class="card stat-card metric-card stat-card-compact h-100"><div class="card-body"><div class="stat-label">Резервный режим телеметрии</div><div class="stat-value text-warning">{{ degraded_clients_count }}</div></div></div></div>
+  <div class="col-xl-3 col-md-6"><div class="card stat-card metric-card stat-card-compact h-100"><div class="card-body"><div class="stat-label">Последняя синхронизация с серверами</div><div class="small">{{ last_runtime_sync|default:'Ещё не запускалась' }}</div></div></div></div>
 </div>
 
 <div class="row g-3 mb-4">
@@ -91,21 +91,22 @@
     <div class="card panel-card h-100">
       <div class="card-body">
         <div class="d-flex justify-content-between align-items-center mb-3">
-          <h2 class="h6 mb-0">Запросы продления из кабинета</h2>
-          <a href="/clients/?renewal_state=with" class="small text-decoration-none">Клиенты с запросами</a>
+          <h2 class="h6 mb-0">Заявки на продление из кабинета клиента</h2>
+          <a href="/clients/renewal-requests/" class="small text-decoration-none">Все заявки</a>
         </div>
         <div class="d-flex gap-3 mb-3">
+          <div><div class="small text-secondary">Открытые</div><div class="h4 mb-0">{{ renewal_open_count }}</div></div>
           <div><div class="small text-secondary">За 24 часа</div><div class="h4 mb-0">{{ renewal_requests_last_24h }}</div></div>
           <div><div class="small text-secondary">За 7 дней</div><div class="h4 mb-0">{{ renewal_requests_last_7d }}</div></div>
         </div>
         <ul class="list-group list-group-flush">
           {% for log in recent_renewal_requests %}
             <li class="list-group-item bg-transparent px-0 d-flex justify-content-between">
-              <a class="text-decoration-none" href="/clients/{{ log.entity_id }}/">Клиент #{{ log.entity_id }}</a>
-              <span class="small text-secondary">{{ log.created_at|date:'d.m.Y H:i' }}</span>
+              <a class="text-decoration-none" href="/clients/{{ log.client_id }}/">{{ log.client.name }}</a>
+              <span class="small text-secondary">{{ log.get_status_display }} · {{ log.created_at|date:'d.m.Y H:i' }}</span>
             </li>
           {% empty %}
-            <li class="list-group-item bg-transparent px-0"><div class="empty-state">Запросов продления пока нет.</div></li>
+            <li class="list-group-item bg-transparent px-0"><div class="empty-state">Заявок на продление пока нет.</div></li>
           {% endfor %}
         </ul>
       </div>

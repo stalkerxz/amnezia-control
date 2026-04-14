@@ -12,7 +12,7 @@ from servers.models import ProtocolProfile, Server, ServerProtocol
 from vpn.models import VPNClient
 from vpn.services import VPNClientService
 
-from .models import ClientPortalAccess
+from .models import ClientPortalAccess, ClientRenewalRequest
 from .services import PortalAccessService
 
 
@@ -99,7 +99,7 @@ class PortalFlowTests(TestCase):
         self.assertContains(response, "base64-qr")
         qr_mock.assert_called_once_with(self.client_obj)
 
-    def test_renewal_request_creates_audit_entry(self):
+    def test_renewal_request_creates_workflow_request_and_audit_entry(self):
         token = self._issue_token()
 
         response = self.client.post(reverse("portal-request-renewal", kwargs={"token": token}), follow=True)
@@ -109,8 +109,9 @@ class PortalFlowTests(TestCase):
             AuditLog.objects.filter(action="portal.renewal.request", entity_type="VPNClient", entity_id=str(self.client_obj.id)).count(),
             1,
         )
+        self.assertEqual(ClientRenewalRequest.objects.filter(client=self.client_obj, status="new").count(), 1)
 
-    def test_repeated_renewal_request_inside_cooldown_does_not_duplicate(self):
+    def test_repeated_renewal_request_does_not_create_duplicate_open_requests(self):
         token = self._issue_token()
 
         self.client.post(reverse("portal-request-renewal", kwargs={"token": token}), follow=True)
@@ -120,7 +121,74 @@ class PortalFlowTests(TestCase):
             AuditLog.objects.filter(action="portal.renewal.request", entity_type="VPNClient", entity_id=str(self.client_obj.id)).count(),
             1,
         )
-        self.assertContains(response, "Заявка уже была отправлена недавно")
+        self.assertEqual(ClientRenewalRequest.objects.filter(client=self.client_obj, status="new").count(), 1)
+        self.assertContains(response, "Заявка уже отправлена")
+
+
+    def test_new_request_can_be_created_after_done(self):
+        token = self._issue_token()
+        self.client.post(reverse("portal-request-renewal", kwargs={"token": token}), follow=True)
+        request_obj = ClientRenewalRequest.objects.get(client=self.client_obj)
+        request_obj.status = ClientRenewalRequest.Status.DONE
+        request_obj.processed_at = timezone.now()
+        request_obj.save(update_fields=["status", "processed_at", "updated_at"])
+
+        self.client.post(reverse("portal-request-renewal", kwargs={"token": token}), follow=True)
+
+        self.assertEqual(
+            ClientRenewalRequest.objects.filter(client=self.client_obj).count(),
+            2,
+        )
+        self.assertEqual(
+            ClientRenewalRequest.objects.filter(
+                client=self.client_obj,
+                status__in=[ClientRenewalRequest.Status.NEW, ClientRenewalRequest.Status.IN_PROGRESS],
+            ).count(),
+            1,
+        )
+
+    def test_new_request_can_be_created_after_dismissed(self):
+        token = self._issue_token()
+        self.client.post(reverse("portal-request-renewal", kwargs={"token": token}), follow=True)
+        request_obj = ClientRenewalRequest.objects.get(client=self.client_obj)
+        request_obj.status = ClientRenewalRequest.Status.DISMISSED
+        request_obj.processed_at = timezone.now()
+        request_obj.save(update_fields=["status", "processed_at", "updated_at"])
+
+        self.client.post(reverse("portal-request-renewal", kwargs={"token": token}), follow=True)
+
+        self.assertEqual(ClientRenewalRequest.objects.filter(client=self.client_obj).count(), 2)
+        self.assertEqual(
+            ClientRenewalRequest.objects.filter(client=self.client_obj, status=ClientRenewalRequest.Status.NEW).count(),
+            1,
+        )
+
+    def test_portal_shows_status_text_for_latest_closed_request(self):
+        token = self._issue_token()
+        request_obj = ClientRenewalRequest.objects.create(
+            client=self.client_obj,
+            status=ClientRenewalRequest.Status.DONE,
+            processed_at=timezone.now(),
+            operator_note="Продление уже применено.",
+            created_from_portal=True,
+        )
+
+        response = self.client.get(reverse("portal-home", kwargs={"token": token}))
+
+        self.assertContains(response, "Последняя заявка выполнена")
+        self.assertContains(response, request_obj.operator_note)
+
+    def test_portal_shows_in_progress_state_for_open_request(self):
+        token = self._issue_token()
+        ClientRenewalRequest.objects.create(
+            client=self.client_obj,
+            status=ClientRenewalRequest.Status.IN_PROGRESS,
+            created_from_portal=True,
+        )
+
+        response = self.client.get(reverse("portal-home", kwargs={"token": token}))
+
+        self.assertContains(response, "Заявка в работе")
 
     def test_portal_link_lifetime_uses_system_settings(self):
         SystemSettings.get_solo().portal_link_lifetime_days = 10
@@ -129,23 +197,6 @@ class PortalFlowTests(TestCase):
         self._issue_token()
         access = ClientPortalAccess.objects.get(client=self.client_obj)
         self.assertGreaterEqual(access.expires_at, timezone.now() + timedelta(days=9, hours=23))
-
-    def test_renewal_cooldown_uses_system_settings(self):
-        settings_obj = SystemSettings.get_solo()
-        settings_obj.portal_renewal_cooldown_hours = 1
-        settings_obj.save(update_fields=["portal_renewal_cooldown_hours"])
-
-        token = self._issue_token()
-        self.client.post(reverse("portal-request-renewal", kwargs={"token": token}), follow=True)
-        log = AuditLog.objects.filter(action="portal.renewal.request", entity_id=str(self.client_obj.id)).first()
-        AuditLog.objects.filter(id=log.id).update(created_at=timezone.now() - timedelta(hours=2))
-
-        self.client.post(reverse("portal-request-renewal", kwargs={"token": token}), follow=True)
-
-        self.assertEqual(
-            AuditLog.objects.filter(action="portal.renewal.request", entity_type="VPNClient", entity_id=str(self.client_obj.id)).count(),
-            2,
-        )
 
     def test_portal_hides_technical_traffic_error_details(self):
         token = self._issue_token()

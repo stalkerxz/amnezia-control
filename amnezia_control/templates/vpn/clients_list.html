@@ -3,11 +3,11 @@
 <div class="page-header d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
   <div>
     <p class="page-kicker">Операторская · Клиенты</p>
-    <h1 class="h3 mb-1">Управление VPN клиентами</h1>
+    <h1 class="h3 mb-1">Управление VPN-клиентами</h1>
     <p class="text-secondary mb-0">Контроль статусов, лимитов и подключений в одном списке.</p>
   </div>
   <div class="d-flex gap-2">
-    <form method="post" action="/clients/import/">{% csrf_token %}<button class="btn btn-outline-secondary">Импорт из runtime</button></form>
+    <form method="post" action="/clients/import/">{% csrf_token %}<button class="btn btn-outline-secondary">Импорт с сервера</button></form>
     <a class="btn btn-primary" href="/clients/new/">Создать клиента</a>
   </div>
 </div>
@@ -107,7 +107,7 @@
         <th>Срок действия</th>
         <th>Источник</th>
         <th>Создал / Последнее действие</th>
-        <th>Runtime</th>
+        <th>Адрес в системе</th>
         <th>Лимиты / трафик</th>
         <th>Обновлено</th>
         <th class="text-end">Действия</th>
@@ -129,9 +129,9 @@
             {% if c.limit_state == 'traffic_exceeded' %}<span class="badge status-badge status-danger">Трафик превышен</span>{% endif %}
             {% if c.status == 'deleted' %}<span class="badge status-badge status-danger">Удалён</span>{% endif %}
             {% if row.telemetry.badge_label %}<span class="badge status-badge status-neutral">{{ row.telemetry.badge_label }}</span>{% endif %}
-            {% if row.has_recent_renewal_request %}<span class="badge status-badge status-warning">Запрос продления</span>{% endif %}
+            {% if row.has_recent_renewal_request %}<a class="badge status-badge status-warning text-decoration-none" href="/clients/renewal-requests/">Продление</a>{% endif %}
           </div>
-          {% if row.last_renewal_request_at %}<div class="small text-secondary mt-1">Последний запрос продления: {{ row.last_renewal_request_at|date:'d.m.Y H:i' }}</div>{% endif %}
+          {% if row.last_renewal_request_at %}<div class="small text-secondary mt-1">Последняя заявка на продление: {{ row.last_renewal_request_at|date:'d.m.Y H:i' }}</div>{% endif %}
         </td>
         <td>{{ c.server.name|default:'—' }}</td>
         <td>{{ row.expires_display }}</td>
@@ -141,7 +141,7 @@
             <span class="text-secondary">Создал:</span>
             {% if c.created_by %}
               {{ c.created_by.username }}
-              {% if c.created_by_id == request.user.id %}<span class="badge status-badge status-success">Мой</span>{% else %}<span class="badge status-badge status-neutral">Другой админ</span>{% endif %}
+              {% if c.created_by_id == request.user.id %}<span class="badge status-badge status-success">Мой</span>{% else %}<span class="badge status-badge status-neutral">Другой оператор</span>{% endif %}
             {% else %}
               <span class="text-secondary">система</span>
             {% endif %}
@@ -158,7 +158,7 @@
         </td>
         <td>
           <code>{{ row.runtime_address_display }}</code>
-          <button type="button" class="btn btn-xs btn-outline-secondary ms-1 js-copy" data-copy="{{ row.runtime_address_display|default:'' }}">Копия</button>
+          <button type="button" class="btn btn-xs btn-outline-secondary ms-1 js-copy" data-copy="{{ row.runtime_address_display|default:'' }}">Копировать</button>
         </td>
         <td>
           <div>{% if c.traffic_limit_bytes %}{{ row.traffic_used_display }} / {{ row.traffic_limit_display }}{% else %}{{ row.traffic_used_display }}{% endif %}</div>
@@ -174,8 +174,8 @@
               <button class="btn btn-sm btn-success" type="submit">Восстановить</button>
             </form>
             {% endif %}
-            <a class="btn btn-sm btn-outline-primary" href="/clients/{{ c.id }}/download/" title="Скачать конфиг">Config</a>
-            <button class="btn btn-sm btn-outline-info js-open-qr-modal" type="button" data-client-id="{{ c.id }}" data-client-name="{{ c.name }}" data-bs-toggle="modal" data-bs-target="#clientQrModal">QR</button>
+            <a class="btn btn-sm btn-outline-primary" href="/clients/{{ c.id }}/download/" title="Скачать конфиг">Файл</a>
+            <button class="btn btn-sm btn-outline-info js-open-qr-modal" type="button" data-client-id="{{ c.id }}" data-client-name="{{ c.name }}" data-bs-toggle="modal" data-bs-target="#clientQrModal">QR-код</button>
             <div class="dropdown">
               <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">Ещё</button>
               <ul class="dropdown-menu dropdown-menu-end">
@@ -222,7 +222,7 @@
 {% else %}
 <div class="empty-state">
   <h2 class="h6 mb-2">Клиенты не найдены</h2>
-  <p class="mb-3">Измените фильтры, создайте нового клиента или выполните импорт peers из runtime.</p>
+  <p class="mb-3">Измените фильтры, создайте нового клиента или выполните импорт клиентов с сервера.</p>
   <a class="btn btn-sm btn-primary" href="/clients/new/">Создать клиента</a>
 </div>
 {% endif %}
@@ -231,7 +231,7 @@
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content panel-card">
       <div class="modal-header">
-        <h2 class="modal-title fs-5" id="clientQrModalLabel">QR клиента</h2>
+        <h2 class="modal-title fs-5" id="clientQrModalLabel">QR-код клиента</h2>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
       </div>
       <div class="modal-body" id="clientQrModalBody"><div class="text-secondary">Загрузка…</div></div>
@@ -375,7 +375,7 @@
       btn.addEventListener('click', async () => {
         const id = btn.dataset.clientId;
         const name = btn.dataset.clientName;
-        title.textContent = `QR клиента: ${name}`;
+        title.textContent = `QR-код клиента: ${name}`;
         body.innerHTML = '<div class="text-secondary">Загрузка…</div>';
 
         try {
@@ -383,7 +383,7 @@
           if (!response.ok) throw new Error('request failed');
           body.innerHTML = await response.text();
         } catch (e) {
-          body.innerHTML = '<div class="alert alert-danger mb-0">Не удалось загрузить QR. Попробуйте ещё раз.</div>';
+          body.innerHTML = '<div class="alert alert-danger mb-0">Не удалось загрузить QR-код. Попробуйте ещё раз.</div>';
         }
       });
     });
@@ -422,10 +422,10 @@
         try {
           await navigator.clipboard.writeText(text);
           btn.textContent = 'Скопировано';
-          setTimeout(() => btn.textContent = 'Копия', 1200);
+          setTimeout(() => btn.textContent = 'Копировать', 1200);
         } catch (_) {
           btn.textContent = 'Ошибка';
-          setTimeout(() => btn.textContent = 'Копия', 1200);
+          setTimeout(() => btn.textContent = 'Копировать', 1200);
         }
       });
     });

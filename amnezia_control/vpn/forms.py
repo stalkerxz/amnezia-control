@@ -293,7 +293,7 @@ class VPNClientListFilterForm(forms.Form):
         label="Статус",
         choices=(
             ("", "Активные и отключенные"),
-            (STATUS_ALL, "Все (включая удаленных)"),
+            (STATUS_ALL, "Все (включая удалённых)"),
         )
         + tuple(VPNClient.Status.choices),
     )
@@ -320,8 +320,8 @@ class VPNClientListFilterForm(forms.Form):
         label="Запрос продления",
         choices=(
             (RENEWAL_ALL, "Все"),
-            (RENEWAL_WITH, "Есть запросы"),
-            (RENEWAL_WITHOUT, "Без запросов"),
+            (RENEWAL_WITH, "Есть открытая заявка"),
+            (RENEWAL_WITHOUT, "Без открытых заявок"),
         ),
         initial=RENEWAL_ALL,
     )

@@ -6,6 +6,7 @@ from django.utils import timezone
 from jobs.models import Job
 from servers.models import ProtocolProfile, Server, ServerProtocol
 from servers.services import ServerService
+from portal.models import ClientRenewalRequest
 from portal.services import PortalAccessService
 
 from .forms import VPNClientCreateForm, VPNClientLimitsUpdateForm
@@ -1768,19 +1769,163 @@ class VPNClientPortalAdminAndRenewalVisibilityTest(TestCase):
         self.assertContains(response, "Текущая ссылка кабинета")
         self.assertContains(response, f"/portal/{token}/")
 
-    def test_clients_list_marks_and_filters_recent_renewal_requests(self):
-        AuditLog.objects.create(
-            action="portal.renewal.request",
-            entity_type="VPNClient",
-            entity_id=str(self.client_with_renewal.id),
-            details={},
-        )
+    def test_clients_list_marks_and_filters_open_renewal_requests(self):
+        ClientRenewalRequest.objects.create(client=self.client_with_renewal, status=ClientRenewalRequest.Status.NEW)
 
         response = self.client.get("/clients/")
         self.assertContains(response, "client-with-renewal")
-        self.assertContains(response, "Запрос продления")
-        self.assertContains(response, "Последний запрос продления")
+        self.assertContains(response, "Продление")
+        self.assertContains(response, "Последняя заявка на продление")
 
         filtered = self.client.get("/clients/", {"renewal_state": "with"})
         self.assertContains(filtered, "client-with-renewal")
         self.assertNotContains(filtered, "client-without-renewal")
+
+    def test_operator_can_change_renewal_status_and_save_note(self):
+        request_obj = ClientRenewalRequest.objects.create(
+            client=self.client_with_renewal,
+            status=ClientRenewalRequest.Status.NEW,
+            note="Нужно продление",
+        )
+
+        response = self.client.post(
+            f"/clients/{self.client_with_renewal.id}/action/renewal_set_status/",
+            {
+                "renewal_request_id": request_obj.id,
+                "target_status": ClientRenewalRequest.Status.IN_PROGRESS,
+                "operator_note": "Связались с клиентом.",
+            },
+            follow=True,
+        )
+        request_obj.refresh_from_db()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(request_obj.status, ClientRenewalRequest.Status.IN_PROGRESS)
+        self.assertEqual(request_obj.operator_note, "Связались с клиентом.")
+        self.assertTrue(
+            AuditLog.objects.filter(
+                action="portal.renewal.in_progress",
+                entity_type="VPNClient",
+                entity_id=str(self.client_with_renewal.id),
+            ).exists()
+        )
+
+
+    def test_renewal_status_change_redirects_to_next_url(self):
+        request_obj = ClientRenewalRequest.objects.create(
+            client=self.client_with_renewal,
+            status=ClientRenewalRequest.Status.NEW,
+        )
+        next_url = "/clients/renewal-requests/?status=open"
+
+        response = self.client.post(
+            f"/clients/{self.client_with_renewal.id}/action/renewal_set_status/",
+            {
+                "renewal_request_id": request_obj.id,
+                "target_status": ClientRenewalRequest.Status.IN_PROGRESS,
+                "operator_note": "Берём в работу",
+                "next": next_url,
+            },
+            follow=False,
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, next_url)
+
+
+    def test_invalid_status_value_redirects_safely_to_next_url(self):
+        request_obj = ClientRenewalRequest.objects.create(
+            client=self.client_with_renewal,
+            status=ClientRenewalRequest.Status.NEW,
+        )
+        next_url = "/clients/renewal-requests/"
+
+        response = self.client.post(
+            f"/clients/{self.client_with_renewal.id}/action/renewal_set_status/",
+            {
+                "renewal_request_id": request_obj.id,
+                "target_status": "bad_status",
+                "operator_note": "",
+                "next": next_url,
+            },
+            follow=False,
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, next_url)
+
+    def test_invalid_transition_redirects_safely_to_next_url(self):
+        request_obj = ClientRenewalRequest.objects.create(
+            client=self.client_with_renewal,
+            status=ClientRenewalRequest.Status.DONE,
+            processed_at=timezone.now(),
+        )
+        next_url = "/clients/renewal-requests/?status=done"
+
+        response = self.client.post(
+            f"/clients/{self.client_with_renewal.id}/action/renewal_set_status/",
+            {
+                "renewal_request_id": request_obj.id,
+                "target_status": ClientRenewalRequest.Status.IN_PROGRESS,
+                "operator_note": "Попытка открыть заново",
+                "next": next_url,
+            },
+            follow=False,
+        )
+        request_obj.refresh_from_db()
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, next_url)
+        self.assertEqual(request_obj.status, ClientRenewalRequest.Status.DONE)
+
+    def test_comment_only_save_redirects_and_persists_note(self):
+        request_obj = ClientRenewalRequest.objects.create(
+            client=self.client_with_renewal,
+            status=ClientRenewalRequest.Status.DISMISSED,
+            processed_at=timezone.now(),
+        )
+        next_url = "/clients/renewal-requests/?status=dismissed"
+
+        response = self.client.post(
+            f"/clients/{self.client_with_renewal.id}/action/renewal_set_status/",
+            {
+                "renewal_request_id": request_obj.id,
+                "target_status": ClientRenewalRequest.Status.DISMISSED,
+                "operator_note": "Комментарий сохранён без смены статуса",
+                "next": next_url,
+            },
+            follow=False,
+        )
+        request_obj.refresh_from_db()
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, next_url)
+        self.assertEqual(request_obj.status, ClientRenewalRequest.Status.DISMISSED)
+        self.assertEqual(request_obj.operator_note, "Комментарий сохранён без смены статуса")
+        self.assertTrue(
+            AuditLog.objects.filter(
+                action="portal.renewal.note_updated",
+                entity_type="VPNClient",
+                entity_id=str(self.client_with_renewal.id),
+            ).exists()
+        )
+
+    def test_closed_renewal_request_rejects_reopen_transition(self):
+        request_obj = ClientRenewalRequest.objects.create(
+            client=self.client_with_renewal,
+            status=ClientRenewalRequest.Status.DONE,
+            processed_at=timezone.now(),
+        )
+
+        self.client.post(
+            f"/clients/{self.client_with_renewal.id}/action/renewal_set_status/",
+            {
+                "renewal_request_id": request_obj.id,
+                "target_status": ClientRenewalRequest.Status.IN_PROGRESS,
+                "operator_note": "Попытка вернуть в работу",
+            },
+            follow=True,
+        )
+        request_obj.refresh_from_db()
+
+        self.assertEqual(request_obj.status, ClientRenewalRequest.Status.DONE)

@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.utils.translation import gettext_lazy as _
 
-from .models import ClientPortalAccess
+from .models import ClientPortalAccess, ClientRenewalRequest
 
 
 @admin.register(ClientPortalAccess)
@@ -42,3 +42,26 @@ class ClientPortalAccessAdmin(admin.ModelAdmin):
         return f"{value[:8]}…{value[-8:]}"
 
     token_hash_short.short_description = _("Хэш токена")
+
+
+@admin.register(ClientRenewalRequest)
+class ClientRenewalRequestAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "client",
+        "status",
+        "created_from_portal",
+        "created_at",
+        "updated_at",
+        "processed_at",
+    )
+    list_filter = ("status", "created_from_portal", "created_at", "processed_at")
+    search_fields = ("client__name", "note", "operator_note")
+    autocomplete_fields = ("client",)
+    readonly_fields = ("created_at", "updated_at", "processed_at")
+    fieldsets = (
+        (_("Заявка"), {"fields": ("client", "status", "created_from_portal")}),
+        (_("Комментарий клиента"), {"fields": ("note",)}),
+        (_("Комментарий оператора"), {"fields": ("operator_note",)}),
+        (_("Даты"), {"fields": ("created_at", "updated_at", "processed_at")}),
+    )

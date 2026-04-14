@@ -16,6 +16,7 @@ from jobs.models import Job, JobEvent
 from jobs.services import classify_job_signal
 from servers.models import Server, ServerProtocol
 from servers.services import ServerService
+from portal.models import ClientRenewalRequest
 from vpn.models import VPNClient
 
 from .forms import SystemSettingsForm
@@ -42,12 +43,17 @@ def _job_action_label(action: str) -> str:
 def _audit_action_label(action: str) -> str:
     labels = {
         "server.sync_runtime": "Сервер: синхронизация состояния",
-        "server.import_runtime_peers": "Сервер: импорт клиентов из runtime",
+        "server.import_runtime_peers": "Сервер: импорт клиентов с сервера",
         "client.create": "Клиент: создан",
         "client.reissue": "Клиент: конфигурация переиздана",
         "client.disable": "Клиент: отключён",
         "client.enable": "Клиент: включён",
         "client.delete": "Клиент: помечен удалённым",
+        "portal.renewal.request": "Портал: клиент отправил заявку на продление",
+        "portal.renewal.in_progress": "Портал: заявка на продление взята в работу",
+        "portal.renewal.done": "Портал: заявка на продление выполнена",
+        "portal.renewal.dismissed": "Портал: заявка на продление отклонена",
+        "portal.renewal.note_updated": "Портал: обновлён комментарий оператора по заявке",
     }
     return labels.get(action, (action or "—").replace(".", " · "))
 
@@ -102,10 +108,13 @@ def dashboard_view(request):
     failed_jobs_created_from = (timezone.localdate() - timezone.timedelta(days=1)).isoformat()
     renewal_24h_cutoff = timezone.now() - timezone.timedelta(hours=24)
     renewal_7d_cutoff = timezone.now() - timezone.timedelta(days=7)
-    renewal_requests_last_24h = AuditLog.objects.filter(action="portal.renewal.request", created_at__gte=renewal_24h_cutoff).count()
-    renewal_requests_last_7d = AuditLog.objects.filter(action="portal.renewal.request", created_at__gte=renewal_7d_cutoff).count()
+    renewal_requests_last_24h = ClientRenewalRequest.objects.filter(created_at__gte=renewal_24h_cutoff).count()
+    renewal_requests_last_7d = ClientRenewalRequest.objects.filter(created_at__gte=renewal_7d_cutoff).count()
+    renewal_open_count = ClientRenewalRequest.objects.filter(
+        status__in=[ClientRenewalRequest.Status.NEW, ClientRenewalRequest.Status.IN_PROGRESS]
+    ).count()
     recent_renewal_requests = list(
-        AuditLog.objects.filter(action="portal.renewal.request").order_by("-created_at")[:5]
+        ClientRenewalRequest.objects.select_related("client").order_by("-created_at")[:5]
     )
 
     jobs_last_24h = list(
@@ -159,13 +168,19 @@ def dashboard_view(request):
             "tone": "danger",
         },
         {
+            "title": "Заявки на продление: открытые",
+            "count": renewal_open_count,
+            "url": reverse("renewal-requests-list"),
+            "tone": "warning",
+        },
+        {
             "title": "Ошибки задач за последние 24 часа",
             "count": failed_jobs_recent_count,
             "url": f"{reverse('jobs-list')}?status=failed&created_from={failed_jobs_created_from}",
             "tone": "danger",
         },
         {
-            "title": "Клиенты в soft delete",
+            "title": "Клиенты в архиве",
             "count": sum(1 for client in clients if client.status == VPNClient.Status.DELETED),
             "url": f"{reverse('clients-list')}?quick=deleted",
             "tone": "neutral",
@@ -174,7 +189,7 @@ def dashboard_view(request):
 
     current_limitations = []
     if degraded_clients_count:
-        current_limitations.append(f"AWG2 fallback-телеметрия используется для {degraded_clients_count} клиент(ов).")
+        current_limitations.append(f"AWG2 работает в резервном режиме для {degraded_clients_count} клиент(ов).")
     not_checked_servers_count = sum(1 for state in server_health_states if state == ServerService.HEALTH_NOT_CHECKED)
     if not_checked_servers_count:
         current_limitations.append(f"Не проверены серверы: {not_checked_servers_count}.")
@@ -191,7 +206,7 @@ def dashboard_view(request):
         "clients_total_count": len(clients),
         "active_clients_count": sum(1 for client in clients if client.status == VPNClient.Status.ACTIVE),
         "disabled_clients_count": sum(1 for client in clients if client.status == VPNClient.Status.DISABLED),
-        "deleted_clients_count": attention_items[5]["count"],
+        "deleted_clients_count": attention_items[6]["count"],
         "expired_clients_count": attention_items[2]["count"],
         "traffic_exceeded_clients_count": attention_items[3]["count"],
         "degraded_clients_count": degraded_clients_count,
@@ -209,6 +224,7 @@ def dashboard_view(request):
         "current_limitations": current_limitations,
         "renewal_requests_last_24h": renewal_requests_last_24h,
         "renewal_requests_last_7d": renewal_requests_last_7d,
+        "renewal_open_count": renewal_open_count,
         "recent_renewal_requests": recent_renewal_requests,
     }
     return render(request, "core/dashboard.html", context)

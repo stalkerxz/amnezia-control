@@ -1,18 +1,15 @@
-from datetime import timedelta
-
 from django.contrib import messages
 from django.http import HttpResponse
 from django.shortcuts import redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 
-from audit.models import AuditLog
 from audit.services import AuditService
-from core.services import get_portal_renewal_cooldown_hours
 from vpn.models import VPNClient
 from vpn.services import VPNClientService
 
-from .services import PortalAccessService, PortalResolveReason
+from .models import ClientRenewalRequest
+from .services import PortalAccessService, PortalResolveReason, RenewalRequestService
 
 def _fmt_bytes(value: int | None):
     if value is None:
@@ -68,6 +65,8 @@ def portal_home_view(request, token: str):
     client = access.client
     limit_state = VPNClientService.get_limit_state(client)
     blocked = client.status != VPNClient.Status.ACTIVE or limit_state != VPNClient.LimitState.ACTIVE
+    open_renewal_request = RenewalRequestService.get_open_for_client(client=client)
+    latest_renewal_request = RenewalRequestService.get_latest_for_client(client=client)
     return render(
         request,
         "portal/home.html",
@@ -79,6 +78,8 @@ def portal_home_view(request, token: str):
             "blocked": blocked,
             "traffic_used_display": _fmt_bytes(client.traffic_used_bytes),
             "traffic_limit_display": _fmt_bytes(client.traffic_limit_bytes),
+            "open_renewal_request": open_renewal_request,
+            "latest_renewal_request": latest_renewal_request,
         },
     )
 
@@ -118,28 +119,27 @@ def portal_request_renewal_view(request, token: str):
         return error_response
 
     client = access.client
-    cooldown_started_at = timezone.now() - timedelta(hours=get_portal_renewal_cooldown_hours())
-    has_recent_request = AuditLog.objects.filter(
-        action="portal.renewal.request",
-        entity_type="VPNClient",
-        entity_id=str(client.id),
-        created_at__gte=cooldown_started_at,
-    ).exists()
-    if has_recent_request:
-        messages.info(request, "Заявка уже была отправлена недавно. Ожидайте ответа оператора.")
-        return redirect("portal-home", token=token)
+    open_request, created = RenewalRequestService.create_or_get_open_from_portal(client=client)
 
-    AuditService.log(
-        actor=None,
-        action="portal.renewal.request",
-        entity_type="VPNClient",
-        entity_id=str(client.id),
-        details={
-            "portal_access_id": access.id,
-            "requested_at": timezone.now().isoformat(),
-            "ip": request.META.get("REMOTE_ADDR", ""),
-            "user_agent": request.META.get("HTTP_USER_AGENT", "")[:255],
-        },
-    )
-    messages.success(request, "Запрос на продление отправлен оператору. Ожидайте обратной связи.")
+    if created:
+        AuditService.log(
+            actor=None,
+            action="portal.renewal.request",
+            entity_type="VPNClient",
+            entity_id=str(client.id),
+            details={
+                "portal_access_id": access.id,
+                "renewal_request_id": open_request.id,
+                "requested_at": timezone.now().isoformat(),
+                "ip": request.META.get("REMOTE_ADDR", ""),
+                "user_agent": request.META.get("HTTP_USER_AGENT", "")[:255],
+            },
+        )
+        messages.success(request, "Заявка на продление отправлена. Мы уже передали её оператору.")
+    else:
+        if open_request.status == ClientRenewalRequest.Status.NEW:
+            messages.info(request, "Заявка уже отправлена и ожидает обработки.")
+        else:
+            messages.info(request, "Заявка уже в работе у оператора.")
+
     return redirect("portal-home", token=token)
