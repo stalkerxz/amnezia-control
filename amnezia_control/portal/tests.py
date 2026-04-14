@@ -207,3 +207,99 @@ class PortalFlowTests(TestCase):
 
         self.assertContains(response, "Статистика трафика временно недоступна")
         self.assertNotContains(response, "Peer отсутствует в runtime")
+
+    def test_portal_selfservice_reissue_works_and_writes_audit_log(self):
+        from unittest.mock import patch
+
+        token = self._issue_token()
+        VPNClientService._store_revision(
+            self.client_obj,
+            "[Interface]\nPrivateKey = old\nAddress = 10.66.0.2/32\n\n[Peer]\nPublicKey = server\nEndpoint = host:51820\n",
+        )
+
+        def _mock_reissue(*, client, actor):
+            VPNClientService._store_revision(
+                client,
+                "[Interface]\nPrivateKey = new\nAddress = 10.66.0.3/32\n\n[Peer]\nPublicKey = server\nEndpoint = host:51820\n",
+            )
+
+        with patch("portal.views.VPNClientService.reissue_config", side_effect=_mock_reissue):
+            response = self.client.post(
+                reverse("portal-reissue-config", kwargs={"token": token}),
+                {"confirm_reissue": "1"},
+                follow=True,
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "новая конфигурация выпущена")
+        self.assertTrue(
+            AuditLog.objects.filter(action="portal.config.reissue", entity_type="VPNClient", entity_id=str(self.client_obj.id)).exists()
+        )
+
+    def test_portal_reissue_cooldown_prevents_second_immediate_reissue(self):
+        from unittest.mock import patch
+
+        token = self._issue_token()
+        VPNClientService._store_revision(
+            self.client_obj,
+            "[Interface]\nPrivateKey = old\nAddress = 10.66.0.2/32\n\n[Peer]\nPublicKey = server\nEndpoint = host:51820\n",
+        )
+        with patch("portal.views.VPNClientService.reissue_config", return_value=None):
+            first = self.client.post(
+                reverse("portal-reissue-config", kwargs={"token": token}),
+                {"confirm_reissue": "1"},
+                follow=True,
+            )
+            second = self.client.post(
+                reverse("portal-reissue-config", kwargs={"token": token}),
+                {"confirm_reissue": "1"},
+                follow=True,
+            )
+
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(second.status_code, 200)
+        self.assertContains(second, "Переиздать конфигурацию можно позже")
+
+    def test_portal_download_and_qr_use_new_current_config_after_reissue(self):
+        from unittest.mock import patch
+
+        token = self._issue_token()
+        VPNClientService._store_revision(
+            self.client_obj,
+            "[Interface]\nPrivateKey = old\nAddress = 10.66.0.2/32\n\n[Peer]\nPublicKey = server\nEndpoint = old-host:51820\n",
+        )
+
+        def _mock_reissue(*, client, actor):
+            VPNClientService._store_revision(
+                client,
+                "[Interface]\nPrivateKey = new\nAddress = 10.66.0.3/32\n\n[Peer]\nPublicKey = server\nEndpoint = new-host:51820\n",
+            )
+
+        with patch("portal.views.VPNClientService.reissue_config", side_effect=_mock_reissue):
+            self.client.post(reverse("portal-reissue-config", kwargs={"token": token}), {"confirm_reissue": "1"}, follow=True)
+
+        config_response = self.client.get(reverse("portal-config", kwargs={"token": token}))
+        qr_response = self.client.get(reverse("portal-qr", kwargs={"token": token}))
+
+        self.assertEqual(config_response.status_code, 200)
+        self.assertContains(config_response, "new-host:51820")
+        self.assertContains(qr_response, "/portal/")
+        self.assertContains(qr_response, "data:image/png;base64")
+
+    def test_portal_reissue_blocked_client_shows_russian_message(self):
+        token = self._issue_token()
+        self.client_obj.status = VPNClient.Status.DELETED
+        self.client_obj.save(update_fields=["status"])
+        VPNClientService._store_revision(
+            self.client_obj,
+            "[Interface]\nPrivateKey = old\nAddress = 10.66.0.2/32\n\n[Peer]\nPublicKey = server\nEndpoint = host:51820\n",
+        )
+
+        response = self.client.post(
+            reverse("portal-reissue-config", kwargs={"token": token}),
+            {"confirm_reissue": "1"},
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Переиздание недоступно: обратитесь к оператору.")

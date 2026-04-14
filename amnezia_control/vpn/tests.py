@@ -1824,6 +1824,43 @@ class VPNClientPortalAdminAndRenewalVisibilityTest(TestCase):
             ).exists()
         )
 
+    def test_operator_can_extend_and_close_renewal_request(self):
+        request_obj = ClientRenewalRequest.objects.create(
+            client=self.client_with_renewal,
+            status=ClientRenewalRequest.Status.NEW,
+            note="Нужно продление",
+        )
+        old_expires_at = timezone.now() - timedelta(days=1)
+        self.client_with_renewal.expires_at = old_expires_at
+        self.client_with_renewal.save(update_fields=["expires_at"])
+
+        response = self.client.post(
+            f"/clients/{self.client_with_renewal.id}/action/renewal_set_status/",
+            {
+                "renewal_request_id": request_obj.id,
+                "target_status": "extend_and_close",
+                "extension_days": "14",
+                "operator_note": "Продлили на 14 дней.",
+            },
+            follow=True,
+        )
+        request_obj.refresh_from_db()
+        self.client_with_renewal.refresh_from_db()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(request_obj.status, ClientRenewalRequest.Status.DONE)
+        self.assertEqual(request_obj.operator_note, "Продлили на 14 дней.")
+        self.assertIsNotNone(request_obj.processed_at)
+        self.assertEqual(request_obj.processed_by_id, self.user.id)
+        self.assertGreaterEqual(self.client_with_renewal.expires_at, timezone.now() + timedelta(days=13, hours=23))
+        self.assertTrue(
+            AuditLog.objects.filter(
+                action="portal.renewal.extend_and_close",
+                entity_type="VPNClient",
+                entity_id=str(self.client_with_renewal.id),
+            ).exists()
+        )
+
 
     def test_renewal_status_change_redirects_to_next_url(self):
         request_obj = ClientRenewalRequest.objects.create(

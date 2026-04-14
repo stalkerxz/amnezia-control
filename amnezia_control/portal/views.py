@@ -9,7 +9,7 @@ from vpn.models import VPNClient
 from vpn.services import VPNClientService
 
 from .models import ClientRenewalRequest
-from .services import PortalAccessService, PortalResolveReason, RenewalRequestService
+from .services import PortalAccessService, PortalReissuePolicyService, PortalResolveReason, RenewalRequestService
 
 def _fmt_bytes(value: int | None):
     if value is None:
@@ -67,6 +67,7 @@ def portal_home_view(request, token: str):
     blocked = client.status != VPNClient.Status.ACTIVE or limit_state != VPNClient.LimitState.ACTIVE
     open_renewal_request = RenewalRequestService.get_open_for_client(client=client)
     latest_renewal_request = RenewalRequestService.get_latest_for_client(client=client)
+    can_selfservice_reissue, reissue_block_message = PortalReissuePolicyService.can_selfservice_reissue(access=access)
     return render(
         request,
         "portal/home.html",
@@ -80,6 +81,9 @@ def portal_home_view(request, token: str):
             "traffic_limit_display": _fmt_bytes(client.traffic_limit_bytes),
             "open_renewal_request": open_renewal_request,
             "latest_renewal_request": latest_renewal_request,
+            "can_selfservice_reissue": can_selfservice_reissue,
+            "reissue_block_message": reissue_block_message,
+            "reissue_cooldown_hours": PortalReissuePolicyService.COOLDOWN_HOURS,
         },
     )
 
@@ -142,4 +146,43 @@ def portal_request_renewal_view(request, token: str):
         else:
             messages.info(request, "Заявка уже в работе у оператора.")
 
+    return redirect("portal-home", token=token)
+
+
+@require_http_methods(["POST"])
+def portal_reissue_config_view(request, token: str):
+    access, error_response = _resolve_access_or_error(request, token)
+    if error_response:
+        return error_response
+
+    if (request.POST.get("confirm_reissue") or "") != "1":
+        messages.warning(request, "Подтвердите переиздание конфигурации.")
+        return redirect("portal-home", token=token)
+
+    can_selfservice_reissue, block_message = PortalReissuePolicyService.can_selfservice_reissue(access=access)
+    if not can_selfservice_reissue:
+        messages.warning(request, block_message)
+        return redirect("portal-home", token=token)
+
+    client = access.client
+    VPNClientService.reissue_config(client=client, actor=None)
+    access.last_selfservice_reissue_at = timezone.now()
+    access.save(update_fields=["last_selfservice_reissue_at"])
+    AuditService.log(
+        actor=None,
+        action="portal.config.reissue",
+        entity_type="VPNClient",
+        entity_id=str(client.id),
+        details={
+            "portal_access_id": access.id,
+            "performed_at": timezone.now().isoformat(),
+            "ip": request.META.get("REMOTE_ADDR", ""),
+            "user_agent": request.META.get("HTTP_USER_AGENT", "")[:255],
+            "cooldown_hours": PortalReissuePolicyService.COOLDOWN_HOURS,
+        },
+    )
+    messages.success(
+        request,
+        "Готово: новая конфигурация выпущена. Скачайте её заново или откройте новый QR‑код. Предыдущая конфигурация больше не действует.",
+    )
     return redirect("portal-home", token=token)

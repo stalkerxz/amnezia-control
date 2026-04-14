@@ -9,6 +9,8 @@ from django.db import transaction
 from django.utils import timezone
 
 from core.services import get_portal_link_lifetime_days
+from vpn.models import VPNClient
+from vpn.services import VPNClientPolicyService
 
 from .models import ClientPortalAccess, ClientRenewalRequest
 
@@ -164,3 +166,32 @@ class RenewalRequestService:
     @classmethod
     def get_latest_for_client(cls, *, client):
         return ClientRenewalRequest.objects.filter(client=client).order_by("-created_at").first()
+
+
+class PortalReissuePolicyService:
+    COOLDOWN_HOURS = 12
+
+    @classmethod
+    def cooldown_timedelta(cls):
+        return timedelta(hours=cls.COOLDOWN_HOURS)
+
+    @classmethod
+    def can_selfservice_reissue(cls, *, access: ClientPortalAccess):
+        client = access.client
+        if client.status != VPNClient.Status.ACTIVE:
+            return False, "Переиздание недоступно: обратитесь к оператору."
+        if not client.revisions.exists():
+            return False, "Конфигурация ещё не готова. Обратитесь к оператору."
+        block_reason = VPNClientPolicyService.reissue_block_reason(client)
+        if block_reason:
+            return False, block_reason
+        if access.last_selfservice_reissue_at:
+            next_allowed_at = access.last_selfservice_reissue_at + cls.cooldown_timedelta()
+            if next_allowed_at > timezone.now():
+                return False, cls.cooldown_message(next_allowed_at)
+        return True, ""
+
+    @staticmethod
+    def cooldown_message(next_allowed_at):
+        local_time = timezone.localtime(next_allowed_at).strftime("%d.%m.%Y %H:%M")
+        return f"Переиздать конфигурацию можно позже. Следующая попытка будет доступна после {local_time}."

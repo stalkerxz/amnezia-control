@@ -13,6 +13,27 @@
     </div>
   </div>
 
+  <div class="alert alert-light border mb-3">
+    <div class="fw-semibold mb-1">Переиздание конфигурации</div>
+    <p class="mb-2 small">Если устройство утеряно или вы хотите выдать доступ заново, можно переиздать конфигурацию самостоятельно.</p>
+    <p class="mb-2 small text-danger">Важно: после переиздания предыдущая конфигурация и старый QR-код перестанут работать.</p>
+    {% if can_selfservice_reissue %}
+      <form method="post" action="/portal/{{ token }}/reissue-config/" class="d-flex flex-column flex-sm-row gap-2 align-items-sm-center">
+        {% csrf_token %}
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="1" id="confirmReissue" name="confirm_reissue" required>
+          <label class="form-check-label small" for="confirmReissue">
+            Подтверждаю переиздание и понимаю, что старая конфигурация станет недействительной.
+          </label>
+        </div>
+        <button class="btn btn-outline-danger btn-sm">Переиздать конфигурацию</button>
+      </form>
+      <div class="small text-secondary mt-2">Повторное переиздание доступно не чаще одного раза в {{ reissue_cooldown_hours }} часов.</div>
+    {% else %}
+      <div class="small text-secondary">{{ reissue_block_message }}</div>
+    {% endif %}
+  </div>
+
   {% if blocked %}
   <div class="alert alert-warning">
     <strong>Подключение ограничено.</strong>
@@ -49,7 +70,7 @@
         {% if open_renewal_request.status == 'new' %}
           <strong>Заявка отправлена.</strong> Оператор скоро возьмёт её в работу.
         {% else %}
-          <strong>Заявка в работе.</strong> Ожидайте, пожалуйста, ответ оператора.
+          <strong>Заявка в работе.</strong> Оператор уже обрабатывает ваш запрос.
         {% endif %}
       </div>
       {% elif latest_renewal_request %}

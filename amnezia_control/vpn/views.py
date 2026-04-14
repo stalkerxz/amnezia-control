@@ -1,6 +1,7 @@
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required, user_passes_test
+from datetime import timedelta
 from django.db.models import Q
 from django.db.models.functions import Coalesce
 from django.http import HttpResponse
@@ -17,6 +18,8 @@ from servers.models import Server, ServerProtocol
 from .forms import VPNClientBulkLimitsUpdateForm, VPNClientCreateForm, VPNClientLimitsUpdateForm, VPNClientListFilterForm
 from .models import VPNClient
 from .services import VPNClientPolicyService, VPNClientService
+
+DEFAULT_RENEWAL_EXTENSION_DAYS = 30
 
 
 def _admin_required(user):
@@ -496,13 +499,59 @@ def client_action_view(request, pk: int, action: str):
                 ClientRenewalRequest.Status.DONE: set(),
                 ClientRenewalRequest.Status.DISMISSED: set(),
             }
-            if target_status not in {choice[0] for choice in ClientRenewalRequest.Status.choices}:
+            if target_status not in {choice[0] for choice in ClientRenewalRequest.Status.choices} and target_status != "extend_and_close":
                 messages.error(request, "Некорректный статус заявки.")
                 return redirect(next_url or "renewal-requests-list")
 
             current_status = request_obj.status
             operator_note = (request.POST.get("operator_note") or "").strip()
+            extension_days_raw = (request.POST.get("extension_days") or "").strip()
             status_changed = current_status != target_status
+
+            if target_status == "extend_and_close":
+                if current_status not in {ClientRenewalRequest.Status.NEW, ClientRenewalRequest.Status.IN_PROGRESS}:
+                    messages.warning(request, "Продление доступно только для открытой заявки.")
+                    return redirect(next_url or "renewal-requests-list")
+
+                if extension_days_raw:
+                    if not extension_days_raw.isdigit():
+                        messages.error(request, "Введите корректное число дней продления.")
+                        return redirect(next_url or "renewal-requests-list")
+                    extension_days = int(extension_days_raw)
+                else:
+                    extension_days = DEFAULT_RENEWAL_EXTENSION_DAYS
+
+                if extension_days < 1 or extension_days > 365:
+                    messages.error(request, "Число дней продления должно быть от 1 до 365.")
+                    return redirect(next_url or "renewal-requests-list")
+
+                base_time = client.expires_at if client.expires_at and client.expires_at > timezone.now() else timezone.now()
+                client.expires_at = base_time + timedelta(days=extension_days)
+                client.limit_state = VPNClientService.get_limit_state(client)
+                client.save(update_fields=["expires_at", "limit_state"])
+
+                request_obj.status = ClientRenewalRequest.Status.DONE
+                request_obj.processed_at = timezone.now()
+                request_obj.processed_by = request.user
+                request_obj.operator_note = operator_note
+                request_obj.save(update_fields=["status", "processed_at", "processed_by", "operator_note", "updated_at"])
+
+                AuditLog.objects.create(
+                    actor=request.user,
+                    action="portal.renewal.extend_and_close",
+                    entity_type="VPNClient",
+                    entity_id=str(client.id),
+                    details={
+                        "renewal_request_id": request_obj.id,
+                        "from_status": current_status,
+                        "to_status": request_obj.status,
+                        "operator_note": request_obj.operator_note,
+                        "extension_days": extension_days,
+                        "new_expires_at": client.expires_at.isoformat() if client.expires_at else None,
+                    },
+                )
+                messages.success(request, f"Доступ клиента продлён на {extension_days} дн., заявка закрыта.")
+                return redirect(next_url or "renewal-requests-list")
 
             if status_changed and target_status not in allowed_transitions.get(current_status, set()):
                 messages.warning(request, "Недопустимый переход статуса для этой заявки.")
