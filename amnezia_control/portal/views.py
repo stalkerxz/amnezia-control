@@ -4,12 +4,14 @@ from django.shortcuts import redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 
+from audit.models import AuditLog
 from audit.services import AuditService
 from vpn.models import VPNClient
 from vpn.services import VPNClientService
 
 from .models import ClientRenewalRequest
 from .services import PortalAccessService, PortalReissuePolicyService, PortalResolveReason, RenewalRequestService
+
 
 def _fmt_bytes(value: int | None):
     if value is None:
@@ -56,6 +58,106 @@ def _resolve_access_or_error(request, token: str):
     return access, None
 
 
+def _build_portal_status_block(*, open_renewal_request, latest_renewal_request):
+    if open_renewal_request:
+        if open_renewal_request.status == ClientRenewalRequest.Status.NEW:
+            return {
+                "title": "Заявка отправлена",
+                "text": "Мы получили ваш запрос на продление. Оператор скоро начнёт обработку.",
+                "variant": "info",
+                "badge": "Ожидает обработки",
+                "updated_at": open_renewal_request.created_at,
+                "operator_note": (open_renewal_request.operator_note or "").strip(),
+            }
+        return {
+            "title": "Заявка в работе",
+            "text": "Оператор уже обрабатывает ваш запрос на продление.",
+            "variant": "primary",
+            "badge": "В работе",
+            "updated_at": open_renewal_request.updated_at,
+            "operator_note": (open_renewal_request.operator_note or "").strip(),
+        }
+
+    if not latest_renewal_request:
+        return None
+
+    if latest_renewal_request.status == ClientRenewalRequest.Status.DONE:
+        return {
+            "title": "Последняя заявка выполнена",
+            "text": "Продление по последнему обращению уже завершено.",
+            "variant": "success",
+            "badge": "Выполнено",
+            "updated_at": latest_renewal_request.processed_at or latest_renewal_request.updated_at,
+            "operator_note": (latest_renewal_request.operator_note or "").strip(),
+        }
+
+    if latest_renewal_request.status == ClientRenewalRequest.Status.DISMISSED:
+        return {
+            "title": "Последняя заявка отклонена",
+            "text": "Последний запрос на продление закрыт без выполнения.",
+            "variant": "secondary",
+            "badge": "Отклонено",
+            "updated_at": latest_renewal_request.processed_at or latest_renewal_request.updated_at,
+            "operator_note": (latest_renewal_request.operator_note or "").strip(),
+        }
+
+    return None
+
+
+def _build_portal_history(*, access, client, limit: int = 8):
+    timeline = []
+
+    def push(when, title: str, text: str):
+        if not when:
+            return
+        timeline.append({"at": when, "title": title, "text": text})
+
+    push(access.created_at, "Доступ к кабинету выдан", "Ссылка на кабинет клиента была выпущена.")
+    push(access.last_access_at, "Кабинет открыт", "Вы вошли в кабинет по персональной ссылке.")
+    push(
+        access.last_selfservice_reissue_at,
+        "Конфигурация переиздана",
+        "Вы самостоятельно переиздали конфигурацию. Предыдущая версия больше не действует.",
+    )
+
+    audit_actions = {
+        "portal.renewal.request": "Заявка на продление отправлена",
+        "portal.renewal.in_progress": "Заявка передана в работу",
+        "portal.renewal.done": "Заявка выполнена",
+        "portal.renewal.extend_and_close": "Заявка выполнена",
+        "portal.renewal.dismissed": "Заявка отклонена",
+        "portal.renewal.note_updated": "Комментарий по заявке обновлён",
+        "portal.config.reissue": "Конфигурация переиздана",
+    }
+
+    recent_audits = (
+        AuditLog.objects.filter(entity_type="VPNClient", entity_id=str(client.id), action__in=audit_actions.keys())
+        .order_by("-created_at")[:20]
+    )
+    for event in recent_audits:
+        title = audit_actions.get(event.action)
+        if not title:
+            continue
+        text = ""
+        operator_note = (event.details or {}).get("operator_note") or ""
+        if operator_note.strip():
+            text = f"Комментарий оператора: {operator_note.strip()}"
+        elif event.action == "portal.renewal.request":
+            text = "Запрос уже передан оператору."
+        elif event.action == "portal.renewal.in_progress":
+            text = "Оператор начал обработку вашего обращения."
+        elif event.action in {"portal.renewal.done", "portal.renewal.extend_and_close"}:
+            text = "Продление по заявке завершено."
+        elif event.action == "portal.renewal.dismissed":
+            text = "По заявке принято решение об отклонении."
+        elif event.action == "portal.config.reissue":
+            text = "Конфигурация обновлена и готова к скачиванию."
+        push(event.created_at, title, text)
+
+    timeline.sort(key=lambda item: item["at"], reverse=True)
+    return timeline[:limit]
+
+
 @require_http_methods(["GET"])
 def portal_home_view(request, token: str):
     access, error_response = _resolve_access_or_error(request, token)
@@ -67,6 +169,11 @@ def portal_home_view(request, token: str):
     blocked = client.status != VPNClient.Status.ACTIVE or limit_state != VPNClient.LimitState.ACTIVE
     open_renewal_request = RenewalRequestService.get_open_for_client(client=client)
     latest_renewal_request = RenewalRequestService.get_latest_for_client(client=client)
+    status_block = _build_portal_status_block(
+        open_renewal_request=open_renewal_request,
+        latest_renewal_request=latest_renewal_request,
+    )
+    history_items = _build_portal_history(access=access, client=client)
     can_selfservice_reissue, reissue_block_message = PortalReissuePolicyService.can_selfservice_reissue(access=access)
     return render(
         request,
@@ -81,6 +188,8 @@ def portal_home_view(request, token: str):
             "traffic_limit_display": _fmt_bytes(client.traffic_limit_bytes),
             "open_renewal_request": open_renewal_request,
             "latest_renewal_request": latest_renewal_request,
+            "status_block": status_block,
+            "history_items": history_items,
             "can_selfservice_reissue": can_selfservice_reissue,
             "reissue_block_message": reissue_block_message,
             "reissue_cooldown_hours": PortalReissuePolicyService.COOLDOWN_HOURS,

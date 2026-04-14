@@ -178,6 +178,41 @@ class PortalFlowTests(TestCase):
         self.assertContains(response, "Последняя заявка выполнена")
         self.assertContains(response, request_obj.operator_note)
 
+    def test_portal_history_shows_recent_client_friendly_events(self):
+        token = self._issue_token()
+        access = ClientPortalAccess.objects.get(client=self.client_obj)
+        access.last_selfservice_reissue_at = timezone.now()
+        access.save(update_fields=["last_selfservice_reissue_at"])
+        done_request = ClientRenewalRequest.objects.create(
+            client=self.client_obj,
+            status=ClientRenewalRequest.Status.DONE,
+            processed_at=timezone.now(),
+            operator_note="Продление подтверждено.",
+            created_from_portal=True,
+        )
+        AuditLog.objects.create(
+            actor=self.user,
+            action="portal.renewal.done",
+            entity_type="VPNClient",
+            entity_id=str(self.client_obj.id),
+            details={"renewal_request_id": done_request.id, "operator_note": "Продление подтверждено."},
+        )
+        AuditLog.objects.create(
+            actor=self.user,
+            action="portal.renewal.request",
+            entity_type="VPNClient",
+            entity_id=str(self.client_obj.id),
+            details={"renewal_request_id": done_request.id},
+        )
+
+        response = self.client.get(reverse("portal-home", kwargs={"token": token}))
+
+        self.assertContains(response, "История действий")
+        self.assertContains(response, "Доступ к кабинету выдан")
+        self.assertContains(response, "Заявка выполнена")
+        self.assertContains(response, "Комментарий оператора: Продление подтверждено.")
+        self.assertContains(response, "Конфигурация переиздана")
+
     def test_portal_shows_in_progress_state_for_open_request(self):
         token = self._issue_token()
         ClientRenewalRequest.objects.create(
@@ -189,6 +224,58 @@ class PortalFlowTests(TestCase):
         response = self.client.get(reverse("portal-home", kwargs={"token": token}))
 
         self.assertContains(response, "Заявка в работе")
+        self.assertContains(response, "Текущий статус")
+        self.assertContains(response, "В работе")
+
+    def test_portal_shows_done_result_block_with_operator_comment(self):
+        token = self._issue_token()
+        ClientRenewalRequest.objects.create(
+            client=self.client_obj,
+            status=ClientRenewalRequest.Status.DONE,
+            processed_at=timezone.now(),
+            operator_note="Продлили до конца месяца.",
+            created_from_portal=True,
+        )
+
+        response = self.client.get(reverse("portal-home", kwargs={"token": token}))
+
+        self.assertContains(response, "Текущий статус")
+        self.assertContains(response, "Последняя заявка выполнена")
+        self.assertContains(response, "Комментарий оператора")
+        self.assertContains(response, "Продлили до конца месяца.")
+
+    def test_portal_shows_dismissed_result_block(self):
+        token = self._issue_token()
+        ClientRenewalRequest.objects.create(
+            client=self.client_obj,
+            status=ClientRenewalRequest.Status.DISMISSED,
+            processed_at=timezone.now(),
+            operator_note="Срок уже активен, продление пока не требуется.",
+            created_from_portal=True,
+        )
+
+        response = self.client.get(reverse("portal-home", kwargs={"token": token}))
+
+        self.assertContains(response, "Текущий статус")
+        self.assertContains(response, "Последняя заявка отклонена")
+        self.assertContains(response, "Срок уже активен, продление пока не требуется.")
+
+    def test_portal_history_does_not_show_raw_technical_audit_internals(self):
+        token = self._issue_token()
+        AuditLog.objects.create(
+            actor=self.user,
+            action="portal.renewal.request",
+            entity_type="VPNClient",
+            entity_id=str(self.client_obj.id),
+            details={"ip": "10.10.10.10", "user_agent": "test-agent", "renewal_request_id": 42},
+        )
+
+        response = self.client.get(reverse("portal-home", kwargs={"token": token}))
+
+        self.assertContains(response, "Заявка на продление отправлена")
+        self.assertNotContains(response, "10.10.10.10")
+        self.assertNotContains(response, "test-agent")
+        self.assertNotContains(response, "renewal_request_id")
 
     def test_portal_link_lifetime_uses_system_settings(self):
         SystemSettings.get_solo().portal_link_lifetime_days = 10
