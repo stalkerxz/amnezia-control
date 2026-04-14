@@ -1563,6 +1563,75 @@ class VPNClientDetailDiagnosticsViewTest(TestCase):
 
 
 @override_settings(CONFIG_ENCRYPTION_KEY=Fernet.generate_key().decode())
+class VPNClientAdminExportParityTest(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user("admin-export", password="123", is_staff=True)
+        self.client.force_login(self.user)
+        self.server = Server.objects.create(name="export-server", public_endpoint_host="vpn.example.com")
+        self.protocol = ServerProtocol.objects.create(
+            server=self.server,
+            protocol_type=ServerProtocol.ProtocolType.AWG,
+            container_name="amnezia-awg",
+            enabled=True,
+            runtime_metadata={"udp_port": 51820, "subnet": "10.66.0.0/24"},
+        )
+        self.profile = ProtocolProfile.objects.create(
+            server_protocol=self.protocol,
+            name="export-profile",
+            protocol_type=ServerProtocol.ProtocolType.AWG,
+            config_template="[Interface]",
+        )
+        self.vpn_client = VPNClient.objects.create(
+            server=self.server,
+            name="export-client",
+            protocol_type=VPNClient.ProtocolType.AWG,
+            profile=self.profile,
+            created_by=self.user,
+        )
+        VPNClientService._store_revision(self.vpn_client, "[Interface]\nPrivateKey = test")
+
+    def test_admin_qr_modal_uses_portal_export_payload(self):
+        from unittest.mock import patch
+
+        with patch("vpn.views.VPNClientService.portal_qr_png_base64", return_value="admin-qr") as portal_qr_mock:
+            with patch("vpn.views.VPNClientService.qr_png_base64") as legacy_qr_mock:
+                response = self.client.get(f"/clients/{self.vpn_client.id}/qr-modal/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "admin-qr")
+        portal_qr_mock.assert_called_once_with(self.vpn_client)
+        legacy_qr_mock.assert_not_called()
+
+    def test_admin_download_uses_portal_export_config(self):
+        from unittest.mock import patch
+
+        with patch("vpn.views.VPNClientService.portal_export_config", return_value="portal-export") as portal_export_mock:
+            with patch("vpn.views.VPNClientService.latest_config") as latest_config_mock:
+                response = self.client.get(f"/clients/{self.vpn_client.id}/download/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "portal-export")
+        portal_export_mock.assert_called_once_with(self.vpn_client)
+        latest_config_mock.assert_not_called()
+
+    def test_admin_and_portal_export_payloads_match(self):
+        from unittest.mock import patch
+
+        portal_access, token = PortalAccessService.issue_for_client(self.vpn_client)
+
+        with patch("vpn.views.VPNClientService.portal_export_config", return_value="shared-export"):
+            admin_response = self.client.get(f"/clients/{self.vpn_client.id}/download/")
+
+        with patch("portal.views.VPNClientService.portal_export_config", return_value="shared-export"):
+            portal_response = self.client.get(f"/portal/{token}/config/")
+
+        self.assertEqual(admin_response.status_code, 200)
+        self.assertEqual(portal_response.status_code, 200)
+        self.assertEqual(admin_response.content, portal_response.content)
+        self.assertEqual(portal_access.client_id, self.vpn_client.id)
+
+
+@override_settings(CONFIG_ENCRYPTION_KEY=Fernet.generate_key().decode())
 class VPNClientDegradedTelemetryWordingTest(TestCase):
     def setUp(self):
         self.user = get_user_model().objects.create_user("admin-degraded", password="123", is_staff=True)
