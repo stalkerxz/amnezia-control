@@ -1,0 +1,13 @@
+{% extends 'partials/base.html' %}
+{% block title %}Доступ к кабинету недоступен{% endblock %}
+{% block content %}
+<div class="container px-0" style="max-width: 640px;">
+  <div class="card panel-card border-warning">
+    <div class="card-body">
+      <h1 class="h4 mb-3">{{ title }}</h1>
+      <p class="mb-2">{{ message }}</p>
+      <p class="small text-secondary mb-0">Обратитесь к оператору для получения новой ссылки доступа.</p>
+    </div>
+  </div>
+</div>
+{% endblock %}

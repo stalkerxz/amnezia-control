@@ -13,4 +13,5 @@ urlpatterns = [
     path("clients/", include("vpn.urls")),
     path("audit/", include("audit.urls")),
     path("jobs/", include("jobs.urls")),
+    path("portal/", include("portal.urls")),
 ]
