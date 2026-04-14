@@ -51,11 +51,14 @@
     <thead><tr><th>ID</th><th>Клиент</th><th>Сервер</th><th>Статус</th><th>Создана</th><th>Обработана</th><th>Оператор</th><th style="min-width:300px">Комментарий оператора</th><th>Действия</th></tr></thead>
     <tbody>
       {% for item in request_rows %}
-      <tr>
+      <tr class="{% if item.status == 'new' %}table-warning{% elif item.status == 'in_progress' %}table-info{% endif %}">
         <td>#{{ item.id }}</td>
         <td><a href="/clients/{{ item.client_id }}/" class="text-decoration-none">{{ item.client.name }}</a></td>
         <td>{{ item.client.server.name }}</td>
-        <td><span class="badge status-badge {% if item.status == 'new' %}status-warning{% elif item.status == 'in_progress' %}status-info{% elif item.status == 'done' %}status-success{% else %}status-neutral{% endif %}">{{ item.get_status_display }}</span></td>
+        <td>
+          <span class="badge status-badge {% if item.status == 'new' %}status-warning{% elif item.status == 'in_progress' %}status-info{% elif item.status == 'done' %}status-success{% else %}status-neutral{% endif %}">{{ item.get_status_display }}</span>
+          {% if item.status == 'new' %}<div class="small text-warning-emphasis mt-1">Новая заявка</div>{% endif %}
+        </td>
         <td>{{ item.created_at|date:'d.m.Y H:i' }}</td>
         <td>{% if item.processed_at %}{{ item.processed_at|date:'d.m.Y H:i' }}{% else %}—{% endif %}</td>
         <td>{% if item.processed_by %}{{ item.processed_by.username }}{% else %}—{% endif %}</td>
@@ -65,12 +68,21 @@
             <input type="hidden" name="renewal_request_id" value="{{ item.id }}">
             <input type="hidden" name="next" value="{{ request.get_full_path }}">
             <textarea name="operator_note" class="form-control form-control-sm" rows="2" placeholder="Комментарий для клиента или для команды">{{ item.operator_note }}</textarea>
+            {% if item.status == 'new' or item.status == 'in_progress' %}
+            <div class="input-group input-group-sm">
+              <span class="input-group-text">Продлить на</span>
+              <input type="number" min="1" max="365" class="form-control" name="extension_days" placeholder="30">
+              <span class="input-group-text">дней</span>
+            </div>
+            {% endif %}
             <div class="d-flex gap-1 flex-wrap">
               {% if item.status == 'new' %}
                 <button class="btn btn-sm btn-outline-primary" name="target_status" value="in_progress">В работу</button>
+                <button class="btn btn-sm btn-success" name="target_status" value="extend_and_close">Продлить и закрыть</button>
                 <button class="btn btn-sm btn-outline-success" name="target_status" value="done">Выполнено</button>
                 <button class="btn btn-sm btn-outline-secondary" name="target_status" value="dismissed">Отклонить</button>
               {% elif item.status == 'in_progress' %}
+                <button class="btn btn-sm btn-success" name="target_status" value="extend_and_close">Продлить и закрыть</button>
                 <button class="btn btn-sm btn-outline-success" name="target_status" value="done">Выполнено</button>
                 <button class="btn btn-sm btn-outline-secondary" name="target_status" value="dismissed">Отклонить</button>
               {% else %}

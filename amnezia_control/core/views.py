@@ -52,8 +52,10 @@ def _audit_action_label(action: str) -> str:
         "portal.renewal.request": "Портал: клиент отправил заявку на продление",
         "portal.renewal.in_progress": "Портал: заявка на продление взята в работу",
         "portal.renewal.done": "Портал: заявка на продление выполнена",
+        "portal.renewal.extend_and_close": "Портал: заявка продлена и закрыта оператором",
         "portal.renewal.dismissed": "Портал: заявка на продление отклонена",
         "portal.renewal.note_updated": "Портал: обновлён комментарий оператора по заявке",
+        "portal.config.reissue": "Портал: клиент переиздал конфигурацию",
     }
     return labels.get(action, (action or "—").replace(".", " · "))
 
