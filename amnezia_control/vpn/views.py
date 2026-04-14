@@ -10,6 +10,8 @@ import ipaddress
 
 from audit.models import AuditLog
 from jobs.models import Job
+from portal.models import ClientPortalAccess
+from portal.services import PortalAccessService
 from servers.models import Server, ServerProtocol
 from .forms import VPNClientBulkLimitsUpdateForm, VPNClientCreateForm, VPNClientLimitsUpdateForm, VPNClientListFilterForm
 from .models import VPNClient
@@ -341,6 +343,8 @@ def clients_detail_view(request, pk: int):
     if not recent_jobs:
         recent_jobs = list(Job.objects.select_related("server", "actor").filter(server=client.server).order_by("-created_at")[:5])
 
+    portal_access = ClientPortalAccess.objects.filter(client=client).first()
+
     return render(
         request,
         "vpn/clients_detail.html",
@@ -367,6 +371,8 @@ def clients_detail_view(request, pk: int):
             "recent_audit_logs": recent_audit_logs,
             "latest_operator_action": latest_operator_action,
             "recent_jobs": recent_jobs,
+            "portal_access": portal_access,
+            "portal_access_enabled": bool(portal_access and portal_access.enabled and not portal_access.revoked_at),
         },
     )
 
@@ -420,6 +426,28 @@ def client_action_view(request, pk: int, action: str):
             success_message = "Клиент помечен как удаленный и скрыт из основного списка"
         elif action == "reissue":
             VPNClientService.reissue_config(client=client, actor=request.user)
+        elif action == "portal_issue":
+            access, raw_token = PortalAccessService.issue_for_client(client)
+            AuditLog.objects.create(
+                actor=request.user,
+                action="portal.access.issue",
+                entity_type="VPNClient",
+                entity_id=str(client.id),
+                details={"portal_access_id": access.id},
+            )
+            portal_link = request.build_absolute_uri(reverse("portal-home", kwargs={"token": raw_token}))
+            success_message = f"Ссылка кабинета выпущена: {portal_link}"
+        elif action == "portal_revoke":
+            revoked = PortalAccessService.revoke_for_client(client)
+            if revoked:
+                AuditLog.objects.create(
+                    actor=request.user,
+                    action="portal.access.revoke",
+                    entity_type="VPNClient",
+                    entity_id=str(client.id),
+                    details={"portal_access_id": revoked.id},
+                )
+            success_message = "Ссылка кабинета отозвана" if revoked else "Ссылка кабинета для клиента не была выпущена"
         messages.success(request, success_message)
     except Exception as exc:
         messages.error(request, f"Ошибка выполнения действия: {exc}")

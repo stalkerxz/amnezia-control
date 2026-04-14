@@ -22,6 +22,7 @@ INSTALLED_APPS = [
     "vpn",
     "audit",
     "jobs",
+    "portal",
 ]
 
 MIDDLEWARE = [

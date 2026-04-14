@@ -1,0 +1,54 @@
+{% extends 'partials/base.html' %}
+{% block title %}Кабинет клиента · {{ client.name }}{% endblock %}
+{% block content %}
+<div class="container px-0" style="max-width: 820px;">
+  <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+    <div>
+      <p class="text-secondary mb-1">Кабинет клиента</p>
+      <h1 class="h3 mb-0">{{ client.name }}</h1>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+      <a href="/portal/{{ token }}/config/" class="btn btn-primary">Скачать конфиг</a>
+      <a href="/portal/{{ token }}/qr/" class="btn btn-outline-primary">Показать QR</a>
+    </div>
+  </div>
+
+  {% if blocked %}
+  <div class="alert alert-warning">
+    <strong>Подключение ограничено.</strong>
+    {% if client.disable_reason != 'none' %}Причина: {{ client.get_disable_reason_display }}.{% endif %}
+    {% if limit_state != 'active' %} Текущее состояние лимитов: {{ client.get_limit_state_display }}.{% endif %}
+  </div>
+  {% endif %}
+
+  {% if client.traffic_sync_error %}
+  <div class="alert alert-danger">Не удалось синхронизировать статистику трафика: {{ client.traffic_sync_error }}</div>
+  {% endif %}
+
+  <div class="card panel-card mb-3">
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-sm-6"><div class="small text-secondary">Протокол</div><div>{{ client.protocol_type|upper }}</div></div>
+        <div class="col-sm-6"><div class="small text-secondary">Статус</div><div>{{ client.get_status_display }}</div></div>
+        <div class="col-sm-6"><div class="small text-secondary">Истекает</div><div>{% if client.expires_at %}{{ client.expires_at|date:'d.m.Y H:i' }}{% else %}Не задано{% endif %}</div></div>
+        <div class="col-sm-6"><div class="small text-secondary">Состояние лимитов</div><div>{{ client.get_limit_state_display }}</div></div>
+        <div class="col-sm-6"><div class="small text-secondary">Лимит трафика</div><div>{{ traffic_limit_display }}</div></div>
+        <div class="col-sm-6"><div class="small text-secondary">Использовано трафика</div><div>{{ traffic_used_display }}</div></div>
+        <div class="col-sm-6"><div class="small text-secondary">Последняя синхронизация трафика</div><div>{% if client.traffic_last_sync_at %}{{ client.traffic_last_sync_at|date:'d.m.Y H:i' }}{% else %}Нет данных{% endif %}</div></div>
+        <div class="col-sm-6"><div class="small text-secondary">Portal last access</div><div>{% if access.last_access_at %}{{ access.last_access_at|date:'d.m.Y H:i' }}{% else %}Первое посещение{% endif %}</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card panel-card">
+    <div class="card-body">
+      <h2 class="h6">Запросить продление</h2>
+      <p class="small text-secondary">Оператор получит заявку в журнале аудита.</p>
+      <form method="post" action="/portal/{{ token }}/request-renewal/">
+        {% csrf_token %}
+        <button class="btn btn-outline-warning">Отправить запрос на продление</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
