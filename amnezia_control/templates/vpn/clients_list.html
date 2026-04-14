@@ -54,6 +54,14 @@
         {% endfor %}
       </select>
     </div>
+    <div class="col-xl-2 col-md-4">
+      <label class="form-label" for="id_renewal_state">Продления</label>
+      <select class="form-select" id="id_renewal_state" name="renewal_state">
+        {% for value, label in filter_form.fields.renewal_state.choices %}
+          <option value="{{ value }}" {% if filter_form.renewal_state.value|default:'all' == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
     <div class="col-xl-2">
       <button class="btn btn-primary w-100" type="submit">Применить</button>
     </div>
@@ -121,7 +129,9 @@
             {% if c.limit_state == 'traffic_exceeded' %}<span class="badge status-badge status-danger">Трафик превышен</span>{% endif %}
             {% if c.status == 'deleted' %}<span class="badge status-badge status-danger">Удалён</span>{% endif %}
             {% if row.telemetry.badge_label %}<span class="badge status-badge status-neutral">{{ row.telemetry.badge_label }}</span>{% endif %}
+            {% if row.has_recent_renewal_request %}<span class="badge status-badge status-warning">Запрос продления</span>{% endif %}
           </div>
+          {% if row.last_renewal_request_at %}<div class="small text-secondary mt-1">Последний запрос продления: {{ row.last_renewal_request_at|date:'d.m.Y H:i' }}</div>{% endif %}
         </td>
         <td>{{ c.server.name|default:'—' }}</td>
         <td>{{ row.expires_display }}</td>

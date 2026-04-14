@@ -17,6 +17,8 @@ from .forms import VPNClientBulkLimitsUpdateForm, VPNClientCreateForm, VPNClient
 from .models import VPNClient
 from .services import VPNClientPolicyService, VPNClientService
 
+PORTAL_RENEWAL_RECENT_DAYS = 7
+
 
 def _admin_required(user):
     return user.is_authenticated and user.is_staff
@@ -119,12 +121,21 @@ def clients_list_view(request):
         .order_by("-id")
     )
 
+    renewal_cutoff = timezone.now() - timezone.timedelta(days=PORTAL_RENEWAL_RECENT_DAYS)
+    renewal_client_ids_qs = AuditLog.objects.filter(
+        action="portal.renewal.request",
+        entity_type="VPNClient",
+        created_at__gte=renewal_cutoff,
+    ).values_list("entity_id", flat=True)
+    renewal_client_ids = {int(entity_id) for entity_id in renewal_client_ids_qs if str(entity_id).isdigit()}
+
     if filter_form.is_valid():
         q = filter_form.cleaned_data["q"].strip()
         protocol = filter_form.cleaned_data["protocol"]
         status = filter_form.cleaned_data["status"]
         source = filter_form.cleaned_data["source"]
         quick = filter_form.cleaned_data["quick"]
+        renewal_state = filter_form.cleaned_data["renewal_state"] or VPNClientListFilterForm.RENEWAL_ALL
         operator_scope = filter_form.cleaned_data["operator_scope"] or VPNClientListFilterForm.OPERATOR_SCOPE_ALL
 
         if q:
@@ -143,6 +154,10 @@ def clients_list_view(request):
             clients = clients.filter(imported_from_runtime=False)
         if operator_scope == VPNClientListFilterForm.OPERATOR_SCOPE_MINE:
             clients = clients.filter(created_by=request.user)
+        if renewal_state == VPNClientListFilterForm.RENEWAL_WITH:
+            clients = clients.filter(id__in=renewal_client_ids)
+        elif renewal_state == VPNClientListFilterForm.RENEWAL_WITHOUT:
+            clients = clients.exclude(id__in=renewal_client_ids)
 
         if quick == VPNClientListFilterForm.QUICK_ACTIVE:
             clients = clients.filter(status=VPNClient.Status.ACTIVE)
@@ -172,6 +187,20 @@ def clients_list_view(request):
     for log in recent_client_logs:
         latest_log_by_client_id.setdefault(log.entity_id, log)
 
+    renewal_logs = (
+        AuditLog.objects.filter(
+            action="portal.renewal.request",
+            entity_type="VPNClient",
+            entity_id__in=[str(client.id) for client in clients],
+            created_at__gte=renewal_cutoff,
+        )
+        .order_by("entity_id", "-created_at")
+        .values("entity_id", "created_at")
+    )
+    latest_renewal_by_client_id = {}
+    for item in renewal_logs:
+        latest_renewal_by_client_id.setdefault(item["entity_id"], item["created_at"])
+
     client_rows = []
     for client in clients:
         badge_class, badge_label = _limit_state_badge(client.limit_state)
@@ -191,6 +220,8 @@ def clients_list_view(request):
                 "telemetry": telemetry_state,
                 "reissue_blocked": bool(reissue_block_reason),
                 "reissue_block_reason": reissue_block_reason,
+                "has_recent_renewal_request": str(client.id) in latest_renewal_by_client_id,
+                "last_renewal_request_at": latest_renewal_by_client_id.get(str(client.id)),
             }
         )
 
@@ -344,6 +375,8 @@ def clients_detail_view(request, pk: int):
         recent_jobs = list(Job.objects.select_related("server", "actor").filter(server=client.server).order_by("-created_at")[:5])
 
     portal_access = ClientPortalAccess.objects.filter(client=client).first()
+    portal_raw_token = PortalAccessService.get_raw_token_for_client(client)
+    portal_link = request.build_absolute_uri(reverse("portal-home", kwargs={"token": portal_raw_token})) if portal_raw_token else ""
 
     return render(
         request,
@@ -373,6 +406,7 @@ def clients_detail_view(request, pk: int):
             "recent_jobs": recent_jobs,
             "portal_access": portal_access,
             "portal_access_enabled": bool(portal_access and portal_access.enabled and not portal_access.revoked_at),
+            "portal_link": portal_link,
         },
     )
 
@@ -437,6 +471,14 @@ def client_action_view(request, pk: int, action: str):
             )
             portal_link = request.build_absolute_uri(reverse("portal-home", kwargs={"token": raw_token}))
             success_message = f"Ссылка кабинета выпущена: {portal_link}"
+        elif action == "portal_show":
+            raw_token = PortalAccessService.get_raw_token_for_client(client)
+            if raw_token:
+                portal_link = request.build_absolute_uri(reverse("portal-home", kwargs={"token": raw_token}))
+                success_message = f"Текущая ссылка кабинета: {portal_link}"
+            else:
+                messages.warning(request, "Для клиента нет активной ссылки кабинета.")
+                return redirect("clients-detail", pk=client.id)
         elif action == "portal_revoke":
             revoked = PortalAccessService.revoke_for_client(client)
             if revoked:

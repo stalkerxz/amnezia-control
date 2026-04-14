@@ -92,6 +92,14 @@ def dashboard_view(request):
     ]
 
     failed_jobs_created_from = (timezone.localdate() - timezone.timedelta(days=1)).isoformat()
+    renewal_24h_cutoff = timezone.now() - timezone.timedelta(hours=24)
+    renewal_7d_cutoff = timezone.now() - timezone.timedelta(days=7)
+    renewal_requests_last_24h = AuditLog.objects.filter(action="portal.renewal.request", created_at__gte=renewal_24h_cutoff).count()
+    renewal_requests_last_7d = AuditLog.objects.filter(action="portal.renewal.request", created_at__gte=renewal_7d_cutoff).count()
+    recent_renewal_requests = list(
+        AuditLog.objects.filter(action="portal.renewal.request").order_by("-created_at")[:5]
+    )
+
     jobs_last_24h = list(
         Job.objects.prefetch_related(Prefetch("events", queryset=JobEvent.objects.order_by("-created_at"))).filter(
             created_at__gte=timezone.now() - timezone.timedelta(hours=24)
@@ -191,6 +199,9 @@ def dashboard_view(request):
         "audit_recent_rows": audit_recent_rows,
         "attention_items": attention_items,
         "current_limitations": current_limitations,
+        "renewal_requests_last_24h": renewal_requests_last_24h,
+        "renewal_requests_last_7d": renewal_requests_last_7d,
+        "recent_renewal_requests": recent_renewal_requests,
     }
     return render(request, "core/dashboard.html", context)
 

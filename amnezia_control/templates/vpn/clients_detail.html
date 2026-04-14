@@ -127,15 +127,24 @@
   <div class="small text-secondary mb-1">Последний доступ: {% if portal_access.last_access_at %}{{ portal_access.last_access_at|date:'d.m.Y H:i' }}{% else %}ещё не открывали{% endif %}</div>
   <div class="small text-secondary mb-3">Действует до: {% if portal_access.expires_at %}{{ portal_access.expires_at|date:'d.m.Y H:i' }}{% else %}не ограничено{% endif %}</div>
   {% endif %}
+  {% if portal_link %}
+  <div class="mb-3">
+    <label class="form-label small text-secondary mb-1">Текущая ссылка кабинета</label>
+    <div class="input-group">
+      <input class="form-control form-control-sm" type="text" readonly value="{{ portal_link }}">
+      <button class="btn btn-outline-secondary btn-sm js-copy" type="button" data-copy="{{ portal_link }}">Копировать</button>
+    </div>
+  </div>
+  {% endif %}
   <div class="d-flex gap-2 flex-wrap">
-    <form method="post" action="/clients/{{ client.id }}/action/portal_issue/">{% csrf_token %}<button class="btn btn-outline-primary">Сгенерировать/обновить ссылку</button></form>
+    <form method="post" action="/clients/{{ client.id }}/action/portal_show/">{% csrf_token %}<button class="btn btn-outline-secondary" {% if not portal_access_enabled %}disabled{% endif %}>Показать текущую ссылку</button></form>
+    <form method="post" action="/clients/{{ client.id }}/action/portal_issue/">{% csrf_token %}<button class="btn btn-outline-primary">Регенерировать ссылку</button></form>
     {% if portal_access_enabled %}
     <form method="post" action="/clients/{{ client.id }}/action/portal_revoke/">{% csrf_token %}<button class="btn btn-outline-danger">Отозвать ссылку</button></form>
     {% else %}
     <button class="btn btn-outline-danger" disabled>Отозвать ссылку</button>
     {% endif %}
   </div>
-  <p class="small text-secondary mb-0 mt-3">Сырая ссылка показывается только один раз в success-сообщении после выпуска токена.</p>
 </div></div>
 
 <div class="card panel-card mb-3"><div class="card-body">

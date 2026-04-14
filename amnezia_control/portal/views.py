@@ -96,9 +96,9 @@ def portal_download_config_view(request, token: str):
         messages.warning(request, "Конфигурация ещё не выпущена оператором.")
         return redirect("portal-home", token=token)
 
-    config = VPNClientService.latest_config(client)
+    config = VPNClientService.portal_export_config(client)
     response = HttpResponse(config, content_type="text/plain; charset=utf-8")
-    response["Content-Disposition"] = f'attachment; filename="{client.name}-{client.protocol_type}-amneziavpn.conf"'
+    response["Content-Disposition"] = f'attachment; filename="{client.name}-{client.protocol_type}-amneziawg.conf"'
     return response
 
 
@@ -109,7 +109,7 @@ def portal_qr_view(request, token: str):
         return error_response
 
     client = access.client
-    qr_base64 = VPNClientService.qr_png_base64(client) if client.revisions.exists() else ""
+    qr_base64 = VPNClientService.portal_qr_png_base64(client) if client.revisions.exists() else ""
     return render(request, "portal/qr.html", {"token": token, "client": client, "qr_base64": qr_base64, "access": access})
 
 

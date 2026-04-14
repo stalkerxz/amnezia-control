@@ -3,6 +3,7 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
+from audit.models import AuditLog
 from jobs.models import Job, JobEvent
 from servers.models import ProtocolProfile, Server, ServerProtocol
 from vpn.models import VPNClient
@@ -94,6 +95,32 @@ class DashboardViewTest(TestCase):
         self.assertEqual(response.context["failed_jobs_recent_count"], 1)
         self.assertEqual(response.context["warning_jobs_recent_count"], 1)
         self.assertEqual(response.context["degraded_jobs_recent_count"], 1)
+
+    def test_dashboard_shows_portal_renewal_request_counters(self):
+        client = self._make_client(name="renewal-client")
+        recent_log = AuditLog.objects.create(
+            action="portal.renewal.request",
+            entity_type="VPNClient",
+            entity_id=str(client.id),
+            details={},
+        )
+        old_log = AuditLog.objects.create(
+            action="portal.renewal.request",
+            entity_type="VPNClient",
+            entity_id=str(client.id),
+            details={},
+        )
+        AuditLog.objects.filter(id=old_log.id).update(created_at=timezone.now() - timezone.timedelta(days=8))
+
+        response = self.client.get(reverse("dashboard"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Запросы продления из кабинета")
+        self.assertContains(response, "За 24 часа")
+        self.assertContains(response, "За 7 дней")
+        self.assertContains(response, f"/clients/{recent_log.entity_id}/")
+        self.assertEqual(response.context["renewal_requests_last_24h"], 1)
+        self.assertEqual(response.context["renewal_requests_last_7d"], 1)
 
 
 class LoginTemplateViewTest(TestCase):
