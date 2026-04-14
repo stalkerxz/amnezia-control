@@ -1,4 +1,5 @@
 from django.contrib import messages
+from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.db.models import Q
 from django.db.models.functions import Coalesce
@@ -367,6 +368,13 @@ def clients_detail_view(request, pk: int):
         recent_jobs = list(Job.objects.select_related("server", "actor").filter(server=client.server).order_by("-created_at")[:5])
 
     portal_access = ClientPortalAccess.objects.filter(client=client).first()
+    portal_access_status = PortalAccessService.get_status_for_access(portal_access)
+    portal_status_meta = {
+        PortalAccessService.STATUS_ACTIVE: {"label": "активен", "badge_class": "status-success"},
+        PortalAccessService.STATUS_EXPIRED: {"label": "истёк", "badge_class": "status-warning"},
+        PortalAccessService.STATUS_REVOKED: {"label": "отозван", "badge_class": "status-danger"},
+        PortalAccessService.STATUS_NOT_ISSUED: {"label": "не выдан", "badge_class": "status-neutral"},
+    }
     open_renewal_request = ClientRenewalRequest.objects.filter(
         client=client, status__in=[ClientRenewalRequest.Status.NEW, ClientRenewalRequest.Status.IN_PROGRESS]
     ).order_by("-created_at").first()
@@ -400,7 +408,10 @@ def clients_detail_view(request, pk: int):
             "latest_operator_action": latest_operator_action,
             "recent_jobs": recent_jobs,
             "portal_access": portal_access,
-            "portal_access_enabled": bool(portal_access and portal_access.enabled and not portal_access.revoked_at),
+            "portal_access_enabled": portal_access_status == PortalAccessService.STATUS_ACTIVE,
+            "portal_access_status": portal_access_status,
+            "portal_access_status_label": portal_status_meta[portal_access_status]["label"],
+            "portal_access_status_badge_class": portal_status_meta[portal_access_status]["badge_class"],
             "portal_link": portal_link,
             "open_renewal_request": open_renewal_request,
         },
@@ -498,6 +509,7 @@ def client_action_view(request, pk: int, action: str):
                 return redirect(next_url or "renewal-requests-list")
 
             request_obj.operator_note = operator_note
+            request_obj.processed_by = request.user
             if status_changed:
                 request_obj.status = target_status
                 if target_status in {ClientRenewalRequest.Status.DONE, ClientRenewalRequest.Status.DISMISSED}:
@@ -514,7 +526,7 @@ def client_action_view(request, pk: int, action: str):
                 success_message = "Комментарий оператора сохранён"
                 audit_action = "portal.renewal.note_updated"
 
-            request_obj.save(update_fields=["status", "processed_at", "operator_note", "updated_at"])
+            request_obj.save(update_fields=["status", "processed_at", "processed_by", "operator_note", "updated_at"])
             AuditLog.objects.create(
                 actor=request.user,
                 action=audit_action,
@@ -553,11 +565,34 @@ def client_action_view(request, pk: int, action: str):
 @user_passes_test(_admin_required)
 def renewal_requests_list_view(request):
     status_filter = request.GET.get("status") or "open"
-    requests_qs = ClientRenewalRequest.objects.select_related("client", "client__server").order_by("-created_at")
+    server_filter = (request.GET.get("server") or "").strip()
+    operator_filter = (request.GET.get("operator") or "").strip()
+    only_my_actions = (request.GET.get("only_my_actions") or "").strip() == "1"
+    requests_qs = ClientRenewalRequest.objects.select_related("client", "client__server", "processed_by").order_by("-created_at")
     if status_filter == "open":
         requests_qs = requests_qs.filter(status__in=[ClientRenewalRequest.Status.NEW, ClientRenewalRequest.Status.IN_PROGRESS])
     elif status_filter in {ClientRenewalRequest.Status.NEW, ClientRenewalRequest.Status.IN_PROGRESS, ClientRenewalRequest.Status.DONE, ClientRenewalRequest.Status.DISMISSED}:
         requests_qs = requests_qs.filter(status=status_filter)
+    if server_filter.isdigit():
+        requests_qs = requests_qs.filter(client__server_id=int(server_filter))
+    if operator_filter.isdigit():
+        requests_qs = requests_qs.filter(processed_by_id=int(operator_filter))
+    if only_my_actions:
+        requests_qs = requests_qs.filter(processed_by=request.user)
+
+    server_choices = list(
+        Server.objects.filter(clients__renewal_requests__isnull=False)
+        .distinct()
+        .order_by("name")
+        .values_list("id", "name")
+    )
+    operator_choices = list(
+        get_user_model()
+        .objects.filter(processed_renewal_requests__isnull=False)
+        .distinct()
+        .order_by("username")
+        .values_list("id", "username")
+    )
 
     return render(
         request,
@@ -572,6 +607,11 @@ def renewal_requests_list_view(request):
                 (ClientRenewalRequest.Status.DONE, "Выполненные"),
                 (ClientRenewalRequest.Status.DISMISSED, "Отклонённые"),
             ],
+            "server_choices": server_choices,
+            "operator_choices": operator_choices,
+            "server_filter": server_filter,
+            "operator_filter": operator_filter,
+            "only_my_actions": only_my_actions,
         },
     )
 
