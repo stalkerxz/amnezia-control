@@ -15,7 +15,7 @@
 
   <div class="alert alert-light border mb-3">
     <div class="fw-semibold mb-1">Переиздание конфигурации</div>
-    <p class="mb-2 small">Если устройство утеряно или вы хотите выдать доступ заново, можно переиздать конфигурацию самостоятельно.</p>
+    <p class="mb-2 small">Если устройство утеряно или нужно заново выдать доступ, вы можете переиздать конфигурацию самостоятельно.</p>
     <p class="mb-2 small text-danger">Важно: после переиздания предыдущая конфигурация и старый QR-код перестанут работать.</p>
     {% if can_selfservice_reissue %}
       <form method="post" action="/portal/{{ token }}/reissue-config/" class="d-flex flex-column flex-sm-row gap-2 align-items-sm-center">

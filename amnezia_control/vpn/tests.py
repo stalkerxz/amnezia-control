@@ -1861,6 +1861,89 @@ class VPNClientPortalAdminAndRenewalVisibilityTest(TestCase):
             ).exists()
         )
 
+    def test_extend_and_close_uses_default_30_days_when_days_not_passed(self):
+        request_obj = ClientRenewalRequest.objects.create(
+            client=self.client_with_renewal,
+            status=ClientRenewalRequest.Status.NEW,
+        )
+        self.client_with_renewal.expires_at = timezone.now() + timedelta(days=5)
+        self.client_with_renewal.save(update_fields=["expires_at"])
+        previous_expires = self.client_with_renewal.expires_at
+
+        self.client.post(
+            f"/clients/{self.client_with_renewal.id}/action/renewal_set_status/",
+            {
+                "renewal_request_id": request_obj.id,
+                "target_status": "extend_and_close",
+                "operator_note": "Продлили по стандартному сроку.",
+            },
+            follow=True,
+        )
+        self.client_with_renewal.refresh_from_db()
+
+        self.assertGreaterEqual(self.client_with_renewal.expires_at, previous_expires + timedelta(days=29, hours=23))
+
+    def test_extend_and_close_rejects_non_numeric_days(self):
+        request_obj = ClientRenewalRequest.objects.create(
+            client=self.client_with_renewal,
+            status=ClientRenewalRequest.Status.NEW,
+        )
+
+        response = self.client.post(
+            f"/clients/{self.client_with_renewal.id}/action/renewal_set_status/",
+            {
+                "renewal_request_id": request_obj.id,
+                "target_status": "extend_and_close",
+                "extension_days": "abc",
+            },
+            follow=True,
+        )
+        request_obj.refresh_from_db()
+
+        self.assertContains(response, "Укажите число дней продления цифрами.")
+        self.assertEqual(request_obj.status, ClientRenewalRequest.Status.NEW)
+
+    def test_extend_and_close_rejects_out_of_range_days(self):
+        request_obj = ClientRenewalRequest.objects.create(
+            client=self.client_with_renewal,
+            status=ClientRenewalRequest.Status.NEW,
+        )
+
+        response = self.client.post(
+            f"/clients/{self.client_with_renewal.id}/action/renewal_set_status/",
+            {
+                "renewal_request_id": request_obj.id,
+                "target_status": "extend_and_close",
+                "extension_days": "366",
+            },
+            follow=True,
+        )
+        request_obj.refresh_from_db()
+
+        self.assertContains(response, "Число дней продления должно быть в диапазоне от 1 до 365.")
+        self.assertEqual(request_obj.status, ClientRenewalRequest.Status.NEW)
+
+    def test_extend_and_close_rejects_closed_request(self):
+        request_obj = ClientRenewalRequest.objects.create(
+            client=self.client_with_renewal,
+            status=ClientRenewalRequest.Status.DONE,
+            processed_at=timezone.now(),
+        )
+
+        response = self.client.post(
+            f"/clients/{self.client_with_renewal.id}/action/renewal_set_status/",
+            {
+                "renewal_request_id": request_obj.id,
+                "target_status": "extend_and_close",
+                "extension_days": "30",
+            },
+            follow=True,
+        )
+        request_obj.refresh_from_db()
+
+        self.assertContains(response, "Продление доступно только для открытой заявки.")
+        self.assertEqual(request_obj.status, ClientRenewalRequest.Status.DONE)
+
 
     def test_renewal_status_change_redirects_to_next_url(self):
         request_obj = ClientRenewalRequest.objects.create(

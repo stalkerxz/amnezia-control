@@ -515,14 +515,14 @@ def client_action_view(request, pk: int, action: str):
 
                 if extension_days_raw:
                     if not extension_days_raw.isdigit():
-                        messages.error(request, "Введите корректное число дней продления.")
+                        messages.error(request, "Укажите число дней продления цифрами.")
                         return redirect(next_url or "renewal-requests-list")
                     extension_days = int(extension_days_raw)
                 else:
                     extension_days = DEFAULT_RENEWAL_EXTENSION_DAYS
 
                 if extension_days < 1 or extension_days > 365:
-                    messages.error(request, "Число дней продления должно быть от 1 до 365.")
+                    messages.error(request, "Число дней продления должно быть в диапазоне от 1 до 365.")
                     return redirect(next_url or "renewal-requests-list")
 
                 base_time = client.expires_at if client.expires_at and client.expires_at > timezone.now() else timezone.now()
@@ -550,7 +550,7 @@ def client_action_view(request, pk: int, action: str):
                         "new_expires_at": client.expires_at.isoformat() if client.expires_at else None,
                     },
                 )
-                messages.success(request, f"Доступ клиента продлён на {extension_days} дн., заявка закрыта.")
+                messages.success(request, f"Доступ клиента продлён на {extension_days} дней. Заявка закрыта.")
                 return redirect(next_url or "renewal-requests-list")
 
             if status_changed and target_status not in allowed_transitions.get(current_status, set()):

@@ -165,7 +165,12 @@ def portal_reissue_config_view(request, token: str):
         return redirect("portal-home", token=token)
 
     client = access.client
-    VPNClientService.reissue_config(client=client, actor=None)
+    try:
+        VPNClientService.reissue_config(client=client, actor=None)
+    except Exception:
+        messages.error(request, "Не удалось переиздать конфигурацию. Попробуйте позже или обратитесь к оператору.")
+        return redirect("portal-home", token=token)
+
     access.last_selfservice_reissue_at = timezone.now()
     access.save(update_fields=["last_selfservice_reissue_at"])
     AuditService.log(
@@ -183,6 +188,6 @@ def portal_reissue_config_view(request, token: str):
     )
     messages.success(
         request,
-        "Готово: новая конфигурация выпущена. Скачайте её заново или откройте новый QR‑код. Предыдущая конфигурация больше не действует.",
+        "Готово. Новая конфигурация уже выпущена. Скачайте её заново или откройте новый QR-код. Предыдущая конфигурация больше не действует.",
     )
     return redirect("portal-home", token=token)
