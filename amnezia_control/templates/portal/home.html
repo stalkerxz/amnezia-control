@@ -8,8 +8,8 @@
       <h1 class="h3 mb-0">{{ client.name }}</h1>
     </div>
     <div class="d-flex gap-2 flex-wrap">
-      <a href="/portal/{{ token }}/config/" class="btn btn-primary">Скачать конфиг</a>
-      <a href="/portal/{{ token }}/qr/" class="btn btn-outline-primary">Показать QR</a>
+      <a href="/portal/{{ token }}/config/" class="btn btn-primary">Скачать настройки</a>
+      <a href="/portal/{{ token }}/qr/" class="btn btn-outline-primary">Показать QR-код</a>
     </div>
   </div>
 
@@ -30,25 +30,35 @@
       <div class="row g-3">
         <div class="col-sm-6"><div class="small text-secondary">Протокол</div><div>{{ client.protocol_type|upper }}</div></div>
         <div class="col-sm-6"><div class="small text-secondary">Статус</div><div>{{ client.get_status_display }}</div></div>
-        <div class="col-sm-6"><div class="small text-secondary">Истекает</div><div>{% if client.expires_at %}{{ client.expires_at|date:'d.m.Y H:i' }}{% else %}Не задано{% endif %}</div></div>
-        <div class="col-sm-6"><div class="small text-secondary">Состояние лимитов</div><div>{{ client.get_limit_state_display }}</div></div>
-        <div class="col-sm-6"><div class="small text-secondary">Лимит трафика</div><div>{{ traffic_limit_display }}</div></div>
-        <div class="col-sm-6"><div class="small text-secondary">Использовано трафика</div><div>{{ traffic_used_display }}</div></div>
-        <div class="col-sm-6"><div class="small text-secondary">Последняя синхронизация трафика</div><div>{% if client.traffic_last_sync_at %}{{ client.traffic_last_sync_at|date:'d.m.Y H:i' }}{% else %}Нет данных{% endif %}</div></div>
-        <div class="col-sm-6"><div class="small text-secondary">Последний вход по ссылке</div><div>{% if access.last_access_at %}{{ access.last_access_at|date:'d.m.Y H:i' }}{% else %}Первое посещение{% endif %}</div></div>
-        <div class="col-sm-6"><div class="small text-secondary">Срок действия ссылки</div><div>{% if access.expires_at %}{{ access.expires_at|date:'d.m.Y H:i' }}{% else %}Не ограничен{% endif %}</div></div>
+        <div class="col-sm-6"><div class="small text-secondary">Доступ до</div><div>{% if client.expires_at %}{{ client.expires_at|date:'d.m.Y H:i' }}{% else %}Без ограничения{% endif %}</div></div>
+        <div class="col-sm-6"><div class="small text-secondary">Состояние доступа</div><div>{{ client.get_limit_state_display }}</div></div>
+        <div class="col-sm-6"><div class="small text-secondary">Пакет трафика</div><div>{{ traffic_limit_display }}</div></div>
+        <div class="col-sm-6"><div class="small text-secondary">Использовано</div><div>{{ traffic_used_display }}</div></div>
+        <div class="col-sm-6"><div class="small text-secondary">Обновление данных</div><div>{% if client.traffic_last_sync_at %}{{ client.traffic_last_sync_at|date:'d.m.Y H:i' }}{% else %}Пока нет данных{% endif %}</div></div>
+        <div class="col-sm-6"><div class="small text-secondary">Последнее открытие кабинета</div><div>{% if access.last_access_at %}{{ access.last_access_at|date:'d.m.Y H:i' }}{% else %}Первое посещение{% endif %}</div></div>
+        <div class="col-sm-6"><div class="small text-secondary">Срок действия ссылки кабинета</div><div>{% if access.expires_at %}{{ access.expires_at|date:'d.m.Y H:i' }}{% else %}Не ограничен{% endif %}</div></div>
       </div>
     </div>
   </div>
 
   <div class="card panel-card">
     <div class="card-body">
-      <h2 class="h6">Запросить продление</h2>
-      <p class="small text-secondary">Оператор получит заявку в журнале аудита.</p>
+      <h2 class="h6">Продление доступа</h2>
+      {% if open_renewal_request %}
+      <div class="alert alert-info mb-3">
+        {% if open_renewal_request.status == 'new' %}
+          Заявка уже отправлена. Оператор рассмотрит её в ближайшее время.
+        {% else %}
+          Заявка уже в работе у оператора. Мы сообщим о результате.
+        {% endif %}
+      </div>
+      {% else %}
+      <p class="small text-secondary">Если нужен новый срок доступа, отправьте заявку оператору.</p>
       <form method="post" action="/portal/{{ token }}/request-renewal/">
         {% csrf_token %}
-        <button class="btn btn-outline-warning">Отправить запрос на продление</button>
+        <button class="btn btn-outline-warning">Отправить заявку на продление</button>
       </form>
+      {% endif %}
     </div>
   </div>
 </div>

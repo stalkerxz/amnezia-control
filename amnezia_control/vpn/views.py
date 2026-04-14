@@ -10,14 +10,12 @@ import ipaddress
 
 from audit.models import AuditLog
 from jobs.models import Job
-from portal.models import ClientPortalAccess
+from portal.models import ClientPortalAccess, ClientRenewalRequest
 from portal.services import PortalAccessService
 from servers.models import Server, ServerProtocol
 from .forms import VPNClientBulkLimitsUpdateForm, VPNClientCreateForm, VPNClientLimitsUpdateForm, VPNClientListFilterForm
 from .models import VPNClient
 from .services import VPNClientPolicyService, VPNClientService
-
-PORTAL_RENEWAL_RECENT_DAYS = 7
 
 
 def _admin_required(user):
@@ -80,8 +78,8 @@ def _telemetry_view_state(*, client: VPNClient, peer_source: str):
             "is_degraded": True,
             "status_label": "Runtime-опрос недоступен",
             "status_class": "text-warning",
-            "details": "Используется fallback. Peers читаются из конфигурации, поэтому live-счётчики трафика сейчас недоступны.",
-            "badge_label": "Fallback-режим",
+            "details": "Используется резервный режим. Список клиентов читается из конфигурации, поэтому онлайн-статистика трафика сейчас недоступна.",
+            "badge_label": "Резервный режим",
         }
     if client.traffic_sync_error:
         return {
@@ -121,13 +119,16 @@ def clients_list_view(request):
         .order_by("-id")
     )
 
-    renewal_cutoff = timezone.now() - timezone.timedelta(days=PORTAL_RENEWAL_RECENT_DAYS)
-    renewal_client_ids_qs = AuditLog.objects.filter(
-        action="portal.renewal.request",
-        entity_type="VPNClient",
-        created_at__gte=renewal_cutoff,
-    ).values_list("entity_id", flat=True)
-    renewal_client_ids = {int(entity_id) for entity_id in renewal_client_ids_qs if str(entity_id).isdigit()}
+    open_renewal_requests = {}
+    for item in (
+        ClientRenewalRequest.objects.filter(
+            status__in=[ClientRenewalRequest.Status.NEW, ClientRenewalRequest.Status.IN_PROGRESS]
+        )
+        .order_by("client_id", "-created_at")
+        .values("id", "client_id", "status", "created_at")
+    ):
+        open_renewal_requests.setdefault(item["client_id"], item)
+    renewal_client_ids = set(open_renewal_requests.keys())
 
     if filter_form.is_valid():
         q = filter_form.cleaned_data["q"].strip()
@@ -187,19 +188,9 @@ def clients_list_view(request):
     for log in recent_client_logs:
         latest_log_by_client_id.setdefault(log.entity_id, log)
 
-    renewal_logs = (
-        AuditLog.objects.filter(
-            action="portal.renewal.request",
-            entity_type="VPNClient",
-            entity_id__in=[str(client.id) for client in clients],
-            created_at__gte=renewal_cutoff,
-        )
-        .order_by("entity_id", "-created_at")
-        .values("entity_id", "created_at")
-    )
-    latest_renewal_by_client_id = {}
-    for item in renewal_logs:
-        latest_renewal_by_client_id.setdefault(item["entity_id"], item["created_at"])
+    latest_renewal_by_client_id = {
+        str(client_id): renewal["created_at"] for client_id, renewal in open_renewal_requests.items()
+    }
 
     client_rows = []
     for client in clients:
@@ -222,6 +213,7 @@ def clients_list_view(request):
                 "reissue_block_reason": reissue_block_reason,
                 "has_recent_renewal_request": str(client.id) in latest_renewal_by_client_id,
                 "last_renewal_request_at": latest_renewal_by_client_id.get(str(client.id)),
+                "open_renewal_request": open_renewal_requests.get(client.id),
             }
         )
 
@@ -350,7 +342,7 @@ def clients_detail_view(request, pk: int):
     if not client.runtime_peer_public_key:
         warning_items.append("В runtime не найден public key peer-клиента.")
     if telemetry_state["is_degraded"]:
-        warning_items.append("Runtime-опрос недоступен. Используется fallback, peers читаются из конфигурации.")
+        warning_items.append("Опрос сервера недоступен. Используется резервный режим, данные читаются из конфигурации.")
     elif client.traffic_sync_error:
         warning_items.append("Телеметрия трафика недоступна.")
     if not revision:
@@ -375,6 +367,9 @@ def clients_detail_view(request, pk: int):
         recent_jobs = list(Job.objects.select_related("server", "actor").filter(server=client.server).order_by("-created_at")[:5])
 
     portal_access = ClientPortalAccess.objects.filter(client=client).first()
+    open_renewal_request = ClientRenewalRequest.objects.filter(
+        client=client, status__in=[ClientRenewalRequest.Status.NEW, ClientRenewalRequest.Status.IN_PROGRESS]
+    ).order_by("-created_at").first()
     portal_raw_token = PortalAccessService.get_raw_token_for_client(client)
     portal_link = request.build_absolute_uri(reverse("portal-home", kwargs={"token": portal_raw_token})) if portal_raw_token else ""
 
@@ -407,6 +402,7 @@ def clients_detail_view(request, pk: int):
             "portal_access": portal_access,
             "portal_access_enabled": bool(portal_access and portal_access.enabled and not portal_access.revoked_at),
             "portal_link": portal_link,
+            "open_renewal_request": open_renewal_request,
         },
     )
 
@@ -479,6 +475,29 @@ def client_action_view(request, pk: int, action: str):
             else:
                 messages.warning(request, "Для клиента нет активной ссылки кабинета.")
                 return redirect("clients-detail", pk=client.id)
+        elif action in {"renewal_in_progress", "renewal_done", "renewal_dismiss"}:
+            renewal_request_id = request.POST.get("renewal_request_id")
+            request_obj = get_object_or_404(ClientRenewalRequest, pk=renewal_request_id, client=client)
+            if action == "renewal_in_progress":
+                request_obj.status = ClientRenewalRequest.Status.IN_PROGRESS
+                success_message = "Заявка переведена в работу"
+            elif action == "renewal_done":
+                request_obj.status = ClientRenewalRequest.Status.DONE
+                request_obj.processed_at = timezone.now()
+                success_message = "Заявка отмечена как выполненная"
+            else:
+                request_obj.status = ClientRenewalRequest.Status.DISMISSED
+                request_obj.processed_at = timezone.now()
+                success_message = "Заявка отклонена"
+            request_obj.operator_note = (request.POST.get("operator_note") or "").strip()
+            request_obj.save(update_fields=["status", "processed_at", "operator_note", "updated_at"])
+            AuditLog.objects.create(
+                actor=request.user,
+                action=f"portal.renewal.{request_obj.status}",
+                entity_type="VPNClient",
+                entity_id=str(client.id),
+                details={"renewal_request_id": request_obj.id, "operator_note": request_obj.operator_note},
+            )
         elif action == "portal_revoke":
             revoked = PortalAccessService.revoke_for_client(client)
             if revoked:
@@ -499,6 +518,33 @@ def client_action_view(request, pk: int, action: str):
     if action == "delete":
         return redirect("clients-list")
     return redirect("clients-detail", pk=client.id)
+
+
+@login_required
+@user_passes_test(_admin_required)
+def renewal_requests_list_view(request):
+    status_filter = request.GET.get("status") or "open"
+    requests_qs = ClientRenewalRequest.objects.select_related("client", "client__server").order_by("-created_at")
+    if status_filter == "open":
+        requests_qs = requests_qs.filter(status__in=[ClientRenewalRequest.Status.NEW, ClientRenewalRequest.Status.IN_PROGRESS])
+    elif status_filter in {ClientRenewalRequest.Status.NEW, ClientRenewalRequest.Status.IN_PROGRESS, ClientRenewalRequest.Status.DONE, ClientRenewalRequest.Status.DISMISSED}:
+        requests_qs = requests_qs.filter(status=status_filter)
+
+    return render(
+        request,
+        "vpn/renewal_requests_list.html",
+        {
+            "request_rows": requests_qs[:200],
+            "status_filter": status_filter,
+            "status_choices": [
+                ("open", "Открытые"),
+                (ClientRenewalRequest.Status.NEW, "Новые"),
+                (ClientRenewalRequest.Status.IN_PROGRESS, "В работе"),
+                (ClientRenewalRequest.Status.DONE, "Выполненные"),
+                (ClientRenewalRequest.Status.DISMISSED, "Отклонённые"),
+            ],
+        },
+    )
 
 
 @login_required

@@ -1,0 +1,65 @@
+{% extends 'partials/base.html' %}
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
+  <div>
+    <p class="page-kicker">Операторская · Продления</p>
+    <h1 class="h3 mb-1">Заявки на продление</h1>
+    <p class="text-secondary mb-0">Обрабатывайте запросы из клиентского кабинета в одном списке.</p>
+  </div>
+</div>
+
+<form method="get" class="card card-body filter-panel mb-3">
+  <div class="row g-2 align-items-end">
+    <div class="col-md-4">
+      <label class="form-label" for="id_status">Статус</label>
+      <select class="form-select" id="id_status" name="status">
+        {% for value, label in status_choices %}
+          <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-2"><button class="btn btn-primary w-100">Применить</button></div>
+  </div>
+</form>
+
+<div class="table-responsive card table-shell p-2">
+  <table class="table table-hover align-middle mb-0">
+    <thead><tr><th>ID</th><th>Клиент</th><th>Статус</th><th>Создана</th><th>Обновлена</th><th>Действия</th></tr></thead>
+    <tbody>
+      {% for item in request_rows %}
+      <tr>
+        <td>#{{ item.id }}</td>
+        <td><a href="/clients/{{ item.client_id }}/" class="text-decoration-none">{{ item.client.name }}</a></td>
+        <td><span class="badge status-badge {% if item.status == 'new' %}status-warning{% elif item.status == 'in_progress' %}status-info{% elif item.status == 'done' %}status-success{% else %}status-neutral{% endif %}">{{ item.get_status_display }}</span></td>
+        <td>{{ item.created_at|date:'d.m.Y H:i' }}</td>
+        <td>{{ item.updated_at|date:'d.m.Y H:i' }}</td>
+        <td>
+          <div class="d-flex gap-1 flex-wrap">
+            {% if item.status != 'in_progress' and item.status != 'done' and item.status != 'dismissed' %}
+            <form method="post" action="/clients/{{ item.client_id }}/action/renewal_in_progress/">{% csrf_token %}
+              <input type="hidden" name="renewal_request_id" value="{{ item.id }}">
+              <button class="btn btn-sm btn-outline-primary">В работу</button>
+            </form>
+            {% endif %}
+            {% if item.status != 'done' %}
+            <form method="post" action="/clients/{{ item.client_id }}/action/renewal_done/">{% csrf_token %}
+              <input type="hidden" name="renewal_request_id" value="{{ item.id }}">
+              <button class="btn btn-sm btn-outline-success">Выполнено</button>
+            </form>
+            {% endif %}
+            {% if item.status != 'dismissed' %}
+            <form method="post" action="/clients/{{ item.client_id }}/action/renewal_dismiss/">{% csrf_token %}
+              <input type="hidden" name="renewal_request_id" value="{{ item.id }}">
+              <button class="btn btn-sm btn-outline-secondary">Отклонить</button>
+            </form>
+            {% endif %}
+          </div>
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="6"><div class="empty-state">Заявок по выбранному фильтру нет.</div></td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

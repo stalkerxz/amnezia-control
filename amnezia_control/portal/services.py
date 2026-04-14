@@ -10,7 +10,7 @@ from django.utils import timezone
 
 from core.services import get_portal_link_lifetime_days
 
-from .models import ClientPortalAccess
+from .models import ClientPortalAccess, ClientRenewalRequest
 
 
 class PortalResolveReason:
@@ -110,3 +110,38 @@ class PortalAccessService:
         if not access or not access.enabled or access.revoked_at:
             return None
         return cls._decrypt_token(access.token_encrypted)
+
+
+class RenewalRequestService:
+    OPEN_STATUSES = (ClientRenewalRequest.Status.NEW, ClientRenewalRequest.Status.IN_PROGRESS)
+
+    @classmethod
+    @transaction.atomic
+    def create_or_get_open_from_portal(cls, *, client, note: str = ""):
+        request_obj = (
+            ClientRenewalRequest.objects.select_for_update()
+            .filter(client=client, status__in=cls.OPEN_STATUSES)
+            .order_by("-created_at")
+            .first()
+        )
+        if request_obj:
+            if note and not request_obj.note:
+                request_obj.note = note
+                request_obj.save(update_fields=["note", "updated_at"])
+            return request_obj, False
+
+        request_obj = ClientRenewalRequest.objects.create(
+            client=client,
+            status=ClientRenewalRequest.Status.NEW,
+            note=note,
+            created_from_portal=True,
+        )
+        return request_obj, True
+
+    @classmethod
+    def get_open_for_client(cls, *, client):
+        return (
+            ClientRenewalRequest.objects.filter(client=client, status__in=cls.OPEN_STATUSES)
+            .order_by("-created_at")
+            .first()
+        )

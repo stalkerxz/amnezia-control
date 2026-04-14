@@ -8,6 +8,7 @@ from .views import (
     clients_detail_view,
     clients_import_view,
     clients_list_view,
+    renewal_requests_list_view,
     clients_bulk_action_view,
     client_update_limits_view,
 )
@@ -16,6 +17,7 @@ urlpatterns = [
     path("", clients_list_view, name="clients-list"),
     path("new/", clients_create_view, name="clients-create"),
     path("import/", clients_import_view, name="clients-import"),
+    path("renewal-requests/", renewal_requests_list_view, name="renewal-requests-list"),
     path("bulk-action/", clients_bulk_action_view, name="clients-bulk-action"),
     path("<int:pk>/", clients_detail_view, name="clients-detail"),
     path("<int:pk>/download/", client_download_config_view, name="clients-download"),

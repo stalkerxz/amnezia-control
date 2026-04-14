@@ -40,7 +40,7 @@ class VPNClientAdmin(admin.ModelAdmin):
                 "fields": ("expires_at", "traffic_limit_bytes", "traffic_used_bytes", "traffic_last_sync_at", "traffic_sync_error")
             },
         ),
-        (_("Рантайм"), {"fields": ("imported_from_runtime", "runtime_peer_public_key", "runtime_address", "last_runtime_sync_at")}),
+        (_("Серверные данные"), {"fields": ("imported_from_runtime", "runtime_peer_public_key", "runtime_address", "last_runtime_sync_at")}),
         (_("Техническое"), {"fields": ("created_at",)}),
     )
 
