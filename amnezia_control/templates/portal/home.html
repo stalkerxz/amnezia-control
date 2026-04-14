@@ -13,25 +13,29 @@
     </div>
   </div>
 
-  <div class="alert alert-light border mb-3">
-    <div class="fw-semibold mb-1">Переиздание конфигурации</div>
-    <p class="mb-2 small">Если устройство утеряно или нужно заново выдать доступ, вы можете переиздать конфигурацию самостоятельно.</p>
-    <p class="mb-2 small text-danger">Важно: после переиздания предыдущая конфигурация и старый QR-код перестанут работать.</p>
-    {% if can_selfservice_reissue %}
-      <form method="post" action="/portal/{{ token }}/reissue-config/" class="d-flex flex-column flex-sm-row gap-2 align-items-sm-center">
-        {% csrf_token %}
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="1" id="confirmReissue" name="confirm_reissue" required>
-          <label class="form-check-label small" for="confirmReissue">
-            Подтверждаю переиздание и понимаю, что старая конфигурация станет недействительной.
-          </label>
-        </div>
-        <button class="btn btn-outline-danger btn-sm">Переиздать конфигурацию</button>
-      </form>
-      <div class="small text-secondary mt-2">Повторное переиздание доступно не чаще одного раза в {{ reissue_cooldown_hours }} часов.</div>
-    {% else %}
-      <div class="small text-secondary">{{ reissue_block_message }}</div>
-    {% endif %}
+  <div class="card panel-card portal-reissue-card mb-3">
+    <div class="card-body py-3">
+      <h2 class="h6 mb-1">Переиздание конфигурации</h2>
+      <p class="small text-secondary mb-2">Если устройство утеряно или нужно заново выдать доступ, конфигурацию можно переиздать самостоятельно.</p>
+      <div class="portal-reissue-warning small mb-2">
+        После переиздания предыдущая конфигурация и старый QR-код станут недействительными.
+      </div>
+      {% if can_selfservice_reissue %}
+        <form method="post" action="/portal/{{ token }}/reissue-config/" class="portal-reissue-form">
+          {% csrf_token %}
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" value="1" id="confirmReissue" name="confirm_reissue" required>
+            <label class="form-check-label small" for="confirmReissue">
+              Подтверждаю переиздание и понимаю последствия.
+            </label>
+          </div>
+          <button class="btn btn-outline-danger btn-sm">Переиздать конфигурацию</button>
+        </form>
+        <div class="small text-secondary mt-2">Повторное переиздание доступно не чаще одного раза в {{ reissue_cooldown_hours }} часов.</div>
+      {% else %}
+        <div class="small text-secondary">{{ reissue_block_message }}</div>
+      {% endif %}
+    </div>
   </div>
 
   {% if blocked %}
