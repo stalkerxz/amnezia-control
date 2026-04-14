@@ -129,7 +129,7 @@
             {% if c.limit_state == 'traffic_exceeded' %}<span class="badge status-badge status-danger">Трафик превышен</span>{% endif %}
             {% if c.status == 'deleted' %}<span class="badge status-badge status-danger">Удалён</span>{% endif %}
             {% if row.telemetry.badge_label %}<span class="badge status-badge status-neutral">{{ row.telemetry.badge_label }}</span>{% endif %}
-            {% if row.has_recent_renewal_request %}<a class="badge status-badge status-warning text-decoration-none" href="/clients/renewal-requests/">Заявка на продление</a>{% endif %}
+            {% if row.has_recent_renewal_request %}<a class="badge status-badge status-warning text-decoration-none" href="/clients/renewal-requests/">Продление</a>{% endif %}
           </div>
           {% if row.last_renewal_request_at %}<div class="small text-secondary mt-1">Последняя заявка на продление: {{ row.last_renewal_request_at|date:'d.m.Y H:i' }}</div>{% endif %}
         </td>

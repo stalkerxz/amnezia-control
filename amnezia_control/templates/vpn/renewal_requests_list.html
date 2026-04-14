@@ -4,7 +4,7 @@
   <div>
     <p class="page-kicker">Операторская · Продления</p>
     <h1 class="h3 mb-1">Заявки на продление</h1>
-    <p class="text-secondary mb-0">Обрабатывайте запросы из клиентского кабинета в одном списке.</p>
+    <p class="text-secondary mb-0">Единый список заявок из кабинета клиента с обработкой статусов и комментариев.</p>
   </div>
 </div>
 
@@ -24,7 +24,7 @@
 
 <div class="table-responsive card table-shell p-2">
   <table class="table table-hover align-middle mb-0">
-    <thead><tr><th>ID</th><th>Клиент</th><th>Статус</th><th>Создана</th><th>Обновлена</th><th>Действия</th></tr></thead>
+    <thead><tr><th>ID</th><th>Клиент</th><th>Статус</th><th>Создана</th><th>Обработана</th><th style="min-width:300px">Комментарий оператора</th><th>Действия</th></tr></thead>
     <tbody>
       {% for item in request_rows %}
       <tr>
@@ -32,32 +32,31 @@
         <td><a href="/clients/{{ item.client_id }}/" class="text-decoration-none">{{ item.client.name }}</a></td>
         <td><span class="badge status-badge {% if item.status == 'new' %}status-warning{% elif item.status == 'in_progress' %}status-info{% elif item.status == 'done' %}status-success{% else %}status-neutral{% endif %}">{{ item.get_status_display }}</span></td>
         <td>{{ item.created_at|date:'d.m.Y H:i' }}</td>
-        <td>{{ item.updated_at|date:'d.m.Y H:i' }}</td>
+        <td>{% if item.processed_at %}{{ item.processed_at|date:'d.m.Y H:i' }}{% else %}—{% endif %}</td>
         <td>
-          <div class="d-flex gap-1 flex-wrap">
-            {% if item.status != 'in_progress' and item.status != 'done' and item.status != 'dismissed' %}
-            <form method="post" action="/clients/{{ item.client_id }}/action/renewal_in_progress/">{% csrf_token %}
-              <input type="hidden" name="renewal_request_id" value="{{ item.id }}">
-              <button class="btn btn-sm btn-outline-primary">В работу</button>
-            </form>
-            {% endif %}
-            {% if item.status != 'done' %}
-            <form method="post" action="/clients/{{ item.client_id }}/action/renewal_done/">{% csrf_token %}
-              <input type="hidden" name="renewal_request_id" value="{{ item.id }}">
-              <button class="btn btn-sm btn-outline-success">Выполнено</button>
-            </form>
-            {% endif %}
-            {% if item.status != 'dismissed' %}
-            <form method="post" action="/clients/{{ item.client_id }}/action/renewal_dismiss/">{% csrf_token %}
-              <input type="hidden" name="renewal_request_id" value="{{ item.id }}">
-              <button class="btn btn-sm btn-outline-secondary">Отклонить</button>
-            </form>
-            {% endif %}
-          </div>
+          <form method="post" action="/clients/{{ item.client_id }}/action/renewal_set_status/" class="d-flex flex-column gap-2">
+            {% csrf_token %}
+            <input type="hidden" name="renewal_request_id" value="{{ item.id }}">
+            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+            <textarea name="operator_note" class="form-control form-control-sm" rows="2" placeholder="Комментарий для клиента или для команды">{{ item.operator_note }}</textarea>
+            <div class="d-flex gap-1 flex-wrap">
+              {% if item.status == 'new' %}
+                <button class="btn btn-sm btn-outline-primary" name="target_status" value="in_progress">В работу</button>
+                <button class="btn btn-sm btn-outline-success" name="target_status" value="done">Выполнено</button>
+                <button class="btn btn-sm btn-outline-secondary" name="target_status" value="dismissed">Отклонить</button>
+              {% elif item.status == 'in_progress' %}
+                <button class="btn btn-sm btn-outline-success" name="target_status" value="done">Выполнено</button>
+                <button class="btn btn-sm btn-outline-secondary" name="target_status" value="dismissed">Отклонить</button>
+              {% else %}
+                <button class="btn btn-sm btn-outline-secondary" name="target_status" value="{{ item.status }}">Сохранить комментарий</button>
+              {% endif %}
+            </div>
+          </form>
         </td>
+        <td><a class="btn btn-sm btn-outline-primary" href="/clients/{{ item.client_id }}/">К клиенту</a></td>
       </tr>
       {% empty %}
-      <tr><td colspan="6"><div class="empty-state">Заявок по выбранному фильтру нет.</div></td></tr>
+      <tr><td colspan="7"><div class="empty-state">Заявок по выбранному фильтру нет.</div></td></tr>
       {% endfor %}
     </tbody>
   </table>

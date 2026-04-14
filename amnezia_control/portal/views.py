@@ -66,6 +66,7 @@ def portal_home_view(request, token: str):
     limit_state = VPNClientService.get_limit_state(client)
     blocked = client.status != VPNClient.Status.ACTIVE or limit_state != VPNClient.LimitState.ACTIVE
     open_renewal_request = RenewalRequestService.get_open_for_client(client=client)
+    latest_renewal_request = RenewalRequestService.get_latest_for_client(client=client)
     return render(
         request,
         "portal/home.html",
@@ -78,6 +79,7 @@ def portal_home_view(request, token: str):
             "traffic_used_display": _fmt_bytes(client.traffic_used_bytes),
             "traffic_limit_display": _fmt_bytes(client.traffic_limit_bytes),
             "open_renewal_request": open_renewal_request,
+            "latest_renewal_request": latest_renewal_request,
         },
     )
 

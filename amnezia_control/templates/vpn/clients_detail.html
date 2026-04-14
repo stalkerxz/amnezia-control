@@ -151,8 +151,9 @@
 {% if open_renewal_request %}
 <div class="card panel-card mb-3"><div class="card-body">
   <h2 class="h6 mb-2">Заявка на продление</h2>
-  <div class="small text-secondary mb-2">Текущий статус: <span class="badge status-badge status-warning">{{ open_renewal_request.get_status_display }}</span></div>
-  <div class="small text-secondary mb-3">Создана: {{ open_renewal_request.created_at|date:'d.m.Y H:i' }}</div>
+  <div class="small text-secondary mb-2">Текущий статус: <span class="badge status-badge {% if open_renewal_request.status == 'new' %}status-warning{% else %}status-info{% endif %}">{{ open_renewal_request.get_status_display }}</span></div>
+  <div class="small text-secondary mb-1">Создана: {{ open_renewal_request.created_at|date:'d.m.Y H:i' }}</div>
+  {% if open_renewal_request.operator_note %}<div class="small text-secondary mb-3">Комментарий оператора: {{ open_renewal_request.operator_note }}</div>{% else %}<div class="small text-secondary mb-3">Комментарий оператора пока не добавлен.</div>{% endif %}
   <a class="btn btn-outline-primary btn-sm" href="/clients/renewal-requests/">Открыть список заявок</a>
 </div></div>
 {% endif %}
@@ -161,7 +162,7 @@
   <h2 class="h6 mb-3">Операции и экспорт</h2>
   {% if is_deleted %}
   <div class="alert alert-info py-2 mb-3">
-    Клиент удалён (мягкого удаления). Доступно восстановление в состояние <strong>«Отключён»</strong>.
+    Клиент помечен как удалённый и находится в архиве. Доступно восстановление в состояние <strong>«Отключён»</strong>.
   </div>
   {% endif %}
   <div class="d-flex gap-2 flex-wrap">
@@ -247,7 +248,7 @@
 
 <div class="card panel-card border-danger mb-3"><div class="card-body">
   <h2 class="h6 text-danger mb-2">Опасные действия</h2>
-  <p class="small text-secondary mb-0">Удаление помечает клиента как удалённого (мягкого удаления) и скрывает из основного списка.</p>
+  <p class="small text-secondary mb-0">Удаление помечает клиента как удалённого и переносит его в архив.</p>
 </div></div>
 
 <div class="modal fade" id="deleteClientDetailModal" tabindex="-1" aria-labelledby="deleteClientDetailModalLabel" aria-hidden="true">

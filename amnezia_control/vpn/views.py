@@ -76,7 +76,7 @@ def _telemetry_view_state(*, client: VPNClient, peer_source: str):
         return {
             "is_unavailable": True,
             "is_degraded": True,
-            "status_label": "Runtime-опрос недоступен",
+            "status_label": "Опрос сервера недоступен",
             "status_class": "text-warning",
             "details": "Используется резервный режим. Список клиентов читается из конфигурации, поэтому онлайн-статистика трафика сейчас недоступна.",
             "badge_label": "Резервный режим",
@@ -439,7 +439,7 @@ def client_action_view(request, pk: int, action: str):
             VPNClientService.set_status(client=client, status=VPNClient.Status.DISABLED, actor=request.user)
         elif action == "enable":
             VPNClientService.set_status(client=client, status=VPNClient.Status.ACTIVE, actor=request.user)
-            success_message = "Клиент включен"
+            success_message = "Клиент включён"
         elif action == "restore":
             if client.status != VPNClient.Status.DELETED:
                 messages.warning(request, "Восстановление доступно только для удалённых клиентов.")
@@ -453,7 +453,7 @@ def client_action_view(request, pk: int, action: str):
             success_message = "Клиент восстановлен в состояние «Отключён»"
         elif action == "delete":
             VPNClientService.set_status(client=client, status=VPNClient.Status.DELETED, actor=request.user)
-            success_message = "Клиент помечен как удаленный и скрыт из основного списка"
+            success_message = "Клиент помечен как удалённый и скрыт из основного списка"
         elif action == "reissue":
             VPNClientService.reissue_config(client=client, actor=request.user)
         elif action == "portal_issue":
@@ -475,28 +475,57 @@ def client_action_view(request, pk: int, action: str):
             else:
                 messages.warning(request, "Для клиента нет активной ссылки кабинета.")
                 return redirect("clients-detail", pk=client.id)
-        elif action in {"renewal_in_progress", "renewal_done", "renewal_dismiss"}:
+        elif action == "renewal_set_status":
             renewal_request_id = request.POST.get("renewal_request_id")
+            target_status = request.POST.get("target_status", "").strip()
             request_obj = get_object_or_404(ClientRenewalRequest, pk=renewal_request_id, client=client)
-            if action == "renewal_in_progress":
-                request_obj.status = ClientRenewalRequest.Status.IN_PROGRESS
-                success_message = "Заявка переведена в работу"
-            elif action == "renewal_done":
-                request_obj.status = ClientRenewalRequest.Status.DONE
-                request_obj.processed_at = timezone.now()
-                success_message = "Заявка отмечена как выполненная"
+            allowed_transitions = {
+                ClientRenewalRequest.Status.NEW: {ClientRenewalRequest.Status.IN_PROGRESS, ClientRenewalRequest.Status.DONE, ClientRenewalRequest.Status.DISMISSED},
+                ClientRenewalRequest.Status.IN_PROGRESS: {ClientRenewalRequest.Status.DONE, ClientRenewalRequest.Status.DISMISSED},
+                ClientRenewalRequest.Status.DONE: set(),
+                ClientRenewalRequest.Status.DISMISSED: set(),
+            }
+            if target_status not in {choice[0] for choice in ClientRenewalRequest.Status.choices}:
+                messages.error(request, "Некорректный статус заявки.")
+                return redirect(next_url or "renewal-requests-list")
+
+            current_status = request_obj.status
+            operator_note = (request.POST.get("operator_note") or "").strip()
+            status_changed = current_status != target_status
+
+            if status_changed and target_status not in allowed_transitions.get(current_status, set()):
+                messages.warning(request, "Недопустимый переход статуса для этой заявки.")
+                return redirect(next_url or "renewal-requests-list")
+
+            request_obj.operator_note = operator_note
+            if status_changed:
+                request_obj.status = target_status
+                if target_status in {ClientRenewalRequest.Status.DONE, ClientRenewalRequest.Status.DISMISSED}:
+                    request_obj.processed_at = timezone.now()
+                else:
+                    request_obj.processed_at = None
+                success_message = {
+                    ClientRenewalRequest.Status.IN_PROGRESS: "Заявка переведена в работу",
+                    ClientRenewalRequest.Status.DONE: "Заявка отмечена как выполненная",
+                    ClientRenewalRequest.Status.DISMISSED: "Заявка отклонена",
+                }.get(target_status, "Статус заявки обновлён")
+                audit_action = f"portal.renewal.{target_status}"
             else:
-                request_obj.status = ClientRenewalRequest.Status.DISMISSED
-                request_obj.processed_at = timezone.now()
-                success_message = "Заявка отклонена"
-            request_obj.operator_note = (request.POST.get("operator_note") or "").strip()
+                success_message = "Комментарий оператора сохранён"
+                audit_action = "portal.renewal.note_updated"
+
             request_obj.save(update_fields=["status", "processed_at", "operator_note", "updated_at"])
             AuditLog.objects.create(
                 actor=request.user,
-                action=f"portal.renewal.{request_obj.status}",
+                action=audit_action,
                 entity_type="VPNClient",
                 entity_id=str(client.id),
-                details={"renewal_request_id": request_obj.id, "operator_note": request_obj.operator_note},
+                details={
+                    "renewal_request_id": request_obj.id,
+                    "from_status": current_status,
+                    "to_status": request_obj.status,
+                    "operator_note": request_obj.operator_note,
+                },
             )
         elif action == "portal_revoke":
             revoked = PortalAccessService.revoke_for_client(client)

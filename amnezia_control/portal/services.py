@@ -145,3 +145,8 @@ class RenewalRequestService:
             .order_by("-created_at")
             .first()
         )
+
+
+    @classmethod
+    def get_latest_for_client(cls, *, client):
+        return ClientRenewalRequest.objects.filter(client=client).order_by("-created_at").first()

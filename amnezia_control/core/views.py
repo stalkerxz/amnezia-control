@@ -43,7 +43,7 @@ def _job_action_label(action: str) -> str:
 def _audit_action_label(action: str) -> str:
     labels = {
         "server.sync_runtime": "Сервер: синхронизация состояния",
-        "server.import_runtime_peers": "Сервер: импорт клиентов из runtime",
+        "server.import_runtime_peers": "Сервер: импорт клиентов с сервера",
         "client.create": "Клиент: создан",
         "client.reissue": "Клиент: конфигурация переиздана",
         "client.disable": "Клиент: отключён",
@@ -53,6 +53,7 @@ def _audit_action_label(action: str) -> str:
         "portal.renewal.in_progress": "Портал: заявка на продление взята в работу",
         "portal.renewal.done": "Портал: заявка на продление выполнена",
         "portal.renewal.dismissed": "Портал: заявка на продление отклонена",
+        "portal.renewal.note_updated": "Портал: обновлён комментарий оператора по заявке",
     }
     return labels.get(action, (action or "—").replace(".", " · "))
 

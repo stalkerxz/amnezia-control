@@ -8,7 +8,7 @@
       <h1 class="h3 mb-0">{{ client.name }}</h1>
     </div>
     <div class="d-flex gap-2 flex-wrap">
-      <a href="/portal/{{ token }}/config/" class="btn btn-primary">Скачать настройки</a>
+      <a href="/portal/{{ token }}/config/" class="btn btn-primary">Скачать конфигурацию</a>
       <a href="/portal/{{ token }}/qr/" class="btn btn-outline-primary">Показать QR-код</a>
     </div>
   </div>
@@ -47,11 +47,30 @@
       {% if open_renewal_request %}
       <div class="alert alert-info mb-3">
         {% if open_renewal_request.status == 'new' %}
-          Заявка уже отправлена. Оператор рассмотрит её в ближайшее время.
+          <strong>Заявка отправлена.</strong> Оператор скоро возьмёт её в работу.
         {% else %}
-          Заявка уже в работе у оператора. Мы сообщим о результате.
+          <strong>Заявка в работе.</strong> Ожидайте, пожалуйста, ответ оператора.
         {% endif %}
       </div>
+      {% elif latest_renewal_request %}
+      <div class="alert {% if latest_renewal_request.status == 'done' %}alert-success{% else %}alert-secondary{% endif %} mb-3">
+        {% if latest_renewal_request.status == 'done' %}
+          <strong>Последняя заявка выполнена.</strong>
+        {% elif latest_renewal_request.status == 'dismissed' %}
+          <strong>Последняя заявка отклонена.</strong>
+        {% endif %}
+        {% if latest_renewal_request.processed_at %}
+          <span class="d-block small mt-1">Статус обновлён {{ latest_renewal_request.processed_at|date:'d.m.Y H:i' }}.</span>
+        {% endif %}
+        {% if latest_renewal_request.operator_note %}
+          <span class="d-block small mt-1">Комментарий оператора: {{ latest_renewal_request.operator_note }}</span>
+        {% endif %}
+      </div>
+      <p class="small text-secondary">При необходимости вы можете отправить новую заявку.</p>
+      <form method="post" action="/portal/{{ token }}/request-renewal/">
+        {% csrf_token %}
+        <button class="btn btn-outline-warning">Отправить новую заявку</button>
+      </form>
       {% else %}
       <p class="small text-secondary">Если нужен новый срок доступа, отправьте заявку оператору.</p>
       <form method="post" action="/portal/{{ token }}/request-renewal/">

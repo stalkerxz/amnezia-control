@@ -124,6 +124,72 @@ class PortalFlowTests(TestCase):
         self.assertEqual(ClientRenewalRequest.objects.filter(client=self.client_obj, status="new").count(), 1)
         self.assertContains(response, "Заявка уже отправлена")
 
+
+    def test_new_request_can_be_created_after_done(self):
+        token = self._issue_token()
+        self.client.post(reverse("portal-request-renewal", kwargs={"token": token}), follow=True)
+        request_obj = ClientRenewalRequest.objects.get(client=self.client_obj)
+        request_obj.status = ClientRenewalRequest.Status.DONE
+        request_obj.processed_at = timezone.now()
+        request_obj.save(update_fields=["status", "processed_at", "updated_at"])
+
+        self.client.post(reverse("portal-request-renewal", kwargs={"token": token}), follow=True)
+
+        self.assertEqual(
+            ClientRenewalRequest.objects.filter(client=self.client_obj).count(),
+            2,
+        )
+        self.assertEqual(
+            ClientRenewalRequest.objects.filter(
+                client=self.client_obj,
+                status__in=[ClientRenewalRequest.Status.NEW, ClientRenewalRequest.Status.IN_PROGRESS],
+            ).count(),
+            1,
+        )
+
+    def test_new_request_can_be_created_after_dismissed(self):
+        token = self._issue_token()
+        self.client.post(reverse("portal-request-renewal", kwargs={"token": token}), follow=True)
+        request_obj = ClientRenewalRequest.objects.get(client=self.client_obj)
+        request_obj.status = ClientRenewalRequest.Status.DISMISSED
+        request_obj.processed_at = timezone.now()
+        request_obj.save(update_fields=["status", "processed_at", "updated_at"])
+
+        self.client.post(reverse("portal-request-renewal", kwargs={"token": token}), follow=True)
+
+        self.assertEqual(ClientRenewalRequest.objects.filter(client=self.client_obj).count(), 2)
+        self.assertEqual(
+            ClientRenewalRequest.objects.filter(client=self.client_obj, status=ClientRenewalRequest.Status.NEW).count(),
+            1,
+        )
+
+    def test_portal_shows_status_text_for_latest_closed_request(self):
+        token = self._issue_token()
+        request_obj = ClientRenewalRequest.objects.create(
+            client=self.client_obj,
+            status=ClientRenewalRequest.Status.DONE,
+            processed_at=timezone.now(),
+            operator_note="Продление уже применено.",
+            created_from_portal=True,
+        )
+
+        response = self.client.get(reverse("portal-home", kwargs={"token": token}))
+
+        self.assertContains(response, "Последняя заявка выполнена")
+        self.assertContains(response, request_obj.operator_note)
+
+    def test_portal_shows_in_progress_state_for_open_request(self):
+        token = self._issue_token()
+        ClientRenewalRequest.objects.create(
+            client=self.client_obj,
+            status=ClientRenewalRequest.Status.IN_PROGRESS,
+            created_from_portal=True,
+        )
+
+        response = self.client.get(reverse("portal-home", kwargs={"token": token}))
+
+        self.assertContains(response, "Заявка в работе")
+
     def test_portal_link_lifetime_uses_system_settings(self):
         SystemSettings.get_solo().portal_link_lifetime_days = 10
         SystemSettings.get_solo().save(update_fields=["portal_link_lifetime_days"])
