@@ -1,6 +1,7 @@
-{% load static %}
+{% load static i18n %}
 <!doctype html>
-<html lang="ru" data-bs-theme="dark">
+{% get_current_language as CURRENT_LANGUAGE %}
+<html lang="{{ CURRENT_LANGUAGE }}" data-bs-theme="dark">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -13,19 +14,19 @@
 <div class="app-layout d-flex">
   <aside class="sidebar p-3">
     <a class="brand d-block mb-4" href="/">amnezia-control</a>
-    <div class="sidebar-section mb-2">Навигация</div>
+    <div class="sidebar-section mb-2">{% trans "Навигация" %}</div>
     <nav class="nav flex-column gap-1">
       <a class="nav-link {% if request.path|slice:':9' == '/clients/' %}active{% endif %}" href="/clients/">Клиенты</a>
       <a class="nav-link {% if request.path|slice:':9' == '/servers/' %}active{% endif %}" href="/servers/">Сервер</a>
       <a class="nav-link {% if request.path|slice:':6' == '/jobs/' %}active{% endif %}" href="/jobs/">Задания</a>
-      <a class="nav-link {% if request.path|slice:':7' == '/audit/' %}active{% endif %}" href="/audit/">Audit</a>
-      <a class="nav-link disabled" href="#" aria-disabled="true">Настройки</a>
+      <a class="nav-link {% if request.path|slice:':7' == '/audit/' %}active{% endif %}" href="/audit/">{% trans "Аудит" %}</a>
+      <a class="nav-link {% if request.path|slice:':10' == '/settings/' %}active{% endif %}" href="/settings/">{% trans "Настройки" %}</a>
     </nav>
     <hr class="my-4 sidebar-divider">
-    <div class="sidebar-section sidebar-section-muted mb-2">Техническое</div>
+    <div class="sidebar-section sidebar-section-muted mb-2">{% trans "Техническое" %}</div>
     <nav class="nav flex-column gap-1 sidebar-nav-aux">
-      <a class="nav-link" href="/admin/">Django Admin</a>
-      <a class="nav-link nav-link-danger" href="/logout/">Выход</a>
+      <a class="nav-link" href="/admin/">{% trans "Админ-панель Django" %}</a>
+      <a class="nav-link nav-link-danger" href="/logout/">{% trans "Выход" %}</a>
     </nav>
   </aside>
 

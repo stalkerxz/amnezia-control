@@ -8,6 +8,8 @@ from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
+from core.services import get_portal_link_lifetime_days
+
 from .models import ClientPortalAccess
 
 
@@ -19,7 +21,6 @@ class PortalResolveReason:
 
 class PortalAccessService:
     TOKEN_BYTES = 32
-    DEFAULT_EXPIRES_IN_DAYS = 30
 
     @classmethod
     def _hash_token(cls, token: str) -> str:
@@ -52,7 +53,7 @@ class PortalAccessService:
         token = secrets.token_urlsafe(cls.TOKEN_BYTES)
         token_hash = cls._hash_token(token)
         token_encrypted = cls._encrypt_token(token)
-        expires_at = timezone.now() + timedelta(days=cls.DEFAULT_EXPIRES_IN_DAYS)
+        expires_at = timezone.now() + timedelta(days=get_portal_link_lifetime_days())
         access, _ = ClientPortalAccess.objects.get_or_create(
             client=client,
             defaults={"token_hash": token_hash, "token_encrypted": token_encrypted, "enabled": True, "expires_at": expires_at},

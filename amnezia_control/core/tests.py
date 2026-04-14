@@ -1,9 +1,12 @@
 from django.contrib.auth import get_user_model
+from django.conf import settings
 from django.test import TestCase
 from django.urls import reverse
+from django.utils.translation import LANGUAGE_SESSION_KEY
 from django.utils import timezone
 
 from audit.models import AuditLog
+from core.models import SystemSettings
 from jobs.models import Job, JobEvent
 from servers.models import ProtocolProfile, Server, ServerProtocol
 from vpn.models import VPNClient
@@ -131,3 +134,40 @@ class LoginTemplateViewTest(TestCase):
         self.assertContains(response, "amnezia-control")
         self.assertContains(response, "Безопасное управление клиентами")
         self.assertContains(response, "id=\"togglePasswordBtn\"", html=False)
+
+
+class SettingsViewTest(TestCase):
+    def setUp(self):
+        self.staff_user = get_user_model().objects.create_user("staff", password="123", is_staff=True)
+        self.regular_user = get_user_model().objects.create_user("regular", password="123", is_staff=False)
+
+    def test_settings_page_requires_staff(self):
+        self.client.force_login(self.regular_user)
+        response = self.client.get(reverse("settings"))
+        self.assertEqual(response.status_code, 302)
+
+    def test_staff_can_update_system_settings(self):
+        self.client.force_login(self.staff_user)
+        response = self.client.post(
+            reverse("settings"),
+            {"portal_link_lifetime_days": 45, "portal_renewal_cooldown_hours": 12},
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        settings_obj = SystemSettings.get_solo()
+        self.assertEqual(settings_obj.portal_link_lifetime_days, 45)
+        self.assertEqual(settings_obj.portal_renewal_cooldown_hours, 12)
+        self.assertContains(response, "Настройки сохранены")
+
+    def test_settings_page_language_switch_persists_in_session(self):
+        self.client.force_login(self.staff_user)
+
+        response = self.client.post(
+            reverse("set_language"),
+            {"language": "en", "next": reverse("settings")},
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.client.session.get(LANGUAGE_SESSION_KEY), "en")
+        self.assertEqual(response.cookies[settings.LANGUAGE_COOKIE_NAME].value, "en")

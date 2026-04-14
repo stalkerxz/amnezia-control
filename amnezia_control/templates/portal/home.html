@@ -22,7 +22,7 @@
   {% endif %}
 
   {% if client.traffic_sync_error %}
-  <div class="alert alert-danger">Не удалось синхронизировать статистику трафика: {{ client.traffic_sync_error }}</div>
+  <div class="alert alert-warning">Статистика трафика временно недоступна.</div>
   {% endif %}
 
   <div class="card panel-card mb-3">

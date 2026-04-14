@@ -1,9 +1,14 @@
+import os
+
+from django.conf import settings
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.db.models import Max
 from django.db.models import Prefetch
 from django.http import JsonResponse
 from django.urls import reverse
-from django.shortcuts import render
+from django.shortcuts import redirect, render
+from django.utils.translation import gettext as _
 from django.utils import timezone
 
 from audit.models import AuditLog
@@ -12,6 +17,9 @@ from jobs.services import classify_job_signal
 from servers.models import Server, ServerProtocol
 from servers.services import ServerService
 from vpn.models import VPNClient
+
+from .forms import SystemSettingsForm
+from .models import SystemSettings
 
 
 def _admin_required(user):
@@ -208,3 +216,28 @@ def dashboard_view(request):
 
 def health_view(request):
     return JsonResponse({"status": "ok"})
+
+
+@login_required
+@user_passes_test(_admin_required)
+def settings_view(request):
+    system_settings = SystemSettings.get_solo()
+    if request.method == "POST":
+        form = SystemSettingsForm(request.POST, instance=system_settings)
+        if form.is_valid():
+            form.save()
+            messages.success(request, _("Настройки сохранены."))
+            return redirect("settings")
+    else:
+        form = SystemSettingsForm(instance=system_settings)
+
+    app_version = os.getenv("APP_VERSION") or os.getenv("RELEASE") or os.getenv("GIT_SHA") or "unknown"
+    context = {
+        "form": form,
+        "limits_enforce_every_minutes": settings.LIMITS_ENFORCE_EVERY_MINUTES,
+        "timezone_name": settings.TIME_ZONE,
+        "debug_enabled": settings.DEBUG,
+        "app_version": app_version,
+        "python_version": os.sys.version.split(" ")[0],
+    }
+    return render(request, "core/settings.html", context)
