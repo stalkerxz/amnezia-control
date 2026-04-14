@@ -426,3 +426,67 @@ input:-webkit-autofill:focus {
   color: #91a4c8;
   font-size: .84rem;
 }
+
+.renewal-table-shell .table td,
+.renewal-table-shell .table th {
+  vertical-align: middle;
+}
+
+.renewal-main-row-open td:first-child {
+  box-shadow: inset 3px 0 0 rgba(129, 160, 217, .38);
+}
+
+.renewal-status-note {
+  display: block;
+  margin-top: .3rem;
+  font-size: .74rem;
+  color: #9aabca;
+}
+
+.renewal-action-collapse {
+  padding: 0 .35rem .6rem;
+}
+
+.renewal-action-card {
+  border: 1px solid #2f415d;
+  border-radius: .78rem;
+  background: rgba(16, 25, 36, .84);
+  padding: .78rem;
+}
+
+.renewal-action-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .45rem;
+}
+
+.portal-reissue-card {
+  background: linear-gradient(180deg, rgba(24, 36, 52, .92) 0%, rgba(20, 31, 45, .95) 100%);
+}
+
+.portal-reissue-warning {
+  border: 1px solid rgba(183, 134, 73, .38);
+  background: rgba(111, 78, 37, .18);
+  border-radius: .65rem;
+  color: #ebd8b5;
+  padding: .5rem .65rem;
+}
+
+.portal-reissue-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .6rem;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.portal-reissue-form .form-check {
+  margin: 0;
+  flex: 1 1 320px;
+}
+
+@media (max-width: 767.98px) {
+  .portal-reissue-form .btn {
+    width: 100%;
+  }
+}

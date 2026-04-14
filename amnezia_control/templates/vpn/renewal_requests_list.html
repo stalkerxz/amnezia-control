@@ -46,55 +46,97 @@
   </div>
 </form>
 
-<div class="table-responsive card table-shell p-2">
-  <table class="table table-hover align-middle mb-0">
-    <thead><tr><th>ID</th><th>Клиент</th><th>Сервер</th><th>Статус</th><th>Создана</th><th>Обработана</th><th>Оператор</th><th style="min-width:300px">Комментарий оператора</th><th>Действия</th></tr></thead>
+<div class="table-responsive card table-shell p-2 renewal-table-shell">
+  <table class="table table-hover align-middle mb-0 renewal-table">
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Клиент</th>
+        <th>Сервер</th>
+        <th>Статус</th>
+        <th>Создана</th>
+        <th>Обработана</th>
+        <th>Оператор</th>
+        <th class="text-end">Действия</th>
+      </tr>
+    </thead>
     <tbody>
       {% for item in request_rows %}
-      <tr class="{% if item.status == 'new' %}table-warning{% elif item.status == 'in_progress' %}table-info{% endif %}">
+      <tr class="renewal-main-row {% if item.status == 'new' or item.status == 'in_progress' %}renewal-main-row-open{% endif %}">
         <td>#{{ item.id }}</td>
-        <td><a href="/clients/{{ item.client_id }}/" class="text-decoration-none">{{ item.client.name }}</a></td>
+        <td>
+          <a href="/clients/{{ item.client_id }}/" class="text-decoration-none fw-semibold">{{ item.client.name }}</a>
+        </td>
         <td>{{ item.client.server.name }}</td>
         <td>
           <span class="badge status-badge {% if item.status == 'new' %}status-warning{% elif item.status == 'in_progress' %}status-info{% elif item.status == 'done' %}status-success{% else %}status-neutral{% endif %}">{{ item.get_status_display }}</span>
-          {% if item.status == 'new' %}<div class="small text-warning-emphasis mt-1">Новая заявка</div>{% endif %}
+          {% if item.status == 'new' %}
+            <span class="renewal-status-note">Новая</span>
+          {% elif item.status == 'in_progress' %}
+            <span class="renewal-status-note">В работе</span>
+          {% endif %}
         </td>
         <td>{{ item.created_at|date:'d.m.Y H:i' }}</td>
         <td>{% if item.processed_at %}{{ item.processed_at|date:'d.m.Y H:i' }}{% else %}—{% endif %}</td>
         <td>{% if item.processed_by %}{{ item.processed_by.username }}{% else %}—{% endif %}</td>
-        <td>
-          <form method="post" action="/clients/{{ item.client_id }}/action/renewal_set_status/" class="d-flex flex-column gap-2">
-            {% csrf_token %}
-            <input type="hidden" name="renewal_request_id" value="{{ item.id }}">
-            <input type="hidden" name="next" value="{{ request.get_full_path }}">
-            <textarea name="operator_note" class="form-control form-control-sm" rows="2" placeholder="Комментарий для клиента или для команды">{{ item.operator_note }}</textarea>
-            {% if item.status == 'new' or item.status == 'in_progress' %}
-            <div class="input-group input-group-sm">
-              <span class="input-group-text">Продлить на</span>
-              <input type="number" min="1" max="365" class="form-control" name="extension_days" placeholder="30">
-              <span class="input-group-text">дней</span>
-            </div>
-            {% endif %}
-            <div class="d-flex gap-1 flex-wrap">
-              {% if item.status == 'new' %}
-                <button class="btn btn-sm btn-outline-primary" name="target_status" value="in_progress">В работу</button>
-                <button class="btn btn-sm btn-success" name="target_status" value="extend_and_close">Продлить и закрыть</button>
-                <button class="btn btn-sm btn-outline-success" name="target_status" value="done">Выполнено</button>
-                <button class="btn btn-sm btn-outline-secondary" name="target_status" value="dismissed">Отклонить</button>
-              {% elif item.status == 'in_progress' %}
-                <button class="btn btn-sm btn-success" name="target_status" value="extend_and_close">Продлить и закрыть</button>
-                <button class="btn btn-sm btn-outline-success" name="target_status" value="done">Выполнено</button>
-                <button class="btn btn-sm btn-outline-secondary" name="target_status" value="dismissed">Отклонить</button>
-              {% else %}
-                <button class="btn btn-sm btn-outline-secondary" name="target_status" value="{{ item.status }}">Сохранить комментарий</button>
-              {% endif %}
-            </div>
-          </form>
+        <td class="text-end">
+          <div class="d-flex justify-content-end gap-2 flex-wrap">
+            <a class="btn btn-sm btn-outline-primary" href="/clients/{{ item.client_id }}/">К клиенту</a>
+            <button
+              class="btn btn-sm btn-outline-secondary"
+              type="button"
+              data-bs-toggle="collapse"
+              data-bs-target="#renewal-actions-{{ item.id }}"
+              aria-expanded="false"
+              aria-controls="renewal-actions-{{ item.id }}"
+            >
+              Обработать
+            </button>
+          </div>
         </td>
-        <td><a class="btn btn-sm btn-outline-primary" href="/clients/{{ item.client_id }}/">К клиенту</a></td>
+      </tr>
+      <tr class="collapse-row">
+        <td colspan="8" class="py-0 border-0">
+          <div class="collapse renewal-action-collapse" id="renewal-actions-{{ item.id }}">
+            <form method="post" action="/clients/{{ item.client_id }}/action/renewal_set_status/" class="renewal-action-card">
+              {% csrf_token %}
+              <input type="hidden" name="renewal_request_id" value="{{ item.id }}">
+              <input type="hidden" name="next" value="{{ request.get_full_path }}">
+
+              <div class="row g-3 align-items-end">
+                <div class="col-lg-7">
+                  <label class="form-label mb-1" for="operator_note_{{ item.id }}">Комментарий оператора</label>
+                  <textarea id="operator_note_{{ item.id }}" name="operator_note" class="form-control form-control-sm" rows="2" placeholder="Комментарий для клиента или команды">{{ item.operator_note }}</textarea>
+                </div>
+                <div class="col-lg-3">
+                  <label class="form-label mb-1" for="extension_days_{{ item.id }}">Продлить на (дней)</label>
+                  <input id="extension_days_{{ item.id }}" type="number" min="1" max="365" class="form-control form-control-sm" name="extension_days" placeholder="30" {% if item.status != 'new' and item.status != 'in_progress' %}disabled{% endif %}>
+                </div>
+                <div class="col-lg-2">
+                  <button class="btn btn-sm btn-outline-secondary w-100" name="target_status" value="{{ item.status }}">Сохранить</button>
+                </div>
+              </div>
+
+              <div class="renewal-action-buttons mt-3">
+                {% if item.status == 'new' %}
+                  <button class="btn btn-sm btn-success" name="target_status" value="extend_and_close">Продлить и закрыть</button>
+                  <button class="btn btn-sm btn-outline-primary" name="target_status" value="in_progress">В работу</button>
+                  <button class="btn btn-sm btn-outline-success" name="target_status" value="done">Выполнено</button>
+                  <button class="btn btn-sm btn-outline-secondary" name="target_status" value="dismissed">Отклонить</button>
+                {% elif item.status == 'in_progress' %}
+                  <button class="btn btn-sm btn-success" name="target_status" value="extend_and_close">Продлить и закрыть</button>
+                  <button class="btn btn-sm btn-outline-success" name="target_status" value="done">Выполнено</button>
+                  <button class="btn btn-sm btn-outline-secondary" name="target_status" value="dismissed">Отклонить</button>
+                {% else %}
+                  <button class="btn btn-sm btn-outline-secondary" name="target_status" value="{{ item.status }}">Сохранить комментарий</button>
+                {% endif %}
+              </div>
+            </form>
+          </div>
+        </td>
       </tr>
       {% empty %}
-      <tr><td colspan="9"><div class="empty-state">Заявок по выбранному фильтру нет.</div></td></tr>
+      <tr><td colspan="8"><div class="empty-state">Заявок по выбранному фильтру нет.</div></td></tr>
       {% endfor %}
     </tbody>
   </table>
