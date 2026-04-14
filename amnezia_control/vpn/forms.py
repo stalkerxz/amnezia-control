@@ -272,6 +272,9 @@ class VPNClientListFilterForm(forms.Form):
     STATUS_ALL = "__all__"
     OPERATOR_SCOPE_ALL = "all"
     OPERATOR_SCOPE_MINE = "mine"
+    RENEWAL_ALL = "all"
+    RENEWAL_WITH = "with"
+    RENEWAL_WITHOUT = "without"
 
     QUICK_ACTIVE = "active"
     QUICK_DISABLED = "disabled"
@@ -311,6 +314,16 @@ class VPNClientListFilterForm(forms.Form):
             (OPERATOR_SCOPE_MINE, "Мои"),
         ),
         initial=OPERATOR_SCOPE_ALL,
+    )
+    renewal_state = forms.ChoiceField(
+        required=False,
+        label="Запрос продления",
+        choices=(
+            (RENEWAL_ALL, "Все"),
+            (RENEWAL_WITH, "Есть запросы"),
+            (RENEWAL_WITHOUT, "Без запросов"),
+        ),
+        initial=RENEWAL_ALL,
     )
     quick = forms.ChoiceField(
         required=False,

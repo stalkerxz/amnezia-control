@@ -6,6 +6,7 @@ from django.utils import timezone
 from jobs.models import Job
 from servers.models import ProtocolProfile, Server, ServerProtocol
 from servers.services import ServerService
+from portal.services import PortalAccessService
 
 from .forms import VPNClientCreateForm, VPNClientLimitsUpdateForm
 from .models import VPNClient
@@ -1656,3 +1657,61 @@ class VPNClientOperatorVisibilityTest(TestCase):
         self.assertContains(response, "Оператор")
         self.assertContains(response, "Создал")
         self.assertContains(response, "Последнее действие")
+
+
+@override_settings(CONFIG_ENCRYPTION_KEY=Fernet.generate_key().decode())
+class VPNClientPortalAdminAndRenewalVisibilityTest(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user("admin-portal-renewal", password="123", is_staff=True)
+        self.client.force_login(self.user)
+        self.server = Server.objects.create(name="portal-renewal-server")
+        self.protocol = ServerProtocol.objects.create(
+            server=self.server,
+            protocol_type=ServerProtocol.ProtocolType.AWG,
+            runtime_metadata={"udp_port": 51820, "subnet": "10.66.0.0/24"},
+        )
+        self.profile = ProtocolProfile.objects.create(
+            server_protocol=self.protocol,
+            name="portal-renewal-profile",
+            protocol_type=ServerProtocol.ProtocolType.AWG,
+            config_template="[Interface]",
+        )
+        self.client_with_renewal = VPNClient.objects.create(
+            server=self.server,
+            name="client-with-renewal",
+            protocol_type=VPNClient.ProtocolType.AWG,
+            profile=self.profile,
+            created_by=self.user,
+        )
+        self.client_without_renewal = VPNClient.objects.create(
+            server=self.server,
+            name="client-without-renewal",
+            protocol_type=VPNClient.ProtocolType.AWG,
+            profile=self.profile,
+            created_by=self.user,
+        )
+
+    def test_admin_can_retrieve_current_portal_link_after_issue(self):
+        _, token = PortalAccessService.issue_for_client(self.client_with_renewal)
+        response = self.client.get(f"/clients/{self.client_with_renewal.id}/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Текущая ссылка кабинета")
+        self.assertContains(response, f"/portal/{token}/")
+
+    def test_clients_list_marks_and_filters_recent_renewal_requests(self):
+        AuditLog.objects.create(
+            action="portal.renewal.request",
+            entity_type="VPNClient",
+            entity_id=str(self.client_with_renewal.id),
+            details={},
+        )
+
+        response = self.client.get("/clients/")
+        self.assertContains(response, "client-with-renewal")
+        self.assertContains(response, "Запрос продления")
+        self.assertContains(response, "Последний запрос продления")
+
+        filtered = self.client.get("/clients/", {"renewal_state": "with"})
+        self.assertContains(filtered, "client-with-renewal")
+        self.assertNotContains(filtered, "client-without-renewal")

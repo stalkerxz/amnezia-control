@@ -73,14 +73,30 @@ class PortalFlowTests(TestCase):
         self.assertContains(response, "Срок действия ссылки истёк")
 
     def test_config_download_works_when_revision_exists(self):
+        from unittest.mock import patch
+
         token = self._issue_token()
         config_text = "[Interface]\nPrivateKey = test"
         VPNClientService._store_revision(self.client_obj, config_text)
 
-        response = self.client.get(reverse("portal-config", kwargs={"token": token}))
+        with patch("portal.views.VPNClientService.portal_export_config", return_value="native-export-config") as export_mock:
+            response = self.client.get(reverse("portal-config", kwargs={"token": token}))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "PrivateKey = test")
+        self.assertContains(response, "native-export-config")
+        export_mock.assert_called_once_with(self.client_obj)
+
+    def test_portal_qr_uses_portal_export_payload(self):
+        from unittest.mock import patch
+
+        token = self._issue_token()
+        VPNClientService._store_revision(self.client_obj, "[Interface]\nPrivateKey = test")
+        with patch("portal.views.VPNClientService.portal_qr_png_base64", return_value="base64-qr") as qr_mock:
+            response = self.client.get(reverse("portal-qr", kwargs={"token": token}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "base64-qr")
+        qr_mock.assert_called_once_with(self.client_obj)
 
     def test_renewal_request_creates_audit_entry(self):
         token = self._issue_token()

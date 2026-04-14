@@ -805,16 +805,31 @@ class VPNClientService:
         return ConfigCryptoService.decrypt(rev.config_blob_encrypted)
 
     @staticmethod
-    def qr_png_bytes(client: VPNClient) -> bytes:
-        payload = VPNClientService.latest_config(client)
+    def _qr_png_bytes_from_payload(payload: str) -> bytes:
         img = qrcode.make(payload)
         buffer = io.BytesIO()
         img.save(buffer, format="PNG")
         return buffer.getvalue()
 
     @staticmethod
+    def _qr_png_base64_from_payload(payload: str) -> str:
+        return base64.b64encode(VPNClientService._qr_png_bytes_from_payload(payload)).decode()
+
+    @staticmethod
+    def qr_png_bytes(client: VPNClient) -> bytes:
+        return VPNClientService._qr_png_bytes_from_payload(VPNClientService.latest_config(client))
+
+    @staticmethod
     def qr_png_base64(client: VPNClient) -> str:
-        return base64.b64encode(VPNClientService.qr_png_bytes(client)).decode()
+        return VPNClientService._qr_png_base64_from_payload(VPNClientService.latest_config(client))
+
+    @staticmethod
+    def portal_export_config(client: VPNClient) -> str:
+        return VPNClientService.build_native_client_config(client)
+
+    @staticmethod
+    def portal_qr_png_base64(client: VPNClient) -> str:
+        return VPNClientService._qr_png_base64_from_payload(VPNClientService.portal_export_config(client))
 
     @staticmethod
     @transaction.atomic

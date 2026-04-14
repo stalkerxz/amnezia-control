@@ -88,6 +88,33 @@
 
 <div class="row g-3 mb-4">
   <div class="col-lg-6">
+    <div class="card panel-card h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h2 class="h6 mb-0">Запросы продления из кабинета</h2>
+          <a href="/clients/?renewal_state=with" class="small text-decoration-none">Клиенты с запросами</a>
+        </div>
+        <div class="d-flex gap-3 mb-3">
+          <div><div class="small text-secondary">За 24 часа</div><div class="h4 mb-0">{{ renewal_requests_last_24h }}</div></div>
+          <div><div class="small text-secondary">За 7 дней</div><div class="h4 mb-0">{{ renewal_requests_last_7d }}</div></div>
+        </div>
+        <ul class="list-group list-group-flush">
+          {% for log in recent_renewal_requests %}
+            <li class="list-group-item bg-transparent px-0 d-flex justify-content-between">
+              <a class="text-decoration-none" href="/clients/{{ log.entity_id }}/">Клиент #{{ log.entity_id }}</a>
+              <span class="small text-secondary">{{ log.created_at|date:'d.m.Y H:i' }}</span>
+            </li>
+          {% empty %}
+            <li class="list-group-item bg-transparent px-0"><div class="empty-state">Запросов продления пока нет.</div></li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-lg-6">
     <div class="card panel-card h-100"><div class="card-body">
       <h2 class="h6">Протоколы и доступность</h2>
       <div class="d-flex flex-wrap gap-2 mb-2">
