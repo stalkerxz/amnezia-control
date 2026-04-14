@@ -431,7 +431,7 @@ def client_action_view(request, pk: int, action: str):
     if request.method != "POST":
         return redirect("clients-detail", pk=client.id)
 
-    next_url = request.POST.get("next")
+    next_url = request.POST.get("next") or reverse("renewal-requests-list")
 
     try:
         success_message = "Действие выполнено"

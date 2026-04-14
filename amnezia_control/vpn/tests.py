@@ -1810,6 +1810,106 @@ class VPNClientPortalAdminAndRenewalVisibilityTest(TestCase):
             ).exists()
         )
 
+
+    def test_renewal_status_change_redirects_to_next_url(self):
+        request_obj = ClientRenewalRequest.objects.create(
+            client=self.client_with_renewal,
+            status=ClientRenewalRequest.Status.NEW,
+        )
+        next_url = "/clients/renewal-requests/?status=open"
+
+        response = self.client.post(
+            f"/clients/{self.client_with_renewal.id}/action/renewal_set_status/",
+            {
+                "renewal_request_id": request_obj.id,
+                "target_status": ClientRenewalRequest.Status.IN_PROGRESS,
+                "operator_note": "Берём в работу",
+                "next": next_url,
+            },
+            follow=False,
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, next_url)
+
+
+    def test_invalid_status_value_redirects_safely_to_next_url(self):
+        request_obj = ClientRenewalRequest.objects.create(
+            client=self.client_with_renewal,
+            status=ClientRenewalRequest.Status.NEW,
+        )
+        next_url = "/clients/renewal-requests/"
+
+        response = self.client.post(
+            f"/clients/{self.client_with_renewal.id}/action/renewal_set_status/",
+            {
+                "renewal_request_id": request_obj.id,
+                "target_status": "bad_status",
+                "operator_note": "",
+                "next": next_url,
+            },
+            follow=False,
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, next_url)
+
+    def test_invalid_transition_redirects_safely_to_next_url(self):
+        request_obj = ClientRenewalRequest.objects.create(
+            client=self.client_with_renewal,
+            status=ClientRenewalRequest.Status.DONE,
+            processed_at=timezone.now(),
+        )
+        next_url = "/clients/renewal-requests/?status=done"
+
+        response = self.client.post(
+            f"/clients/{self.client_with_renewal.id}/action/renewal_set_status/",
+            {
+                "renewal_request_id": request_obj.id,
+                "target_status": ClientRenewalRequest.Status.IN_PROGRESS,
+                "operator_note": "Попытка открыть заново",
+                "next": next_url,
+            },
+            follow=False,
+        )
+        request_obj.refresh_from_db()
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, next_url)
+        self.assertEqual(request_obj.status, ClientRenewalRequest.Status.DONE)
+
+    def test_comment_only_save_redirects_and_persists_note(self):
+        request_obj = ClientRenewalRequest.objects.create(
+            client=self.client_with_renewal,
+            status=ClientRenewalRequest.Status.DISMISSED,
+            processed_at=timezone.now(),
+        )
+        next_url = "/clients/renewal-requests/?status=dismissed"
+
+        response = self.client.post(
+            f"/clients/{self.client_with_renewal.id}/action/renewal_set_status/",
+            {
+                "renewal_request_id": request_obj.id,
+                "target_status": ClientRenewalRequest.Status.DISMISSED,
+                "operator_note": "Комментарий сохранён без смены статуса",
+                "next": next_url,
+            },
+            follow=False,
+        )
+        request_obj.refresh_from_db()
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, next_url)
+        self.assertEqual(request_obj.status, ClientRenewalRequest.Status.DISMISSED)
+        self.assertEqual(request_obj.operator_note, "Комментарий сохранён без смены статуса")
+        self.assertTrue(
+            AuditLog.objects.filter(
+                action="portal.renewal.note_updated",
+                entity_type="VPNClient",
+                entity_id=str(self.client_with_renewal.id),
+            ).exists()
+        )
+
     def test_closed_renewal_request_rejects_reopen_transition(self):
         request_obj = ClientRenewalRequest.objects.create(
             client=self.client_with_renewal,
