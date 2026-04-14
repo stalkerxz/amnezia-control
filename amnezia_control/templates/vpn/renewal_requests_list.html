@@ -1,14 +1,14 @@
 {% extends 'partials/base.html' %}
 {% block content %}
-<div class="page-header d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
+<div class="page-header d-flex justify-content-between align-items-start gap-2 flex-wrap">
   <div>
     <p class="page-kicker">Операторская · Продления</p>
     <h1 class="h3 mb-1">Заявки на продление</h1>
-    <p class="text-secondary mb-0">Единый список заявок из кабинета клиента с обработкой статусов и комментариев.</p>
+    <p class="page-subtle">Плотный рабочий поток обработки клиентских заявок.</p>
   </div>
 </div>
 
-<form method="get" class="card card-body filter-panel mb-3">
+<form method="get" class="card card-body filter-panel dense-section">
   <div class="row g-2 align-items-end">
     <div class="col-md-3">
       <label class="form-label" for="id_status">Статус</label>
@@ -46,7 +46,7 @@
   </div>
 </form>
 
-<div class="table-responsive card table-shell p-2 renewal-table-shell">
+<div class="table-responsive card table-shell renewal-table-shell">
   <table class="table table-hover align-middle mb-0 renewal-table">
     <thead>
       <tr>
@@ -98,7 +98,7 @@
       <tr class="collapse-row">
         <td colspan="8" class="py-0 border-0">
           <div class="collapse renewal-action-collapse" id="renewal-actions-{{ item.id }}">
-            <form method="post" action="/clients/{{ item.client_id }}/action/renewal_set_status/" class="renewal-action-card">
+            <form method="post" action="/clients/{{ item.client_id }}/action/renewal_set_status/" class="renewal-action-card filter-panel">
               {% csrf_token %}
               <input type="hidden" name="renewal_request_id" value="{{ item.id }}">
               <input type="hidden" name="next" value="{{ request.get_full_path }}">

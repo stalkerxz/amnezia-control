@@ -12,7 +12,7 @@
 <body class="app-shell{% if not user.is_authenticated %} app-auth-shell{% endif %}">
 {% if user.is_authenticated %}
 <div class="app-layout d-flex">
-  <aside class="sidebar p-3">
+  <aside class="sidebar p-2">
     <a class="brand d-block mb-4" href="/">amnezia-control</a>
     <div class="sidebar-section mb-2">{% trans "Навигация" %}</div>
     <nav class="nav flex-column gap-1">
@@ -32,7 +32,7 @@
   </aside>
 
   <section class="app-main flex-grow-1">
-    <header class="topbar px-4 py-3 border-bottom d-flex justify-content-between align-items-center gap-3">
+    <header class="topbar border-bottom d-flex justify-content-between align-items-center gap-3">
       <div>
         <div class="topbar-title">Операторская панель</div>
         <div class="topbar-subtitle">Рабочее место управления Amnezia</div>
@@ -41,7 +41,7 @@
         <div>{{ user.username }}</div>
       </div>
     </header>
-    <main class="content p-4 p-xl-4 p-lg-4 p-md-3">
+    <main class="content p-3">
 {% for message in messages %}
       <div class="alert {% if message.tags == 'error' %}alert-danger{% elif message.tags %}alert-{{ message.tags }}{% else %}alert-info{% endif %} alert-dismissible fade show app-alert shadow-sm" role="alert">
         <div>{{ message }}</div>

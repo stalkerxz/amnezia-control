@@ -1,18 +1,18 @@
 {% extends 'partials/base.html' %}
 {% block content %}
-<div class="page-header page-header-compact mb-3">
+<div class="page-header page-header-compact">
   <p class="page-kicker">Клиент #{{ client.id }} · Сервер: {{ client.server.name }}</p>
-  <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+  <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
     <div>
       <h1 class="h3 mb-2">{{ client.name }}</h1>
-      <div class="d-flex flex-wrap gap-1">
+      <div class="meta-strip">
         <span class="badge badge-soft {% if client.protocol_type == 'awg2' %}badge-protocol-awg2{% else %}badge-protocol-awg{% endif %}">{{ client.protocol_type|upper }}</span>
         <span class="badge status-badge {% if client.status == 'active' %}status-success{% elif client.status == 'disabled' %}status-warning{% else %}status-danger{% endif %}">{{ client.get_status_display }}</span>
         <span class="badge {{ limit_badge_class }}">Лимиты: {{ limit_badge_label }}</span>
         <span class="badge status-badge {% if client.imported_from_runtime %}status-info{% else %}status-neutral{% endif %}">{% if client.imported_from_runtime %}Импортирован{% else %}Создан в панели{% endif %}</span>
       </div>
     </div>
-    <div class="d-flex gap-2 flex-wrap">
+    <div class="action-cluster">
       {% if revision %}
       <a class="btn btn-primary" href="/clients/{{ client.id }}/download/native/">Скачать .conf (AmneziaWG)</a>
       <a class="btn btn-outline-primary" href="/clients/{{ client.id }}/download/">Скачать .conf (AmneziaVPN)</a>
@@ -48,7 +48,7 @@
 </div>
 {% endif %}
 
-<div class="row g-2 mb-3">
+<div class="row g-2 dense-section">
   <div class="col-xl-3 col-md-6"><div class="card stat-card metric-card stat-card-compact h-100"><div class="card-body"><h2 class="h6 mb-2">Сервер</h2><div class="small text-secondary mb-1">Связан с</div><div class="fw-semibold">{{ client.server.name }}</div><div class="small text-secondary mt-2">Последняя синхронизация</div><div>{% if client.last_runtime_sync_at %}{{ client.last_runtime_sync_at|date:'d.m.Y H:i' }}{% else %}Нет данных{% endif %}</div></div></div></div>
   <div class="col-xl-3 col-md-6"><div class="card stat-card metric-card stat-card-compact h-100"><div class="card-body"><h2 class="h6 mb-2">Оператор</h2><div class="small text-secondary mb-1">Создал</div><div>{% if client.created_by %}{{ client.created_by.username }}{% if client.created_by_id == request.user.id %} <span class="badge status-badge status-success">Мой</span>{% else %} <span class="badge status-badge status-neutral">Другой оператор</span>{% endif %}{% else %}система{% endif %}</div><div class="small text-secondary mt-2">Последнее действие</div><div>{% if latest_operator_action %}<code>{{ latest_operator_action.action }}</code> · {% if latest_operator_action.actor %}{{ latest_operator_action.actor.username }}{% else %}система{% endif %}{% else %}Нет данных{% endif %}</div></div></div></div>
   <div class="col-xl-3 col-md-6"><div class="card stat-card metric-card stat-card-compact h-100"><div class="card-body"><h2 class="h6 mb-2">Ревизии</h2><div class="small text-secondary mb-1">Всего</div><div class="h3 mb-1">{{ revision_count }}</div><div class="small text-secondary">{% if revision %}Последняя: #{{ revision.revision_number }}{% else %}Отсутствуют{% endif %}</div></div></div></div>
@@ -56,7 +56,7 @@
   <div class="col-xl-3 col-md-6"><div class="card stat-card metric-card stat-card-compact h-100"><div class="card-body"><h2 class="h6 mb-2">Ключ клиента</h2><div class="small text-secondary mb-1">Ключ</div><code>{{ client.runtime_peer_public_key|default:'-' }}</code><button type="button" class="btn btn-xs btn-outline-secondary mt-2 js-copy" data-copy="{{ client.runtime_peer_public_key|default:'' }}">Копировать ключ</button></div></div></div>
 </div>
 
-<div class="card panel-card mb-3"><div class="card-body py-3">
+<div class="card panel-card dense-section"><div class="card-body py-2">
   <h2 class="h6 mb-3">Диагностика клиента</h2>
   <div class="tech-grid">
     <div class="tech-block"><div class="tech-block-label">Протокол</div><div>{{ client.protocol_type|upper }}</div></div>
@@ -72,7 +72,7 @@
   </div>
 </div></div>
 
-<div class="card panel-card mb-3"><div class="card-body py-3">
+<div class="card panel-card dense-section"><div class="card-body py-2">
   <h2 class="h6 mb-2">Лимиты и телеметрия</h2>
   <div class="row g-2">
     <div class="col-lg-4"><div class="small text-secondary">Ограничение по времени</div><div>{{ expires_display }}</div></div>
@@ -87,7 +87,7 @@
   {% if client.disable_reason != 'none' %}<div class="alert alert-warning mt-3 mb-0">Причина блокировки: <strong>{{ client.get_disable_reason_display }}</strong></div>{% endif %}
 </div></div>
 
-<div class="card panel-card mb-3"><div class="card-body">
+<div class="card panel-card dense-section"><div class="card-body">
   <h2 class="h6">Изменить лимиты</h2>
   {% if is_deleted %}
   <div class="alert alert-secondary mb-0">Изменение лимитов недоступно для удаленного клиента.</div>
@@ -118,7 +118,7 @@
 </div></div>
 
 
-<div class="card panel-card mb-3"><div class="card-body">
+<div class="card panel-card dense-section"><div class="card-body">
   <h2 class="h6 mb-3">Кабинет клиента (самообслуживание)</h2>
   <div class="small text-secondary mb-2">Статус доступа:
     <span class="badge status-badge {{ portal_access_status_badge_class }}">{{ portal_access_status_label }}</span>
@@ -149,7 +149,7 @@
 
 
 {% if open_renewal_request %}
-<div class="card panel-card mb-3"><div class="card-body">
+<div class="card panel-card dense-section"><div class="card-body">
   <h2 class="h6 mb-2">Заявка на продление</h2>
   <div class="small text-secondary mb-2">Текущий статус: <span class="badge status-badge {% if open_renewal_request.status == 'new' %}status-warning{% else %}status-info{% endif %}">{{ open_renewal_request.get_status_display }}</span></div>
   <div class="small text-secondary mb-1">Создана: {{ open_renewal_request.created_at|date:'d.m.Y H:i' }}</div>
@@ -158,7 +158,7 @@
 </div></div>
 {% endif %}
 
-<div class="card panel-card mb-3"><div class="card-body">
+<div class="card panel-card dense-section"><div class="card-body">
   <h2 class="h6 mb-3">Операции и экспорт</h2>
   {% if is_deleted %}
   <div class="alert alert-info py-2 mb-3">
@@ -194,10 +194,10 @@
 </div></div>
 
 {% if revision and qr_base64 %}
-<div class="card panel-card border-primary mb-3" id="qr-card"><div class="card-body"><h2 class="h6">QR для подключения</h2><img src="data:image/png;base64,{{ qr_base64 }}" alt="QR" class="img-thumbnail" style="max-width:300px;"><p class="secondary-note mt-2 mb-0">Отсканируйте код в приложении для быстрого импорта профиля.</p></div></div>
+<div class="card panel-card border-primary dense-section" id="qr-card"><div class="card-body"><h2 class="h6">QR для подключения</h2><img src="data:image/png;base64,{{ qr_base64 }}" alt="QR" class="img-thumbnail" style="max-width:300px;"><p class="secondary-note mt-2 mb-0">Отсканируйте код в приложении для быстрого импорта профиля.</p></div></div>
 {% endif %}
 
-<div class="card panel-card mb-3"><div class="card-body">
+<div class="card panel-card dense-section"><div class="card-body">
   <h2 class="h6 mb-3">Недавняя активность</h2>
   <div class="row g-3">
     <div class="col-lg-6">
@@ -246,7 +246,7 @@
   </div>
 </div></div>
 
-<div class="card panel-card border-danger mb-3"><div class="card-body">
+<div class="card panel-card border-danger dense-section"><div class="card-body">
   <h2 class="h6 text-danger mb-2">Опасные действия</h2>
   <p class="small text-secondary mb-0">Удаление помечает клиента как удалённого и переносит его в архив.</p>
 </div></div>

@@ -1,104 +1,57 @@
 {% extends 'partials/base.html' %}
 {% block title %}Кабинет клиента · {{ client.name }}{% endblock %}
 {% block content %}
-<div class="container px-0" style="max-width: 820px;">
-  <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-4">
+<div class="container px-0 portal-shell">
+  <div class="page-header d-flex justify-content-between align-items-start flex-wrap gap-2">
     <div>
-      <p class="text-secondary mb-1">Кабинет клиента</p>
+      <p class="page-kicker">Кабинет клиента</p>
       <h1 class="h3 mb-0">{{ client.name }}</h1>
+      <p class="page-subtle">Управление доступом и конфигурацией в одном экране.</p>
     </div>
-    <div class="d-flex gap-2 flex-wrap">
+    <div class="action-cluster">
       <a href="/portal/{{ token }}/config/" class="btn btn-primary">Скачать конфигурацию</a>
       <a href="/portal/{{ token }}/qr/" class="btn btn-outline-primary">Показать QR-код</a>
     </div>
   </div>
 
-  <div class="card panel-card mb-3 border-0 shadow-sm">
-    <div class="card-body py-3">
-      <h2 class="h6 mb-3">Обзор доступа</h2>
-      <div class="row g-3">
-        <div class="col-md-4">
-          <div class="small text-secondary mb-1">Состояние доступа</div>
-          {% if blocked %}
-            <span class="badge text-bg-warning">Ограничен</span>
-          {% else %}
-            <span class="badge text-bg-success">Активен</span>
-          {% endif %}
-          <div class="small text-secondary mt-2">{{ client.get_status_display }} · {{ client.get_limit_state_display }}</div>
+  <div class="card panel-card portal-card dense-section">
+    <div class="card-body">
+      <h2 class="h6 mb-2">Обзор доступа</h2>
+      <div class="compact-grid cols-3">
+        <div class="metric-cell">
+          <div class="label">Состояние доступа</div>
+          <div class="value">{% if blocked %}<span class="badge status-badge status-warning">Ограничен</span>{% else %}<span class="badge status-badge status-success">Активен</span>{% endif %}</div>
+          <div class="meta">{{ client.get_status_display }} · {{ client.get_limit_state_display }}</div>
         </div>
-        <div class="col-md-4">
-          <div class="small text-secondary mb-1">Доступ до</div>
-          <div class="fw-semibold">
-            {% if client.expires_at %}
-              {{ client.expires_at|date:'d.m.Y H:i' }}
-            {% else %}
-              Без ограничения
-            {% endif %}
-          </div>
+        <div class="metric-cell">
+          <div class="label">Доступ до</div>
+          <div class="value">{% if client.expires_at %}{{ client.expires_at|date:'d.m.Y H:i' }}{% else %}Без ограничения{% endif %}</div>
         </div>
-        <div class="col-md-4">
-          <div class="small text-secondary mb-1">Трафик</div>
-          <div class="fw-semibold">{{ traffic_used_display }} / {{ traffic_limit_display }}</div>
+        <div class="metric-cell">
+          <div class="label">Трафик</div>
+          <div class="value">{{ traffic_used_display }} / {{ traffic_limit_display }}</div>
         </div>
       </div>
     </div>
   </div>
 
   {% if status_block %}
-  <div class="card panel-card mb-3 border-{{ status_block.variant }}">
-    <div class="card-body py-3">
+  <div class="card panel-card portal-card dense-section border-{{ status_block.variant }}">
+    <div class="card-body">
       <div class="d-flex justify-content-between align-items-start gap-2">
-        <div>
-          <h2 class="h6 mb-1">Результат по заявке</h2>
-          <div class="fw-semibold">{{ status_block.title }}</div>
-        </div>
+        <div><h2 class="h6 mb-1">Результат по заявке</h2><div class="fw-semibold">{{ status_block.title }}</div></div>
         <span class="badge text-bg-{{ status_block.variant }}">{{ status_block.badge }}</span>
       </div>
       <p class="small text-secondary mt-2 mb-0">{{ status_block.text }}</p>
-      {% if status_block.expires_at %}
-      <div class="mt-2">
-        <span class="badge text-bg-light border">Новый срок доступа: {{ status_block.expires_at|date:'d.m.Y H:i' }}</span>
-      </div>
-      {% endif %}
-      {% if status_block.updated_at %}
-      <div class="small text-secondary mt-2">Обновлено: {{ status_block.updated_at|date:'d.m.Y H:i' }}</div>
-      {% endif %}
-      {% if status_block.operator_note %}
-      <div class="small mt-2 p-2 rounded bg-light">
-        <span class="text-secondary">Комментарий оператора:</span> {{ status_block.operator_note }}
-      </div>
-      {% endif %}
+      {% if status_block.expires_at %}<div class="small mt-2">Новый срок доступа: {{ status_block.expires_at|date:'d.m.Y H:i' }}</div>{% endif %}
+      {% if status_block.operator_note %}<div class="small mt-2 text-secondary">Комментарий оператора: {{ status_block.operator_note }}</div>{% endif %}
     </div>
   </div>
   {% endif %}
 
-  <div class="card panel-card portal-reissue-card mb-3">
-    <div class="card-body py-3">
-      <h2 class="h6 mb-1">Переиздание конфигурации</h2>
-      <p class="small text-secondary mb-2">Если устройство утеряно или нужно заново выдать доступ, конфигурацию можно переиздать самостоятельно.</p>
-      <div class="portal-reissue-warning small mb-2">
-        После переиздания предыдущая конфигурация и старый QR-код станут недействительными.
-      </div>
-      {% if can_selfservice_reissue %}
-        <form method="post" action="/portal/{{ token }}/reissue-config/" class="portal-reissue-form">
-          {% csrf_token %}
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="1" id="confirmReissue" name="confirm_reissue" required>
-            <label class="form-check-label small" for="confirmReissue">
-              Подтверждаю переиздание и понимаю последствия.
-            </label>
-          </div>
-          <button class="btn btn-outline-danger btn-sm">Переиздать конфигурацию</button>
-        </form>
-        <div class="small text-secondary mt-2">Повторное переиздание доступно не чаще одного раза в {{ reissue_cooldown_hours }} часов.</div>
-      {% else %}
-        <div class="small text-secondary">{{ reissue_block_message }}</div>
-      {% endif %}
-    </div>
-  </div>
 
   {% if blocked %}
-  <div class="alert alert-warning">
+  <div class="alert alert-warning py-2 dense-section">
     <strong>Подключение ограничено.</strong>
     {% if client.disable_reason != 'none' %}Причина: {{ client.get_disable_reason_display }}.{% endif %}
     {% if limit_state != 'active' %} Текущее состояние лимитов: {{ client.get_limit_state_display }}.{% endif %}
@@ -106,34 +59,51 @@
   {% endif %}
 
   {% if client.traffic_sync_error %}
-  <div class="alert alert-warning">Статистика трафика временно недоступна.</div>
+  <div class="alert alert-warning py-2 dense-section">Статистика трафика временно недоступна.</div>
   {% endif %}
 
-  <div class="card panel-card mb-3">
+  <div class="card panel-card portal-card dense-section">
     <div class="card-body">
-      <div class="row g-3">
-        <div class="col-sm-6"><div class="small text-secondary">Протокол</div><div>{{ client.protocol_type|upper }}</div></div>
-        <div class="col-sm-6"><div class="small text-secondary">Обновление данных</div><div>{% if client.traffic_last_sync_at %}{{ client.traffic_last_sync_at|date:'d.m.Y H:i' }}{% else %}Пока нет данных{% endif %}</div></div>
-        <div class="col-sm-6"><div class="small text-secondary">Последнее открытие кабинета</div><div>{% if access.last_access_at %}{{ access.last_access_at|date:'d.m.Y H:i' }}{% else %}Первое посещение{% endif %}</div></div>
-        <div class="col-sm-6"><div class="small text-secondary">Срок действия ссылки кабинета</div><div>{% if access.expires_at %}{{ access.expires_at|date:'d.m.Y H:i' }}{% else %}Не ограничен{% endif %}</div></div>
+      <h2 class="h6 mb-1">Переиздание конфигурации</h2>
+      <p class="small text-secondary mb-2">После переиздания старая конфигурация и QR-код станут недействительными.</p>
+      {% if can_selfservice_reissue %}
+        <form method="post" action="/portal/{{ token }}/reissue-config/" class="d-flex flex-column gap-2">
+          {% csrf_token %}
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" value="1" id="confirmReissue" name="confirm_reissue" required>
+            <label class="form-check-label small" for="confirmReissue">Подтверждаю переиздание и понимаю последствия.</label>
+          </div>
+          <div class="action-cluster">
+            <button class="btn btn-outline-danger btn-sm">Переиздать конфигурацию</button>
+            <span class="small text-secondary align-self-center">Повторно: не чаще 1 раза в {{ reissue_cooldown_hours }} ч.</span>
+          </div>
+        </form>
+      {% else %}
+        <div class="small text-secondary">{{ reissue_block_message }}</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card panel-card portal-card dense-section">
+    <div class="card-body">
+      <div class="kv-inline">
+        <div><div class="k">Протокол</div><div class="v">{{ client.protocol_type|upper }}</div></div>
+        <div><div class="k">Обновление данных</div><div class="v">{% if client.traffic_last_sync_at %}{{ client.traffic_last_sync_at|date:'d.m.Y H:i' }}{% else %}Пока нет данных{% endif %}</div></div>
+        <div><div class="k">Последнее открытие кабинета</div><div class="v">{% if access.last_access_at %}{{ access.last_access_at|date:'d.m.Y H:i' }}{% else %}Первое посещение{% endif %}</div></div>
+        <div><div class="k">Срок действия ссылки</div><div class="v">{% if access.expires_at %}{{ access.expires_at|date:'d.m.Y H:i' }}{% else %}Не ограничен{% endif %}</div></div>
       </div>
     </div>
   </div>
 
-  <div class="card panel-card mb-3">
+  <div class="card panel-card portal-card portal-history dense-section">
     <div class="card-body">
       <h2 class="h6 mb-2">История действий</h2>
       {% if history_items %}
       <ul class="list-group list-group-flush">
         {% for item in history_items %}
-        <li class="list-group-item px-0 py-2">
-          <div class="d-flex justify-content-between align-items-start gap-2">
-            <div>
-              <div class="fw-semibold">{{ item.title }}</div>
-              {% if item.text %}<div class="small text-secondary">{{ item.text }}</div>{% endif %}
-            </div>
-            <span class="small text-secondary text-nowrap">{{ item.at|date:'d.m.Y H:i' }}</span>
-          </div>
+        <li class="list-group-item px-0 d-flex justify-content-between align-items-start gap-2">
+          <div><div class="fw-semibold">{{ item.title }}</div>{% if item.text %}<div class="small text-secondary">{{ item.text }}</div>{% endif %}</div>
+          <span class="small text-secondary text-nowrap">{{ item.at|date:'d.m.Y H:i' }}</span>
         </li>
         {% endfor %}
       </ul>
@@ -143,29 +113,17 @@
     </div>
   </div>
 
-  <div class="card panel-card">
+  <div class="card panel-card portal-card">
     <div class="card-body">
-      <h2 class="h6">Продление доступа</h2>
+      <h2 class="h6 mb-2">Продление доступа</h2>
       {% if open_renewal_request %}
-      <div class="alert alert-info mb-3">
-        {% if open_renewal_request.status == 'new' %}
-          <strong>Заявка отправлена.</strong> Оператор скоро возьмёт её в работу.
-        {% else %}
-          <strong>Заявка в работе.</strong> Оператор уже обрабатывает ваш запрос.
-        {% endif %}
-      </div>
+      <div class="alert alert-info py-2 mb-2">{% if open_renewal_request.status == 'new' %}<strong>Заявка отправлена.</strong> Оператор скоро возьмёт её в работу.{% else %}<strong>Заявка в работе.</strong> Оператор уже обрабатывает запрос.{% endif %}</div>
       {% elif latest_renewal_request %}
       <p class="small text-secondary">Если понадобится ещё одно продление, отправьте новую заявку.</p>
-      <form method="post" action="/portal/{{ token }}/request-renewal/">
-        {% csrf_token %}
-        <button class="btn btn-outline-warning">Отправить новую заявку</button>
-      </form>
+      <form method="post" action="/portal/{{ token }}/request-renewal/">{% csrf_token %}<button class="btn btn-outline-warning btn-sm">Отправить новую заявку</button></form>
       {% else %}
       <p class="small text-secondary">Если нужен новый срок доступа, отправьте заявку оператору.</p>
-      <form method="post" action="/portal/{{ token }}/request-renewal/">
-        {% csrf_token %}
-        <button class="btn btn-outline-warning">Отправить заявку на продление</button>
-      </form>
+      <form method="post" action="/portal/{{ token }}/request-renewal/">{% csrf_token %}<button class="btn btn-outline-warning btn-sm">Отправить заявку на продление</button></form>
       {% endif %}
     </div>
   </div>

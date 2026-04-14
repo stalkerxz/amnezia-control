@@ -4,50 +4,46 @@
 {% block title %}Настройки · amnezia-control{% endblock %}
 
 {% block content %}
-<div class="d-flex align-items-center justify-content-between mb-4">
-  <div>
-    <h1 class="h3 mb-1">{% trans "Настройки" %}</h1>
-    <div class="text-secondary">{% trans "Операторские параметры и техническая информация." %}</div>
-  </div>
+<div class="page-header">
+  <p class="page-kicker">Операторская · Конфигурация</p>
+  <h1 class="h3 mb-1">{% trans "Настройки" %}</h1>
+  <p class="page-subtle">{% trans "Операторские параметры и техническая информация." %}</p>
 </div>
 
-<div class="row g-4">
+<div class="row g-2">
   <div class="col-xl-7">
-    <div class="card shadow-sm border-0 h-100">
+    <div class="card panel-card h-100 dense-section">
       <div class="card-body">
-        <h2 class="h5 mb-3">{% trans "Редактируемые параметры" %}</h2>
-        <form method="post" class="row g-3">
+        <div class="section-header-compact"><h2 class="h6">{% trans "Редактируемые параметры" %}</h2></div>
+        <form method="post" class="row g-2">
           {% csrf_token %}
-          <div class="col-12">
+          <div class="col-md-6">
             <label class="form-label" for="id_portal_link_lifetime_days">{{ form.portal_link_lifetime_days.label }}</label>
             {{ form.portal_link_lifetime_days }}
           </div>
-          <div class="col-12">
+          <div class="col-md-6">
             <label class="form-label" for="id_portal_renewal_cooldown_hours">{{ form.portal_renewal_cooldown_hours.label }}</label>
             {{ form.portal_renewal_cooldown_hours }}
           </div>
-          <div class="col-12">
-            <button type="submit" class="btn btn-primary">{% trans "Сохранить" %}</button>
-          </div>
+          <div class="col-12"><button type="submit" class="btn btn-primary">{% trans "Сохранить" %}</button></div>
         </form>
       </div>
     </div>
   </div>
 
   <div class="col-xl-5">
-    <div class="card shadow-sm border-0 mb-4">
+    <div class="card panel-card dense-section">
       <div class="card-body">
-        <h2 class="h5 mb-3">{% trans "Параметры только для чтения" %}</h2>
-        <dl class="row mb-0">
-          <dt class="col-8">{% trans "Интервал проверки лимитов" %}</dt>
-          <dd class="col-4 text-end">{{ limits_enforce_every_minutes }} {% trans "мин" %}</dd>
-        </dl>
+        <h2 class="h6 mb-2">{% trans "Параметры только для чтения" %}</h2>
+        <div class="kv-inline">
+          <div><div class="k">{% trans "Интервал проверки лимитов" %}</div><div class="v">{{ limits_enforce_every_minutes }} {% trans "мин" %}</div></div>
+        </div>
       </div>
     </div>
 
-    <div class="card shadow-sm border-0 mb-4">
+    <div class="card panel-card dense-section">
       <div class="card-body">
-        <h2 class="h5 mb-3">{% trans "Язык интерфейса" %}</h2>
+        <h2 class="h6 mb-2">{% trans "Язык интерфейса" %}</h2>
         <form method="post" action="{% url 'set_language' %}" class="row g-2 align-items-end">
           {% csrf_token %}
           <input type="hidden" name="next" value="{{ request.path }}">
@@ -61,26 +57,20 @@
               {% endfor %}
             </select>
           </div>
-          <div class="col-4">
-            <button type="submit" class="btn btn-outline-primary w-100">{% trans "Применить" %}</button>
-          </div>
+          <div class="col-4"><button type="submit" class="btn btn-outline-primary w-100">{% trans "Применить" %}</button></div>
         </form>
       </div>
     </div>
 
-    <div class="card shadow-sm border-0">
+    <div class="card panel-card">
       <div class="card-body">
-        <h2 class="h5 mb-3">{% trans "Окружение" %}</h2>
-        <dl class="row mb-0 small">
-          <dt class="col-6">{% trans "Часовой пояс" %}</dt>
-          <dd class="col-6 text-end">{{ timezone_name }}</dd>
-          <dt class="col-6">{% trans "Режим отладки" %}</dt>
-          <dd class="col-6 text-end">{% if debug_enabled %}{% trans "вкл" %}{% else %}{% trans "выкл" %}{% endif %}</dd>
-          <dt class="col-6">{% trans "Версия приложения" %}</dt>
-          <dd class="col-6 text-end">{{ app_version }}</dd>
-          <dt class="col-6">{% trans "Версия Python" %}</dt>
-          <dd class="col-6 text-end">{{ python_version }}</dd>
-        </dl>
+        <h2 class="h6 mb-2">{% trans "Окружение" %}</h2>
+        <div class="kv-inline">
+          <div><div class="k">{% trans "Часовой пояс" %}</div><div class="v">{{ timezone_name }}</div></div>
+          <div><div class="k">{% trans "Режим отладки" %}</div><div class="v">{% if debug_enabled %}{% trans "вкл" %}{% else %}{% trans "выкл" %}{% endif %}</div></div>
+          <div><div class="k">{% trans "Версия приложения" %}</div><div class="v">{{ app_version }}</div></div>
+          <div><div class="k">{% trans "Версия Python" %}</div><div class="v">{{ python_version }}</div></div>
+        </div>
       </div>
     </div>
   </div>
