@@ -13,6 +13,27 @@
     </div>
   </div>
 
+  {% if status_block %}
+  <div class="card panel-card mb-3 border-{{ status_block.variant }}">
+    <div class="card-body py-3">
+      <div class="d-flex justify-content-between align-items-start gap-2">
+        <div>
+          <h2 class="h6 mb-1">Текущий статус</h2>
+          <div class="fw-semibold">{{ status_block.title }}</div>
+        </div>
+        <span class="badge text-bg-{{ status_block.variant }}">{{ status_block.badge }}</span>
+      </div>
+      <p class="small text-secondary mt-2 mb-0">{{ status_block.text }}</p>
+      {% if status_block.updated_at %}
+      <div class="small text-secondary mt-1">Обновлено: {{ status_block.updated_at|date:'d.m.Y H:i' }}</div>
+      {% endif %}
+      {% if status_block.operator_note %}
+      <div class="mt-2 small"><strong>Комментарий оператора:</strong> {{ status_block.operator_note }}</div>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
   <div class="card panel-card portal-reissue-card mb-3">
     <div class="card-body py-3">
       <h2 class="h6 mb-1">Переиздание конфигурации</h2>
@@ -66,6 +87,29 @@
     </div>
   </div>
 
+  <div class="card panel-card mb-3">
+    <div class="card-body">
+      <h2 class="h6 mb-2">История действий</h2>
+      {% if history_items %}
+      <ul class="list-group list-group-flush">
+        {% for item in history_items %}
+        <li class="list-group-item px-0 py-2">
+          <div class="d-flex justify-content-between align-items-start gap-2">
+            <div>
+              <div class="fw-semibold">{{ item.title }}</div>
+              {% if item.text %}<div class="small text-secondary">{{ item.text }}</div>{% endif %}
+            </div>
+            <span class="small text-secondary text-nowrap">{{ item.at|date:'d.m.Y H:i' }}</span>
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="small text-secondary mb-0">События появятся здесь после первых действий в кабинете.</p>
+      {% endif %}
+    </div>
+  </div>
+
   <div class="card panel-card">
     <div class="card-body">
       <h2 class="h6">Продление доступа</h2>
@@ -78,20 +122,7 @@
         {% endif %}
       </div>
       {% elif latest_renewal_request %}
-      <div class="alert {% if latest_renewal_request.status == 'done' %}alert-success{% else %}alert-secondary{% endif %} mb-3">
-        {% if latest_renewal_request.status == 'done' %}
-          <strong>Последняя заявка выполнена.</strong>
-        {% elif latest_renewal_request.status == 'dismissed' %}
-          <strong>Последняя заявка отклонена.</strong>
-        {% endif %}
-        {% if latest_renewal_request.processed_at %}
-          <span class="d-block small mt-1">Статус обновлён {{ latest_renewal_request.processed_at|date:'d.m.Y H:i' }}.</span>
-        {% endif %}
-        {% if latest_renewal_request.operator_note %}
-          <span class="d-block small mt-1">Комментарий оператора: {{ latest_renewal_request.operator_note }}</span>
-        {% endif %}
-      </div>
-      <p class="small text-secondary">При необходимости вы можете отправить новую заявку.</p>
+      <p class="small text-secondary">Если понадобится ещё одно продление, отправьте новую заявку.</p>
       <form method="post" action="/portal/{{ token }}/request-renewal/">
         {% csrf_token %}
         <button class="btn btn-outline-warning">Отправить новую заявку</button>
