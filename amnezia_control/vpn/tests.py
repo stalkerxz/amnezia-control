@@ -1733,12 +1733,19 @@ class VPNClientOperatorVisibilityTest(TestCase):
 class VPNClientPortalAdminAndRenewalVisibilityTest(TestCase):
     def setUp(self):
         self.user = get_user_model().objects.create_user("admin-portal-renewal", password="123", is_staff=True)
+        self.other_user = get_user_model().objects.create_user("admin-portal-renewal-2", password="123", is_staff=True)
         self.client.force_login(self.user)
         self.server = Server.objects.create(name="portal-renewal-server")
+        self.server_2 = Server.objects.create(name="portal-renewal-server-2")
         self.protocol = ServerProtocol.objects.create(
             server=self.server,
             protocol_type=ServerProtocol.ProtocolType.AWG,
             runtime_metadata={"udp_port": 51820, "subnet": "10.66.0.0/24"},
+        )
+        self.protocol_2 = ServerProtocol.objects.create(
+            server=self.server_2,
+            protocol_type=ServerProtocol.ProtocolType.AWG,
+            runtime_metadata={"udp_port": 51821, "subnet": "10.67.0.0/24"},
         )
         self.profile = ProtocolProfile.objects.create(
             server_protocol=self.protocol,
@@ -1759,6 +1766,13 @@ class VPNClientPortalAdminAndRenewalVisibilityTest(TestCase):
             protocol_type=VPNClient.ProtocolType.AWG,
             profile=self.profile,
             created_by=self.user,
+        )
+        self.client_on_second_server = VPNClient.objects.create(
+            server=self.server_2,
+            name="client-second-server",
+            protocol_type=VPNClient.ProtocolType.AWG,
+            profile=self.profile,
+            created_by=self.other_user,
         )
 
     def test_admin_can_retrieve_current_portal_link_after_issue(self):
@@ -1929,3 +1943,78 @@ class VPNClientPortalAdminAndRenewalVisibilityTest(TestCase):
         request_obj.refresh_from_db()
 
         self.assertEqual(request_obj.status, ClientRenewalRequest.Status.DONE)
+
+    def test_client_detail_shows_expired_portal_access_as_not_active(self):
+        access, _ = PortalAccessService.issue_for_client(self.client_with_renewal)
+        access.expires_at = timezone.now() - timedelta(minutes=5)
+        access.save(update_fields=["expires_at"])
+
+        response = self.client.get(f"/clients/{self.client_with_renewal.id}/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Статус доступа:")
+        self.assertContains(response, "истёк")
+        self.assertNotContains(response, "status-success\">активен")
+
+    def test_client_detail_shows_revoked_portal_access_as_not_active(self):
+        PortalAccessService.issue_for_client(self.client_with_renewal)
+        PortalAccessService.revoke_for_client(self.client_with_renewal)
+
+        response = self.client.get(f"/clients/{self.client_with_renewal.id}/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Статус доступа:")
+        self.assertContains(response, "отозван")
+        self.assertNotContains(response, "status-success\">активен")
+
+    def test_client_detail_shows_non_expired_portal_access_as_active(self):
+        PortalAccessService.issue_for_client(self.client_with_renewal)
+
+        response = self.client.get(f"/clients/{self.client_with_renewal.id}/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Статус доступа:")
+        self.assertContains(response, "status-success\">активен")
+
+    def test_renewal_requests_list_can_be_filtered_by_server(self):
+        first_request = ClientRenewalRequest.objects.create(client=self.client_with_renewal, status=ClientRenewalRequest.Status.NEW)
+        second_request = ClientRenewalRequest.objects.create(client=self.client_on_second_server, status=ClientRenewalRequest.Status.NEW)
+
+        response = self.client.get("/clients/renewal-requests/", {"status": "open", "server": str(self.server.id)})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, f"#{first_request.id}")
+        self.assertNotContains(response, f"#{second_request.id}")
+
+    def test_renewal_requests_list_operator_and_my_actions_filters_work(self):
+        request_first = ClientRenewalRequest.objects.create(client=self.client_with_renewal, status=ClientRenewalRequest.Status.NEW)
+        request_second = ClientRenewalRequest.objects.create(client=self.client_on_second_server, status=ClientRenewalRequest.Status.NEW)
+
+        self.client.post(
+            f"/clients/{self.client_with_renewal.id}/action/renewal_set_status/",
+            {
+                "renewal_request_id": request_first.id,
+                "target_status": ClientRenewalRequest.Status.IN_PROGRESS,
+                "operator_note": "Взял в работу",
+            },
+            follow=False,
+        )
+        self.client.force_login(self.other_user)
+        self.client.post(
+            f"/clients/{self.client_on_second_server.id}/action/renewal_set_status/",
+            {
+                "renewal_request_id": request_second.id,
+                "target_status": ClientRenewalRequest.Status.IN_PROGRESS,
+                "operator_note": "Берём в работу",
+            },
+            follow=False,
+        )
+        self.client.force_login(self.user)
+
+        by_operator = self.client.get("/clients/renewal-requests/", {"status": "open", "operator": str(self.user.id)})
+        self.assertContains(by_operator, f"#{request_first.id}")
+        self.assertNotContains(by_operator, f"#{request_second.id}")
+
+        only_mine = self.client.get("/clients/renewal-requests/", {"status": "open", "only_my_actions": "1"})
+        self.assertContains(only_mine, f"#{request_first.id}")
+        self.assertNotContains(only_mine, f"#{request_second.id}")

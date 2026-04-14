@@ -121,7 +121,7 @@
 <div class="card panel-card mb-3"><div class="card-body">
   <h2 class="h6 mb-3">Кабинет клиента (самообслуживание)</h2>
   <div class="small text-secondary mb-2">Статус доступа:
-    {% if portal_access_enabled %}<span class="badge status-badge status-success">активен</span>{% else %}<span class="badge status-badge status-neutral">не выдан</span>{% endif %}
+    <span class="badge status-badge {{ portal_access_status_badge_class }}">{{ portal_access_status_label }}</span>
   </div>
   {% if portal_access %}
   <div class="small text-secondary mb-1">Последний доступ: {% if portal_access.last_access_at %}{{ portal_access.last_access_at|date:'d.m.Y H:i' }}{% else %}ещё не открывали{% endif %}</div>

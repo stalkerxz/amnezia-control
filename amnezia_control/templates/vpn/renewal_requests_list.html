@@ -10,7 +10,7 @@
 
 <form method="get" class="card card-body filter-panel mb-3">
   <div class="row g-2 align-items-end">
-    <div class="col-md-4">
+    <div class="col-md-3">
       <label class="form-label" for="id_status">Статус</label>
       <select class="form-select" id="id_status" name="status">
         {% for value, label in status_choices %}
@@ -18,21 +18,47 @@
         {% endfor %}
       </select>
     </div>
-    <div class="col-md-2"><button class="btn btn-primary w-100">Применить</button></div>
+    <div class="col-md-3">
+      <label class="form-label" for="id_server">Сервер</label>
+      <select class="form-select" id="id_server" name="server">
+        <option value="">Все серверы</option>
+        {% for server_id, server_name in server_choices %}
+          <option value="{{ server_id }}" {% if server_filter == server_id|stringformat:'s' %}selected{% endif %}>{{ server_name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label" for="id_operator">Оператор</label>
+      <select class="form-select" id="id_operator" name="operator">
+        <option value="">Все операторы</option>
+        {% for operator_id, operator_name in operator_choices %}
+          <option value="{{ operator_id }}" {% if operator_filter == operator_id|stringformat:'s' %}selected{% endif %}>{{ operator_name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-2">
+      <div class="form-check mb-2">
+        <input class="form-check-input" type="checkbox" value="1" id="id_only_my_actions" name="only_my_actions" {% if only_my_actions %}checked{% endif %}>
+        <label class="form-check-label" for="id_only_my_actions">Только мои действия</label>
+      </div>
+      <button class="btn btn-primary w-100">Применить</button>
+    </div>
   </div>
 </form>
 
 <div class="table-responsive card table-shell p-2">
   <table class="table table-hover align-middle mb-0">
-    <thead><tr><th>ID</th><th>Клиент</th><th>Статус</th><th>Создана</th><th>Обработана</th><th style="min-width:300px">Комментарий оператора</th><th>Действия</th></tr></thead>
+    <thead><tr><th>ID</th><th>Клиент</th><th>Сервер</th><th>Статус</th><th>Создана</th><th>Обработана</th><th>Оператор</th><th style="min-width:300px">Комментарий оператора</th><th>Действия</th></tr></thead>
     <tbody>
       {% for item in request_rows %}
       <tr>
         <td>#{{ item.id }}</td>
         <td><a href="/clients/{{ item.client_id }}/" class="text-decoration-none">{{ item.client.name }}</a></td>
+        <td>{{ item.client.server.name }}</td>
         <td><span class="badge status-badge {% if item.status == 'new' %}status-warning{% elif item.status == 'in_progress' %}status-info{% elif item.status == 'done' %}status-success{% else %}status-neutral{% endif %}">{{ item.get_status_display }}</span></td>
         <td>{{ item.created_at|date:'d.m.Y H:i' }}</td>
         <td>{% if item.processed_at %}{{ item.processed_at|date:'d.m.Y H:i' }}{% else %}—{% endif %}</td>
+        <td>{% if item.processed_by %}{{ item.processed_by.username }}{% else %}—{% endif %}</td>
         <td>
           <form method="post" action="/clients/{{ item.client_id }}/action/renewal_set_status/" class="d-flex flex-column gap-2">
             {% csrf_token %}
@@ -56,7 +82,7 @@
         <td><a class="btn btn-sm btn-outline-primary" href="/clients/{{ item.client_id }}/">К клиенту</a></td>
       </tr>
       {% empty %}
-      <tr><td colspan="7"><div class="empty-state">Заявок по выбранному фильтру нет.</div></td></tr>
+      <tr><td colspan="9"><div class="empty-state">Заявок по выбранному фильтру нет.</div></td></tr>
       {% endfor %}
     </tbody>
   </table>

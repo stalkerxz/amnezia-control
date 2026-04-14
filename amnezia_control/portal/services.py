@@ -21,6 +21,10 @@ class PortalResolveReason:
 
 class PortalAccessService:
     TOKEN_BYTES = 32
+    STATUS_ACTIVE = "active"
+    STATUS_EXPIRED = "expired"
+    STATUS_REVOKED = "revoked"
+    STATUS_NOT_ISSUED = "not_issued"
 
     @classmethod
     def _hash_token(cls, token: str) -> str:
@@ -107,9 +111,19 @@ class PortalAccessService:
     @classmethod
     def get_raw_token_for_client(cls, client) -> str | None:
         access = ClientPortalAccess.objects.filter(client=client).first()
-        if not access or not access.enabled or access.revoked_at:
+        if cls.get_status_for_access(access) != cls.STATUS_ACTIVE:
             return None
         return cls._decrypt_token(access.token_encrypted)
+
+    @classmethod
+    def get_status_for_access(cls, access: ClientPortalAccess | None) -> str:
+        if not access:
+            return cls.STATUS_NOT_ISSUED
+        if not access.enabled or access.revoked_at:
+            return cls.STATUS_REVOKED
+        if access.expires_at and access.expires_at <= timezone.now():
+            return cls.STATUS_EXPIRED
+        return cls.STATUS_ACTIVE
 
 
 class RenewalRequestService:
