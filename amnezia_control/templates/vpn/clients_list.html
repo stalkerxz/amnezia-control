@@ -1,20 +1,20 @@
 {% extends 'partials/base.html' %}
 {% block content %}
-<div class="page-header d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
+<div class="page-header d-flex justify-content-between align-items-start gap-2 flex-wrap">
   <div>
     <p class="page-kicker">Операторская · Клиенты</p>
     <h1 class="h3 mb-1">Управление VPN-клиентами</h1>
-    <p class="text-secondary mb-0">Контроль статусов, лимитов и подключений в одном списке.</p>
+    <p class="page-subtle">Контроль статусов, лимитов и подключений в плотном рабочем формате.</p>
   </div>
-  <div class="d-flex gap-2">
+  <div class="action-cluster">
     <form method="post" action="/clients/import/">{% csrf_token %}<button class="btn btn-outline-secondary">Импорт с сервера</button></form>
     <a class="btn btn-primary" href="/clients/new/">Создать клиента</a>
   </div>
 </div>
 
-<form method="get" class="card card-body filter-panel filter-bar mb-3">
-  <div class="d-flex justify-content-between align-items-center mb-2">
-    <h2 class="h6 mb-0">Фильтры</h2>
+<form method="get" class="card card-body filter-panel filter-bar dense-section">
+  <div class="section-header-compact">
+    <h2 class="h6">Фильтры</h2>
     <a class="small text-decoration-none" href="/clients/">Сбросить все</a>
   </div>
   <div class="row g-2 align-items-end">
@@ -66,7 +66,7 @@
       <button class="btn btn-primary w-100" type="submit">Применить</button>
     </div>
   </div>
-  <div class="mt-3 btn-toolbar-clean">
+  <div class="mt-2 btn-toolbar-clean">
     {% for item in quick_filter_links %}
       <a href="{{ item.url }}" class="btn btn-sm {% if item.active %}btn-primary{% else %}btn-outline-secondary{% endif %}">{{ item.label }}</a>
     {% endfor %}
@@ -80,7 +80,7 @@
   <input type="hidden" name="action" id="bulkActionInput" value="">
   <div id="bulkSelectionContainer"></div>
 </form>
-  <div id="bulkToolbar" class="card card-body action-toolbar mb-2 d-none">
+  <div id="bulkToolbar" class="card card-body action-toolbar mb-2 d-none filter-panel">
     <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">
       <div>
         Выбрано клиентов: <strong id="selectedCount">0</strong>
@@ -96,7 +96,7 @@
       </div>
     </div>
   </div>
-  <div class="table-responsive card table-shell p-2 clients-table-wrap">
+  <div class="table-responsive card table-shell clients-table-wrap">
   <table class="table table-hover align-middle mb-0 clients-table">
     <thead>
       <tr>
@@ -120,8 +120,8 @@
         <td><input class="form-check-input js-client-checkbox" type="checkbox" name="client_ids" value="{{ c.id }}" data-status="{{ c.status }}" aria-label="Выбрать клиента {{ c.name }}"></td>
         <td class="text-muted">#{{ c.id }}</td>
         <td>
-          <a href="/clients/{{ c.id }}/" class="fw-semibold text-decoration-none d-block mb-1">{{ c.name }}</a>
-          <div class="d-flex flex-wrap gap-1">
+          <a href="/clients/{{ c.id }}/" class="fw-semibold text-decoration-none d-block mb-0">{{ c.name }}</a>
+          <div class="meta-strip">
             <span class="badge badge-soft {% if c.protocol_type == 'awg2' %}badge-protocol-awg2{% else %}badge-protocol-awg{% endif %}">{{ c.protocol_type|upper }}</span>
             <span class="badge status-badge {% if c.status == 'active' %}status-success{% elif c.status == 'disabled' %}status-warning{% else %}status-danger{% endif %}">{{ c.get_status_display }}</span>
             <span class="badge {{ row.limit_badge_class }}">{{ row.limit_badge_label }}</span>
