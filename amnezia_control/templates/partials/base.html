@@ -13,8 +13,8 @@
 {% if user.is_authenticated %}
 <div class="app-layout d-flex">
   <aside class="sidebar p-2">
-    <a class="brand d-block mb-4" href="/">amnezia-control</a>
-    <div class="sidebar-section mb-2">{% trans "Навигация" %}</div>
+    <a class="brand d-block" href="/">amnezia-control</a>
+    <div class="sidebar-section mt-3 mb-2">{% trans "Навигация" %}</div>
     <nav class="nav flex-column gap-1">
       <a class="nav-link {% if request.path|slice:':9' == '/clients/' and request.path|slice:':26' != '/clients/renewal-requests/' %}active{% endif %}" href="/clients/">Клиенты</a>
       <a class="nav-link {% if request.path|slice:':26' == '/clients/renewal-requests/' %}active{% endif %}" href="/clients/renewal-requests/">Продления</a>
@@ -23,7 +23,7 @@
       <a class="nav-link {% if request.path|slice:':7' == '/audit/' %}active{% endif %}" href="/audit/">{% trans "Аудит" %}</a>
       <a class="nav-link {% if request.path|slice:':10' == '/settings/' %}active{% endif %}" href="/settings/">{% trans "Настройки" %}</a>
     </nav>
-    <hr class="my-4 sidebar-divider">
+    <hr class="my-3 sidebar-divider">
     <div class="sidebar-section sidebar-section-muted mb-2">{% trans "Техническое" %}</div>
     <nav class="nav flex-column gap-1 sidebar-nav-aux">
       <a class="nav-link" href="/admin/">{% trans "Администрирование Django" %}</a>
@@ -34,16 +34,14 @@
   <section class="app-main flex-grow-1">
     <header class="topbar border-bottom d-flex justify-content-between align-items-center gap-3">
       <div>
-        <div class="topbar-title">Операторская панель</div>
-        <div class="topbar-subtitle">Рабочее место управления Amnezia</div>
+        <div class="topbar-title">amnezia-control</div>
+        <div class="topbar-subtitle">Операторский режим</div>
       </div>
-      <div class="text-end small text-secondary">
-        <div>{{ user.username }}</div>
-      </div>
+      <div class="text-end small text-secondary">{{ user.username }}</div>
     </header>
     <main class="content p-3">
 {% for message in messages %}
-      <div class="alert {% if message.tags == 'error' %}alert-danger{% elif message.tags %}alert-{{ message.tags }}{% else %}alert-info{% endif %} alert-dismissible fade show app-alert shadow-sm" role="alert">
+      <div class="alert {% if message.tags == 'error' %}alert-danger{% elif message.tags %}alert-{{ message.tags }}{% else %}alert-info{% endif %} alert-dismissible fade show app-alert" role="alert">
         <div>{{ message }}</div>
         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Закрыть"></button>
       </div>
