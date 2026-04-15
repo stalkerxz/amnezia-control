@@ -4,56 +4,61 @@
   <div>
     <p class="page-kicker">Операторская · Продления</p>
     <h1 class="h3 mb-1">Очередь продлений</h1>
-    <p class="page-subtle">Компактный workflow: фильтр, контекст, действие в строке.</p>
+    <p class="page-subtle">Страница обработчика заявок: компактная сводка очереди, плотный список и встроенный блок обработки.</p>
   </div>
 </div>
 
-<section class="section-block">
+<section class="section-block section-quiet">
   <div class="section-body">
     <div class="summary-strip">
-      <div class="summary-item span-2"><div class="label">Статус списка</div><div class="meta">{{ request_rows|length }} записей в текущем фильтре</div></div>
-      <div class="summary-item span-2"><div class="label">Новые</div><div class="value text-warning">Приоритет обработки</div></div>
-      <div class="summary-item span-2"><div class="label">В работе</div><div class="value text-info">Операторы в процессе</div></div>
-      <div class="summary-item span-2"><div class="label">Закрытые</div><div class="meta">Выполнено / отклонено</div></div>
-      <div class="summary-item span-4"><div class="label">Режим</div><div class="meta">Основная таблица + раскрытие обработки без переходов</div></div>
+      <div class="summary-item span-3"><div class="label">Всего в фильтре</div><div class="value">{{ request_rows|length }}</div></div>
+      <div class="summary-item span-3"><div class="label">Новые</div><div class="meta">приоритет на обработку</div></div>
+      <div class="summary-item span-3"><div class="label">В работе</div><div class="meta">назначенные оператору</div></div>
+      <div class="summary-item span-3"><div class="label">Закрытые</div><div class="meta">выполнено / отклонено</div></div>
     </div>
   </div>
 </section>
 
-<form method="get" class="filter-panel dense-section">
-  <div class="row g-2 align-items-end">
-    <div class="col-md-3">
-      <label class="form-label" for="id_status">Статус</label>
-      <select class="form-select" id="id_status" name="status">
-        {% for value, label in status_choices %}
-          <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>
-        {% endfor %}
-      </select>
-    </div>
-    <div class="col-md-3">
-      <label class="form-label" for="id_server">Сервер</label>
-      <select class="form-select" id="id_server" name="server">
-        <option value="">Все серверы</option>
-        {% for server_id, server_name in server_choices %}
-          <option value="{{ server_id }}" {% if server_filter == server_id|stringformat:'s' %}selected{% endif %}>{{ server_name }}</option>
-        {% endfor %}
-      </select>
-    </div>
-    <div class="col-md-3">
-      <label class="form-label" for="id_operator">Оператор</label>
-      <select class="form-select" id="id_operator" name="operator">
-        <option value="">Все операторы</option>
-        {% for operator_id, operator_name in operator_choices %}
-          <option value="{{ operator_id }}" {% if operator_filter == operator_id|stringformat:'s' %}selected{% endif %}>{{ operator_name }}</option>
-        {% endfor %}
-      </select>
-    </div>
-    <div class="col-md-2">
-      <div class="form-check mb-1">
-        <input class="form-check-input" type="checkbox" value="1" id="id_only_my_actions" name="only_my_actions" {% if only_my_actions %}checked{% endif %}>
-        <label class="form-check-label" for="id_only_my_actions">Только мои действия</label>
+<form method="get" class="section-block">
+  <div class="section-body">
+    <div class="section-header-compact"><h2 class="h6">Фильтр очереди</h2></div>
+    <div class="filters-row">
+      <div class="field">
+        <label class="form-label" for="id_status">Статус</label>
+        <select class="form-select" id="id_status" name="status">
+          {% for value, label in status_choices %}
+            <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
       </div>
-      <button class="btn btn-primary w-100">Применить</button>
+      <div class="field">
+        <label class="form-label" for="id_server">Сервер</label>
+        <select class="form-select" id="id_server" name="server">
+          <option value="">Все серверы</option>
+          {% for server_id, server_name in server_choices %}
+            <option value="{{ server_id }}" {% if server_filter == server_id|stringformat:'s' %}selected{% endif %}>{{ server_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label class="form-label" for="id_operator">Оператор</label>
+        <select class="form-select" id="id_operator" name="operator">
+          <option value="">Все операторы</option>
+          {% for operator_id, operator_name in operator_choices %}
+            <option value="{{ operator_id }}" {% if operator_filter == operator_id|stringformat:'s' %}selected{% endif %}>{{ operator_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field-actions">
+        <div class="form-check mb-1 mt-4">
+          <input class="form-check-input" type="checkbox" value="1" id="id_only_my_actions" name="only_my_actions" {% if only_my_actions %}checked{% endif %}>
+          <label class="form-check-label" for="id_only_my_actions">Только мои действия</label>
+        </div>
+      </div>
+      <div class="field-actions">
+        <label class="form-label">&nbsp;</label>
+        <button class="btn btn-primary w-100">Применить</button>
+      </div>
     </div>
   </div>
 </form>
@@ -78,19 +83,11 @@
         <td>#{{ item.id }}</td>
         <td><a href="/clients/{{ item.client_id }}/" class="text-decoration-none fw-semibold">{{ item.client.name }}</a></td>
         <td>{{ item.client.server.name }}</td>
-        <td>
-          <span class="badge status-badge {% if item.status == 'new' %}status-warning{% elif item.status == 'in_progress' %}status-info{% elif item.status == 'done' %}status-success{% else %}status-neutral{% endif %}">{{ item.get_status_display }}</span>
-          {% if item.status == 'new' %}<span class="renewal-status-note">Новая</span>{% elif item.status == 'in_progress' %}<span class="renewal-status-note">В работе</span>{% endif %}
-        </td>
+        <td><span class="badge status-badge {% if item.status == 'new' %}status-warning{% elif item.status == 'in_progress' %}status-info{% elif item.status == 'done' %}status-success{% else %}status-neutral{% endif %}">{{ item.get_status_display }}</span></td>
         <td>{{ item.created_at|date:'d.m.Y H:i' }}</td>
         <td>{% if item.processed_at %}{{ item.processed_at|date:'d.m.Y H:i' }}{% else %}—{% endif %}</td>
         <td>{% if item.processed_by %}{{ item.processed_by.username }}{% else %}—{% endif %}</td>
-        <td class="text-end">
-          <div class="d-flex justify-content-end gap-2 flex-wrap">
-            <a class="btn btn-sm btn-outline-primary" href="/clients/{{ item.client_id }}/">К клиенту</a>
-            <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#renewal-actions-{{ item.id }}" aria-expanded="false" aria-controls="renewal-actions-{{ item.id }}">Обработать</button>
-          </div>
-        </td>
+        <td class="text-end"><div class="table-actions"><a class="btn btn-sm btn-outline-primary" href="/clients/{{ item.client_id }}/">К клиенту</a><button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#renewal-actions-{{ item.id }}" aria-expanded="false" aria-controls="renewal-actions-{{ item.id }}">Обработать</button></div></td>
       </tr>
       <tr class="collapse-row">
         <td colspan="8" class="py-0 border-0">
@@ -100,29 +97,30 @@
               <input type="hidden" name="renewal_request_id" value="{{ item.id }}">
               <input type="hidden" name="next" value="{{ request.get_full_path }}">
               <div class="row g-2 align-items-end">
-                <div class="col-lg-7">
+                <div class="col-lg-6">
                   <label class="form-label" for="operator_note_{{ item.id }}">Комментарий оператора</label>
-                  <textarea id="operator_note_{{ item.id }}" name="operator_note" class="form-control form-control-sm" rows="2" placeholder="Комментарий для клиента или команды">{{ item.operator_note }}</textarea>
+                  <textarea id="operator_note_{{ item.id }}" name="operator_note" class="form-control form-control-sm" rows="2" placeholder="Короткий комментарий по результату">{{ item.operator_note }}</textarea>
                 </div>
-                <div class="col-lg-3">
+                <div class="col-lg-2">
                   <label class="form-label" for="extension_days_{{ item.id }}">Продлить на (дней)</label>
                   <input id="extension_days_{{ item.id }}" type="number" min="1" max="365" class="form-control form-control-sm" name="extension_days" placeholder="30" {% if item.status != 'new' and item.status != 'in_progress' %}disabled{% endif %}>
                 </div>
-                <div class="col-lg-2"><button class="btn btn-sm btn-outline-secondary w-100" name="target_status" value="{{ item.status }}">Сохранить</button></div>
-              </div>
-              <div class="renewal-action-buttons mt-2">
-                {% if item.status == 'new' %}
-                  <button class="btn btn-sm btn-success" name="target_status" value="extend_and_close">Продлить и закрыть</button>
-                  <button class="btn btn-sm btn-outline-primary" name="target_status" value="in_progress">В работу</button>
-                  <button class="btn btn-sm btn-outline-success" name="target_status" value="done">Выполнено</button>
-                  <button class="btn btn-sm btn-outline-secondary" name="target_status" value="dismissed">Отклонить</button>
-                {% elif item.status == 'in_progress' %}
-                  <button class="btn btn-sm btn-success" name="target_status" value="extend_and_close">Продлить и закрыть</button>
-                  <button class="btn btn-sm btn-outline-success" name="target_status" value="done">Выполнено</button>
-                  <button class="btn btn-sm btn-outline-secondary" name="target_status" value="dismissed">Отклонить</button>
-                {% else %}
-                  <button class="btn btn-sm btn-outline-secondary" name="target_status" value="{{ item.status }}">Сохранить комментарий</button>
-                {% endif %}
+                <div class="col-lg-4">
+                  <label class="form-label">Действия</label>
+                  <div class="renewal-action-buttons">
+                    <button class="btn btn-sm btn-outline-secondary" name="target_status" value="{{ item.status }}">Сохранить</button>
+                    {% if item.status == 'new' %}
+                      <button class="btn btn-sm btn-outline-primary" name="target_status" value="in_progress">В работу</button>
+                      <button class="btn btn-sm btn-outline-success" name="target_status" value="done">Выполнено</button>
+                      <button class="btn btn-sm btn-outline-secondary" name="target_status" value="dismissed">Отклонить</button>
+                      <button class="btn btn-sm btn-success" name="target_status" value="extend_and_close">Продлить и закрыть</button>
+                    {% elif item.status == 'in_progress' %}
+                      <button class="btn btn-sm btn-outline-success" name="target_status" value="done">Выполнено</button>
+                      <button class="btn btn-sm btn-outline-secondary" name="target_status" value="dismissed">Отклонить</button>
+                      <button class="btn btn-sm btn-success" name="target_status" value="extend_and_close">Продлить и закрыть</button>
+                    {% endif %}
+                  </div>
+                </div>
               </div>
             </form>
           </div>

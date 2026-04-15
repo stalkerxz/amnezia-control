@@ -1,261 +1,244 @@
 {% extends 'partials/base.html' %}
 {% block content %}
-<div class="page-header page-header-compact">
-  <p class="page-kicker">Клиент #{{ client.id }} · Сервер: {{ client.server.name }}</p>
+<div class="page-header">
+  <p class="page-kicker">Клиент #{{ client.id }} · {{ client.server.name }}</p>
   <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
     <div>
-      <h1 class="h3 mb-2">{{ client.name }}</h1>
+      <h1 class="h3 mb-1">{{ client.name }}</h1>
       <div class="meta-strip">
         <span class="badge badge-soft {% if client.protocol_type == 'awg2' %}badge-protocol-awg2{% else %}badge-protocol-awg{% endif %}">{{ client.protocol_type|upper }}</span>
         <span class="badge status-badge {% if client.status == 'active' %}status-success{% elif client.status == 'disabled' %}status-warning{% else %}status-danger{% endif %}">{{ client.get_status_display }}</span>
-        <span class="badge {{ limit_badge_class }}">Лимиты: {{ limit_badge_label }}</span>
-        <span class="badge status-badge {% if client.imported_from_runtime %}status-info{% else %}status-neutral{% endif %}">{% if client.imported_from_runtime %}Импортирован{% else %}Создан в панели{% endif %}</span>
+        <span class="badge {{ limit_badge_class }}">{{ limit_badge_label }}</span>
+        <span class="badge status-badge {% if client.imported_from_runtime %}status-info{% else %}status-neutral{% endif %}">{% if client.imported_from_runtime %}Импорт{% else %}Панель{% endif %}</span>
       </div>
     </div>
     <div class="action-cluster">
       {% if revision %}
-      <a class="btn btn-primary" href="/clients/{{ client.id }}/download/native/">Скачать .conf (AmneziaWG)</a>
-      <a class="btn btn-outline-primary" href="/clients/{{ client.id }}/download/">Скачать .conf (AmneziaVPN)</a>
+      <a class="btn btn-primary" href="/clients/{{ client.id }}/download/native/">AmneziaWG .conf</a>
+      <a class="btn btn-outline-primary" href="/clients/{{ client.id }}/download/">AmneziaVPN .conf</a>
       {% else %}
-      <button class="btn btn-primary" disabled>Скачать .conf (AmneziaWG)</button>
-      <button class="btn btn-outline-primary" disabled>Скачать .conf (AmneziaVPN)</button>
+      <button class="btn btn-primary" disabled>AmneziaWG .conf</button>
+      <button class="btn btn-outline-primary" disabled>AmneziaVPN .conf</button>
       {% endif %}
     </div>
   </div>
 </div>
 
 {% if warning_items %}
-<div class="alert alert-warning mb-3 panel-card">
-  <h2 class="h6 mb-2">Требуется внимание оператора</h2>
-  <ul class="mb-0">
-    {% for warning in warning_items %}
-    <li>{{ warning }}</li>
-    {% endfor %}
-  </ul>
-</div>
+<section class="section-block section-warning">
+  <div class="section-body">
+    <div class="section-header"><h2 class="h6">Требует внимания</h2></div>
+    <ul class="mb-0 small">
+      {% for warning in warning_items %}
+      <li>{{ warning }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+</section>
 {% endif %}
 
 {% if missing_endpoint or missing_awg2_metadata or not revision %}
-<div class="card panel-card border-warning mb-3">
-  <div class="card-body">
-    <h2 class="h6 text-warning-emphasis">Нужны действия перед выдачей/переизданием</h2>
-    <ul class="mb-0">
+<section class="section-block section-warning">
+  <div class="section-body">
+    <div class="section-header"><h2 class="h6">Нужны действия до выдачи конфига</h2></div>
+    <ul class="mb-0 small">
       {% if missing_endpoint %}<li>Не найден публичный endpoint сервера (host/port). Заполните endpoint и выполните синхронизацию runtime.</li>{% endif %}
       {% if missing_awg2_metadata %}<li>Отсутствуют обязательные AWG2-метаданные. Выполните синхронизацию runtime и проверьте live-конфиг AWG2.</li>{% endif %}
       {% if not revision %}<li>Конфиг клиенту ещё не выдан. Нажмите «Переиздать», чтобы выпустить первую ревизию.</li>{% endif %}
     </ul>
   </div>
-</div>
+</section>
 {% endif %}
 
-<section class="section-block">
+<section class="section-block section-quiet">
   <div class="section-body">
-    <div class="section-header"><h2 class="h6">Сводка клиента</h2></div>
     <div class="summary-strip">
-      <div class="summary-item span-2"><div class="label">Сервер</div><div class="value">{{ client.server.name }}</div><div class="meta">{% if client.last_runtime_sync_at %}Синхр.: {{ client.last_runtime_sync_at|date:'d.m.Y H:i' }}{% else %}Нет синхронизации{% endif %}</div></div>
-      <div class="summary-item span-2"><div class="label">Оператор</div><div class="value">{% if client.created_by %}{{ client.created_by.username }}{% else %}система{% endif %}</div><div class="meta">{% if client.created_by_id == request.user.id %}Мой клиент{% else %}Назначение по журналу{% endif %}</div></div>
-      <div class="summary-item span-2"><div class="label">Ревизии</div><div class="value">{{ revision_count }}</div><div class="meta">{% if revision %}Последняя #{{ revision.revision_number }}{% else %}Ещё не выпущены{% endif %}</div></div>
-      <div class="summary-item span-2"><div class="label">Срок действия</div><div class="value">{{ expires_display }}</div></div>
-      <div class="summary-item span-2"><div class="label">Лимит трафика</div><div class="value">{% if client.traffic_limit_bytes %}{{ traffic_limit_display }}{% else %}Не задан{% endif %}</div></div>
-      <div class="summary-item span-2"><div class="label">Ключ клиента</div><div class="meta"><code>{{ client.runtime_peer_public_key|default:'-' }}</code></div><button type="button" class="btn btn-xs btn-outline-secondary mt-1 js-copy" data-copy="{{ client.runtime_peer_public_key|default:'' }}">Копировать ключ</button></div>
+      <div class="summary-item span-2"><div class="label">Сервер</div><div class="value">{{ client.server.name }}</div><div class="meta">{% if client.last_runtime_sync_at %}sync {{ client.last_runtime_sync_at|date:'d.m.Y H:i' }}{% else %}нет sync{% endif %}</div></div>
+      <div class="summary-item span-2"><div class="label">Оператор</div><div class="value">{% if client.created_by %}{{ client.created_by.username }}{% else %}система{% endif %}</div></div>
+      <div class="summary-item span-2"><div class="label">Ревизии</div><div class="value">{{ revision_count }}</div><div class="meta">{% if revision %}последняя #{{ revision.revision_number }}{% else %}нет{% endif %}</div></div>
+      <div class="summary-item span-2"><div class="label">Срок</div><div class="value">{{ expires_display }}</div></div>
+      <div class="summary-item span-2"><div class="label">Лимит</div><div class="value">{% if client.traffic_limit_bytes %}{{ traffic_limit_display }}{% else %}Не задан{% endif %}</div></div>
+      <div class="summary-item span-2"><div class="label">Portal</div><div class="value"><span class="badge status-badge {{ portal_access_status_badge_class }}">{{ portal_access_status_label }}</span></div></div>
+      <div class="summary-item span-6"><div class="label">Runtime ключ клиента</div><div class="meta"><code>{{ client.runtime_peer_public_key|default:'-' }}</code></div></div>
+      <div class="summary-item span-6"><div class="label">Адрес в runtime</div><div class="value"><code>{{ runtime_address_display }}</code></div><button type="button" class="btn btn-xs btn-outline-secondary mt-1 js-copy" data-copy="{{ runtime_address_display|default:'' }}">Копировать</button></div>
     </div>
   </div>
 </section>
 
-<div class="card panel-card dense-section"><div class="card-body py-2">
-  <h2 class="h6 mb-3">Диагностика клиента</h2>
-  <div class="tech-grid">
-    <div class="tech-block"><div class="tech-block-label">Протокол</div><div>{{ client.protocol_type|upper }}</div></div>
-    <div class="tech-block"><div class="tech-block-label">Статус</div><div>{{ client.get_status_display }}</div></div>
-    <div class="tech-block"><div class="tech-block-label">Состояние лимитов</div><div>{{ limit_badge_label }}</div></div>
-    <div class="tech-block"><div class="tech-block-label">Адрес клиента</div><code>{{ runtime_address_display }}</code></div>
-    <div class="tech-block"><div class="tech-block-label">Публичный ключ клиента</div><code>{{ client.runtime_peer_public_key|default:'—' }}</code></div>
-    <div class="tech-block"><div class="tech-block-label">Последняя синхронизация</div><div>{% if client.last_runtime_sync_at %}{{ client.last_runtime_sync_at|date:'d.m.Y H:i' }}{% else %}Нет данных{% endif %}</div></div>
-    <div class="tech-block"><div class="tech-block-label">Синхронизация трафика</div><div><span class="{{ telemetry.status_class }}">{{ telemetry.status_label }}</span></div></div>
-    <div class="tech-block"><div class="tech-block-label">Детали синхронизации трафика</div><div>{{ telemetry.details }}</div></div>
-    <div class="tech-block"><div class="tech-block-label">Источник клиента</div><div>{% if client.imported_from_runtime %}Импортирован из runtime{% else %}Создан в панели{% endif %}</div></div>
-    <div class="tech-block"><div class="tech-block-label">Наличие ревизии конфига</div><div>{% if revision %}Да{% else %}Нет{% endif %}</div></div>
-  </div>
-</div></div>
+<div class="compact-page-grid cols-wider">
+  <div class="console-stack">
+    <section class="section-block">
+      <div class="section-body">
+        <div class="section-header"><h2 class="h6">Ключевые операции</h2><span class="section-meta">быстрые действия</span></div>
+        <div class="action-bar">
+          {% if is_deleted %}
+          <button class="btn btn-primary" disabled title="Переиздание недоступно для удалённого клиента">Переиздать конфиг</button>
+          {% elif reissue_blocked %}
+          <button class="btn btn-primary" disabled title="{{ reissue_block_reason }}">Переиздать конфиг</button>
+          {% else %}
+          <form method="post" action="/clients/{{ client.id }}/action/reissue/">{% csrf_token %}<button class="btn btn-primary">Переиздать конфиг</button></form>
+          {% endif %}
 
-<div class="card panel-card dense-section"><div class="card-body py-2">
-  <h2 class="h6 mb-2">Лимиты и телеметрия</h2>
-  <div class="row g-2">
-    <div class="col-lg-4"><div class="small text-secondary">Ограничение по времени</div><div>{{ expires_display }}</div></div>
-    <div class="col-lg-4"><div class="small text-secondary">Ограничение по трафику</div><div>{% if client.traffic_limit_bytes %}{{ traffic_limit_display }}{% else %}Не задано{% endif %}</div></div>
-    <div class="col-lg-4"><div class="small text-secondary">Использовано / лимит</div><div>{% if client.traffic_limit_bytes %}{{ traffic_used_display }} / {{ traffic_limit_display }}{% else %}{{ traffic_used_display }}{% endif %}</div></div>
-  </div>
-  <div class="small mt-2 text-secondary telemetry-note">
-    {% if traffic_usage_unavailable %}<span class="badge status-badge status-neutral">{{ telemetry.badge_label|default:'Телеметрия недоступна' }}</span> {{ telemetry.details }}
-    {% elif client.traffic_last_sync_at %}Синхронизация: {{ client.traffic_last_sync_at|date:'d.m.Y H:i' }}
-    {% else %}Синхронизация: нет данных{% endif %}
-  </div>
-  {% if client.disable_reason != 'none' %}<div class="alert alert-warning mt-3 mb-0">Причина блокировки: <strong>{{ client.get_disable_reason_display }}</strong></div>{% endif %}
-</div></div>
+          {% if client.status == 'active' %}
+          <form method="post" action="/clients/{{ client.id }}/action/disable/">{% csrf_token %}<button class="btn btn-outline-warning">Отключить</button></form>
+          {% elif is_deleted %}
+          <form method="post" action="/clients/{{ client.id }}/action/restore/">{% csrf_token %}<button class="btn btn-outline-success">Восстановить</button></form>
+          {% else %}
+          <form method="post" action="/clients/{{ client.id }}/action/enable/">{% csrf_token %}<button class="btn btn-outline-success">Включить</button></form>
+          {% endif %}
 
-<div class="card panel-card dense-section"><div class="card-body">
-  <h2 class="h6">Изменить лимиты</h2>
-  {% if is_deleted %}
-  <div class="alert alert-secondary mb-0">Изменение лимитов недоступно для удаленного клиента.</div>
-  {% else %}
-  <form method="post" action="/clients/{{ client.id }}/limits/update/">
-    {% csrf_token %}
-    <div class="row g-3">
-      <div class="col-lg-6">
-        <label class="form-label" for="{{ limits_form.expires_preset.id_for_label }}">{{ limits_form.expires_preset.label }}</label>
-        {{ limits_form.expires_preset }}
-        <div id="expires-custom-wrapper" class="mt-2">
-          <label class="form-label" for="{{ limits_form.expires_at.id_for_label }}">{{ limits_form.expires_at.label }}</label>
-          {{ limits_form.expires_at }}
+          {% if revision and qr_base64 %}<a class="btn btn-outline-primary" href="#qr-card">Показать QR</a>{% endif %}
         </div>
+        {% if reissue_blocked %}<div class="small text-warning mt-2">{{ reissue_block_reason }}</div>{% endif %}
       </div>
-      <div class="col-lg-6">
-        <label class="form-label" for="{{ limits_form.traffic_limit_preset.id_for_label }}">{{ limits_form.traffic_limit_preset.label }}</label>
-        {{ limits_form.traffic_limit_preset }}
-        <div id="traffic-custom-wrapper" class="mt-2">
-          <label class="form-label" for="{{ limits_form.traffic_custom_value.id_for_label }}">{{ limits_form.traffic_custom_value.label }}</label>
-          <div class="input-group">{{ limits_form.traffic_custom_value }}{{ limits_form.traffic_custom_unit }}</div>
+    </section>
+
+    <section class="section-block">
+      <div class="section-body">
+        <div class="section-header"><h2 class="h6">Лимиты и телеметрия</h2></div>
+        <div class="compact-info-grid mb-2">
+          <div class="info-cell"><div class="info-label">Срок действия</div><div class="info-value">{{ expires_display }}</div></div>
+          <div class="info-cell"><div class="info-label">Лимит трафика</div><div class="info-value">{% if client.traffic_limit_bytes %}{{ traffic_limit_display }}{% else %}Не задано{% endif %}</div></div>
+          <div class="info-cell"><div class="info-label">Использовано</div><div class="info-value">{% if client.traffic_limit_bytes %}{{ traffic_used_display }} / {{ traffic_limit_display }}{% else %}{{ traffic_used_display }}{% endif %}</div></div>
+          <div class="info-cell"><div class="info-label">Синхронизация трафика</div><div class="info-value"><span class="{{ telemetry.status_class }}">{{ telemetry.status_label }}</span></div></div>
         </div>
+        <div class="small text-secondary">{{ telemetry.details }}</div>
+        {% if client.disable_reason != 'none' %}<div class="alert alert-warning mt-2 mb-0 py-2">Причина блокировки: <strong>{{ client.get_disable_reason_display }}</strong></div>{% endif %}
       </div>
-    </div>
-    <div class="mt-3"><button class="btn btn-outline-primary">Сохранить лимиты</button></div>
-  </form>
-  {% endif %}
-</div></div>
+    </section>
 
-
-<div class="card panel-card dense-section"><div class="card-body">
-  <h2 class="h6 mb-3">Кабинет клиента (самообслуживание)</h2>
-  <div class="small text-secondary mb-2">Статус доступа:
-    <span class="badge status-badge {{ portal_access_status_badge_class }}">{{ portal_access_status_label }}</span>
-  </div>
-  {% if portal_access %}
-  <div class="small text-secondary mb-1">Последний доступ: {% if portal_access.last_access_at %}{{ portal_access.last_access_at|date:'d.m.Y H:i' }}{% else %}ещё не открывали{% endif %}</div>
-  <div class="small text-secondary mb-3">Действует до: {% if portal_access.expires_at %}{{ portal_access.expires_at|date:'d.m.Y H:i' }}{% else %}не ограничено{% endif %}</div>
-  {% endif %}
-  {% if portal_link %}
-  <div class="mb-3">
-    <label class="form-label small text-secondary mb-1">Текущая ссылка кабинета</label>
-    <div class="input-group">
-      <input class="form-control form-control-sm" type="text" readonly value="{{ portal_link }}">
-      <button class="btn btn-outline-secondary btn-sm js-copy" type="button" data-copy="{{ portal_link }}">Копировать</button>
-    </div>
-  </div>
-  {% endif %}
-  <div class="d-flex gap-2 flex-wrap">
-    <form method="post" action="/clients/{{ client.id }}/action/portal_show/">{% csrf_token %}<button class="btn btn-outline-secondary" {% if not portal_access_enabled %}disabled{% endif %}>Показать текущую ссылку</button></form>
-    <form method="post" action="/clients/{{ client.id }}/action/portal_issue/">{% csrf_token %}<button class="btn btn-outline-primary">Регенерировать ссылку</button></form>
-    {% if portal_access_enabled %}
-    <form method="post" action="/clients/{{ client.id }}/action/portal_revoke/">{% csrf_token %}<button class="btn btn-outline-danger">Отозвать ссылку</button></form>
-    {% else %}
-    <button class="btn btn-outline-danger" disabled>Отозвать ссылку</button>
-    {% endif %}
-  </div>
-</div></div>
-
-
-{% if open_renewal_request %}
-<div class="card panel-card dense-section"><div class="card-body">
-  <h2 class="h6 mb-2">Заявка на продление</h2>
-  <div class="small text-secondary mb-2">Текущий статус: <span class="badge status-badge {% if open_renewal_request.status == 'new' %}status-warning{% else %}status-info{% endif %}">{{ open_renewal_request.get_status_display }}</span></div>
-  <div class="small text-secondary mb-1">Создана: {{ open_renewal_request.created_at|date:'d.m.Y H:i' }}</div>
-  {% if open_renewal_request.operator_note %}<div class="small text-secondary mb-3">Комментарий оператора: {{ open_renewal_request.operator_note }}</div>{% else %}<div class="small text-secondary mb-3">Комментарий оператора пока не добавлен.</div>{% endif %}
-  <a class="btn btn-outline-primary btn-sm" href="/clients/renewal-requests/">Открыть список заявок</a>
-</div></div>
-{% endif %}
-
-<div class="card panel-card dense-section"><div class="card-body">
-  <h2 class="h6 mb-3">Операции и экспорт</h2>
-  {% if is_deleted %}
-  <div class="alert alert-info py-2 mb-3">
-    Клиент помечен как удалённый и находится в архиве. Доступно восстановление в состояние <strong>«Отключён»</strong>.
-  </div>
-  {% endif %}
-  <div class="d-flex gap-2 flex-wrap">
-    {% if is_deleted %}
-    <button class="btn btn-primary" disabled title="Переиздание недоступно для удалённого клиента">Переиздать конфиг</button>
-    {% elif reissue_blocked %}
-    <button class="btn btn-primary" disabled title="{{ reissue_block_reason }}">Переиздать конфиг</button>
-    {% else %}
-    <form method="post" action="/clients/{{ client.id }}/action/reissue/">{% csrf_token %}<button class="btn btn-primary">Переиздать конфиг</button></form>
-    {% endif %}
-
-    {% if client.status == 'active' %}
-    <form method="post" action="/clients/{{ client.id }}/action/disable/">{% csrf_token %}<button class="btn btn-outline-warning">Отключить клиента</button></form>
-    {% elif is_deleted %}
-    <form method="post" action="/clients/{{ client.id }}/action/restore/">{% csrf_token %}<button class="btn btn-success">Восстановить клиента</button></form>
-    {% else %}
-    <form method="post" action="/clients/{{ client.id }}/action/enable/">{% csrf_token %}<button class="btn btn-outline-success">Включить клиента</button></form>
-    {% endif %}
-
-    {% if not is_deleted %}
-    <button class="btn btn-danger" type="button" data-bs-toggle="modal" data-bs-target="#deleteClientDetailModal">Удалить клиента</button>
-    {% endif %}
+    <section class="section-block">
+      <div class="section-body">
+        <div class="section-header"><h2 class="h6">Изменить лимиты</h2></div>
+        {% if is_deleted %}
+        <div class="empty-state">Изменение лимитов недоступно для удаленного клиента.</div>
+        {% else %}
+        <form method="post" action="/clients/{{ client.id }}/limits/update/">
+          {% csrf_token %}
+          <div class="row g-2">
+            <div class="col-lg-6">
+              <label class="form-label" for="{{ limits_form.expires_preset.id_for_label }}">{{ limits_form.expires_preset.label }}</label>
+              {{ limits_form.expires_preset }}
+              <div id="expires-custom-wrapper" class="mt-2">
+                <label class="form-label" for="{{ limits_form.expires_at.id_for_label }}">{{ limits_form.expires_at.label }}</label>
+                {{ limits_form.expires_at }}
+              </div>
+            </div>
+            <div class="col-lg-6">
+              <label class="form-label" for="{{ limits_form.traffic_limit_preset.id_for_label }}">{{ limits_form.traffic_limit_preset.label }}</label>
+              {{ limits_form.traffic_limit_preset }}
+              <div id="traffic-custom-wrapper" class="mt-2">
+                <label class="form-label" for="{{ limits_form.traffic_custom_value.id_for_label }}">{{ limits_form.traffic_custom_value.label }}</label>
+                <div class="input-group">{{ limits_form.traffic_custom_value }}{{ limits_form.traffic_custom_unit }}</div>
+              </div>
+            </div>
+          </div>
+          <div class="mt-2"><button class="btn btn-outline-primary">Сохранить лимиты</button></div>
+        </form>
+        {% endif %}
+      </div>
+    </section>
 
     {% if revision and qr_base64 %}
-    <a class="btn btn-outline-primary" href="#qr-card">Показать QR</a>
+    <section class="section-block" id="qr-card"><div class="section-body"><div class="section-header"><h2 class="h6">QR для подключения</h2></div><img src="data:image/png;base64,{{ qr_base64 }}" alt="QR" class="img-thumbnail" style="max-width:290px;"><p class="small text-secondary mt-2 mb-0">Старая версия QR перестаёт работать после переиздания.</p></div></section>
     {% endif %}
-  </div>
-  {% if reissue_blocked %}<div class="alert alert-warning mt-3 mb-0">{{ reissue_block_reason }}</div>{% endif %}
-</div></div>
 
-{% if revision and qr_base64 %}
-<div class="card panel-card border-primary dense-section" id="qr-card"><div class="card-body"><h2 class="h6">QR для подключения</h2><img src="data:image/png;base64,{{ qr_base64 }}" alt="QR" class="img-thumbnail" style="max-width:300px;"><p class="secondary-note mt-2 mb-0">Отсканируйте код в приложении для быстрого импорта профиля.</p></div></div>
-{% endif %}
-
-<div class="card panel-card dense-section"><div class="card-body">
-  <h2 class="h6 mb-3">Недавняя активность</h2>
-  <div class="row g-3">
-    <div class="col-lg-6">
-      <h3 class="h6">Последние действия в аудите по клиенту</h3>
-      {% if recent_audit_logs %}
-      <div class="table-responsive">
-        <table class="table table-sm mb-0">
-          <thead><tr><th>Когда</th><th>Действие</th><th>Кто</th></tr></thead>
-          <tbody>
-            {% for log in recent_audit_logs %}
-            <tr>
-              <td>{{ log.created_at|date:'d.m.Y H:i' }}</td>
-              <td><code>{{ log.action }}</code></td>
-              <td>{% if log.actor %}{{ log.actor.username }}{% else %}<span class="text-secondary">система</span>{% endif %}</td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
+    <section class="section-block">
+      <div class="section-body">
+        <div class="section-header"><h2 class="h6">Недавняя активность</h2></div>
+        <div class="table-shell mb-2">
+          <table class="table table-sm mb-0">
+            <thead><tr><th>Аудит</th><th>Действие</th><th>Кто</th></tr></thead>
+            <tbody>
+              {% for log in recent_audit_logs %}
+              <tr><td>{{ log.created_at|date:'d.m.Y H:i' }}</td><td><code>{{ log.action }}</code></td><td>{% if log.actor %}{{ log.actor.username }}{% else %}<span class="text-secondary">система</span>{% endif %}</td></tr>
+              {% empty %}
+              <tr><td colspan="3"><span class="text-secondary">По этому клиенту пока нет записей аудита.</span></td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div class="table-shell">
+          <table class="table table-sm mb-0">
+            <thead><tr><th>ID job</th><th>Действие</th><th>Статус</th><th>Когда</th></tr></thead>
+            <tbody>
+              {% for job in recent_jobs %}
+              <tr><td><a href="/jobs/{{ job.id }}/">#{{ job.id }}</a></td><td><code>{{ job.action }}</code></td><td>{{ job.get_status_display }}</td><td>{{ job.created_at|date:'d.m.Y H:i' }}</td></tr>
+              {% empty %}
+              <tr><td colspan="4"><span class="text-secondary">Подходящих задач пока нет.</span></td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
       </div>
-      {% else %}
-      <p class="small text-secondary mb-0">По этому клиенту пока нет записей аудита.</p>
-      {% endif %}
-    </div>
-    <div class="col-lg-6">
-      <h3 class="h6">Последние jobs по серверу/клиенту</h3>
-      {% if recent_jobs %}
-      <div class="table-responsive">
-        <table class="table table-sm mb-0">
-          <thead><tr><th>ID</th><th>Действие</th><th>Статус</th><th>Когда</th></tr></thead>
-          <tbody>
-            {% for job in recent_jobs %}
-            <tr>
-              <td><a href="/jobs/{{ job.id }}/">#{{ job.id }}</a></td>
-              <td><code>{{ job.action }}</code></td>
-              <td>{{ job.get_status_display }}</td>
-              <td>{{ job.created_at|date:'d.m.Y H:i' }}</td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-      {% else %}
-      <p class="small text-secondary mb-0">Подходящих задач пока нет.</p>
-      {% endif %}
-    </div>
+    </section>
   </div>
-</div></div>
 
-<div class="card panel-card border-danger dense-section"><div class="card-body">
-  <h2 class="h6 text-danger mb-2">Опасные действия</h2>
-  <p class="small text-secondary mb-0">Удаление помечает клиента как удалённого и переносит его в архив.</p>
-</div></div>
+  <div class="console-stack">
+    <section class="section-block section-quiet">
+      <div class="section-body">
+        <div class="section-header"><h2 class="h6">Технический профиль</h2></div>
+        <div class="kv-inline">
+          <div><div class="k">Протокол</div><div class="v">{{ client.protocol_type|upper }}</div></div>
+          <div><div class="k">Состояние лимитов</div><div class="v">{{ limit_badge_label }}</div></div>
+          <div><div class="k">Источник клиента</div><div class="v">{% if client.imported_from_runtime %}Импортирован{% else %}Создан в панели{% endif %}</div></div>
+          <div><div class="k">Ревизия</div><div class="v">{% if revision %}Есть{% else %}Нет{% endif %}</div></div>
+          <div><div class="k">Синхронизация runtime</div><div class="v">{% if client.last_runtime_sync_at %}{{ client.last_runtime_sync_at|date:'d.m.Y H:i' }}{% else %}Нет данных{% endif %}</div></div>
+          <div><div class="k">Ключ клиента</div><div class="v"><code>{{ client.runtime_peer_public_key|default:'—' }}</code></div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section-block">
+      <div class="section-body">
+        <div class="section-header"><h2 class="h6">Кабинет клиента</h2></div>
+        <div class="small text-secondary mb-2">Статус доступа: <span class="badge status-badge {{ portal_access_status_badge_class }}">{{ portal_access_status_label }}</span></div>
+        {% if portal_access %}
+        <div class="small text-secondary mb-1">Последний доступ: {% if portal_access.last_access_at %}{{ portal_access.last_access_at|date:'d.m.Y H:i' }}{% else %}ещё не открывали{% endif %}</div>
+        <div class="small text-secondary mb-2">Действует до: {% if portal_access.expires_at %}{{ portal_access.expires_at|date:'d.m.Y H:i' }}{% else %}не ограничено{% endif %}</div>
+        {% endif %}
+        {% if portal_link %}
+        <div class="input-group mb-2">
+          <input class="form-control" type="text" readonly value="{{ portal_link }}">
+          <button class="btn btn-outline-secondary js-copy" type="button" data-copy="{{ portal_link }}">Копировать</button>
+        </div>
+        {% endif %}
+        <div class="action-cluster">
+          <form method="post" action="/clients/{{ client.id }}/action/portal_show/">{% csrf_token %}<button class="btn btn-outline-secondary" {% if not portal_access_enabled %}disabled{% endif %}>Показать ссылку</button></form>
+          <form method="post" action="/clients/{{ client.id }}/action/portal_issue/">{% csrf_token %}<button class="btn btn-outline-primary">Регенерировать</button></form>
+          {% if portal_access_enabled %}
+          <form method="post" action="/clients/{{ client.id }}/action/portal_revoke/">{% csrf_token %}<button class="btn btn-outline-danger">Отозвать</button></form>
+          {% else %}
+          <button class="btn btn-outline-danger" disabled>Отозвать</button>
+          {% endif %}
+        </div>
+      </div>
+    </section>
+
+    {% if open_renewal_request %}
+    <section class="section-block section-quiet">
+      <div class="section-body">
+        <div class="section-header"><h2 class="h6">Открытая заявка на продление</h2><a class="small" href="/clients/renewal-requests/">Открыть очередь</a></div>
+        <div class="small text-secondary mb-1">Статус: <span class="badge status-badge {% if open_renewal_request.status == 'new' %}status-warning{% else %}status-info{% endif %}">{{ open_renewal_request.get_status_display }}</span></div>
+        <div class="small text-secondary mb-1">Создана: {{ open_renewal_request.created_at|date:'d.m.Y H:i' }}</div>
+        <div class="small text-secondary">{% if open_renewal_request.operator_note %}Комментарий: {{ open_renewal_request.operator_note }}{% else %}Комментарий оператора пока не добавлен.{% endif %}</div>
+      </div>
+    </section>
+    {% endif %}
+
+    <section class="section-block section-danger">
+      <div class="section-body">
+        <div class="section-header"><h2 class="h6 text-danger">Опасные действия</h2></div>
+        <p class="small text-secondary">Удаление помечает клиента как удалённого и переносит его в архив.</p>
+        {% if not is_deleted %}
+        <button class="btn btn-danger" type="button" data-bs-toggle="modal" data-bs-target="#deleteClientDetailModal">Удалить клиента</button>
+        {% else %}
+        <button class="btn btn-danger" disabled>Клиент уже в архиве</button>
+        {% endif %}
+      </div>
+    </section>
+  </div>
+</div>
 
 <div class="modal fade" id="deleteClientDetailModal" tabindex="-1" aria-labelledby="deleteClientDetailModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
@@ -299,7 +282,7 @@
       if (!text) return;
       await navigator.clipboard.writeText(text);
       btn.textContent = 'Скопировано';
-      setTimeout(() => btn.textContent = 'Копировать ключ', 1200);
+      setTimeout(() => btn.textContent = 'Копировать', 1200);
     });
   });
 </script>
