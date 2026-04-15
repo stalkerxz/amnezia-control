@@ -7,36 +7,40 @@
 <div class="page-header">
   <p class="page-kicker">Операторская · Конфигурация</p>
   <h1 class="h3 mb-1">{% trans "Настройки" %}</h1>
-  <p class="page-subtle">{% trans "Компактные группы параметров и технической информации." %}</p>
+  <p class="page-subtle">{% trans "Компактная структура по зонам: редактируемые параметры, readonly и окружение." %}</p>
 </div>
 
 <div class="compact-page-grid cols-main">
-  <section class="section-block">
-    <div class="section-body">
-      <div class="section-header"><h2 class="h6">{% trans "Редактируемые параметры" %}</h2></div>
-      <form method="post" class="row g-2">
-        {% csrf_token %}
-        <div class="col-md-6">
-          <label class="form-label" for="id_portal_link_lifetime_days">{{ form.portal_link_lifetime_days.label }}</label>
-          {{ form.portal_link_lifetime_days }}
-        </div>
-        <div class="col-md-6">
-          <label class="form-label" for="id_portal_renewal_cooldown_hours">{{ form.portal_renewal_cooldown_hours.label }}</label>
-          {{ form.portal_renewal_cooldown_hours }}
-        </div>
-        <div class="col-12"><button type="submit" class="btn btn-primary">{% trans "Сохранить" %}</button></div>
-      </form>
-    </div>
-  </section>
-
-  <div class="compact-page-grid">
+  <div class="console-stack">
     <section class="section-block">
       <div class="section-body">
-        <div class="section-header"><h2 class="h6">{% trans "Параметры только для чтения" %}</h2></div>
-        <div class="kv-inline"><div><div class="k">{% trans "Интервал проверки лимитов" %}</div><div class="v">{{ limits_enforce_every_minutes }} {% trans "мин" %}</div></div></div>
+        <div class="section-header"><h2 class="h6">{% trans "Редактируемые параметры" %}</h2></div>
+        <form method="post" class="row g-2">
+          {% csrf_token %}
+          <div class="col-md-6">
+            <label class="form-label" for="id_portal_link_lifetime_days">{{ form.portal_link_lifetime_days.label }}</label>
+            {{ form.portal_link_lifetime_days }}
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="id_portal_renewal_cooldown_hours">{{ form.portal_renewal_cooldown_hours.label }}</label>
+            {{ form.portal_renewal_cooldown_hours }}
+          </div>
+          <div class="col-12"><button type="submit" class="btn btn-primary">{% trans "Сохранить" %}</button></div>
+        </form>
       </div>
     </section>
 
+    <section class="section-block section-quiet">
+      <div class="section-body">
+        <div class="section-header"><h2 class="h6">{% trans "Параметры только для чтения" %}</h2></div>
+        <div class="kv-inline">
+          <div><div class="k">{% trans "Интервал проверки лимитов" %}</div><div class="v">{{ limits_enforce_every_minutes }} {% trans "мин" %}</div></div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="console-stack">
     <section class="section-block">
       <div class="section-body">
         <div class="section-header"><h2 class="h6">{% trans "Язык интерфейса" %}</h2></div>
@@ -58,7 +62,7 @@
       </div>
     </section>
 
-    <section class="section-block">
+    <section class="section-block section-quiet">
       <div class="section-body">
         <div class="section-header"><h2 class="h6">{% trans "Окружение" %}</h2></div>
         <div class="kv-inline">

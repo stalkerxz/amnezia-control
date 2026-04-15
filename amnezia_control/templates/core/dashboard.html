@@ -2,46 +2,44 @@
 {% block content %}
 <div class="page-header d-flex justify-content-between align-items-start gap-2 flex-wrap">
   <div>
-    <p class="page-kicker">Операторская · Обзор</p>
+    <p class="page-kicker">Операторская · Командный обзор</p>
     <h1 class="h3">Операционный центр</h1>
-    <p class="page-subtle">Быстрая проверка критичных сигналов, очередей и последних событий.</p>
+    <p class="page-subtle">Первый экран показывает риски, очереди и последние изменения без декоративных блоков.</p>
   </div>
 </div>
 
-<section class="section-block">
+<section class="section-block section-quiet">
   <div class="section-body">
-    <div class="section-header"><h2 class="h6">Сводка состояния</h2></div>
     <div class="summary-strip">
-      <a class="summary-item span-2 text-decoration-none" href="/servers/?health=healthy"><div class="label">Серверы здоровы</div><div class="value text-success">{{ healthy_servers_count }}</div></a>
-      <a class="summary-item span-2 text-decoration-none" href="/servers/?health=degraded"><div class="label">Серверы ограничены</div><div class="value text-warning">{{ degraded_servers_count }}</div></a>
-      <a class="summary-item span-2 text-decoration-none" href="/servers/?health=unhealthy"><div class="label">Серверы с проблемами</div><div class="value text-danger">{{ unhealthy_servers_count }}</div></a>
-      <a class="summary-item span-2 text-decoration-none" href="/clients/?quick=expired"><div class="label">Клиенты истекли</div><div class="value text-warning">{{ expired_clients_count }}</div></a>
-      <a class="summary-item span-2 text-decoration-none" href="/clients/?quick=traffic_exceeded"><div class="label">Превышен трафик</div><div class="value text-danger">{{ traffic_exceeded_clients_count }}</div></a>
-      <a class="summary-item span-2 text-decoration-none" href="/clients/renewal-requests/"><div class="label">Открытые продления</div><div class="value">{{ renewal_open_count }}</div></a>
+      <a class="summary-item span-2 is-link" href="/servers/?health=unhealthy"><div class="label">Серверы с проблемами</div><div class="value text-danger">{{ unhealthy_servers_count }}</div></a>
+      <a class="summary-item span-2 is-link" href="/servers/?health=degraded"><div class="label">Серверы ограничены</div><div class="value text-warning">{{ degraded_servers_count }}</div></a>
+      <a class="summary-item span-2 is-link" href="/clients/?quick=expired"><div class="label">Клиенты истекли</div><div class="value text-warning">{{ expired_clients_count }}</div></a>
+      <a class="summary-item span-2 is-link" href="/clients/?quick=traffic_exceeded"><div class="label">Превышен трафик</div><div class="value text-danger">{{ traffic_exceeded_clients_count }}</div></a>
+      <a class="summary-item span-2 is-link" href="/clients/renewal-requests/"><div class="label">Открытые продления</div><div class="value">{{ renewal_open_count }}</div></a>
+      <a class="summary-item span-2 is-link" href="/jobs/?signal=failed"><div class="label">Ошибки jobs 24ч</div><div class="value text-danger">{{ failed_jobs_recent_count }}</div></a>
       <div class="summary-item span-4"><div class="label">Клиенты</div><div class="value">{{ active_clients_count }} / {{ clients_total_count }}</div><div class="meta">активные / всего</div></div>
-      <a class="summary-item span-2 text-decoration-none" href="/jobs/?signal=failed"><div class="label">Ошибки jobs 24ч</div><div class="value text-danger">{{ failed_jobs_recent_count }}</div></a>
-      <a class="summary-item span-2 text-decoration-none" href="/jobs/?signal=warning"><div class="label">Предупреждения jobs</div><div class="value text-warning">{{ warning_jobs_recent_count }}</div></a>
-      <a class="summary-item span-2 text-decoration-none" href="/jobs/?signal=degraded_success"><div class="label">Деградация jobs</div><div class="value text-warning">{{ degraded_jobs_recent_count }}</div></a>
-      <div class="summary-item span-2"><div class="label">Синхронизация runtime</div><div class="meta">{{ last_runtime_sync|default:'Ещё не запускалась' }}</div></div>
+      <div class="summary-item span-4"><div class="label">Серверы здоровы</div><div class="value text-success">{{ healthy_servers_count }}</div><div class="meta">последняя runtime sync: {{ last_runtime_sync|default:'ещё не запускалась' }}</div></div>
+      <a class="summary-item span-2 is-link" href="/jobs/?signal=warning"><div class="label">Предупреждения jobs</div><div class="value text-warning">{{ warning_jobs_recent_count }}</div></a>
+      <a class="summary-item span-2 is-link" href="/jobs/?signal=degraded_success"><div class="label">Деградация jobs</div><div class="value text-warning">{{ degraded_jobs_recent_count }}</div></a>
     </div>
   </div>
 </section>
 
 <div class="compact-page-grid cols-main">
-  <div class="compact-page-grid">
+  <div class="console-stack">
     <section class="section-block">
       <div class="section-body">
         <div class="section-header"><h2 class="h6">Требует внимания</h2></div>
-        <ul class="list-group list-group-flush">
+        <div class="queue-list">
           {% for item in attention_items %}
-          <li class="list-group-item bg-transparent px-0 py-2 d-flex justify-content-between align-items-center gap-2">
-            <a href="{{ item.url }}" class="text-decoration-none">{{ item.title }}</a>
+          <div class="queue-item">
+            <div><a href="{{ item.url }}" class="title text-decoration-none">{{ item.title }}</a></div>
             <a href="{{ item.url }}" class="badge status-badge {% if item.tone == 'danger' %}status-danger{% elif item.tone == 'warning' %}status-warning{% elif item.tone == 'success' %}status-success{% else %}status-neutral{% endif %} text-decoration-none">{{ item.count }}</a>
-          </li>
+          </div>
           {% empty %}
-          <li class="list-group-item bg-transparent px-0"><div class="empty-state py-2">Проблемных зон не обнаружено.</div></li>
+          <div class="empty-state">Проблемных зон не обнаружено.</div>
           {% endfor %}
-        </ul>
+        </div>
       </div>
     </section>
 
@@ -55,11 +53,11 @@
               {% for row in jobs_recent_rows %}
               <tr>
                 <td><a href="/jobs/{{ row.job.id }}/">#{{ row.job.id }}</a></td>
-                <td><div class="fw-semibold">{{ row.action_label }}</div></td>
+                <td>{{ row.action_label }}</td>
                 <td><span class="badge status-badge {% if row.job_signal == 'failed' %}status-danger{% elif row.job_signal == 'warning' or row.job_signal == 'degraded_success' %}status-warning{% elif row.job_signal == 'success' %}status-success{% else %}status-neutral{% endif %}">{% if row.job_signal == 'failed' %}Ошибка{% elif row.job_signal == 'warning' %}Успех с предупреждением{% elif row.job_signal == 'degraded_success' %}Успех с деградацией{% elif row.job_signal == 'success' %}Успех{% elif row.job.status == 'running' %}Выполняется{% else %}Ожидает{% endif %}</span></td>
               </tr>
               {% empty %}
-              <tr><td colspan="3"><div class="empty-state py-2">Заданий пока нет.</div></td></tr>
+              <tr><td colspan="3"><div class="empty-state">Заданий пока нет.</div></td></tr>
               {% endfor %}
             </tbody>
           </table>
@@ -68,7 +66,7 @@
     </section>
   </div>
 
-  <div class="compact-page-grid">
+  <div class="console-stack">
     <section class="section-block">
       <div class="section-body">
         <div class="section-header"><h2 class="h6">Очередь продлений</h2><a class="small" href="/clients/renewal-requests/">Открыть очередь</a></div>
@@ -77,32 +75,29 @@
           <div><div class="k">За 24 часа</div><div class="v">{{ renewal_requests_last_24h }}</div></div>
           <div><div class="k">За 7 дней</div><div class="v">{{ renewal_requests_last_7d }}</div></div>
         </div>
-        <ul class="list-group list-group-flush">
+        <div class="queue-list">
           {% for log in recent_renewal_requests %}
-          <li class="list-group-item bg-transparent px-0 py-2 d-flex justify-content-between gap-2">
-            <a class="text-decoration-none" href="/clients/{{ log.client_id }}/">{{ log.client.name }}</a>
-            <span class="small text-secondary text-nowrap">{{ log.get_status_display }} · {{ log.created_at|date:'d.m.Y H:i' }}</span>
-          </li>
+          <div class="queue-item">
+            <div><a class="title text-decoration-none" href="/clients/{{ log.client_id }}/">{{ log.client.name }}</a><div class="meta">{{ log.created_at|date:'d.m.Y H:i' }}</div></div>
+            <span class="badge status-badge status-neutral">{{ log.get_status_display }}</span>
+          </div>
           {% empty %}
-          <li class="list-group-item bg-transparent px-0"><div class="empty-state py-2">Новых заявок нет.</div></li>
+          <div class="empty-state">Новых заявок нет.</div>
           {% endfor %}
-        </ul>
+        </div>
       </div>
     </section>
 
     <section class="section-block">
       <div class="section-body">
-        <div class="section-header"><h2 class="h6">Последние действия аудита</h2><a class="small" href="/audit/">Журнал</a></div>
-        <ul class="list-group list-group-flush">
+        <div class="section-header"><h2 class="h6">Последний аудит</h2><a class="small" href="/audit/">Журнал</a></div>
+        <div class="activity-list">
           {% for row in audit_recent_rows %}
-          <li class="list-group-item bg-transparent px-0 py-2">
-            <div class="small text-secondary">{{ row.log.created_at|date:'d.m.Y H:i' }}</div>
-            <div>{{ row.action_label }}</div>
-          </li>
+          <div class="activity-item"><div><div class="title">{{ row.action_label }}</div><div class="meta">{{ row.log.created_at|date:'d.m.Y H:i' }}</div></div></div>
           {% empty %}
-          <li class="list-group-item bg-transparent px-0"><div class="empty-state py-2">Записей аудита пока нет.</div></li>
+          <div class="empty-state">Записей аудита пока нет.</div>
           {% endfor %}
-        </ul>
+        </div>
       </div>
     </section>
   </div>
