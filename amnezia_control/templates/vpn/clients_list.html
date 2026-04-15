@@ -12,7 +12,20 @@
   </div>
 </div>
 
-<form method="get" class="card card-body filter-panel filter-bar dense-section">
+<section class="section-block">
+  <div class="section-body">
+    <div class="summary-strip">
+      <div class="summary-item span-2"><div class="label">Найдено клиентов</div><div class="value">{{ client_rows|length }}</div></div>
+      <div class="summary-item span-2"><div class="label">Активные фильтры</div><div class="meta">Поиск, статус, источник, продления</div></div>
+      <a class="summary-item span-2 text-decoration-none" href="/clients/?quick=expired"><div class="label">Истекшие</div><div class="value text-warning">Быстрый фильтр</div></a>
+      <a class="summary-item span-2 text-decoration-none" href="/clients/?quick=traffic_exceeded"><div class="label">Превышенный трафик</div><div class="value text-danger">Быстрый фильтр</div></a>
+      <a class="summary-item span-2 text-decoration-none" href="/clients/renewal-requests/"><div class="label">Очередь продлений</div><div class="value">Открыть</div></a>
+      <div class="summary-item span-2"><div class="label">Режим таблицы</div><div class="meta">Плотный список оператора</div></div>
+    </div>
+  </div>
+</section>
+
+<form method="get" class="card card-body filter-panel dense-section">
   <div class="section-header-compact">
     <h2 class="h6">Фильтры</h2>
     <a class="small text-decoration-none" href="/clients/">Сбросить все</a>
@@ -80,7 +93,7 @@
   <input type="hidden" name="action" id="bulkActionInput" value="">
   <div id="bulkSelectionContainer"></div>
 </form>
-  <div id="bulkToolbar" class="card card-body action-toolbar mb-2 d-none filter-panel">
+  <div id="bulkToolbar" class="section-block mb-2 d-none"><div class="section-body">
     <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">
       <div>
         Выбрано клиентов: <strong id="selectedCount">0</strong>
@@ -95,8 +108,8 @@
         <button type="button" class="btn btn-sm btn-primary" id="bulkLimitsBtn">Изменить лимиты</button>
       </div>
     </div>
-  </div>
-  <div class="table-responsive card table-shell clients-table-wrap">
+  </div></div>
+  <div class="table-responsive section-block table-shell clients-table-wrap">
   <table class="table table-hover align-middle mb-0 clients-table">
     <thead>
       <tr>

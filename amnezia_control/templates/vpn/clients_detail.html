@@ -48,13 +48,19 @@
 </div>
 {% endif %}
 
-<div class="row g-2 dense-section">
-  <div class="col-xl-3 col-md-6"><div class="card stat-card metric-card stat-card-compact h-100"><div class="card-body"><h2 class="h6 mb-2">Сервер</h2><div class="small text-secondary mb-1">Связан с</div><div class="fw-semibold">{{ client.server.name }}</div><div class="small text-secondary mt-2">Последняя синхронизация</div><div>{% if client.last_runtime_sync_at %}{{ client.last_runtime_sync_at|date:'d.m.Y H:i' }}{% else %}Нет данных{% endif %}</div></div></div></div>
-  <div class="col-xl-3 col-md-6"><div class="card stat-card metric-card stat-card-compact h-100"><div class="card-body"><h2 class="h6 mb-2">Оператор</h2><div class="small text-secondary mb-1">Создал</div><div>{% if client.created_by %}{{ client.created_by.username }}{% if client.created_by_id == request.user.id %} <span class="badge status-badge status-success">Мой</span>{% else %} <span class="badge status-badge status-neutral">Другой оператор</span>{% endif %}{% else %}система{% endif %}</div><div class="small text-secondary mt-2">Последнее действие</div><div>{% if latest_operator_action %}<code>{{ latest_operator_action.action }}</code> · {% if latest_operator_action.actor %}{{ latest_operator_action.actor.username }}{% else %}система{% endif %}{% else %}Нет данных{% endif %}</div></div></div></div>
-  <div class="col-xl-3 col-md-6"><div class="card stat-card metric-card stat-card-compact h-100"><div class="card-body"><h2 class="h6 mb-2">Ревизии</h2><div class="small text-secondary mb-1">Всего</div><div class="h3 mb-1">{{ revision_count }}</div><div class="small text-secondary">{% if revision %}Последняя: #{{ revision.revision_number }}{% else %}Отсутствуют{% endif %}</div></div></div></div>
-  <div class="col-xl-3 col-md-6"><div class="card stat-card metric-card stat-card-compact h-100"><div class="card-body"><h2 class="h6 mb-2">Лимиты</h2><div class="small text-secondary mb-1">Срок действия</div><div>{{ expires_display }}</div><div class="small text-secondary mt-2">Трафик</div><div>{% if client.traffic_limit_bytes %}{{ traffic_limit_display }}{% else %}Не задано{% endif %}</div></div></div></div>
-  <div class="col-xl-3 col-md-6"><div class="card stat-card metric-card stat-card-compact h-100"><div class="card-body"><h2 class="h6 mb-2">Ключ клиента</h2><div class="small text-secondary mb-1">Ключ</div><code>{{ client.runtime_peer_public_key|default:'-' }}</code><button type="button" class="btn btn-xs btn-outline-secondary mt-2 js-copy" data-copy="{{ client.runtime_peer_public_key|default:'' }}">Копировать ключ</button></div></div></div>
-</div>
+<section class="section-block">
+  <div class="section-body">
+    <div class="section-header"><h2 class="h6">Сводка клиента</h2></div>
+    <div class="summary-strip">
+      <div class="summary-item span-2"><div class="label">Сервер</div><div class="value">{{ client.server.name }}</div><div class="meta">{% if client.last_runtime_sync_at %}Синхр.: {{ client.last_runtime_sync_at|date:'d.m.Y H:i' }}{% else %}Нет синхронизации{% endif %}</div></div>
+      <div class="summary-item span-2"><div class="label">Оператор</div><div class="value">{% if client.created_by %}{{ client.created_by.username }}{% else %}система{% endif %}</div><div class="meta">{% if client.created_by_id == request.user.id %}Мой клиент{% else %}Назначение по журналу{% endif %}</div></div>
+      <div class="summary-item span-2"><div class="label">Ревизии</div><div class="value">{{ revision_count }}</div><div class="meta">{% if revision %}Последняя #{{ revision.revision_number }}{% else %}Ещё не выпущены{% endif %}</div></div>
+      <div class="summary-item span-2"><div class="label">Срок действия</div><div class="value">{{ expires_display }}</div></div>
+      <div class="summary-item span-2"><div class="label">Лимит трафика</div><div class="value">{% if client.traffic_limit_bytes %}{{ traffic_limit_display }}{% else %}Не задан{% endif %}</div></div>
+      <div class="summary-item span-2"><div class="label">Ключ клиента</div><div class="meta"><code>{{ client.runtime_peer_public_key|default:'-' }}</code></div><button type="button" class="btn btn-xs btn-outline-secondary mt-1 js-copy" data-copy="{{ client.runtime_peer_public_key|default:'' }}">Копировать ключ</button></div>
+    </div>
+  </div>
+</section>
 
 <div class="card panel-card dense-section"><div class="card-body py-2">
   <h2 class="h6 mb-3">Диагностика клиента</h2>
