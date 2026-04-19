@@ -1623,7 +1623,7 @@ class VPNClientAdminExportParityTest(TestCase):
         with patch("vpn.views.VPNClientService.portal_export_config", return_value="shared-export"):
             admin_response = self.client.get(f"/clients/{self.vpn_client.id}/download/")
 
-        with patch("portal.views.VPNClientService.portal_export_config", return_value="shared-export"):
+        with patch("portal.views.VPNClientService.portal_export_config_for_target", return_value="shared-export"):
             portal_response = self.client.get(f"/portal/{token}/config/")
 
         self.assertEqual(admin_response.status_code, 200)
@@ -1780,8 +1780,14 @@ class VPNClientPortalAdminAndRenewalVisibilityTest(TestCase):
         response = self.client.get(f"/clients/{self.client_with_renewal.id}/")
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Ссылка скрыта. Нажмите «Показать ссылку»")
+        self.assertContains(response, "Сейчас ссылка скрыта.")
         self.assertNotContains(response, f"/portal/{token}/")
+
+    def test_portal_block_renders_open_action_and_link_state(self):
+        response = self.client.get(f"/clients/{self.client_with_renewal.id}/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Открыть кабинет")
+        self.assertContains(response, "Ссылка кабинета ещё не выпущена.")
 
     def test_portal_show_redirects_back_to_client_detail_and_reveals_link_inline(self):
         _, token = PortalAccessService.issue_for_client(self.client_with_renewal)
@@ -1795,8 +1801,29 @@ class VPNClientPortalAdminAndRenewalVisibilityTest(TestCase):
         self.assertEqual(response.url, f"/clients/{self.client_with_renewal.id}/?show_portal_link=1")
 
         detail_response = self.client.get(response.url)
-        self.assertContains(detail_response, "Текущая ссылка кабинета")
+        self.assertContains(detail_response, "Сейчас ссылка показана.")
         self.assertContains(detail_response, f"/portal/{token}/")
+
+    def test_portal_open_reuses_existing_link(self):
+        _, token = PortalAccessService.issue_for_client(self.client_with_renewal)
+        response = self.client.post(
+            f"/clients/{self.client_with_renewal.id}/action/portal_open/",
+            follow=False,
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, f"/portal/{token}/")
+
+    def test_portal_open_issues_link_when_missing(self):
+        response = self.client.post(
+            f"/clients/{self.client_with_renewal.id}/action/portal_open/",
+            follow=False,
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/portal/", response.url)
+        self.assertEqual(
+            AuditLog.objects.filter(action="portal.access.issue", entity_id=str(self.client_with_renewal.id)).count(),
+            1,
+        )
 
     def test_portal_actions_use_safe_next_fallback_when_next_is_external(self):
         response = self.client.post(

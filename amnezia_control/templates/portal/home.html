@@ -6,13 +6,22 @@
     <div>
       <p class="page-kicker">Кабинет клиента</p>
       <h1 class="h3 mb-0">{{ client.name }}</h1>
-      <p class="page-subtle">Быстрый доступ к конфигурации, статусу подключения и действиям по обслуживанию.</p>
-    </div>
-    <div class="action-cluster">
-      <a href="/portal/{{ token }}/config/" class="btn btn-primary">Скачать конфигурацию</a>
-      <a href="/portal/{{ token }}/qr/" class="btn btn-outline-primary">QR-код</a>
+      <p class="page-subtle">Подключите клиента за 2 шага: выберите приложение и импортируйте конфигурацию или QR-код.</p>
     </div>
   </div>
+
+  <section class="portal-section mt-2">
+    <div class="section-body">
+      <div class="section-header"><h2 class="h6 mb-0">Подключение</h2></div>
+      <p class="small text-secondary mb-2">Если у вас установлен AmneziaVPN, выбирайте варианты для AmneziaVPN. Для приложения AmneziaWG используйте соответствующие кнопки ниже.</p>
+      <div class="action-cluster">
+        <a href="/portal/{{ token }}/config/?target=amneziawg" class="btn btn-primary">Скачать конфигурацию для AmneziaWG</a>
+        <a href="/portal/{{ token }}/config/?target=amneziavpn" class="btn btn-outline-primary">Скачать конфигурацию для AmneziaVPN</a>
+        <a href="/portal/{{ token }}/qr/?target=amneziawg" class="btn btn-outline-secondary">Открыть QR-код для AmneziaWG</a>
+        <a href="/portal/{{ token }}/qr/?target=amneziavpn" class="btn btn-outline-secondary">Открыть QR-код для AmneziaVPN</a>
+      </div>
+    </div>
+  </section>
 
   <section class="portal-section">
     <div class="section-body">

@@ -832,6 +832,18 @@ class VPNClientService:
         return VPNClientService._qr_png_base64_from_payload(VPNClientService.portal_export_config(client))
 
     @staticmethod
+    def portal_export_config_for_target(client: VPNClient, target: str) -> str:
+        if target == "amneziavpn":
+            return VPNClientService.latest_config(client)
+        return VPNClientService.portal_export_config(client)
+
+    @staticmethod
+    def portal_qr_png_base64_for_target(client: VPNClient, target: str) -> str:
+        return VPNClientService._qr_png_base64_from_payload(
+            VPNClientService.portal_export_config_for_target(client, target)
+        )
+
+    @staticmethod
     @transaction.atomic
     def import_runtime_peers(*, server, actor):
         imported = 0

@@ -399,11 +399,7 @@ def clients_detail_view(request, pk: int):
     ).order_by("-created_at").first()
     portal_raw_token = PortalAccessService.get_raw_token_for_client(client)
     should_show_portal_link = request.GET.get("show_portal_link") == "1"
-    portal_link = (
-        request.build_absolute_uri(reverse("portal-home", kwargs={"token": portal_raw_token}))
-        if portal_raw_token and should_show_portal_link
-        else ""
-    )
+    portal_link = request.build_absolute_uri(reverse("portal-home", kwargs={"token": portal_raw_token})) if portal_raw_token else ""
 
     return render(
         request,
@@ -437,6 +433,7 @@ def clients_detail_view(request, pk: int):
             "portal_access_status_label": portal_status_meta[portal_access_status]["label"],
             "portal_access_status_badge_class": portal_status_meta[portal_access_status]["badge_class"],
             "portal_link": portal_link,
+            "portal_link_exists": bool(portal_link),
             "portal_link_is_visible": should_show_portal_link and bool(portal_link),
             "open_renewal_request": open_renewal_request,
         },
@@ -506,6 +503,19 @@ def client_action_view(request, pk: int, action: str):
             )
             success_message = "Ссылка кабинета регенерирована."
             next_url = _set_query_param(next_url, "show_portal_link", "1")
+            next_url = _set_query_param(next_url, "portal_updated", "1")
+        elif action == "portal_open":
+            raw_token = PortalAccessService.get_raw_token_for_client(client)
+            if not raw_token:
+                access, raw_token = PortalAccessService.issue_for_client(client)
+                AuditLog.objects.create(
+                    actor=request.user,
+                    action="portal.access.issue",
+                    entity_type="VPNClient",
+                    entity_id=str(client.id),
+                    details={"portal_access_id": access.id},
+                )
+            return redirect("portal-home", token=raw_token)
         elif action == "portal_show":
             raw_token = PortalAccessService.get_raw_token_for_client(client)
             if raw_token:
