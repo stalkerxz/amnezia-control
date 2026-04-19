@@ -1,6 +1,8 @@
 from django.db import models
 from django.db.models import Q
 from django.conf import settings
+from pathlib import Path
+from uuid import uuid4
 
 from vpn.models import VPNClient
 
@@ -25,6 +27,12 @@ class ClientPortalAccess(models.Model):
         return f"portal:{self.client_id}:{'enabled' if self.enabled else 'disabled'}"
 
 
+def renewal_attachment_upload_to(instance, filename: str) -> str:
+    extension = Path(filename).suffix.lower()
+    safe_extension = extension if extension in {".jpg", ".jpeg", ".pdf"} else ""
+    return f"portal/renewal_attachments/client_{instance.client_id}/{uuid4().hex}{safe_extension}"
+
+
 class ClientRenewalRequest(models.Model):
     class Status(models.TextChoices):
         NEW = "new", "Новая"
@@ -37,6 +45,8 @@ class ClientRenewalRequest(models.Model):
     note = models.TextField(blank=True)
     operator_note = models.TextField(blank=True)
     created_from_portal = models.BooleanField(default=True)
+    attachment = models.FileField(upload_to=renewal_attachment_upload_to, null=True, blank=True)
+    attachment_original_name = models.CharField(max_length=255, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     processed_at = models.DateTimeField(null=True, blank=True)
@@ -66,3 +76,11 @@ class ClientRenewalRequest(models.Model):
     @property
     def is_open(self) -> bool:
         return self.status in {self.Status.NEW, self.Status.IN_PROGRESS}
+
+    @property
+    def attachment_display_name(self) -> str:
+        if self.attachment_original_name:
+            return self.attachment_original_name
+        if self.attachment:
+            return Path(self.attachment.name).name
+        return ""

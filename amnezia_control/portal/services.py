@@ -133,7 +133,7 @@ class RenewalRequestService:
 
     @classmethod
     @transaction.atomic
-    def create_or_get_open_from_portal(cls, *, client, note: str = ""):
+    def create_or_get_open_from_portal(cls, *, client, note: str = "", attachment=None):
         request_obj = (
             ClientRenewalRequest.objects.select_for_update()
             .filter(client=client, status__in=cls.OPEN_STATUSES)
@@ -144,6 +144,10 @@ class RenewalRequestService:
             if note and not request_obj.note:
                 request_obj.note = note
                 request_obj.save(update_fields=["note", "updated_at"])
+            if attachment and not request_obj.attachment:
+                request_obj.attachment = attachment
+                request_obj.attachment_original_name = (attachment.name or "")[:255]
+                request_obj.save(update_fields=["attachment", "attachment_original_name", "updated_at"])
             return request_obj, False
 
         request_obj = ClientRenewalRequest.objects.create(
@@ -151,6 +155,8 @@ class RenewalRequestService:
             status=ClientRenewalRequest.Status.NEW,
             note=note,
             created_from_portal=True,
+            attachment=attachment,
+            attachment_original_name=((attachment.name or "")[:255] if attachment else ""),
         )
         return request_obj, True
 

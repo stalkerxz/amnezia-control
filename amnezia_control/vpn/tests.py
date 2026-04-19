@@ -1,6 +1,7 @@
 from cryptography.fernet import Fernet
 from audit.models import AuditLog
 from django.contrib.auth import get_user_model
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import SimpleTestCase, TestCase, override_settings
 from django.utils import timezone
 from jobs.models import Job
@@ -1806,6 +1807,7 @@ class VPNClientPortalAdminAndRenewalVisibilityTest(TestCase):
         self.assertContains(response, "Открыть кабинет")
         self.assertContains(response, "Ссылка кабинета ещё не выпущена.")
         self.assertNotContains(response, "••••••••")
+        self.assertContains(response, "disabled>Открыть кабинет")
 
     def test_portal_show_redirects_back_to_client_detail_and_reveals_link_inline(self):
         _, token = PortalAccessService.issue_for_client(self.client_with_renewal)
@@ -1831,17 +1833,47 @@ class VPNClientPortalAdminAndRenewalVisibilityTest(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response.url, f"/portal/{token}/")
 
-    def test_portal_open_issues_link_when_missing(self):
+    def test_portal_open_is_blocked_when_link_is_missing(self):
         response = self.client.post(
+            f"/clients/{self.client_with_renewal.id}/action/portal_open/",
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Сначала выполните «Регенерировать».")
+        self.assertEqual(
+            AuditLog.objects.filter(action="portal.access.issue", entity_id=str(self.client_with_renewal.id)).count(),
+            0,
+        )
+
+    def test_portal_open_is_blocked_after_revoke_until_regeneration(self):
+        PortalAccessService.issue_for_client(self.client_with_renewal)
+        PortalAccessService.revoke_for_client(self.client_with_renewal)
+        blocked_response = self.client.post(
+            f"/clients/{self.client_with_renewal.id}/action/portal_open/",
+            follow=True,
+        )
+        self.assertContains(blocked_response, "Сначала выполните «Регенерировать».")
+        self.assertNotContains(blocked_response, "status-success\">активен")
+
+        issue_response = self.client.post(
+            f"/clients/{self.client_with_renewal.id}/action/portal_issue/",
+            {"next": f"/clients/{self.client_with_renewal.id}/"},
+            follow=False,
+        )
+        self.assertEqual(issue_response.status_code, 302)
+        self.assertIn("show_portal_link=1", issue_response.url)
+
+        reopen_response = self.client.post(
             f"/clients/{self.client_with_renewal.id}/action/portal_open/",
             follow=False,
         )
-        self.assertEqual(response.status_code, 302)
-        self.assertIn("/portal/", response.url)
-        self.assertEqual(
-            AuditLog.objects.filter(action="portal.access.issue", entity_id=str(self.client_with_renewal.id)).count(),
-            1,
-        )
+        self.assertEqual(reopen_response.status_code, 302)
+        self.assertIn("/portal/", reopen_response.url)
+
+    def test_portal_block_has_single_copy_link_action(self):
+        PortalAccessService.issue_for_client(self.client_with_renewal)
+        response = self.client.get(f"/clients/{self.client_with_renewal.id}/?show_portal_link=1")
+        self.assertContains(response, "Скопировать ссылку", count=1)
 
     def test_portal_actions_use_safe_next_fallback_when_next_is_external(self):
         response = self.client.post(
@@ -2219,3 +2251,33 @@ class VPNClientPortalAdminAndRenewalVisibilityTest(TestCase):
         only_mine = self.client.get("/clients/renewal-requests/", {"status": "open", "only_my_actions": "1"})
         self.assertContains(only_mine, f"#{request_first.id}")
         self.assertNotContains(only_mine, f"#{request_second.id}")
+
+    def test_operator_ui_shows_attachment_presence_and_can_open_it(self):
+        request_obj = ClientRenewalRequest.objects.create(
+            client=self.client_with_renewal,
+            status=ClientRenewalRequest.Status.NEW,
+            attachment=SimpleUploadedFile("evidence.pdf", b"%PDF-1.4\n1 0 obj\n<<>>\nendobj\n", content_type="application/pdf"),
+            attachment_original_name="evidence.pdf",
+        )
+        list_response = self.client.get("/clients/renewal-requests/")
+        detail_response = self.client.get(f"/clients/{self.client_with_renewal.id}/")
+
+        self.assertContains(list_response, "Есть файл")
+        self.assertContains(list_response, "evidence.pdf")
+        self.assertContains(list_response, "Открыть файл")
+        self.assertContains(detail_response, "evidence.pdf")
+        self.assertContains(detail_response, "Вложение:")
+
+        download_response = self.client.get(f"/clients/renewal-requests/{request_obj.id}/attachment/")
+        self.assertEqual(download_response.status_code, 200)
+
+    def test_attachment_download_is_protected_for_anonymous(self):
+        request_obj = ClientRenewalRequest.objects.create(
+            client=self.client_with_renewal,
+            status=ClientRenewalRequest.Status.NEW,
+            attachment=SimpleUploadedFile("evidence.pdf", b"%PDF-1.4\n1 0 obj\n<<>>\nendobj\n", content_type="application/pdf"),
+        )
+        self.client.logout()
+        response = self.client.get(f"/clients/renewal-requests/{request_obj.id}/attachment/")
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/login/", response.url)

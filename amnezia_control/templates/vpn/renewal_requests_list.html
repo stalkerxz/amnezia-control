@@ -75,6 +75,7 @@
         <th>Создана</th>
         <th>Обработана</th>
         <th>Оператор</th>
+        <th>Файл</th>
         <th class="text-end">Действия</th>
       </tr>
     </thead>
@@ -88,10 +89,19 @@
         <td>{{ item.created_at|date:'d.m.Y H:i' }}</td>
         <td>{% if item.processed_at %}{{ item.processed_at|date:'d.m.Y H:i' }}{% else %}—{% endif %}</td>
         <td>{% if item.processed_by %}{{ item.processed_by.username }}{% else %}—{% endif %}</td>
+        <td>
+          {% if item.attachment %}
+          <span class="badge status-badge status-info mb-1">Есть файл</span><br>
+          <div class="small text-secondary mb-1" title="{{ item.attachment_display_name }}">{{ item.attachment_display_name|truncatechars:28 }}</div>
+          <a class="btn btn-sm btn-outline-secondary" href="{% url 'renewal-request-attachment-download' item.id %}" target="_blank">Открыть файл</a>
+          {% else %}
+          <span class="text-secondary">—</span>
+          {% endif %}
+        </td>
         <td class="text-end"><div class="table-actions"><a class="btn btn-sm btn-outline-primary" href="/clients/{{ item.client_id }}/">К клиенту</a><button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#renewal-actions-{{ item.id }}" aria-expanded="false" aria-controls="renewal-actions-{{ item.id }}">Обработать</button></div></td>
       </tr>
       <tr class="collapse-row">
-        <td colspan="8" class="py-0 border-0">
+        <td colspan="9" class="py-0 border-0">
           <div class="collapse p-2" id="renewal-actions-{{ item.id }}">
             <form method="post" action="/clients/{{ item.client_id }}/action/renewal_set_status/" class="renewal-action-card">
               {% csrf_token %}

@@ -11,6 +11,7 @@ from .views import (
     renewal_requests_list_view,
     clients_bulk_action_view,
     client_update_limits_view,
+    renewal_request_attachment_download_view,
 )
 
 urlpatterns = [
@@ -18,6 +19,11 @@ urlpatterns = [
     path("new/", clients_create_view, name="clients-create"),
     path("import/", clients_import_view, name="clients-import"),
     path("renewal-requests/", renewal_requests_list_view, name="renewal-requests-list"),
+    path(
+        "renewal-requests/<int:pk>/attachment/",
+        renewal_request_attachment_download_view,
+        name="renewal-request-attachment-download",
+    ),
     path("bulk-action/", clients_bulk_action_view, name="clients-bulk-action"),
     path("<int:pk>/", clients_detail_view, name="clients-detail"),
     path("<int:pk>/download/", client_download_config_view, name="clients-download"),
