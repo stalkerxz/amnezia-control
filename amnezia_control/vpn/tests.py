@@ -1780,8 +1780,44 @@ class VPNClientPortalAdminAndRenewalVisibilityTest(TestCase):
         response = self.client.get(f"/clients/{self.client_with_renewal.id}/")
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Текущая ссылка кабинета")
-        self.assertContains(response, f"/portal/{token}/")
+        self.assertContains(response, "Ссылка скрыта. Нажмите «Показать ссылку»")
+        self.assertNotContains(response, f"/portal/{token}/")
+
+    def test_portal_show_redirects_back_to_client_detail_and_reveals_link_inline(self):
+        _, token = PortalAccessService.issue_for_client(self.client_with_renewal)
+        response = self.client.post(
+            f"/clients/{self.client_with_renewal.id}/action/portal_show/",
+            {"next": f"/clients/{self.client_with_renewal.id}/"},
+            follow=False,
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, f"/clients/{self.client_with_renewal.id}/?show_portal_link=1")
+
+        detail_response = self.client.get(response.url)
+        self.assertContains(detail_response, "Текущая ссылка кабинета")
+        self.assertContains(detail_response, f"/portal/{token}/")
+
+    def test_portal_actions_use_safe_next_fallback_when_next_is_external(self):
+        response = self.client.post(
+            f"/clients/{self.client_with_renewal.id}/action/portal_issue/",
+            {"next": "https://evil.example/phish"},
+            follow=False,
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, f"/clients/{self.client_with_renewal.id}/?show_portal_link=1")
+
+    def test_portal_revoke_redirects_back_to_renewal_queue_when_triggered_from_queue(self):
+        PortalAccessService.issue_for_client(self.client_with_renewal)
+        next_url = "/clients/renewal-requests/?status=open"
+        response = self.client.post(
+            f"/clients/{self.client_with_renewal.id}/action/portal_revoke/",
+            {"next": next_url},
+            follow=False,
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, next_url)
 
     def test_clients_list_marks_and_filters_open_renewal_requests(self):
         ClientRenewalRequest.objects.create(client=self.client_with_renewal, status=ClientRenewalRequest.Status.NEW)

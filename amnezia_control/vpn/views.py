@@ -7,8 +7,10 @@ from django.db.models.functions import Coalesce
 from django.http import HttpResponse
 from django.urls import reverse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils import timezone
 import ipaddress
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from audit.models import AuditLog
 from jobs.models import Job
@@ -72,6 +74,20 @@ def _normalize_runtime_address(value: str) -> str:
 def _is_awg2_degraded_telemetry(peer_source: str) -> bool:
     source = (peer_source or "").lower()
     return "config file fallback" in source and "degraded telemetry" in source
+
+
+def _safe_next_url(request, fallback_url: str) -> str:
+    raw_next = (request.POST.get("next") or "").strip()
+    if raw_next and url_has_allowed_host_and_scheme(raw_next, allowed_hosts={request.get_host()}, require_https=request.is_secure()):
+        return raw_next
+    return fallback_url
+
+
+def _set_query_param(url: str, key: str, value: str) -> str:
+    parts = urlsplit(url)
+    query = dict(parse_qsl(parts.query, keep_blank_values=True))
+    query[key] = value
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment))
 
 
 def _telemetry_view_state(*, client: VPNClient, peer_source: str):
@@ -382,7 +398,12 @@ def clients_detail_view(request, pk: int):
         client=client, status__in=[ClientRenewalRequest.Status.NEW, ClientRenewalRequest.Status.IN_PROGRESS]
     ).order_by("-created_at").first()
     portal_raw_token = PortalAccessService.get_raw_token_for_client(client)
-    portal_link = request.build_absolute_uri(reverse("portal-home", kwargs={"token": portal_raw_token})) if portal_raw_token else ""
+    should_show_portal_link = request.GET.get("show_portal_link") == "1"
+    portal_link = (
+        request.build_absolute_uri(reverse("portal-home", kwargs={"token": portal_raw_token}))
+        if portal_raw_token and should_show_portal_link
+        else ""
+    )
 
     return render(
         request,
@@ -416,6 +437,7 @@ def clients_detail_view(request, pk: int):
             "portal_access_status_label": portal_status_meta[portal_access_status]["label"],
             "portal_access_status_badge_class": portal_status_meta[portal_access_status]["badge_class"],
             "portal_link": portal_link,
+            "portal_link_is_visible": should_show_portal_link and bool(portal_link),
             "open_renewal_request": open_renewal_request,
         },
     )
@@ -445,7 +467,10 @@ def client_action_view(request, pk: int, action: str):
     if request.method != "POST":
         return redirect("clients-detail", pk=client.id)
 
-    next_url = request.POST.get("next") or reverse("renewal-requests-list")
+    raw_next = (request.POST.get("next") or "").strip()
+    client_detail_url = reverse("clients-detail", pk=client.id)
+    next_url = _safe_next_url(request, client_detail_url)
+    renewal_next_url = _safe_next_url(request, reverse("renewal-requests-list"))
 
     try:
         success_message = "Действие выполнено"
@@ -471,7 +496,7 @@ def client_action_view(request, pk: int, action: str):
         elif action == "reissue":
             VPNClientService.reissue_config(client=client, actor=request.user)
         elif action == "portal_issue":
-            access, raw_token = PortalAccessService.issue_for_client(client)
+            access, _raw_token = PortalAccessService.issue_for_client(client)
             AuditLog.objects.create(
                 actor=request.user,
                 action="portal.access.issue",
@@ -479,16 +504,16 @@ def client_action_view(request, pk: int, action: str):
                 entity_id=str(client.id),
                 details={"portal_access_id": access.id},
             )
-            portal_link = request.build_absolute_uri(reverse("portal-home", kwargs={"token": raw_token}))
-            success_message = f"Ссылка кабинета выпущена: {portal_link}"
+            success_message = "Ссылка кабинета регенерирована."
+            next_url = _set_query_param(next_url, "show_portal_link", "1")
         elif action == "portal_show":
             raw_token = PortalAccessService.get_raw_token_for_client(client)
             if raw_token:
-                portal_link = request.build_absolute_uri(reverse("portal-home", kwargs={"token": raw_token}))
-                success_message = f"Текущая ссылка кабинета: {portal_link}"
+                success_message = "Ссылка кабинета показана."
+                next_url = _set_query_param(next_url, "show_portal_link", "1")
             else:
                 messages.warning(request, "Для клиента нет активной ссылки кабинета.")
-                return redirect("clients-detail", pk=client.id)
+                return redirect(client_detail_url)
         elif action == "renewal_set_status":
             renewal_request_id = request.POST.get("renewal_request_id")
             target_status = request.POST.get("target_status", "").strip()
@@ -501,7 +526,7 @@ def client_action_view(request, pk: int, action: str):
             }
             if target_status not in {choice[0] for choice in ClientRenewalRequest.Status.choices} and target_status != "extend_and_close":
                 messages.error(request, "Некорректный статус заявки.")
-                return redirect(next_url or "renewal-requests-list")
+                return redirect(renewal_next_url)
 
             current_status = request_obj.status
             operator_note = (request.POST.get("operator_note") or "").strip()
@@ -511,19 +536,19 @@ def client_action_view(request, pk: int, action: str):
             if target_status == "extend_and_close":
                 if current_status not in {ClientRenewalRequest.Status.NEW, ClientRenewalRequest.Status.IN_PROGRESS}:
                     messages.warning(request, "Продление доступно только для открытой заявки.")
-                    return redirect(next_url or "renewal-requests-list")
+                    return redirect(renewal_next_url)
 
                 if extension_days_raw:
                     if not extension_days_raw.isdigit():
                         messages.error(request, "Укажите число дней продления цифрами.")
-                        return redirect(next_url or "renewal-requests-list")
+                        return redirect(renewal_next_url)
                     extension_days = int(extension_days_raw)
                 else:
                     extension_days = DEFAULT_RENEWAL_EXTENSION_DAYS
 
                 if extension_days < 1 or extension_days > 365:
                     messages.error(request, "Число дней продления должно быть в диапазоне от 1 до 365.")
-                    return redirect(next_url or "renewal-requests-list")
+                    return redirect(renewal_next_url)
 
                 base_time = client.expires_at if client.expires_at and client.expires_at > timezone.now() else timezone.now()
                 client.expires_at = base_time + timedelta(days=extension_days)
@@ -551,11 +576,11 @@ def client_action_view(request, pk: int, action: str):
                     },
                 )
                 messages.success(request, f"Доступ клиента продлён на {extension_days} дней. Заявка закрыта.")
-                return redirect(next_url or "renewal-requests-list")
+                return redirect(renewal_next_url)
 
             if status_changed and target_status not in allowed_transitions.get(current_status, set()):
                 messages.warning(request, "Недопустимый переход статуса для этой заявки.")
-                return redirect(next_url or "renewal-requests-list")
+                return redirect(renewal_next_url)
 
             request_obj.operator_note = operator_note
             request_obj.processed_by = request.user
@@ -603,10 +628,12 @@ def client_action_view(request, pk: int, action: str):
     except Exception as exc:
         messages.error(request, f"Ошибка выполнения действия: {exc}")
 
+    if action == "renewal_set_status":
+        return redirect(renewal_next_url)
+    if action == "delete" and not raw_next:
+        return redirect("clients-list")
     if next_url:
         return redirect(next_url)
-    if action == "delete":
-        return redirect("clients-list")
     return redirect("clients-detail", pk=client.id)
 
 
