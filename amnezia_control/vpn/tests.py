@@ -1631,6 +1631,23 @@ class VPNClientAdminExportParityTest(TestCase):
         self.assertEqual(admin_response.content, portal_response.content)
         self.assertEqual(portal_access.client_id, self.vpn_client.id)
 
+    def test_target_specific_export_uses_different_generators(self):
+        from unittest.mock import patch
+
+        with patch("vpn.services.VPNClientService.portal_export_config", return_value="wg-config") as wg_mock:
+            with patch("vpn.services.VPNClientService.latest_config", return_value="vpn-config") as vpn_mock:
+                self.assertEqual(
+                    VPNClientService.portal_export_config_for_target(self.vpn_client, "amneziawg"),
+                    "wg-config",
+                )
+                self.assertEqual(
+                    VPNClientService.portal_export_config_for_target(self.vpn_client, "amneziavpn"),
+                    "vpn-config",
+                )
+
+        wg_mock.assert_called_once_with(self.vpn_client)
+        vpn_mock.assert_called_once_with(self.vpn_client)
+
 
 @override_settings(CONFIG_ENCRYPTION_KEY=Fernet.generate_key().decode())
 class VPNClientDegradedTelemetryWordingTest(TestCase):
@@ -1788,6 +1805,7 @@ class VPNClientPortalAdminAndRenewalVisibilityTest(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Открыть кабинет")
         self.assertContains(response, "Ссылка кабинета ещё не выпущена.")
+        self.assertNotContains(response, "••••••••")
 
     def test_portal_show_redirects_back_to_client_detail_and_reveals_link_inline(self):
         _, token = PortalAccessService.issue_for_client(self.client_with_renewal)

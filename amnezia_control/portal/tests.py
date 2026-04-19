@@ -52,10 +52,10 @@ class PortalFlowTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, self.client_obj.name)
-        self.assertContains(response, "Скачать конфигурацию для AmneziaWG")
-        self.assertContains(response, "Скачать конфигурацию для AmneziaVPN")
-        self.assertContains(response, "Открыть QR-код для AmneziaWG")
-        self.assertContains(response, "Открыть QR-код для AmneziaVPN")
+        self.assertContains(response, "AmneziaWG")
+        self.assertContains(response, "AmneziaVPN")
+        self.assertContains(response, "Выберите приложение, которым вы пользуетесь")
+        self.assertContains(response, "QR-код удобен для быстрого импорта на телефоне")
 
     def test_revoked_token_is_denied(self):
         token = self._issue_token()

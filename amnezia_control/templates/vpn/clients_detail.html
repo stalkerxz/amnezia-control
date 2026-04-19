@@ -210,17 +210,22 @@
         <div class="small text-secondary mb-2">Действует до: {% if portal_access.expires_at %}{{ portal_access.expires_at|date:'d.m.Y H:i' }}{% else %}не ограничено{% endif %}</div>
         {% endif %}
         {% if portal_link_exists %}
+        {% if portal_link_is_visible %}
+        <div class="small text-secondary mb-1">Ссылка кабинета</div>
         <div class="input-group input-group-sm mb-2">
-          <input class="form-control" type="text" readonly value="{% if portal_link_is_visible %}{{ portal_link }}{% else %}••••••••••••••••••••••••••••••{% endif %}">
+          <input class="form-control" type="text" readonly value="{{ portal_link }}">
           <button class="btn btn-outline-secondary js-copy" type="button" data-copy="{{ portal_link }}" {% if not portal_access_enabled %}disabled{% endif %}>Скопировать ссылку</button>
         </div>
+        {% else %}
+        <div class="small text-secondary mb-2">Ссылка скрыта для безопасного отображения.</div>
+        {% endif %}
         {% if request.GET.portal_updated == '1' %}
         <div class="small text-success mb-2">Ссылка обновлена.</div>
         {% endif %}
         {% endif %}
-        <div class="action-cluster align-items-center">
+        <div class="action-cluster align-items-center mb-1">
           <form method="post" action="/clients/{{ client.id }}/action/portal_open/" target="_blank">{% csrf_token %}<button class="btn btn-primary">Открыть кабинет</button></form>
-          <form method="post" action="/clients/{{ client.id }}/action/portal_show/">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><button class="btn btn-outline-secondary" {% if not portal_link_exists %}disabled{% endif %}>Показать ссылку</button></form>
+          <button class="btn btn-outline-secondary js-copy" type="button" data-copy="{{ portal_link }}" {% if not portal_access_enabled %}disabled{% endif %}>Скопировать ссылку</button>
           <form method="post" action="/clients/{{ client.id }}/action/portal_issue/">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><button class="btn btn-outline-primary">Регенерировать</button></form>
           {% if portal_access_enabled %}
           <form method="post" action="/clients/{{ client.id }}/action/portal_revoke/">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><button class="btn btn-outline-danger">Отозвать</button></form>
@@ -228,6 +233,9 @@
           <button class="btn btn-outline-danger" disabled>Отозвать</button>
           {% endif %}
         </div>
+        {% if portal_link_exists and not portal_link_is_visible %}
+        <form method="post" action="/clients/{{ client.id }}/action/portal_show/">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><button class="btn btn-link btn-sm p-0 text-secondary">Показать ссылку</button></form>
+        {% endif %}
       </div>
     </section>
 
