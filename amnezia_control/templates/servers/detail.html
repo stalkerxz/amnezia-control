@@ -19,57 +19,21 @@
   </div>
 </div>
 
-<div class="row g-2 mb-3">
-  <div class="col-xl-2 col-md-4">
-    <div class="card stat-card metric-card stat-card-compact h-100">
-      <div class="card-body">
-        <div class="stat-label">Сервер</div>
-        <div class="stat-value">{{ server.name }}</div>
-      </div>
+<section class="section-block section-flat section-quiet mb-3">
+  <div class="section-body py-2">
+    <div class="summary-strip summary-strip-compact">
+      <div class="summary-item span-2"><div class="label">Сервер</div><div class="value">{{ server.name }}</div></div>
+      <div class="summary-item span-3"><div class="label">Публичный endpoint</div><div class="value"><code>{{ endpoint_display }}</code></div></div>
+      <div class="summary-item span-2"><div class="label">Протоколы</div><div class="value">{{ ready_protocols }} / {{ total_protocols }}</div></div>
+      <div class="summary-item span-3"><div class="label">Синхронизация runtime</div><div class="value">{{ server.last_runtime_sync_at|date:'d.m.Y H:i'|default:'—' }}</div></div>
+      <div class="summary-item span-2"><div class="label">Состояние</div><div class="value"><span class="badge status-badge {% if server.health_status == 'healthy' %}status-success{% elif server.health_status == 'degraded' %}status-warning{% elif server.health_status == 'unhealthy' %}status-danger{% else %}status-neutral{% endif %}">{{ server_health_label }}</span></div></div>
     </div>
   </div>
-  <div class="col-xl-3 col-md-4">
-    <div class="card stat-card metric-card stat-card-compact h-100">
-      <div class="card-body">
-        <div class="stat-label">Публичный endpoint</div>
-        <div class="stat-value"><code>{{ endpoint_display }}</code></div>
-      </div>
-    </div>
-  </div>
-  <div class="col-xl-3 col-md-4">
-    <div class="card stat-card metric-card stat-card-compact h-100">
-      <div class="card-body">
-        <div class="stat-label">Протоколы / контейнеры</div>
-        <div>
-          <span class="badge status-badge status-success">{{ ready_protocols }} готово</span>
-          <span class="badge status-badge status-neutral">из {{ total_protocols }}</span>
-        </div>
-      </div>
-    </div>
-  </div>
-  <div class="col-xl-2 col-md-6">
-    <div class="card stat-card metric-card stat-card-compact h-100">
-      <div class="card-body">
-        <div class="stat-label">Синхронизация runtime</div>
-        <div class="stat-value">{{ server.last_runtime_sync_at|date:'d.m.Y H:i'|default:'—' }}</div>
-      </div>
-    </div>
-  </div>
-  <div class="col-xl-2 col-md-6">
-    <div class="card stat-card metric-card stat-card-compact h-100">
-      <div class="card-body">
-        <div class="stat-label">Состояние проверки</div>
-        <span class="badge status-badge {% if server.health_status == 'healthy' %}status-success{% elif server.health_status == 'degraded' %}status-warning{% elif server.health_status == 'unhealthy' %}status-danger{% else %}status-neutral{% endif %}">
-          {{ server_health_label }}
-        </span>
-      </div>
-    </div>
-  </div>
-</div>
+</section>
 
-<div class="card panel-card mb-3">
-  <div class="card-body">
-    <h2 class="h6 mb-2">Почему такой статус здоровья</h2>
+<div class="section-block section-flat mb-3">
+  <div class="section-body">
+    <h2 class="h6 mb-2">Операторский контекст и действия</h2>
     <ul class="small text-secondary mb-3">
       {% for reason in server_health_reasons %}
       <li>{{ reason }}</li>
@@ -77,8 +41,7 @@
       <li>Нет данных о проверке. Запустите синхронизацию runtime.</li>
       {% endfor %}
     </ul>
-    <h2 class="h6 mb-3">Ключевые действия оператора</h2>
-    <div class="d-flex flex-wrap gap-2 mb-3 action-toolbar p-2">
+    <div class="d-flex flex-wrap gap-2 mb-3">
       <form method="post" action="{% url 'servers-sync-runtime' pk=server.id %}">
         {% csrf_token %}
         <button class="btn btn-primary btn-sm">1. Проверить состояние runtime</button>
@@ -103,14 +66,14 @@
   </div>
 </div>
 
-<div class="card panel-card mb-3">
-  <div class="card-body">
+<div class="section-block section-flat mb-2">
+  <div class="section-body py-2">
     <h2 class="h6 mb-2">Диагностика протоколов и готовности</h2>
     <p class="text-secondary mb-0">Отслеживайте подсеть, endpoint и ключи AWG/AWG2 перед рабочими действиями.</p>
   </div>
 </div>
 
-<div class="table-responsive card table-shell p-2">
+<div class="table-responsive section-block table-shell p-2 diagnostics-table-shell">
   <table class="table table-hover align-middle mb-0">
     <thead>
       <tr>
