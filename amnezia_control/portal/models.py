@@ -46,6 +46,7 @@ class ClientRenewalRequest(models.Model):
     operator_note = models.TextField(blank=True)
     created_from_portal = models.BooleanField(default=True)
     attachment = models.FileField(upload_to=renewal_attachment_upload_to, null=True, blank=True)
+    attachment_original_name = models.CharField(max_length=255, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     processed_at = models.DateTimeField(null=True, blank=True)
@@ -75,3 +76,11 @@ class ClientRenewalRequest(models.Model):
     @property
     def is_open(self) -> bool:
         return self.status in {self.Status.NEW, self.Status.IN_PROGRESS}
+
+    @property
+    def attachment_display_name(self) -> str:
+        if self.attachment_original_name:
+            return self.attachment_original_name
+        if self.attachment:
+            return Path(self.attachment.name).name
+        return ""

@@ -19,7 +19,7 @@ class PortalRenewalRequestForm(forms.Form):
     attachment = forms.FileField(
         required=False,
         label="Файл",
-        help_text="При необходимости приложите JPG/JPEG или PDF (до 5 МБ).",
+        help_text="Форматы: JPG/JPEG/PDF. Максимальный размер файла: 5 МБ.",
     )
 
     def __init__(self, *args, **kwargs):
@@ -41,6 +41,9 @@ class PortalRenewalRequestForm(forms.Form):
             raise ValidationError("Файл слишком большой. Максимальный размер — 5 МБ.")
 
         content_type = (getattr(attachment, "content_type", "") or "").lower()
+        # Некоторые браузеры/прокси для неизвестного файла отдают общий тип
+        # application/octet-stream — в этом случае полагаемся на расширение
+        # и сигнатуру файла ниже.
         if content_type and content_type not in self.ALLOWED_CONTENT_TYPES:
             raise ValidationError("Неверный тип файла. Допустимы только JPG/JPEG или PDF.")
 

@@ -2257,11 +2257,15 @@ class VPNClientPortalAdminAndRenewalVisibilityTest(TestCase):
             client=self.client_with_renewal,
             status=ClientRenewalRequest.Status.NEW,
             attachment=SimpleUploadedFile("evidence.pdf", b"%PDF-1.4\n1 0 obj\n<<>>\nendobj\n", content_type="application/pdf"),
+            attachment_original_name="evidence.pdf",
         )
         list_response = self.client.get("/clients/renewal-requests/")
         detail_response = self.client.get(f"/clients/{self.client_with_renewal.id}/")
 
+        self.assertContains(list_response, "Есть файл")
+        self.assertContains(list_response, "evidence.pdf")
         self.assertContains(list_response, "Открыть файл")
+        self.assertContains(detail_response, "evidence.pdf")
         self.assertContains(detail_response, "Вложение:")
 
         download_response = self.client.get(f"/clients/renewal-requests/{request_obj.id}/attachment/")

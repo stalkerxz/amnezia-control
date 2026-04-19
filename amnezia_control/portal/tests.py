@@ -179,6 +179,20 @@ class PortalFlowTests(TestCase):
         self.assertContains(response, "Допустимы только файлы JPG, JPEG или PDF.")
         self.assertEqual(ClientRenewalRequest.objects.filter(client=self.client_obj).count(), 0)
 
+    def test_renewal_request_rejects_oversized_attachment(self):
+        token = self._issue_token()
+        payload = b"%PDF-1.4\n" + (b"A" * (5 * 1024 * 1024 + 1))
+        huge_pdf = SimpleUploadedFile("too-large.pdf", payload, content_type="application/pdf")
+
+        response = self.client.post(
+            reverse("portal-request-renewal", kwargs={"token": token}),
+            {"attachment": huge_pdf},
+            follow=True,
+        )
+
+        self.assertContains(response, "Файл слишком большой. Максимальный размер — 5 МБ.")
+        self.assertEqual(ClientRenewalRequest.objects.filter(client=self.client_obj).count(), 0)
+
     def test_repeated_renewal_request_does_not_create_duplicate_open_requests(self):
         token = self._issue_token()
 
@@ -191,6 +205,27 @@ class PortalFlowTests(TestCase):
         )
         self.assertEqual(ClientRenewalRequest.objects.filter(client=self.client_obj, status="new").count(), 1)
         self.assertContains(response, "Заявка уже отправлена")
+
+    def test_repeated_submission_with_new_attachment_does_not_replace_existing_open_attachment(self):
+        token = self._issue_token()
+        old_pdf = SimpleUploadedFile("first.pdf", b"%PDF-1.4\n1 0 obj\n<<>>\nendobj\n", content_type="application/pdf")
+        self.client.post(reverse("portal-request-renewal", kwargs={"token": token}), {"attachment": old_pdf}, follow=True)
+        request_obj = ClientRenewalRequest.objects.get(client=self.client_obj, status=ClientRenewalRequest.Status.NEW)
+        old_storage_name = request_obj.attachment.name
+        self.assertEqual(request_obj.attachment_original_name, "first.pdf")
+
+        new_pdf = SimpleUploadedFile("second.pdf", b"%PDF-1.4\n2 0 obj\n<<>>\nendobj\n", content_type="application/pdf")
+        response = self.client.post(
+            reverse("portal-request-renewal", kwargs={"token": token}),
+            {"attachment": new_pdf},
+            follow=True,
+        )
+
+        request_obj.refresh_from_db()
+        self.assertEqual(request_obj.attachment.name, old_storage_name)
+        self.assertEqual(request_obj.attachment_original_name, "first.pdf")
+        self.assertContains(response, "новый файл не заменяет существующий")
+        self.assertContains(response, "first.pdf")
 
 
     def test_new_request_can_be_created_after_done(self):

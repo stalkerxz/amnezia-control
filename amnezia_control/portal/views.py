@@ -302,9 +302,20 @@ def portal_request_renewal_view(request, token: str):
         messages.success(request, "Заявка на продление отправлена. Мы уже передали её оператору.")
     else:
         if open_request.status == ClientRenewalRequest.Status.NEW:
-            messages.info(request, "Заявка уже отправлена и ожидает обработки.")
+            base_message = "Заявка уже отправлена и ожидает обработки."
         else:
-            messages.info(request, "Заявка уже в работе у оператора.")
+            base_message = "Заявка уже в работе у оператора."
+
+        submitted_attachment = form.cleaned_data.get("attachment")
+        if submitted_attachment and open_request.attachment:
+            messages.info(
+                request,
+                f"{base_message} В текущей заявке уже есть файл «{open_request.attachment_display_name}», новый файл не заменяет существующий.",
+            )
+        elif submitted_attachment and not open_request.attachment:
+            messages.info(request, f"{base_message} Файл «{submitted_attachment.name}» добавлен к текущей заявке.")
+        else:
+            messages.info(request, base_message)
 
     return redirect("portal-home", token=token)
 

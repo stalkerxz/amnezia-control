@@ -146,7 +146,8 @@ class RenewalRequestService:
                 request_obj.save(update_fields=["note", "updated_at"])
             if attachment and not request_obj.attachment:
                 request_obj.attachment = attachment
-                request_obj.save(update_fields=["attachment", "updated_at"])
+                request_obj.attachment_original_name = (attachment.name or "")[:255]
+                request_obj.save(update_fields=["attachment", "attachment_original_name", "updated_at"])
             return request_obj, False
 
         request_obj = ClientRenewalRequest.objects.create(
@@ -155,6 +156,7 @@ class RenewalRequestService:
             note=note,
             created_from_portal=True,
             attachment=attachment,
+            attachment_original_name=((attachment.name or "")[:255] if attachment else ""),
         )
         return request_obj, True
 

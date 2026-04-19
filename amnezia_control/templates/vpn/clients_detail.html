@@ -205,6 +205,9 @@
           Сейчас ссылка скрыта.
           {% endif %}
         </div>
+        {% if not portal_access_enabled %}
+        <div class="alert alert-secondary py-2 mb-2">Доступ в кабинет сейчас неактивен. Кнопка «Открыть кабинет» недоступна до явной регенерации.</div>
+        {% endif %}
         {% if portal_access %}
         <div class="small text-secondary mb-1">Последний доступ: {% if portal_access.last_access_at %}{{ portal_access.last_access_at|date:'d.m.Y H:i' }}{% else %}ещё не открывали{% endif %}</div>
         <div class="small text-secondary mb-2">Действует до: {% if portal_access.expires_at %}{{ portal_access.expires_at|date:'d.m.Y H:i' }}{% else %}не ограничено{% endif %}</div>
@@ -248,7 +251,7 @@
         <div class="small text-secondary mb-1">Статус: <span class="badge status-badge {% if open_renewal_request.status == 'new' %}status-warning{% else %}status-info{% endif %}">{{ open_renewal_request.get_status_display }}</span></div>
         <div class="small text-secondary mb-1">Создана: {{ open_renewal_request.created_at|date:'d.m.Y H:i' }}</div>
         {% if open_renewal_request.attachment %}
-        <div class="small text-secondary mb-1">Вложение: <a href="{% url 'renewal-request-attachment-download' open_renewal_request.id %}" target="_blank">Открыть файл</a></div>
+        <div class="small text-secondary mb-1">Вложение: <a href="{% url 'renewal-request-attachment-download' open_renewal_request.id %}" target="_blank">Открыть файл</a> · {{ open_renewal_request.attachment_display_name }}</div>
         {% endif %}
         <div class="small text-secondary">{% if open_renewal_request.operator_note %}Комментарий: {{ open_renewal_request.operator_note }}{% else %}Комментарий оператора пока не добавлен.{% endif %}</div>
       </div>
