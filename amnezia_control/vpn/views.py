@@ -465,7 +465,7 @@ def client_action_view(request, pk: int, action: str):
         return redirect("clients-detail", pk=client.id)
 
     raw_next = (request.POST.get("next") or "").strip()
-    client_detail_url = reverse("clients-detail", pk=client.id)
+    client_detail_url = reverse("clients-detail", kwargs={"pk": client.id})
     next_url = _safe_next_url(request, client_detail_url)
     renewal_next_url = _safe_next_url(request, reverse("renewal-requests-list"))
 
