@@ -1,11 +1,12 @@
 {% extends 'partials/base.html' %}
-{% block title %}QR · {{ client.name }}{% endblock %}
+{% block title %}QR · {{ target_label }} · {{ client.name }}{% endblock %}
 {% block content %}
 <div class="container px-0" style="max-width: 560px;">
   <a href="/portal/{{ token }}/" class="btn btn-link ps-0">← Назад в кабинет</a>
   <div class="card panel-card">
     <div class="card-body text-center">
-      <h1 class="h5 mb-3">QR для {{ client.name }}</h1>
+      <h1 class="h5 mb-1">QR-код для {{ target_label }}</h1>
+      <div class="small text-secondary mb-2">{{ client.name }}</div>
       {% if access.expires_at %}<p class="small text-secondary">Ссылка действует до {{ access.expires_at|date:'d.m.Y H:i' }}</p>{% endif %}
       {% if qr_base64 %}
       <img src="data:image/png;base64,{{ qr_base64 }}" alt="QR" class="img-fluid img-thumbnail" style="max-width: 320px;">

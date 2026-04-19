@@ -52,6 +52,10 @@ class PortalFlowTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, self.client_obj.name)
+        self.assertContains(response, "AmneziaWG")
+        self.assertContains(response, "AmneziaVPN")
+        self.assertContains(response, "Выберите приложение, которым вы пользуетесь")
+        self.assertContains(response, "QR-код удобен для быстрого импорта на телефоне")
 
     def test_revoked_token_is_denied(self):
         token = self._issue_token()
@@ -80,24 +84,43 @@ class PortalFlowTests(TestCase):
         config_text = "[Interface]\nPrivateKey = test"
         VPNClientService._store_revision(self.client_obj, config_text)
 
-        with patch("portal.views.VPNClientService.portal_export_config", return_value="native-export-config") as export_mock:
+        with patch("portal.views.VPNClientService.portal_export_config_for_target", return_value="native-export-config") as export_mock:
             response = self.client.get(reverse("portal-config", kwargs={"token": token}))
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "native-export-config")
-        export_mock.assert_called_once_with(self.client_obj)
+        export_mock.assert_called_once_with(self.client_obj, "amneziawg")
 
     def test_portal_qr_uses_portal_export_payload(self):
         from unittest.mock import patch
 
         token = self._issue_token()
         VPNClientService._store_revision(self.client_obj, "[Interface]\nPrivateKey = test")
-        with patch("portal.views.VPNClientService.portal_qr_png_base64", return_value="base64-qr") as qr_mock:
+        with patch("portal.views.VPNClientService.portal_qr_png_base64_for_target", return_value="base64-qr") as qr_mock:
             response = self.client.get(reverse("portal-qr", kwargs={"token": token}))
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "base64-qr")
-        qr_mock.assert_called_once_with(self.client_obj)
+        qr_mock.assert_called_once_with(self.client_obj, "amneziawg")
+
+    def test_portal_target_specific_actions_use_selected_target(self):
+        token = self._issue_token()
+        VPNClientService._store_revision(self.client_obj, "[Interface]\nPrivateKey = native")
+
+        with self.subTest("amneziavpn config"):
+            response = self.client.get(reverse("portal-config", kwargs={"token": token}), {"target": "amneziavpn"})
+            self.assertEqual(response.status_code, 200)
+            self.assertIn("amneziavpn.conf", response["Content-Disposition"])
+
+        with self.subTest("amneziawg config"):
+            response = self.client.get(reverse("portal-config", kwargs={"token": token}), {"target": "amneziawg"})
+            self.assertEqual(response.status_code, 200)
+            self.assertIn("amneziawg.conf", response["Content-Disposition"])
+
+        with self.subTest("target exposed on qr page"):
+            response = self.client.get(reverse("portal-qr", kwargs={"token": token}), {"target": "amneziavpn"})
+            self.assertEqual(response.status_code, 200)
+            self.assertContains(response, "QR-код для AmneziaVPN")
 
     def test_renewal_request_creates_workflow_request_and_audit_entry(self):
         token = self._issue_token()

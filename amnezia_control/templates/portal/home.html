@@ -6,13 +6,37 @@
     <div>
       <p class="page-kicker">Кабинет клиента</p>
       <h1 class="h3 mb-0">{{ client.name }}</h1>
-      <p class="page-subtle">Быстрый доступ к конфигурации, статусу подключения и действиям по обслуживанию.</p>
-    </div>
-    <div class="action-cluster">
-      <a href="/portal/{{ token }}/config/" class="btn btn-primary">Скачать конфигурацию</a>
-      <a href="/portal/{{ token }}/qr/" class="btn btn-outline-primary">QR-код</a>
+      <p class="page-subtle">Подключите клиента за 2 шага: выберите приложение и импортируйте конфигурацию или QR-код.</p>
     </div>
   </div>
+
+  <section class="portal-section mt-2">
+    <div class="section-body">
+      <div class="section-header"><h2 class="h6 mb-0">Подключение</h2></div>
+      <p class="small text-secondary mb-1">Выберите приложение, которым вы пользуетесь: AmneziaWG или AmneziaVPN.</p>
+      <p class="small text-secondary mb-2">QR-код удобен для быстрого импорта на телефоне, файл конфигурации — для ручного импорта или сохранения.</p>
+      <div class="row g-2">
+        <div class="col-lg-6">
+          <div class="border rounded-3 p-2 h-100">
+            <div class="fw-semibold mb-2">AmneziaWG</div>
+            <div class="action-cluster">
+              <a href="/portal/{{ token }}/config/?target=amneziawg" class="btn btn-primary">Скачать конфигурацию</a>
+              <a href="/portal/{{ token }}/qr/?target=amneziawg" class="btn btn-outline-secondary">Открыть QR-код</a>
+            </div>
+          </div>
+        </div>
+        <div class="col-lg-6">
+          <div class="border rounded-3 p-2 h-100">
+            <div class="fw-semibold mb-2">AmneziaVPN</div>
+            <div class="action-cluster">
+              <a href="/portal/{{ token }}/config/?target=amneziavpn" class="btn btn-primary">Скачать конфигурацию</a>
+              <a href="/portal/{{ token }}/qr/?target=amneziavpn" class="btn btn-outline-secondary">Открыть QR-код</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
 
   <section class="portal-section">
     <div class="section-body">

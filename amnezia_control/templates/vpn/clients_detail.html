@@ -193,21 +193,39 @@
       <div class="section-body">
         <div class="section-header"><h2 class="h6">Кабинет клиента</h2></div>
         <div class="small text-secondary mb-2">Статус доступа: <span class="badge status-badge {{ portal_access_status_badge_class }}">{{ portal_access_status_label }}</span></div>
+        <div class="small text-secondary mb-2">
+          {% if portal_link_exists %}
+          Ссылка кабинета выпущена.
+          {% else %}
+          Ссылка кабинета ещё не выпущена.
+          {% endif %}
+          {% if portal_link_is_visible %}
+          Сейчас ссылка показана.
+          {% elif portal_link_exists %}
+          Сейчас ссылка скрыта.
+          {% endif %}
+        </div>
         {% if portal_access %}
         <div class="small text-secondary mb-1">Последний доступ: {% if portal_access.last_access_at %}{{ portal_access.last_access_at|date:'d.m.Y H:i' }}{% else %}ещё не открывали{% endif %}</div>
         <div class="small text-secondary mb-2">Действует до: {% if portal_access.expires_at %}{{ portal_access.expires_at|date:'d.m.Y H:i' }}{% else %}не ограничено{% endif %}</div>
         {% endif %}
-        {% if portal_link_is_visible and portal_link %}
-        <div class="small text-secondary mb-1">Текущая ссылка кабинета</div>
+        {% if portal_link_exists %}
+        {% if portal_link_is_visible %}
+        <div class="small text-secondary mb-1">Ссылка кабинета</div>
         <div class="input-group input-group-sm mb-2">
           <input class="form-control" type="text" readonly value="{{ portal_link }}">
-          <button class="btn btn-outline-secondary js-copy" type="button" data-copy="{{ portal_link }}">Копировать</button>
+          <button class="btn btn-outline-secondary js-copy" type="button" data-copy="{{ portal_link }}" {% if not portal_access_enabled %}disabled{% endif %}>Скопировать ссылку</button>
         </div>
-        {% elif portal_access_enabled %}
-        <div class="small text-secondary mb-2">Ссылка скрыта. Нажмите «Показать ссылку» для отображения.</div>
+        {% else %}
+        <div class="small text-secondary mb-2">Ссылка скрыта для безопасного отображения.</div>
         {% endif %}
-        <div class="action-cluster align-items-center">
-          <form method="post" action="/clients/{{ client.id }}/action/portal_show/">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><button class="btn btn-outline-secondary" {% if not portal_access_enabled %}disabled{% endif %}>Показать ссылку</button></form>
+        {% if request.GET.portal_updated == '1' %}
+        <div class="small text-success mb-2">Ссылка обновлена.</div>
+        {% endif %}
+        {% endif %}
+        <div class="action-cluster align-items-center mb-1">
+          <form method="post" action="/clients/{{ client.id }}/action/portal_open/" target="_blank">{% csrf_token %}<button class="btn btn-primary">Открыть кабинет</button></form>
+          <button class="btn btn-outline-secondary js-copy" type="button" data-copy="{{ portal_link }}" {% if not portal_access_enabled %}disabled{% endif %}>Скопировать ссылку</button>
           <form method="post" action="/clients/{{ client.id }}/action/portal_issue/">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><button class="btn btn-outline-primary">Регенерировать</button></form>
           {% if portal_access_enabled %}
           <form method="post" action="/clients/{{ client.id }}/action/portal_revoke/">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><button class="btn btn-outline-danger">Отозвать</button></form>
@@ -215,6 +233,9 @@
           <button class="btn btn-outline-danger" disabled>Отозвать</button>
           {% endif %}
         </div>
+        {% if portal_link_exists and not portal_link_is_visible %}
+        <form method="post" action="/clients/{{ client.id }}/action/portal_show/">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><button class="btn btn-link btn-sm p-0 text-secondary">Показать ссылку</button></form>
+        {% endif %}
       </div>
     </section>
 

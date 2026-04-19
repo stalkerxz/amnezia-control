@@ -14,6 +14,13 @@ from vpn.services import VPNClientService
 from .models import ClientRenewalRequest
 from .services import PortalAccessService, PortalReissuePolicyService, PortalResolveReason, RenewalRequestService
 
+PORTAL_TARGET_AMNEZIAWG = "amneziawg"
+PORTAL_TARGET_AMNEZIAVPN = "amneziavpn"
+PORTAL_TARGETS = {
+    PORTAL_TARGET_AMNEZIAWG: {"label": "AmneziaWG", "suffix": "amneziawg"},
+    PORTAL_TARGET_AMNEZIAVPN: {"label": "AmneziaVPN", "suffix": "amneziavpn"},
+}
+
 
 def _fmt_bytes(value: int | None):
     if value is None:
@@ -220,9 +227,15 @@ def portal_download_config_view(request, token: str):
         messages.warning(request, "Конфигурация ещё не выпущена оператором.")
         return redirect("portal-home", token=token)
 
-    config = VPNClientService.portal_export_config(client)
+    target = request.GET.get("target", PORTAL_TARGET_AMNEZIAWG).strip().lower()
+    if target not in PORTAL_TARGETS:
+        target = PORTAL_TARGET_AMNEZIAWG
+
+    config = VPNClientService.portal_export_config_for_target(client, target)
     response = HttpResponse(config, content_type="text/plain; charset=utf-8")
-    response["Content-Disposition"] = f'attachment; filename="{client.name}-{client.protocol_type}-amneziawg.conf"'
+    response["Content-Disposition"] = (
+        f'attachment; filename="{client.name}-{client.protocol_type}-{PORTAL_TARGETS[target]["suffix"]}.conf"'
+    )
     return response
 
 
@@ -233,8 +246,22 @@ def portal_qr_view(request, token: str):
         return error_response
 
     client = access.client
-    qr_base64 = VPNClientService.portal_qr_png_base64(client) if client.revisions.exists() else ""
-    return render(request, "portal/qr.html", {"token": token, "client": client, "qr_base64": qr_base64, "access": access})
+    target = request.GET.get("target", PORTAL_TARGET_AMNEZIAWG).strip().lower()
+    if target not in PORTAL_TARGETS:
+        target = PORTAL_TARGET_AMNEZIAWG
+    qr_base64 = VPNClientService.portal_qr_png_base64_for_target(client, target) if client.revisions.exists() else ""
+    return render(
+        request,
+        "portal/qr.html",
+        {
+            "token": token,
+            "client": client,
+            "qr_base64": qr_base64,
+            "access": access,
+            "target": target,
+            "target_label": PORTAL_TARGETS[target]["label"],
+        },
+    )
 
 
 @require_http_methods(["POST"])
