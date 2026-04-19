@@ -252,9 +252,9 @@ def settings_view(request):
     app_version = os.getenv("APP_VERSION") or os.getenv("RELEASE") or os.getenv("GIT_SHA") or "unknown"
     context = {
         "form": form,
-        "limits_enforce_every_minutes": settings.LIMITS_ENFORCE_EVERY_MINUTES,
-        "timezone_name": settings.TIME_ZONE,
-        "debug_enabled": settings.DEBUG,
+        "limits_enforce_every_minutes": getattr(settings, "LIMITS_ENFORCE_EVERY_MINUTES", "—"),
+        "timezone_name": getattr(settings, "TIME_ZONE", "UTC"),
+        "debug_enabled": bool(getattr(settings, "DEBUG", False)),
         "app_version": app_version,
         "python_version": os.sys.version.split(" ")[0],
     }

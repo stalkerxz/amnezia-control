@@ -8,9 +8,9 @@
   </div>
 </div>
 
-<section class="section-block section-quiet">
-  <div class="section-body">
-    <div class="summary-strip">
+<section class="section-block section-flat section-quiet">
+  <div class="section-body py-2">
+    <div class="summary-strip summary-strip-compact">
       <div class="summary-item span-3"><div class="label">Всего в фильтре</div><div class="value">{{ request_rows|length }}</div></div>
       <div class="summary-item span-3"><div class="label">Новые</div><div class="meta">приоритет на обработку</div></div>
       <div class="summary-item span-3"><div class="label">В работе</div><div class="meta">назначенные оператору</div></div>
@@ -19,8 +19,8 @@
   </div>
 </section>
 
-<form method="get" class="section-block">
-  <div class="section-body">
+<form method="get" class="section-block section-flat filter-toolbar">
+  <div class="section-body py-2">
     <div class="section-header-compact"><h2 class="h6">Фильтр очереди</h2></div>
     <div class="filters-row">
       <div class="field">
@@ -63,7 +63,8 @@
   </div>
 </form>
 
-<div class="table-responsive section-block table-shell renewal-table-shell">
+{% if request_rows %}
+<div class="table-responsive section-block section-flat table-shell renewal-table-shell">
   <table class="table table-hover align-middle mb-0 renewal-table">
     <thead>
       <tr>
@@ -126,10 +127,18 @@
           </div>
         </td>
       </tr>
-      {% empty %}
-      <tr><td colspan="8"><div class="empty-state">Заявок по выбранному фильтру нет.</div></td></tr>
       {% endfor %}
     </tbody>
   </table>
 </div>
+{% else %}
+<section class="section-block section-flat">
+  <div class="section-body py-3">
+    <div class="empty-state compact-empty">
+      <h2 class="h6 mb-1">Очередь пуста</h2>
+      <p class="mb-0">По выбранному фильтру заявок нет. Попробуйте статус «Все» или снимите фильтр по оператору/серверу.</p>
+    </div>
+  </div>
+</section>
+{% endif %}
 {% endblock %}
