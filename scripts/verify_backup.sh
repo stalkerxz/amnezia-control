@@ -14,7 +14,7 @@ USAGE
 BACKUP_DIR="$1"
 [ -d "$BACKUP_DIR" ] || fail "backup directory not found: $BACKUP_DIR"
 
-for f in postgres.sql.gz media.tar.gz .env SHA256SUMS; do
+for f in postgres.sql.gz media.tar.gz .env SHA256SUMS meta.txt; do
   [ -f "$BACKUP_DIR/$f" ] || fail "missing required file: $BACKUP_DIR/$f"
 done
 

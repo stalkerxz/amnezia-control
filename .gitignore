@@ -12,6 +12,5 @@ backups/
 
 # backup/restore artifacts
 backups/runs/
-*.tar.gz
-*.tmp
-SHA256SUMS
+backups/runs/**/SHA256SUMS
+backups/runs/**/*.tar.gz
