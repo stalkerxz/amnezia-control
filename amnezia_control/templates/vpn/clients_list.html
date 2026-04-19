@@ -135,32 +135,32 @@
         <td class="text-muted">#{{ c.id }}</td>
         <td class="table-primary-cell">
           <a href="/clients/{{ c.id }}/" class="primary text-decoration-none d-block">{{ c.name }}</a>
-          <div class="meta-strip meta-strip-primary">
+          <div class="meta-strip meta-strip-primary meta-strip-muted">
             <span class="badge badge-soft {% if c.protocol_type == 'awg2' %}badge-protocol-awg2{% else %}badge-protocol-awg{% endif %}">{{ c.protocol_type|upper }}</span>
             <span class="badge status-badge {% if c.status == 'active' %}status-success{% elif c.status == 'disabled' %}status-warning{% else %}status-danger{% endif %}">{{ c.get_status_display }}</span>
             {% if c.limit_state == 'expired' or c.limit_state == 'traffic_exceeded' %}
             <span class="badge {{ row.limit_badge_class }}">{{ row.limit_badge_label }}</span>
             {% endif %}
-            {% if row.has_recent_renewal_request %}<a class="badge status-badge status-warning text-decoration-none" href="/clients/renewal-requests/">Продление</a>{% endif %}
+            {% if row.has_recent_renewal_request %}<a class="badge status-badge badge-renewal-soft text-decoration-none" href="/clients/renewal-requests/">Продление</a>{% endif %}
           </div>
-          <div class="meta">Лимиты: {{ row.limit_badge_label }}{% if row.telemetry.badge_label %} · {{ row.telemetry.badge_label }}{% endif %}</div>
-          {% if row.last_renewal_request_at %}<div class="meta">Последняя заявка: {{ row.last_renewal_request_at|date:'d.m.Y H:i' }}</div>{% endif %}
+          {% if row.telemetry.badge_label %}<div class="meta table-meta-quiet">{{ row.telemetry.badge_label }}</div>{% endif %}
+          {% if row.last_renewal_request_at %}<div class="meta table-meta-quiet">Заявка: {{ row.last_renewal_request_at|date:'d.m.Y H:i' }}</div>{% endif %}
         </td>
         <td>{{ c.server.name|default:'—' }}</td>
         <td>{{ row.expires_display }}</td>
-        <td>{% if c.imported_from_runtime %}<span class="badge status-badge status-info">Импорт</span>{% else %}<span class="badge status-badge status-neutral">Панель</span>{% endif %}</td>
-        <td><div class="small">{% if c.created_by %}{{ c.created_by.username }}{% else %}<span class="text-secondary">система</span>{% endif %}</div><div class="small text-secondary opacity-75">{% if row.latest_audit_log %}{{ row.latest_audit_log.created_at|date:'d.m.Y H:i' }}{% else %}без аудита{% endif %}</div></td>
-        <td><code>{{ row.runtime_address_display }}</code> <button type="button" class="btn btn-xs btn-outline-secondary ms-1 js-copy" data-copy="{{ row.runtime_address_display|default:'' }}">Копировать</button></td>
+        <td><span class="small table-meta-quiet">{% if c.imported_from_runtime %}Импорт{% else %}Панель{% endif %}</span></td>
+        <td><div class="small">{% if c.created_by %}{{ c.created_by.username }}{% else %}<span class="table-meta-quiet">система</span>{% endif %}</div><div class="small table-meta-quiet">{% if row.latest_audit_log %}{{ row.latest_audit_log.created_at|date:'d.m.Y H:i' }}{% else %}без аудита{% endif %}</div></td>
+        <td class="address-cell"><code>{{ row.runtime_address_display }}</code><button type="button" class="btn btn-xs btn-icon-muted ms-1 js-copy" data-copy="{{ row.runtime_address_display|default:'' }}" title="Копировать IP" aria-label="Копировать адрес">Коп.</button></td>
         <td>
           <div>{% if c.traffic_limit_bytes %}{{ row.traffic_used_display }} / {{ row.traffic_limit_display }}{% else %}{{ row.traffic_used_display }}{% endif %}</div>
-          {% if row.telemetry.is_unavailable %}<div class="small text-secondary">{{ row.telemetry.details }}</div>{% endif %}
+          {% if row.telemetry.is_unavailable %}<div class="small table-meta-soft">{{ row.telemetry.details }}</div>{% endif %}
         </td>
         <td>{{ c.updated_at|date:'d.m.Y H:i' }}</td>
         <td>
           <div class="table-actions table-actions-compact">
             <a class="btn btn-sm btn-primary" href="/clients/{{ c.id }}/">Открыть</a>
             <div class="dropdown">
-              <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">⋯</button>
+              <button class="btn btn-sm btn-icon-muted dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Дополнительные действия">⋯</button>
               <ul class="dropdown-menu dropdown-menu-end">
                 <li><a class="dropdown-item" href="/clients/{{ c.id }}/download/">Скачать конфиг</a></li>
                 <li><button class="dropdown-item js-open-qr-modal" type="button" data-client-id="{{ c.id }}" data-client-name="{{ c.name }}" data-bs-toggle="modal" data-bs-target="#clientQrModal">Показать QR</button></li>
