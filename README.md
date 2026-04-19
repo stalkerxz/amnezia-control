@@ -84,3 +84,32 @@ make down
 
 ### Endpoint readiness flow
 Если сервер локальный (`127.0.0.1`/`localhost`) и runtime не дал публичный host, оператор должен один раз заполнить `public_endpoint_host` (и опционально `public_endpoint_port`) в Server через Django Admin. После этого экспорт конфигов выполняется без ручного редактирования endpoint.
+
+## Хранение media (вложения продлений)
+- `ClientRenewalRequest.attachment` хранится в `MEDIA_ROOT`.
+- Для compose используется `MEDIA_ROOT=/data/media` и named volume `media_data`.
+- Это исключает хранение вложений только внутри эфемерного слоя контейнера.
+
+## Бэкапы (минимум)
+Нужно сохранять:
+1. БД PostgreSQL.
+2. Media volume (`/data/media`, включая `portal/renewal_attachments/...`).
+3. Операционные конфиги (`.env`, включая `CONFIG_ENCRYPTION_KEY`).
+
+Краткое восстановление: восстановить БД + media + `.env`, затем `migrate` и smoke-check.
+
+## Минимальная тестовая среда
+- Для meaningful интеграционных проверок нужен PostgreSQL (проект настроен на `django.db.backends.postgresql`).
+- Локальный быстрый структурный чек без БД: `python manage.py makemigrations --check --dry-run`.
+
+## Post-deploy smoke-check
+```bash
+./scripts/post_deploy_smoke.sh
+```
+Скрипт проверяет:
+- Django check
+- отсутствие дрейфа моделей/миграций
+- план миграций
+- что endpoint скачивания вложений не отдается анониму напрямую
+
+Подробные операционные заметки: `docs/OPERATIONS.md`.
