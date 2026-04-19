@@ -90,13 +90,27 @@ make down
 - Для compose используется `MEDIA_ROOT=/data/media` и named volume `media_data`.
 - Это исключает хранение вложений только внутри эфемерного слоя контейнера.
 
-## Бэкапы (минимум)
-Нужно сохранять:
-1. БД PostgreSQL.
-2. Media volume (`/data/media`, включая `portal/renewal_attachments/...`).
-3. Операционные конфиги (`.env`, включая `CONFIG_ENCRYPTION_KEY`).
+## Бэкап и восстановление (операторские скрипты)
+Полный operational backup/restore выполняется скриптами из `scripts/`:
 
-Краткое восстановление: восстановить БД + media + `.env`, затем `migrate` и smoke-check.
+```bash
+./scripts/backup_all.sh
+./scripts/verify_backup.sh backups/runs/<YYYYMMDD-HHMMSS>
+./scripts/restore_all.sh backups/runs/<YYYYMMDD-HHMMSS>
+./scripts/restore_all.sh --restore-env backups/runs/<YYYYMMDD-HHMMSS>
+./scripts/cleanup_backups.sh
+```
+
+Что входит в backup run (`backups/runs/<timestamp>/`):
+- `postgres.sql.gz` — дамп PostgreSQL;
+- `media.tar.gz` — архив `MEDIA_ROOT`/тома media (включая renewal attachments);
+- `.env` — runtime-конфиг;
+- `SHA256SUMS` — контрольные суммы;
+- `meta.txt` — метаданные бэкапа.
+
+Важно: `CONFIG_ENCRYPTION_KEY` из `.env` должен быть сохранен. Потеря ключа делает зашифрованные данные недешифруемыми.
+
+Полный runbook: `docs/OPERATIONS.md`.
 
 ## Минимальная тестовая среда
 - Для meaningful интеграционных проверок нужен PostgreSQL (проект настроен на `django.db.backends.postgresql`).
