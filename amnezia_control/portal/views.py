@@ -11,6 +11,7 @@ from audit.services import AuditService
 from vpn.models import VPNClient
 from vpn.services import VPNClientService
 
+from .forms import PortalRenewalRequestForm
 from .models import ClientRenewalRequest
 from .services import PortalAccessService, PortalReissuePolicyService, PortalResolveReason, RenewalRequestService
 
@@ -212,6 +213,7 @@ def portal_home_view(request, token: str):
             "can_selfservice_reissue": can_selfservice_reissue,
             "reissue_block_message": reissue_block_message,
             "reissue_cooldown_hours": PortalReissuePolicyService.COOLDOWN_HOURS,
+            "renewal_form": PortalRenewalRequestForm(),
         },
     )
 
@@ -270,8 +272,18 @@ def portal_request_renewal_view(request, token: str):
     if error_response:
         return error_response
 
+    form = PortalRenewalRequestForm(request.POST, request.FILES)
+    if not form.is_valid():
+        for errors in form.errors.values():
+            for error in errors:
+                messages.error(request, error)
+        return redirect("portal-home", token=token)
+
     client = access.client
-    open_request, created = RenewalRequestService.create_or_get_open_from_portal(client=client)
+    open_request, created = RenewalRequestService.create_or_get_open_from_portal(
+        client=client,
+        attachment=form.cleaned_data.get("attachment"),
+    )
 
     if created:
         AuditService.log(

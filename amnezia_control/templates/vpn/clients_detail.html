@@ -214,7 +214,7 @@
         <div class="small text-secondary mb-1">Ссылка кабинета</div>
         <div class="input-group input-group-sm mb-2">
           <input class="form-control" type="text" readonly value="{{ portal_link }}">
-          <button class="btn btn-outline-secondary js-copy" type="button" data-copy="{{ portal_link }}" {% if not portal_access_enabled %}disabled{% endif %}>Скопировать ссылку</button>
+          <button class="btn btn-outline-secondary js-copy" type="button" data-copy="{{ portal_link }}" data-copy-label="Скопировать ссылку" {% if not portal_access_enabled %}disabled{% endif %}>Скопировать ссылку</button>
         </div>
         {% else %}
         <div class="small text-secondary mb-2">Ссылка скрыта для безопасного отображения.</div>
@@ -224,8 +224,7 @@
         {% endif %}
         {% endif %}
         <div class="action-cluster align-items-center mb-1">
-          <form method="post" action="/clients/{{ client.id }}/action/portal_open/" target="_blank">{% csrf_token %}<button class="btn btn-primary">Открыть кабинет</button></form>
-          <button class="btn btn-outline-secondary js-copy" type="button" data-copy="{{ portal_link }}" {% if not portal_access_enabled %}disabled{% endif %}>Скопировать ссылку</button>
+          <form method="post" action="/clients/{{ client.id }}/action/portal_open/" target="_blank">{% csrf_token %}<button class="btn btn-primary" {% if not portal_access_enabled %}disabled{% endif %}>Открыть кабинет</button></form>
           <form method="post" action="/clients/{{ client.id }}/action/portal_issue/">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><button class="btn btn-outline-primary">Регенерировать</button></form>
           {% if portal_access_enabled %}
           <form method="post" action="/clients/{{ client.id }}/action/portal_revoke/">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><button class="btn btn-outline-danger">Отозвать</button></form>
@@ -233,6 +232,9 @@
           <button class="btn btn-outline-danger" disabled>Отозвать</button>
           {% endif %}
         </div>
+        {% if not portal_access_enabled %}
+        <div class="small text-secondary mb-2">Чтобы снова открыть кабинет, сначала нажмите «Регенерировать».</div>
+        {% endif %}
         {% if portal_link_exists and not portal_link_is_visible %}
         <form method="post" action="/clients/{{ client.id }}/action/portal_show/">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><button class="btn btn-link btn-sm p-0 text-secondary">Показать ссылку</button></form>
         {% endif %}
@@ -245,6 +247,9 @@
         <div class="section-header"><h2 class="h6">Открытая заявка на продление</h2><a class="small" href="/clients/renewal-requests/">Открыть очередь</a></div>
         <div class="small text-secondary mb-1">Статус: <span class="badge status-badge {% if open_renewal_request.status == 'new' %}status-warning{% else %}status-info{% endif %}">{{ open_renewal_request.get_status_display }}</span></div>
         <div class="small text-secondary mb-1">Создана: {{ open_renewal_request.created_at|date:'d.m.Y H:i' }}</div>
+        {% if open_renewal_request.attachment %}
+        <div class="small text-secondary mb-1">Вложение: <a href="{% url 'renewal-request-attachment-download' open_renewal_request.id %}" target="_blank">Открыть файл</a></div>
+        {% endif %}
         <div class="small text-secondary">{% if open_renewal_request.operator_note %}Комментарий: {{ open_renewal_request.operator_note }}{% else %}Комментарий оператора пока не добавлен.{% endif %}</div>
       </div>
     </section>
@@ -301,12 +306,13 @@
   toggleCustomFields();
 
   document.querySelectorAll('.js-copy').forEach((btn) => {
+    const defaultLabel = btn.dataset.copyLabel || 'Копировать';
     btn.addEventListener('click', async () => {
       const text = btn.dataset.copy;
       if (!text) return;
       await navigator.clipboard.writeText(text);
       btn.textContent = 'Скопировано';
-      setTimeout(() => btn.textContent = 'Копировать', 1200);
+      setTimeout(() => btn.textContent = defaultLabel, 1200);
     });
   });
 </script>

@@ -2,6 +2,7 @@ from datetime import timedelta
 
 from cryptography.fernet import Fernet
 from django.contrib.auth import get_user_model
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
@@ -16,7 +17,7 @@ from .models import ClientPortalAccess, ClientRenewalRequest
 from .services import PortalAccessService, PortalReissuePolicyService
 
 
-@override_settings(CONFIG_ENCRYPTION_KEY=Fernet.generate_key().decode())
+@override_settings(CONFIG_ENCRYPTION_KEY=Fernet.generate_key().decode(), MEDIA_ROOT="/tmp/amnezia-control-test-media")
 class PortalFlowTests(TestCase):
     def setUp(self):
         self.user = get_user_model().objects.create_user("admin", password="123", is_staff=True)
@@ -133,6 +134,50 @@ class PortalFlowTests(TestCase):
             1,
         )
         self.assertEqual(ClientRenewalRequest.objects.filter(client=self.client_obj, status="new").count(), 1)
+
+    def test_renewal_request_accepts_pdf_attachment(self):
+        token = self._issue_token()
+        pdf = SimpleUploadedFile("renewal.pdf", b"%PDF-1.4\n1 0 obj\n<<>>\nendobj\n", content_type="application/pdf")
+
+        response = self.client.post(
+            reverse("portal-request-renewal", kwargs={"token": token}),
+            {"attachment": pdf},
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        request_obj = ClientRenewalRequest.objects.get(client=self.client_obj, status=ClientRenewalRequest.Status.NEW)
+        self.assertTrue(bool(request_obj.attachment))
+
+    def test_renewal_request_accepts_jpeg_attachment(self):
+        token = self._issue_token()
+        jpeg_payload = (
+            b"\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00"
+            b"\xff\xdb\x00C\x00" + b"\x08" * 64 + b"\xff\xd9"
+        )
+        jpg = SimpleUploadedFile("renewal.jpg", jpeg_payload, content_type="image/jpeg")
+
+        response = self.client.post(
+            reverse("portal-request-renewal", kwargs={"token": token}),
+            {"attachment": jpg},
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(ClientRenewalRequest.objects.filter(client=self.client_obj, status=ClientRenewalRequest.Status.NEW).count(), 1)
+
+    def test_renewal_request_rejects_invalid_attachment_type(self):
+        token = self._issue_token()
+        bad_file = SimpleUploadedFile("script.exe", b"MZbad", content_type="application/octet-stream")
+
+        response = self.client.post(
+            reverse("portal-request-renewal", kwargs={"token": token}),
+            {"attachment": bad_file},
+            follow=True,
+        )
+
+        self.assertContains(response, "Допустимы только файлы JPG, JPEG или PDF.")
+        self.assertEqual(ClientRenewalRequest.objects.filter(client=self.client_obj).count(), 0)
 
     def test_repeated_renewal_request_does_not_create_duplicate_open_requests(self):
         token = self._issue_token()

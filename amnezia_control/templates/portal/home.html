@@ -118,12 +118,29 @@
           <div class="section-header"><h2 class="h6">Продление доступа</h2></div>
           {% if open_renewal_request %}
           <div class="alert alert-info py-2 mb-2">{% if open_renewal_request.status == 'new' %}<strong>Заявка отправлена.</strong> Оператор скоро возьмёт её в работу.{% else %}<strong>Заявка в работе.</strong> Оператор уже обрабатывает запрос.{% endif %}</div>
+          {% if open_renewal_request.attachment %}
+          <div class="small text-secondary">К заявке уже приложен файл.</div>
+          {% endif %}
           {% elif latest_renewal_request %}
           <p class="small text-secondary">Если понадобится ещё одно продление, отправьте новую заявку.</p>
-          <form method="post" action="/portal/{{ token }}/request-renewal/">{% csrf_token %}<button class="btn btn-outline-warning btn-sm">Отправить новую заявку</button></form>
+          <form method="post" action="/portal/{{ token }}/request-renewal/" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div class="mb-2">
+              {{ renewal_form.attachment }}
+              <div class="form-text">{{ renewal_form.attachment.help_text }}</div>
+            </div>
+            <button class="btn btn-outline-warning btn-sm">Отправить новую заявку</button>
+          </form>
           {% else %}
           <p class="small text-secondary">Если нужен новый срок доступа, отправьте заявку оператору.</p>
-          <form method="post" action="/portal/{{ token }}/request-renewal/">{% csrf_token %}<button class="btn btn-outline-warning btn-sm">Отправить заявку на продление</button></form>
+          <form method="post" action="/portal/{{ token }}/request-renewal/" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div class="mb-2">
+              {{ renewal_form.attachment }}
+              <div class="form-text">{{ renewal_form.attachment.help_text }}</div>
+            </div>
+            <button class="btn btn-outline-warning btn-sm">Отправить заявку на продление</button>
+          </form>
           {% endif %}
         </div>
       </section>

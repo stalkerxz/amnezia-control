@@ -4,7 +4,7 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from datetime import timedelta
 from django.db.models import Q
 from django.db.models.functions import Coalesce
-from django.http import HttpResponse
+from django.http import FileResponse, HttpResponse
 from django.urls import reverse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.http import url_has_allowed_host_and_scheme
@@ -507,14 +507,8 @@ def client_action_view(request, pk: int, action: str):
         elif action == "portal_open":
             raw_token = PortalAccessService.get_raw_token_for_client(client)
             if not raw_token:
-                access, raw_token = PortalAccessService.issue_for_client(client)
-                AuditLog.objects.create(
-                    actor=request.user,
-                    action="portal.access.issue",
-                    entity_type="VPNClient",
-                    entity_id=str(client.id),
-                    details={"portal_access_id": access.id},
-                )
+                messages.warning(request, "Доступ в кабинет неактивен. Сначала выполните «Регенерировать».")
+                return redirect(client_detail_url)
             return redirect("portal-home", token=raw_token)
         elif action == "portal_show":
             raw_token = PortalAccessService.get_raw_token_for_client(client)
@@ -699,6 +693,21 @@ def renewal_requests_list_view(request):
             "operator_filter": operator_filter,
             "only_my_actions": only_my_actions,
         },
+    )
+
+
+@login_required
+@user_passes_test(_admin_required)
+def renewal_request_attachment_download_view(request, pk: int):
+    request_obj = get_object_or_404(ClientRenewalRequest.objects.select_related("client"), pk=pk)
+    if not request_obj.attachment:
+        messages.warning(request, "У заявки нет вложения.")
+        return redirect("renewal-requests-list")
+
+    return FileResponse(
+        request_obj.attachment.open("rb"),
+        as_attachment=False,
+        filename=request_obj.attachment.name.rsplit("/", maxsplit=1)[-1],
     )
 
 
