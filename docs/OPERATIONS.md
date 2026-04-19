@@ -27,21 +27,102 @@ Minimum checks per release:
 
 Result: attachments are persisted in Docker volume storage and survive container rebuild/restart.
 
-## 4) Backup scope
-Backups must include:
+## 4) Backup and restore (production runbook)
+### Scope
+Every backup run includes only recoverable runtime state:
 
-1. PostgreSQL database (`postgres_data` or logical dump).
-2. Media files (`media_data` volume, especially `portal/renewal_attachments/...`).
-3. Runtime configuration (`.env`, Caddy/Django settings overrides, encryption key `CONFIG_ENCRYPTION_KEY`).
+1. PostgreSQL dump (`postgres.sql.gz`).
+2. Media volume archive (`media.tar.gz`, includes renewal attachments).
+3. Runtime `.env` (contains secrets, including `CONFIG_ENCRYPTION_KEY`).
+4. Integrity metadata (`SHA256SUMS` + `meta.txt`).
 
-If `CONFIG_ENCRYPTION_KEY` is lost, encrypted portal tokens cannot be decrypted.
+If `CONFIG_ENCRYPTION_KEY` is lost, encrypted portal tokens/config values cannot be decrypted.
 
-## 5) Restore notes (concise)
-1. Restore DB.
-2. Restore media volume contents to `MEDIA_ROOT`.
-3. Restore `.env` with the original `CONFIG_ENCRYPTION_KEY` and DB credentials.
-4. Start stack and run `python manage.py migrate`.
-5. Run `scripts/post_deploy_smoke.sh`.
+### Backup location and layout
+Backups are written to sortable paths:
+
+- `backups/runs/<YYYYMMDD-HHMMSS>/`
+
+Expected files per run:
+
+- `postgres.sql.gz`
+- `media.tar.gz`
+- `.env`
+- `SHA256SUMS`
+- `meta.txt`
+
+### Create backup
+Run from project root:
+
+```bash
+./scripts/backup_all.sh
+```
+
+Script behavior:
+- checks required commands;
+- checks compose services (`db`, `web`) are reachable;
+- auto-detects DB name/user from container env;
+- auto-detects media volume from `web` mount to `/data/media`;
+- checks free disk space before starting;
+- validates generated archives (`gzip -t`, `tar -tzf`);
+- exits non-zero on any failure.
+
+### Verify backup
+Run before transfer and before restore:
+
+```bash
+./scripts/verify_backup.sh backups/runs/<YYYYMMDD-HHMMSS>
+```
+
+Verification includes required files, checksum validation, gzip test, and tar readability test.
+
+### Restore backup
+Default restore (DB + media only):
+
+```bash
+./scripts/restore_all.sh backups/runs/<YYYYMMDD-HHMMSS>
+```
+
+Restore with explicit `.env` overwrite:
+
+```bash
+./scripts/restore_all.sh --restore-env backups/runs/<YYYYMMDD-HHMMSS>
+```
+
+Non-interactive confirmation (automation):
+
+```bash
+./scripts/restore_all.sh --yes backups/runs/<YYYYMMDD-HHMMSS>
+```
+
+Safety rules:
+- restore validates backup first via `verify_backup.sh`;
+- restore is destructive for DB/media and warns clearly;
+- interactive confirmation is required unless `--yes` is passed;
+- `.env` is **never** overwritten unless `--restore-env` is explicitly set.
+
+### Mandatory post-restore steps
+After any restore run:
+
+```bash
+docker compose up -d --build
+docker compose exec web python manage.py migrate
+./scripts/post_deploy_smoke.sh
+```
+
+## 5) Backup retention cleanup
+Policy: keep the latest **14** backup runs in `backups/runs/`.
+
+Cleanup command:
+
+```bash
+./scripts/cleanup_backups.sh
+```
+
+Behavior:
+- only touches `backups/runs/`;
+- removes oldest directories after the most recent 14;
+- does nothing when there are 14 or fewer runs.
 
 ## 6) Attachment access safety
 - Attachments are served only through authenticated operator endpoint `/clients/renewal-requests/<id>/attachment/`.

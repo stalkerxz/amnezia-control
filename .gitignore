@@ -9,3 +9,9 @@ docker-compose.yml.bak.*
 backups/
 *.dump
 *.sql.gz
+
+# backup/restore artifacts
+backups/runs/
+*.tar.gz
+*.tmp
+SHA256SUMS
