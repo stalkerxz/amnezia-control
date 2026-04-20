@@ -26,7 +26,7 @@ def run_job(job_id: int):
         JobService.event(job, "Unknown action", level="error")
         JobService.mark_done(job, ok=False)
         NotificationService.emit_event(
-            event_type=NotificationEventType.BACKUP_FAILED,
+            event_type=NotificationEventType.BACKGROUND_JOB_FAILED,
             payload={"job_id": job.id, "action": job.action},
         )
         return
@@ -38,13 +38,13 @@ def run_job(job_id: int):
         JobService.mark_done(job, ok=ok)
         if not ok:
             NotificationService.emit_event(
-                event_type=NotificationEventType.BACKUP_FAILED,
+                event_type=NotificationEventType.BACKGROUND_JOB_FAILED,
                 payload={"job_id": job.id, "action": job.action},
             )
     except Exception as exc:  # pragma: no cover
         JobService.event(job, f"Execution failed: {exc}", level="error")
         JobService.mark_done(job, ok=False)
         NotificationService.emit_event(
-            event_type=NotificationEventType.BACKUP_FAILED,
+            event_type=NotificationEventType.BACKGROUND_JOB_FAILED,
             payload={"job_id": job.id, "action": job.action},
         )

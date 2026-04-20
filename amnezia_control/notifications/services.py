@@ -1,4 +1,5 @@
 import logging
+import math
 from dataclasses import dataclass
 
 from django.conf import settings
@@ -19,7 +20,7 @@ class NotificationEventType:
     RENEWAL_REQUEST_STATUS_CHANGED = "renewal_request_status_changed"
     CLIENT_ACCESS_EXPIRING = "client_access_expiring"
     CLIENT_ACCESS_EXPIRED = "client_access_expired"
-    BACKUP_FAILED = "backup_failed"
+    BACKGROUND_JOB_FAILED = "background_job_failed"
 
 
 class NotificationRecipientType:
@@ -70,8 +71,8 @@ class NotificationService:
             return cls._build_renewal_status_messages(payload=payload)
         if event_type in {NotificationEventType.CLIENT_ACCESS_EXPIRING, NotificationEventType.CLIENT_ACCESS_EXPIRED}:
             return cls._build_client_access_messages(event_type=event_type, payload=payload)
-        if event_type == NotificationEventType.BACKUP_FAILED:
-            return cls._build_backup_failed_messages(payload=payload)
+        if event_type == NotificationEventType.BACKGROUND_JOB_FAILED:
+            return cls._build_background_job_failed_messages(payload=payload)
         logger.warning("Unknown notification event", extra={"event_type": event_type})
         return []
 
@@ -131,6 +132,7 @@ class NotificationService:
             ClientRenewalRequest.Status.NEW: "Ваша заявка на продление принята.",
             ClientRenewalRequest.Status.IN_PROGRESS: "Оператор взял вашу заявку в работу.",
             ClientRenewalRequest.Status.DONE: "Заявка обработана.",
+            ClientRenewalRequest.Status.DISMISSED: "Заявка отклонена.",
             "extend_and_close": "Доступ продлён.",
         }.get(status)
         client_recipients = cls._client_email_recipients(client_id=client_id)
@@ -168,7 +170,7 @@ class NotificationService:
         ]
 
     @classmethod
-    def _build_backup_failed_messages(cls, *, payload: dict) -> list[NotificationMessage]:
+    def _build_background_job_failed_messages(cls, *, payload: dict) -> list[NotificationMessage]:
         recipients = cls._admin_email_recipients()
         if not recipients:
             return []
@@ -236,9 +238,9 @@ class NotificationService:
         expired = 0
         clients = VPNClient.objects.exclude(status=VPNClient.Status.DELETED).exclude(expires_at__isnull=True)
         for client in clients:
-            delta = client.expires_at - now
-            days_left = delta.days
             if client.expires_at <= now:
+                # Expired state is absolute and does not depend on day rounding.
+                # We dedupe per UTC date to avoid repeated alerts within the day.
                 if cls._mark_limit_event_once(client_id=client.id, event_type=NotificationEventType.CLIENT_ACCESS_EXPIRED, marker=now.date().isoformat(), ttl=60 * 60 * 24):
                     cls.emit_event(
                         event_type=NotificationEventType.CLIENT_ACCESS_EXPIRED,
@@ -246,7 +248,10 @@ class NotificationService:
                     )
                     expired += 1
                 continue
-            if 0 < days_left <= threshold_days:
+            # Use explicit ceil-based day semantics to avoid timedelta.days floor behavior.
+            # Example: 2 days + 1 hour left => 3 days remaining for notification text.
+            days_left = max(1, math.ceil((client.expires_at - now).total_seconds() / 86400))
+            if days_left <= threshold_days:
                 if cls._mark_limit_event_once(client_id=client.id, event_type=NotificationEventType.CLIENT_ACCESS_EXPIRING, marker=str(days_left), ttl=60 * 60 * 24):
                     cls.emit_event(
                         event_type=NotificationEventType.CLIENT_ACCESS_EXPIRING,

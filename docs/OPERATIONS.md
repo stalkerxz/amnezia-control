@@ -137,7 +137,7 @@ Covered events:
 - renewal request status changed
 - client access expiring soon
 - client access expired
-- background job failure extension hook (`backup_failed`)
+- background job failure extension hook (`background_job_failed`)
 
 Required config:
 - `NOTIFICATIONS_ENABLED`

@@ -88,6 +88,22 @@ class NotificationFlowTests(TestCase):
         messages = [call.kwargs["message"] for call in send_mail_mock.call_args_list]
         self.assertTrue(any("Оператор взял вашу заявку в работу." in msg for msg in messages))
 
+
+    def test_client_notification_on_dismissed_status_change(self):
+        with patch("notifications.services.send_mail") as send_mail_mock:
+            NotificationService.deliver(
+                event_type=NotificationEventType.RENEWAL_REQUEST_STATUS_CHANGED,
+                payload={
+                    "client_id": self.client_obj.id,
+                    "client_name": self.client_obj.name,
+                    "renewal_request_id": 100,
+                    "status": "dismissed",
+                },
+            )
+
+        messages = [call.kwargs["message"] for call in send_mail_mock.call_args_list]
+        self.assertTrue(any("Заявка отклонена." in msg for msg in messages))
+
     def test_main_flow_succeeds_when_notification_enqueue_fails(self):
         token = self._issue_token()
         pdf = SimpleUploadedFile("renewal.pdf", b"%PDF-1.4\n1 0 obj\n<<>>\nendobj\n", content_type="application/pdf")
@@ -98,7 +114,7 @@ class NotificationFlowTests(TestCase):
         self.assertContains(response, "Заявка на продление отправлена")
 
     def test_expiring_and_expired_dedup(self):
-        self.client_obj.expires_at = timezone.now() + timedelta(days=2)
+        self.client_obj.expires_at = timezone.now() + timedelta(days=2, hours=1)
         self.client_obj.save(update_fields=["expires_at"])
         with patch.object(NotificationService, "emit_event") as emit_mock:
             first = NotificationService.emit_client_access_limits_notifications()
@@ -107,3 +123,5 @@ class NotificationFlowTests(TestCase):
         self.assertEqual(first["expiring"], 1)
         self.assertEqual(second["expiring"], 0)
         self.assertEqual(emit_mock.call_count, 1)
+        event_payload = emit_mock.call_args.kwargs["payload"]
+        self.assertEqual(event_payload["days_left"], 3)
