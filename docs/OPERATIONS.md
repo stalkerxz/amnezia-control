@@ -130,7 +130,7 @@ Behavior:
 - Keep it this way unless you add explicit signed/private media handling.
 
 ## 7) Notifications (MVP)
-Implemented channel: **email**.
+Implemented channels: **email** + **telegram** (telegram is admin-only in this PR).
 
 Covered events:
 - renewal request created (with attachment marker)
@@ -141,10 +141,15 @@ Covered events:
 
 Required config:
 - `NOTIFICATIONS_ENABLED`
-- `NOTIFICATIONS_CHANNELS=email`
+- `NOTIFICATIONS_CHANNELS` (`email`, `telegram`, `email,telegram`)
 - `NOTIFICATIONS_EMAIL_FROM` / `DEFAULT_FROM_EMAIL`
 - `NOTIFICATIONS_BASE_URL` (recommended for clickable links)
 - `NOTIFICATIONS_EXPIRING_DAYS`
+- `NOTIFICATIONS_TELEGRAM_BOT_TOKEN`
+- `NOTIFICATIONS_TELEGRAM_ADMIN_CHAT_IDS` (comma-separated chat ids)
+
+Telegram delivery is enabled only if bot token + at least one admin chat id are set.
+If Telegram config is missing, Telegram delivery is skipped quietly while email still works.
 
 Delivery model:
 - enqueue via Celery (`notifications.tasks.deliver_notification_event`)
@@ -153,4 +158,5 @@ Delivery model:
 Safety behavior:
 - business actions continue even if enqueue/send fails;
 - failures are logged with event metadata;
+- email and telegram fail independently;
 - expiring/expired reminders use cache-based dedupe keys.

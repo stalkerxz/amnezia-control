@@ -129,12 +129,14 @@ make down
 Подробные операционные заметки: `docs/OPERATIONS.md`.
 
 
-## Уведомления (MVP, PR #1)
+## Уведомления (MVP, PR #63)
 Реализован базовый слой уведомлений с событиями/получателями/каналами.
 
-### Канал в этом PR
-- Реальный канал: **email** (отправка через стандартный Django mail backend).
+### Каналы в этом PR
+- Реальные каналы: **email** и **telegram** (telegram — только для админов).
 - Доставка запускается асинхронно через Celery task `notifications.tasks.deliver_notification_event`.
+- Ошибки канала логируются и не ломают основной бизнес-поток.
+- Каналы независимы: падение telegram не блокирует email и наоборот.
 
 ### События в этом PR
 - `renewal_request_created` — новая заявка на продление (в т.ч. пометка о вложении).
@@ -143,6 +145,8 @@ make down
 - `client_access_expired` — доступ клиента уже истёк.
 - `background_job_failed` — базовая точка расширения при сбое фоновой задачи.
 
+Для telegram (админы) в этом PR отправляются именно эти операционные события.
+
 ### Кто получает уведомления
 - Админы: все активные `is_staff` пользователи с непустым `email`.
 - Клиент: `VPNClient.contact_email` (если поле заполнено).
@@ -150,17 +154,26 @@ make down
 
 ### Настройки
 - `NOTIFICATIONS_ENABLED` (по умолчанию `1`)
-- `NOTIFICATIONS_CHANNELS` (по умолчанию `email`)
+- `NOTIFICATIONS_CHANNELS` (например: `email`, `telegram`, `email,telegram`)
 - `NOTIFICATIONS_EMAIL_FROM` (fallback на `DEFAULT_FROM_EMAIL`)
 - `NOTIFICATIONS_BASE_URL` (базовый URL для абсолютных ссылок в письмах)
 - `NOTIFICATIONS_EXPIRING_DAYS` (по умолчанию `3` дня)
+- `NOTIFICATIONS_TELEGRAM_BOT_TOKEN` (токен Telegram бота)
+- `NOTIFICATIONS_TELEGRAM_ADMIN_CHAT_IDS` (список chat id админов через запятую)
 - `DEFAULT_FROM_EMAIL`, `EMAIL_BACKEND` — стандартные email-настройки Django
+
+Telegram активируется только если одновременно заданы:
+- канал `telegram` в `NOTIFICATIONS_CHANNELS`;
+- `NOTIFICATIONS_TELEGRAM_BOT_TOKEN`;
+- минимум один id в `NOTIFICATIONS_TELEGRAM_ADMIN_CHAT_IDS`.
+
+Если telegram-конфиг отсутствует, telegram-канал тихо пропускается, email продолжает работать.
 
 ### Планировщик
 - Celery beat запускает `notifications.tasks.notify_client_access_limits_task` ежедневно (`08:15`).
 - В задаче есть простая дедупликация напоминаний через cache key, чтобы не рассылать дубли при частом запуске.
 
 ### Что остаётся на будущее
-- Telegram канал
+- Telegram уведомления клиентам (в этом PR telegram только для админов)
 - внутренняя in-app лента уведомлений
 - расширение событий backup/smoke по отдельным action/скриптам

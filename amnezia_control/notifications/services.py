@@ -30,6 +30,7 @@ class NotificationRecipientType:
 
 class NotificationChannel:
     EMAIL = "email"
+    TELEGRAM = "telegram"
 
 
 @dataclass
@@ -38,6 +39,7 @@ class NotificationMessage:
     subject: str
     body: str
     recipients: list[str]
+    telegram_text: str = ""
 
 
 class NotificationService:
@@ -62,6 +64,7 @@ class NotificationService:
             return
         for msg in messages:
             cls._send_email(msg)
+            cls._send_telegram(msg=msg, event_type=event_type, payload=payload)
 
     @classmethod
     def _build_messages(cls, *, event_type: str, payload: dict) -> list[NotificationMessage]:
@@ -88,15 +91,17 @@ class NotificationService:
         if request_id:
             queue_url = cls._full_url(f"{reverse('renewal-requests-list')}?status=open&request_id={request_id}")
         body = f"{text}\n\nОчередь заявок: {queue_url}"
+        telegram_text = f"{text}\nКлиент: {client_name}\n{queue_url}"
         recipients = cls._admin_email_recipients()
         if not recipients:
-            return []
+            recipients = []
         return [
             NotificationMessage(
                 recipient_type=NotificationRecipientType.ADMIN,
                 subject="Новая заявка на продление",
                 body=body,
                 recipients=recipients,
+                telegram_text=telegram_text,
             )
         ]
 
@@ -125,6 +130,7 @@ class NotificationService:
                         subject="Обновление заявки на продление",
                         body=f"{admin_text}\n\nОткрыть очередь: {link}",
                         recipients=recipients,
+                        telegram_text=f"{admin_text}\nКлиент: {client_name}\n{link}",
                     )
                 )
 
@@ -157,8 +163,6 @@ class NotificationService:
         else:
             text = f"Доступ клиента {client_name} уже истёк."
         recipients = cls._admin_email_recipients()
-        if not recipients:
-            return []
         link = cls._full_url(reverse("clients-detail", kwargs={"pk": client_id})) if client_id else cls._full_url(reverse("clients-list"))
         return [
             NotificationMessage(
@@ -166,14 +170,13 @@ class NotificationService:
                 subject="Срок доступа клиента",
                 body=f"{text}\n\nКарточка клиента: {link}",
                 recipients=recipients,
+                telegram_text=f"{text}\nКлиент: {client_name}\n{link}",
             )
         ]
 
     @classmethod
     def _build_background_job_failed_messages(cls, *, payload: dict) -> list[NotificationMessage]:
         recipients = cls._admin_email_recipients()
-        if not recipients:
-            return []
         job_id = payload.get("job_id")
         action = payload.get("action") or "unknown"
         text = f"Сбой фоновой задачи: {action}."
@@ -185,12 +188,15 @@ class NotificationService:
                 subject="Сбой фоновой задачи",
                 body=text,
                 recipients=recipients,
+                telegram_text=text,
             )
         ]
 
     @classmethod
     def _send_email(cls, msg: NotificationMessage):
         if NotificationChannel.EMAIL not in getattr(settings, "NOTIFICATIONS_CHANNELS", [NotificationChannel.EMAIL]):
+            return
+        if not msg.recipients:
             return
         try:
             send_mail(
@@ -204,6 +210,35 @@ class NotificationService:
             logger.exception(
                 "Notification email delivery failed",
                 extra={"recipient_type": msg.recipient_type, "subject": msg.subject, "recipients": msg.recipients},
+            )
+
+    @classmethod
+    def _send_telegram(cls, *, msg: NotificationMessage, event_type: str, payload: dict):
+        if NotificationChannel.TELEGRAM not in getattr(settings, "NOTIFICATIONS_CHANNELS", [NotificationChannel.EMAIL]):
+            return
+        if msg.recipient_type != NotificationRecipientType.ADMIN:
+            return
+        bot_token = getattr(settings, "NOTIFICATIONS_TELEGRAM_BOT_TOKEN", "").strip()
+        chat_ids = getattr(settings, "NOTIFICATIONS_TELEGRAM_ADMIN_CHAT_IDS", [])
+        if not bot_token or not chat_ids:
+            return
+        text = (msg.telegram_text or msg.body or "").strip()
+        if not text:
+            return
+        try:
+            from .telegram import send_telegram_message
+
+            for chat_id in chat_ids:
+                send_telegram_message(bot_token=bot_token, chat_id=str(chat_id), text=text)
+        except Exception:
+            logger.exception(
+                "Notification telegram delivery failed",
+                extra={
+                    "event_type": event_type,
+                    "recipient_type": msg.recipient_type,
+                    "chat_ids": chat_ids,
+                    "payload": payload,
+                },
             )
 
     @staticmethod
