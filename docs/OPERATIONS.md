@@ -128,3 +128,29 @@ Behavior:
 - Attachments are served only through authenticated operator endpoint `/clients/renewal-requests/<id>/attachment/`.
 - There is no direct reverse-proxy alias for `/media`; Caddy forwards requests to Django.
 - Keep it this way unless you add explicit signed/private media handling.
+
+## 7) Notifications (MVP)
+Implemented channel: **email**.
+
+Covered events:
+- renewal request created (with attachment marker)
+- renewal request status changed
+- client access expiring soon
+- client access expired
+- background job failure extension hook (`backup_failed`)
+
+Required config:
+- `NOTIFICATIONS_ENABLED`
+- `NOTIFICATIONS_CHANNELS=email`
+- `NOTIFICATIONS_EMAIL_FROM` / `DEFAULT_FROM_EMAIL`
+- `NOTIFICATIONS_BASE_URL` (recommended for clickable links)
+- `NOTIFICATIONS_EXPIRING_DAYS`
+
+Delivery model:
+- enqueue via Celery (`notifications.tasks.deliver_notification_event`)
+- scheduled reminders via Celery Beat (`notifications.tasks.notify_client_access_limits_task`)
+
+Safety behavior:
+- business actions continue even if enqueue/send fails;
+- failures are logged with event metadata;
+- expiring/expired reminders use cache-based dedupe keys.
