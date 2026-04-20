@@ -146,6 +146,7 @@ class NotificationFlowTests(TestCase):
 
         self.assertEqual(telegram_mock.call_count, 2)
         first_text = telegram_mock.call_args_list[0].kwargs["text"]
+        self.assertTrue(first_text.startswith("[Продление] "))
         self.assertIn("с вложением", first_text)
         self.assertIn("https://panel.example.com/clients/renewal-requests/", first_text)
 
@@ -206,6 +207,15 @@ class NotificationFlowTests(TestCase):
     def test_telegram_message_content_for_required_events(self):
         with patch("notifications.telegram.send_telegram_message") as telegram_mock:
             NotificationService.deliver(
+                event_type=NotificationEventType.RENEWAL_REQUEST_CREATED,
+                payload={
+                    "client_id": self.client_obj.id,
+                    "client_name": self.client_obj.name,
+                    "renewal_request_id": 44,
+                    "has_attachment": False,
+                },
+            )
+            NotificationService.deliver(
                 event_type=NotificationEventType.CLIENT_ACCESS_EXPIRING,
                 payload={"client_id": self.client_obj.id, "client_name": self.client_obj.name, "days_left": 3},
             )
@@ -215,6 +225,30 @@ class NotificationFlowTests(TestCase):
             )
 
         messages = [call.kwargs["text"] for call in telegram_mock.call_args_list]
+        self.assertTrue(any(msg.startswith("[Продление] ") for msg in messages))
+        self.assertTrue(any(msg.startswith("[Доступ] ") for msg in messages))
+        self.assertTrue(any(msg.startswith("[Ошибка] ") for msg in messages))
         self.assertTrue(any("истекает через 3 дня" in msg for msg in messages))
         self.assertTrue(any("https://panel.example.com/clients/" in msg for msg in messages))
         self.assertTrue(any("Сбой фоновой задачи: backup. Job #123." in msg for msg in messages))
+
+    @override_settings(
+        NOTIFICATIONS_CHANNELS=["telegram"],
+        NOTIFICATIONS_TELEGRAM_BOT_TOKEN="bot-token",
+        NOTIFICATIONS_TELEGRAM_ADMIN_CHAT_IDS=["1001", "1002", "1003"],
+    )
+    def test_telegram_delivery_isolated_per_chat_id(self):
+        sent_chat_ids = []
+
+        def _send_telegram_message(*, bot_token, chat_id, text):
+            sent_chat_ids.append(chat_id)
+            if chat_id == "1002":
+                raise RuntimeError("chat is blocked")
+
+        with patch("notifications.telegram.send_telegram_message", side_effect=_send_telegram_message):
+            NotificationService.deliver(
+                event_type=NotificationEventType.BACKGROUND_JOB_FAILED,
+                payload={"action": "sync", "job_id": 555},
+            )
+
+        self.assertEqual(sent_chat_ids, ["1001", "1002", "1003"])
