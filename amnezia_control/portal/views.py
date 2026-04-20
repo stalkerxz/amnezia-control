@@ -309,6 +309,15 @@ def portal_request_renewal_view(request, token: str):
                 "has_attachment": bool(open_request.attachment),
             },
         )
+        NotificationService.emit_event(
+            event_type=NotificationEventType.RENEWAL_REQUEST_STATUS_CHANGED,
+            payload={
+                "client_id": client.id,
+                "client_name": client.name,
+                "renewal_request_id": open_request.id,
+                "status": ClientRenewalRequest.Status.NEW,
+            },
+        )
         messages.success(request, "Заявка на продление отправлена. Мы уже передали её оператору.")
     else:
         if open_request.status == ClientRenewalRequest.Status.NEW:

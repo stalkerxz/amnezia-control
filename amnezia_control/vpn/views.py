@@ -303,6 +303,7 @@ def clients_create_view(request):
                     protocol_type=form.cleaned_data["protocol_type"],
                     expires_at=form.cleaned_data["expires_at"],
                     traffic_limit_bytes=form.cleaned_data["traffic_limit_bytes"],
+                    contact_email=form.cleaned_data["contact_email"],
                     actor=request.user,
                 )
                 messages.success(request, "Клиент создан")
@@ -890,5 +891,11 @@ def client_update_limits_view(request, pk: int):
         traffic_limit_bytes=form.cleaned_data["traffic_limit_bytes"],
         actor=request.user,
     )
+    contact_email = (form.cleaned_data.get("contact_email") or "").strip()
+    if client.contact_email != contact_email:
+        client.contact_email = contact_email
+        client.save(update_fields=["contact_email"])
+        messages.success(request, "Лимиты и контактный email клиента обновлены без переиздания конфига.")
+        return redirect("clients-detail", pk=client.id)
     messages.success(request, "Лимиты клиента обновлены без переиздания конфига.")
     return redirect("clients-detail", pk=client.id)

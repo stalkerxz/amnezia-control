@@ -1009,6 +1009,20 @@ class VPNClientCreateFormTest(SimpleTestCase):
         self.assertTrue(form.is_valid(), form.errors)
         self.assertEqual(form.cleaned_data["traffic_limit_bytes"], 512 * 1024**2)
 
+    def test_contact_email_is_optional_and_preserved(self):
+        form = VPNClientCreateForm(
+            data={
+                "name": "contact-email",
+                "contact_email": "client@example.com",
+                "protocol_type": VPNClient.ProtocolType.AWG,
+                "expires_preset": VPNClientCreateForm.EXPIRATION_PRESET_UNLIMITED,
+                "traffic_limit_preset": "1gb",
+            }
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.cleaned_data["contact_email"], "client@example.com")
+
     def test_traffic_preset_converted_to_bytes(self):
         form = VPNClientCreateForm(
             data={
@@ -1146,6 +1160,29 @@ class VPNClientLimitsUpdateFlowTest(TestCase):
         self.assertIsNotNone(audit)
         self.assertEqual(audit.details.get("old_expires_at"), None)
         self.assertEqual(audit.details.get("new_traffic_limit_bytes"), 1024**3)
+
+    def test_update_form_initializes_contact_email(self):
+        self.vpn_client.contact_email = "client@old.example"
+        self.vpn_client.save(update_fields=["contact_email"])
+
+        form = VPNClientLimitsUpdateForm(client=self.vpn_client)
+        self.assertEqual(form.initial["contact_email"], "client@old.example")
+
+    def test_limits_update_can_change_contact_email(self):
+        response = self.client.post(
+            f"/clients/{self.vpn_client.id}/limits/update/",
+            data={
+                "expires_preset": "unlimited",
+                "traffic_limit_preset": "unlimited",
+                "contact_email": "client@new.example",
+            },
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.vpn_client.refresh_from_db()
+        self.assertEqual(self.vpn_client.contact_email, "client@new.example")
+        self.assertContains(response, "контактный email")
 
     def test_update_form_initializes_custom_traffic_for_non_preset_value(self):
         self.vpn_client.traffic_limit_bytes = 7 * 1024**3

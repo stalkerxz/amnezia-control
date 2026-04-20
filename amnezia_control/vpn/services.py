@@ -664,7 +664,7 @@ class VPNClientService:
 
     @staticmethod
     @transaction.atomic
-    def create_client(*, server, name: str, protocol_type: str, actor, expires_at=None, traffic_limit_bytes=None):
+    def create_client(*, server, name: str, protocol_type: str, actor, expires_at=None, traffic_limit_bytes=None, contact_email: str = ""):
         profile = ProtocolProfile.objects.filter(
             server_protocol__server=server,
             protocol_type=protocol_type,
@@ -681,6 +681,7 @@ class VPNClientService:
             created_by=actor,
             expires_at=expires_at,
             traffic_limit_bytes=traffic_limit_bytes,
+            contact_email=(contact_email or "").strip(),
         )
         VPNClientService.reissue_config(client=client, actor=actor)
         AuditService.log(actor, "client.create", "VPNClient", client.id, {"protocol_type": protocol_type})

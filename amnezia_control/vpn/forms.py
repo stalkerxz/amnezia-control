@@ -37,6 +37,7 @@ class VPNClientCreateForm(forms.Form):
     }
 
     name = forms.CharField(label="Имя клиента", max_length=120)
+    contact_email = forms.EmailField(required=False, label="Контактный email")
     protocol_type = forms.ChoiceField(label="Протокол", choices=VPNClient.ProtocolType.choices)
     expires_preset = forms.ChoiceField(
         label="Срок действия",
@@ -159,6 +160,8 @@ class VPNClientLimitsUpdateForm(VPNClientCreateForm):
                 initial["expires_at"] = local_dt.strftime("%Y-%m-%dT%H:%M")
             else:
                 initial["expires_preset"] = self.EXPIRATION_PRESET_UNLIMITED
+
+            initial["contact_email"] = client.contact_email
 
             if client.traffic_limit_bytes is None:
                 initial["traffic_limit_preset"] = self.TRAFFIC_PRESET_UNLIMITED
