@@ -43,6 +43,14 @@ class NotificationMessage:
 
 
 class NotificationService:
+    TELEGRAM_PREFIXES = {
+        NotificationEventType.RENEWAL_REQUEST_CREATED: "[Продление]",
+        NotificationEventType.RENEWAL_REQUEST_STATUS_CHANGED: "[Продление]",
+        NotificationEventType.CLIENT_ACCESS_EXPIRING: "[Доступ]",
+        NotificationEventType.CLIENT_ACCESS_EXPIRED: "[Доступ]",
+        NotificationEventType.BACKGROUND_JOB_FAILED: "[Ошибка]",
+    }
+
     @classmethod
     def emit_event(cls, *, event_type: str, payload: dict, async_delivery: bool = True):
         if not getattr(settings, "NOTIFICATIONS_ENABLED", True):
@@ -225,21 +233,32 @@ class NotificationService:
         text = (msg.telegram_text or msg.body or "").strip()
         if not text:
             return
-        try:
-            from .telegram import send_telegram_message
+        text = cls._telegram_text_with_prefix(event_type=event_type, text=text)
+        from .telegram import send_telegram_message
 
-            for chat_id in chat_ids:
-                send_telegram_message(bot_token=bot_token, chat_id=str(chat_id), text=text)
-        except Exception:
-            logger.exception(
-                "Notification telegram delivery failed",
-                extra={
-                    "event_type": event_type,
-                    "recipient_type": msg.recipient_type,
-                    "chat_ids": chat_ids,
-                    "payload": payload,
-                },
-            )
+        for chat_id in chat_ids:
+            chat_id_str = str(chat_id)
+            try:
+                send_telegram_message(bot_token=bot_token, chat_id=chat_id_str, text=text)
+            except Exception:
+                logger.exception(
+                    "Notification telegram delivery failed for admin chat",
+                    extra={
+                        "event_type": event_type,
+                        "recipient_type": msg.recipient_type,
+                        "chat_id": chat_id_str,
+                        "payload": payload,
+                    },
+                )
+
+    @classmethod
+    def _telegram_text_with_prefix(cls, *, event_type: str, text: str) -> str:
+        prefix = cls.TELEGRAM_PREFIXES.get(event_type, "").strip()
+        if not prefix:
+            return text
+        if text.startswith(prefix):
+            return text
+        return f"{prefix} {text}"
 
     @staticmethod
     def _admin_email_recipients() -> list[str]:
