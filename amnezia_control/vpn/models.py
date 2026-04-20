@@ -26,6 +26,7 @@ class VPNClient(models.Model):
 
     server = models.ForeignKey(Server, on_delete=models.CASCADE, related_name="clients")
     name = models.CharField(max_length=120)
+    contact_email = models.EmailField(blank=True)
     protocol_type = models.CharField(max_length=16, choices=ProtocolType.choices)
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.ACTIVE)
     profile = models.ForeignKey(ProtocolProfile, on_delete=models.PROTECT)

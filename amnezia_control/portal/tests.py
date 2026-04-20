@@ -135,6 +135,26 @@ class PortalFlowTests(TestCase):
         )
         self.assertEqual(ClientRenewalRequest.objects.filter(client=self.client_obj, status="new").count(), 1)
 
+
+    def test_renewal_request_emits_client_status_new_notification(self):
+        from unittest.mock import patch
+
+        token = self._issue_token()
+        with patch("portal.views.NotificationService.emit_event") as emit_mock:
+            response = self.client.post(reverse("portal-request-renewal", kwargs={"token": token}), follow=True)
+
+        self.assertEqual(response.status_code, 200)
+        event_types = [item.kwargs.get("event_type") for item in emit_mock.call_args_list]
+        self.assertIn("renewal_request_created", event_types)
+        self.assertIn("renewal_request_status_changed", event_types)
+        self.assertTrue(
+            any(
+                item.kwargs.get("event_type") == "renewal_request_status_changed"
+                and item.kwargs.get("payload", {}).get("status") == ClientRenewalRequest.Status.NEW
+                for item in emit_mock.call_args_list
+            )
+        )
+
     def test_renewal_request_accepts_pdf_attachment(self):
         token = self._issue_token()
         pdf = SimpleUploadedFile("renewal.pdf", b"%PDF-1.4\n1 0 obj\n<<>>\nendobj\n", content_type="application/pdf")

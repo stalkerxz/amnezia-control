@@ -26,6 +26,13 @@
     </div>
 
     <div class="col-lg-6">
+      <label class="form-label" for="{{ form.contact_email.id_for_label }}">{{ form.contact_email.label }}</label>
+      {{ form.contact_email }}
+      <div class="form-text">Используется для клиентских email-уведомлений по заявкам на продление.</div>
+      {% for error in form.contact_email.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+    </div>
+
+    <div class="col-lg-6">
       <label class="form-label" for="{{ form.expires_preset.id_for_label }}">{{ form.expires_preset.label }}</label>
       {{ form.expires_preset }}
       <div class="form-text">Быстрый выбор срока или полностью ручная дата и время.</div>

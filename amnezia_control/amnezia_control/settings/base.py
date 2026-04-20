@@ -23,6 +23,7 @@ INSTALLED_APPS = [
     "audit",
     "jobs",
     "portal",
+    "notifications",
 ]
 
 MIDDLEWARE = [
@@ -113,10 +114,23 @@ CELERY_BEAT_SCHEDULE = {
     "vpn-client-limits-enforce": {
         "task": "vpn.tasks.enforce_client_limits_task",
         "schedule": crontab(minute=f"*/{max(1, LIMITS_ENFORCE_EVERY_MINUTES)}"),
-    }
+    },
+    "notifications-client-access-limits": {
+        "task": "notifications.tasks.notify_client_access_limits_task",
+        "schedule": crontab(minute="15", hour="8"),
+    },
 }
 
 CONFIG_ENCRYPTION_KEY = os.getenv("CONFIG_ENCRYPTION_KEY", "")
+
+
+EMAIL_BACKEND = os.getenv("EMAIL_BACKEND", "django.core.mail.backends.smtp.EmailBackend")
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "no-reply@amnezia-control.local")
+NOTIFICATIONS_ENABLED = os.getenv("NOTIFICATIONS_ENABLED", "1") == "1"
+NOTIFICATIONS_CHANNELS = [channel.strip() for channel in os.getenv("NOTIFICATIONS_CHANNELS", "email").split(",") if channel.strip()]
+NOTIFICATIONS_EMAIL_FROM = os.getenv("NOTIFICATIONS_EMAIL_FROM", DEFAULT_FROM_EMAIL)
+NOTIFICATIONS_BASE_URL = os.getenv("NOTIFICATIONS_BASE_URL", "")
+NOTIFICATIONS_EXPIRING_DAYS = int(os.getenv("NOTIFICATIONS_EXPIRING_DAYS", "3"))
 
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 

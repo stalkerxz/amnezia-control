@@ -1,5 +1,6 @@
 from celery import shared_task
 
+from notifications.services import NotificationEventType, NotificationService
 from .executors import SafeSSHExecutor
 from .models import Job
 from .services import JobService
@@ -24,6 +25,10 @@ def run_job(job_id: int):
     if not command:
         JobService.event(job, "Unknown action", level="error")
         JobService.mark_done(job, ok=False)
+        NotificationService.emit_event(
+            event_type=NotificationEventType.BACKGROUND_JOB_FAILED,
+            payload={"job_id": job.id, "action": job.action},
+        )
         return
 
     try:
@@ -31,6 +36,15 @@ def run_job(job_id: int):
         ok = result.exit_code == 0
         JobService.event(job, f"Executed {command}", stdout=result.stdout, stderr=result.stderr, exit_code=result.exit_code)
         JobService.mark_done(job, ok=ok)
+        if not ok:
+            NotificationService.emit_event(
+                event_type=NotificationEventType.BACKGROUND_JOB_FAILED,
+                payload={"job_id": job.id, "action": job.action},
+            )
     except Exception as exc:  # pragma: no cover
         JobService.event(job, f"Execution failed: {exc}", level="error")
         JobService.mark_done(job, ok=False)
+        NotificationService.emit_event(
+            event_type=NotificationEventType.BACKGROUND_JOB_FAILED,
+            payload={"job_id": job.id, "action": job.action},
+        )

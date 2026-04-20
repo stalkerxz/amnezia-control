@@ -127,3 +127,40 @@ make down
 - что endpoint скачивания вложений не отдается анониму напрямую
 
 Подробные операционные заметки: `docs/OPERATIONS.md`.
+
+
+## Уведомления (MVP, PR #1)
+Реализован базовый слой уведомлений с событиями/получателями/каналами.
+
+### Канал в этом PR
+- Реальный канал: **email** (отправка через стандартный Django mail backend).
+- Доставка запускается асинхронно через Celery task `notifications.tasks.deliver_notification_event`.
+
+### События в этом PR
+- `renewal_request_created` — новая заявка на продление (в т.ч. пометка о вложении).
+- `renewal_request_status_changed` — изменения статуса заявки (для админов и клиентов).
+- `client_access_expiring` — доступ клиента скоро истекает.
+- `client_access_expired` — доступ клиента уже истёк.
+- `background_job_failed` — базовая точка расширения при сбое фоновой задачи.
+
+### Кто получает уведомления
+- Админы: все активные `is_staff` пользователи с непустым `email`.
+- Клиент: `VPNClient.contact_email` (если поле заполнено).
+- Email можно задать при создании клиента и обновить в карточке клиента (блок «Изменить лимиты»).
+
+### Настройки
+- `NOTIFICATIONS_ENABLED` (по умолчанию `1`)
+- `NOTIFICATIONS_CHANNELS` (по умолчанию `email`)
+- `NOTIFICATIONS_EMAIL_FROM` (fallback на `DEFAULT_FROM_EMAIL`)
+- `NOTIFICATIONS_BASE_URL` (базовый URL для абсолютных ссылок в письмах)
+- `NOTIFICATIONS_EXPIRING_DAYS` (по умолчанию `3` дня)
+- `DEFAULT_FROM_EMAIL`, `EMAIL_BACKEND` — стандартные email-настройки Django
+
+### Планировщик
+- Celery beat запускает `notifications.tasks.notify_client_access_limits_task` ежедневно (`08:15`).
+- В задаче есть простая дедупликация напоминаний через cache key, чтобы не рассылать дубли при частом запуске.
+
+### Что остаётся на будущее
+- Telegram канал
+- внутренняя in-app лента уведомлений
+- расширение событий backup/smoke по отдельным action/скриптам

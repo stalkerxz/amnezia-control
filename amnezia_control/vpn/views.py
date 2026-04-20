@@ -16,6 +16,7 @@ from audit.models import AuditLog
 from jobs.models import Job
 from portal.models import ClientPortalAccess, ClientRenewalRequest
 from portal.services import PortalAccessService
+from notifications.services import NotificationEventType, NotificationService
 from servers.models import Server, ServerProtocol
 from .forms import VPNClientBulkLimitsUpdateForm, VPNClientCreateForm, VPNClientLimitsUpdateForm, VPNClientListFilterForm
 from .models import VPNClient
@@ -302,6 +303,7 @@ def clients_create_view(request):
                     protocol_type=form.cleaned_data["protocol_type"],
                     expires_at=form.cleaned_data["expires_at"],
                     traffic_limit_bytes=form.cleaned_data["traffic_limit_bytes"],
+                    contact_email=form.cleaned_data["contact_email"],
                     actor=request.user,
                 )
                 messages.success(request, "Клиент создан")
@@ -579,6 +581,15 @@ def client_action_view(request, pk: int, action: str):
                         "new_expires_at": client.expires_at.isoformat() if client.expires_at else None,
                     },
                 )
+                NotificationService.emit_event(
+                    event_type=NotificationEventType.RENEWAL_REQUEST_STATUS_CHANGED,
+                    payload={
+                        "client_id": client.id,
+                        "client_name": client.name,
+                        "renewal_request_id": request_obj.id,
+                        "status": "extend_and_close",
+                    },
+                )
                 messages.success(request, f"Доступ клиента продлён на {extension_days} дней. Заявка закрыта.")
                 return redirect(renewal_next_url)
 
@@ -617,6 +628,16 @@ def client_action_view(request, pk: int, action: str):
                     "operator_note": request_obj.operator_note,
                 },
             )
+            if status_changed:
+                NotificationService.emit_event(
+                    event_type=NotificationEventType.RENEWAL_REQUEST_STATUS_CHANGED,
+                    payload={
+                        "client_id": client.id,
+                        "client_name": client.name,
+                        "renewal_request_id": request_obj.id,
+                        "status": request_obj.status,
+                    },
+                )
         elif action == "portal_revoke":
             revoked = PortalAccessService.revoke_for_client(client)
             if revoked:
@@ -870,5 +891,11 @@ def client_update_limits_view(request, pk: int):
         traffic_limit_bytes=form.cleaned_data["traffic_limit_bytes"],
         actor=request.user,
     )
+    contact_email = (form.cleaned_data.get("contact_email") or "").strip()
+    if client.contact_email != contact_email:
+        client.contact_email = contact_email
+        client.save(update_fields=["contact_email"])
+        messages.success(request, "Лимиты и контактный email клиента обновлены без переиздания конфига.")
+        return redirect("clients-detail", pk=client.id)
     messages.success(request, "Лимиты клиента обновлены без переиздания конфига.")
     return redirect("clients-detail", pk=client.id)

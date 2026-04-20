@@ -10,6 +10,7 @@ from audit.models import AuditLog
 from audit.services import AuditService
 from vpn.models import VPNClient
 from vpn.services import VPNClientService
+from notifications.services import NotificationEventType, NotificationService
 
 from .forms import PortalRenewalRequestForm
 from .models import ClientRenewalRequest
@@ -297,6 +298,24 @@ def portal_request_renewal_view(request, token: str):
                 "requested_at": timezone.now().isoformat(),
                 "ip": request.META.get("REMOTE_ADDR", ""),
                 "user_agent": request.META.get("HTTP_USER_AGENT", "")[:255],
+            },
+        )
+        NotificationService.emit_event(
+            event_type=NotificationEventType.RENEWAL_REQUEST_CREATED,
+            payload={
+                "client_id": client.id,
+                "client_name": client.name,
+                "renewal_request_id": open_request.id,
+                "has_attachment": bool(open_request.attachment),
+            },
+        )
+        NotificationService.emit_event(
+            event_type=NotificationEventType.RENEWAL_REQUEST_STATUS_CHANGED,
+            payload={
+                "client_id": client.id,
+                "client_name": client.name,
+                "renewal_request_id": open_request.id,
+                "status": ClientRenewalRequest.Status.NEW,
             },
         )
         messages.success(request, "Заявка на продление отправлена. Мы уже передали её оператору.")
