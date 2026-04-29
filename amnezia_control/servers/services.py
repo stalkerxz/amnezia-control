@@ -407,7 +407,8 @@ class ServerService:
         running_names = RuntimeCommandService.run(server, actor, "runtime.ps_running", "docker ps --format '{{.Names}}'").stdout.splitlines()
 
         for protocol_type, container_name in cls.CONTAINERS.items():
-            protocol, _ = ServerProtocol.objects.get_or_create(server=server, protocol_type=protocol_type)
+            protocol, created = ServerProtocol.objects.get_or_create(server=server, protocol_type=protocol_type)
+            original_enabled = protocol.enabled
             protocol.container_name = container_name
 
             if container_name in all_names:
@@ -504,12 +505,11 @@ class ServerService:
                     "awg2_optional_missing_keys": awg2_optional_missing,
                     "awg2_metadata_ready": not awg2_required_missing if protocol_type == ServerProtocol.ProtocolType.AWG2 else True,
                 }
-                protocol.enabled = container_name in running_names
             else:
                 protocol.container_status = "missing"
                 protocol.runtime_metadata = {}
-                protocol.enabled = False
 
+            protocol.enabled = (container_name in running_names) if created else original_enabled
             protocol.last_sync_at = timezone.now()
             protocol.save(update_fields=["container_name", "container_status", "runtime_metadata", "enabled", "last_sync_at"])
 

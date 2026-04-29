@@ -312,3 +312,41 @@ Swap:             0          0          0
         self.assertEqual(iface, "eth0")
         self.assertEqual(net["rx_bytes"], 12345)
         self.assertEqual(net["tx_bytes"], 67890)
+
+class ServerSyncDoesNotReenableDisabledProtocolTest(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user("admin-sync", password="123", is_staff=True)
+        self.server = Server.objects.create(name="sync-disabled")
+        self.protocol = ServerProtocol.objects.create(
+            server=self.server,
+            protocol_type=ServerProtocol.ProtocolType.AWG2,
+            container_name="test-container",
+            enabled=False,
+        )
+
+    @patch("servers.services.RuntimeCommandService.run")
+    def test_sync_preserves_manual_disabled_flag(self, run_mock):
+        class Result:
+            def __init__(self, stdout):
+                self.stdout = stdout
+
+        def side_effect(*args, **kwargs):
+            action = args[2]
+            mapping = {
+                "runtime.ps_all": Result("amnezia-awg\namnezia-awg2\n"),
+                "runtime.ps_running": Result("amnezia-awg\namnezia-awg2\n"),
+                "runtime.inspect.awg": Result('[{"State":{"Status":"running"},"NetworkSettings":{"Ports":{"51820/udp":[{"HostIp":"0.0.0.0","HostPort":"51820"}]}},"Config":{"Image":"awg","Env":[]},"Mounts":[]}]'),
+                "runtime.iface.awg": Result("awg0\n"),
+                "runtime.peers.awg": Result("awg0\tprivate\tpub\t51820\n"),
+                "runtime.conf.awg": Result("[Interface]\nAddress = 10.0.0.1/24\nListenPort = 51820\n"),
+                "runtime.inspect.awg2": Result('[{"State":{"Status":"running"},"NetworkSettings":{"Ports":{"51830/udp":[{"HostIp":"0.0.0.0","HostPort":"51830"}]}},"Config":{"Image":"awg2","Env":[]},"Mounts":[]}]'),
+                "runtime.iface.awg2": Result("awg0\n"),
+                "runtime.peers.awg2.all": Result("awg0\tprivate\tpub\t51830\n"),
+                "runtime.conf.awg2": Result("[Interface]\nAddress = 10.1.0.1/24\nListenPort = 51830\n"),
+            }
+            return mapping[action]
+
+        run_mock.side_effect = side_effect
+        ServerService.sync_runtime_state(server=self.server, actor=self.user)
+        self.protocol.refresh_from_db()
+        self.assertFalse(self.protocol.enabled)
