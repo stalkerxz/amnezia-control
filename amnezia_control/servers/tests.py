@@ -350,3 +350,43 @@ class ServerSyncDoesNotReenableDisabledProtocolTest(TestCase):
         ServerService.sync_runtime_state(server=self.server, actor=self.user)
         self.protocol.refresh_from_db()
         self.assertFalse(self.protocol.enabled)
+
+
+class ServerMonitoringCollectMetricsTest(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user("admin-monitor", password="123", is_staff=True)
+        self.server = Server.objects.create(name="monitor-server")
+        ServerProtocol.objects.create(
+            server=self.server,
+            protocol_type=ServerProtocol.ProtocolType.AWG,
+            enabled=True,
+            container_name="proto-awg",
+            runtime_metadata={"interface": "wg-test", "config_path": "/tmp/wg.conf"},
+        )
+
+    @patch("servers.services.RuntimeCommandService.run")
+    def test_collect_load_metrics_marks_protocol_containers(self, run_mock):
+        class Result:
+            def __init__(self, stdout):
+                self.stdout = stdout
+
+        def side_effect(*args, **kwargs):
+            action = args[2]
+            mapping = {
+                "monitoring.hostname": Result("host1\n"),
+                "monitoring.uptime": Result(" 11:20:55 up 1 day,  load average: 0.11, 0.22, 0.33\n"),
+                "monitoring.nproc": Result("4\n"),
+                "monitoring.free": Result("Mem: 1000 250 750\n"),
+                "monitoring.df": Result("Filesystem 1B-blocks Used Available Use% Mounted on\n/dev/sda1 1000 500 500 50% /\n"),
+                "monitoring.route": Result("1.1.1.1 via 10.0.2.2 dev eth0 src 10.0.2.15\n"),
+                "monitoring.netdev": Result("eth0: 12 0 0 0 0 0 0 0 34 0 0 0 0 0 0 0\n"),
+                "monitoring.docker": Result("proto-awg\tUp 1 hour\nother\tUp 2 hours\n"),
+                "monitoring.protocol.peers.awg": Result("1\n1\n"),
+            }
+            return mapping[action]
+
+        run_mock.side_effect = side_effect
+        metrics = ServerService.collect_load_metrics(self.server, self.user)
+        self.assertIsInstance(metrics["docker"]["containers"], list)
+        self.assertTrue(metrics["docker"]["containers"][0]["is_protocol_container"])
+        self.assertFalse(metrics["docker"]["containers"][1]["is_protocol_container"])

@@ -1,6 +1,7 @@
 import ipaddress
 import json
 import re
+import shlex
 
 from django.utils import timezone
 
@@ -92,13 +93,13 @@ class ServerService:
 
     @staticmethod
     def _parse_docker_ps_statuses(docker_ps_output: str):
-        statuses = {}
+        containers = []
         for line in docker_ps_output.splitlines():
             if "\t" not in line:
                 continue
             name, status = line.split("\t", 1)
-            statuses[name.strip()] = status.strip()
-        return statuses
+            containers.append({"name": name.strip(), "status": status.strip()})
+        return containers
 
     @classmethod
     def collect_load_metrics(cls, server: Server, actor):
@@ -160,10 +161,10 @@ class ServerService:
                 metrics["protocols"].append(protocol_row)
                 continue
             try:
-                peer_cmd = 'docker exec {container} sh -lc \'grep -c "^\\[Peer\\]" {config}; wg show {iface} peers | wc -l\'' .format(
-                    container=protocol_row["container_name"],
-                    config=protocol_row["config_path"],
-                    iface=protocol_row["interface"],
+                peer_cmd = "docker exec {container} sh -lc 'grep -c \"^\\[Peer\\]\" {config}; wg show {iface} peers | wc -l'".format(
+                    container=shlex.quote(protocol_row["container_name"]),
+                    config=shlex.quote(protocol_row["config_path"]),
+                    iface=shlex.quote(protocol_row["interface"]),
                 )
                 peer_out = RuntimeCommandService.run(
                     server,
