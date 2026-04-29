@@ -95,13 +95,14 @@ class SafeSSHExecutor:
         else:
             known_hosts_path.chmod(0o600)
 
-        host_token = f"[{host}]:{port}" if port != 22 else host
-        existing_lines = []
-        if known_hosts_path.exists():
-            existing_lines = known_hosts_path.read_text(encoding="utf-8").splitlines()
+        host_token = cls._expected_host_token(host, port)
+        existing_lines = known_hosts_path.read_text(encoding="utf-8").splitlines()
+        existing_entries = cls._parse_known_hosts_entries(existing_lines)
+        if host_token in existing_entries:
+            return known_hosts_path
 
         keyscan_result = subprocess.run(
-            ["ssh-keyscan", "-p", str(port), host],
+            ["ssh-keyscan", host] if port == 22 else ["ssh-keyscan", "-p", str(port), host],
             capture_output=True,
             text=True,
             check=False,
@@ -115,13 +116,36 @@ class SafeSSHExecutor:
         if not scanned_lines:
             raise RuntimeError(f"Failed to parse SSH host key for {host}:{port}")
 
-        existing_for_host = [line.strip() for line in existing_lines if line.strip().startswith(f"{host_token} ")]
-        if existing_for_host:
-            if any(line not in existing_for_host for line in scanned_lines):
+        scanned_entries = cls._parse_known_hosts_entries(scanned_lines)
+        if host_token not in scanned_entries:
+            raise RuntimeError(f"Failed to parse SSH host key for {host}:{port}")
+
+        existing_host_keys = existing_entries.get(host_token, {})
+        scanned_host_keys = scanned_entries.get(host_token, {})
+        for key_type, scanned_key in scanned_host_keys.items():
+            existing_key = existing_host_keys.get(key_type)
+            if existing_key and existing_key != scanned_key:
                 raise RuntimeError(f"SSH host key mismatch for {host}:{port}")
-            return known_hosts_path
 
         with known_hosts_path.open("a", encoding="utf-8") as fh:
             for clean in scanned_lines:
                 fh.write(f"{clean}\n")
         return known_hosts_path
+    @staticmethod
+    def _expected_host_token(host: str, port: int) -> str:
+        return host if port == 22 else f"[{host}]:{port}"
+
+    @classmethod
+    def _parse_known_hosts_entries(cls, raw_lines: list[str]) -> dict[str, dict[str, str]]:
+        entries: dict[str, dict[str, str]] = {}
+        for line in raw_lines:
+            clean = line.strip()
+            if not clean or clean.startswith("#"):
+                continue
+            parts = clean.split()
+            if len(parts) < 3:
+                continue
+            host_field, key_type, key_data = parts[0], parts[1], parts[2]
+            for token in host_field.split(","):
+                entries.setdefault(token, {})[key_type] = key_data
+        return entries
