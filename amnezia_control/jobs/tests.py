@@ -1,5 +1,6 @@
 from unittest import TestCase
 from unittest.mock import MagicMock, patch
+from tempfile import TemporaryDirectory
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase as DjangoTestCase
@@ -12,10 +13,12 @@ from .executors import SafeSSHExecutor
 
 
 class SSHExecutorTest(TestCase):
+    @patch("jobs.executors.SafeSSHExecutor.ensure_known_host")
     @patch("jobs.executors.paramiko.SSHClient")
-    def test_run_allowlisted_command(self, ssh_client_cls):
+    def test_run_allowlisted_command(self, ssh_client_cls, ensure_known_host):
         mock_client = MagicMock()
         ssh_client_cls.return_value = mock_client
+        ensure_known_host.return_value = "/tmp/runtime-known-hosts"
         stdout = MagicMock()
         stderr = MagicMock()
         stdout.read.return_value = b"amnezia-awg\n"
@@ -26,6 +29,58 @@ class SSHExecutorTest(TestCase):
         executor = SafeSSHExecutor(host="127.0.0.1", username="u")
         result = executor.run("docker ps --format '{{.Names}}'")
         self.assertEqual(result.exit_code, 0)
+        mock_client.load_host_keys.assert_called_once()
+
+    @patch("jobs.executors.subprocess.run")
+    def test_ensure_known_host_creates_file_and_adds_host(self, keyscan_run):
+        keyscan_run.return_value = MagicMock(
+            returncode=0,
+            stdout="[127.0.0.1]:2222 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEXAMPLEKEY\n",
+            stderr="",
+        )
+        with TemporaryDirectory() as tmpdir, patch.dict("os.environ", {"SSH_KNOWN_HOSTS_PATH": f"{tmpdir}/known_hosts"}):
+            path = SafeSSHExecutor.ensure_known_host("127.0.0.1", 2222)
+            self.assertTrue(path.exists())
+            content = path.read_text(encoding="utf-8")
+            self.assertIn("[127.0.0.1]:2222 ssh-ed25519", content)
+
+    @patch("jobs.executors.subprocess.run")
+    def test_ensure_known_host_does_not_duplicate_existing_host(self, keyscan_run):
+        keyscan_run.return_value = MagicMock(
+            returncode=0,
+            stdout="[127.0.0.1]:2222 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEXAMPLEKEY\n",
+            stderr="",
+        )
+        with TemporaryDirectory() as tmpdir, patch.dict("os.environ", {"SSH_KNOWN_HOSTS_PATH": f"{tmpdir}/known_hosts"}):
+            path = SafeSSHExecutor.ensure_known_host("127.0.0.1", 2222)
+            before = path.read_text(encoding="utf-8")
+            SafeSSHExecutor.ensure_known_host("127.0.0.1", 2222)
+            after = path.read_text(encoding="utf-8")
+            self.assertEqual(before, after)
+
+    @patch("jobs.executors.subprocess.run")
+    def test_ensure_known_host_raises_on_keyscan_failure(self, keyscan_run):
+        keyscan_run.return_value = MagicMock(returncode=1, stdout="", stderr="connection timed out")
+        with TemporaryDirectory() as tmpdir, patch.dict("os.environ", {"SSH_KNOWN_HOSTS_PATH": f"{tmpdir}/known_hosts"}):
+            with self.assertRaises(RuntimeError):
+                SafeSSHExecutor.ensure_known_host("127.0.0.1", 2222)
+
+    @patch("jobs.executors.subprocess.run")
+    def test_ensure_known_host_raises_on_host_key_mismatch(self, keyscan_run):
+        with TemporaryDirectory() as tmpdir, patch.dict("os.environ", {"SSH_KNOWN_HOSTS_PATH": f"{tmpdir}/known_hosts"}):
+            path = SafeSSHExecutor._known_hosts_path()
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(
+                "[127.0.0.1]:2222 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOLDKEYOLDKEYOLDKEYOLDKEY\n",
+                encoding="utf-8",
+            )
+            keyscan_run.return_value = MagicMock(
+                returncode=0,
+                stdout="[127.0.0.1]:2222 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINEWKEYNEWKEYNEWKEYNEWKEY\n",
+                stderr="",
+            )
+            with self.assertRaises(RuntimeError):
+                SafeSSHExecutor.ensure_known_host("127.0.0.1", 2222)
 
     def test_reject_non_allowlisted_command(self):
         executor = SafeSSHExecutor(host="127.0.0.1", username="u")
