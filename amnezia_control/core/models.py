@@ -16,6 +16,12 @@ class SystemSettings(models.Model):
 
     @classmethod
     def get_solo(cls):
-        obj, _ = cls.objects.get_or_create(pk=1)
-        return obj
+        by_primary = cls.objects.filter(pk=1).first()
+        if by_primary:
+            return by_primary
 
+        existing = cls.objects.order_by("pk").first()
+        if existing:
+            return existing
+
+        return cls.objects.create(pk=1)

@@ -3,6 +3,8 @@ from datetime import timedelta
 from django import forms
 from django.utils import timezone
 
+from servers.models import ProtocolProfile, ServerProtocol
+
 from .models import VPNClient
 
 
@@ -85,6 +87,30 @@ class VPNClientCreateForm(forms.Form):
         initial=TRAFFIC_UNIT_GB,
     )
 
+    def __init__(self, *args, server=None, **kwargs):
+        self.server = server
+        super().__init__(*args, **kwargs)
+        available_protocols = self._available_protocol_choices()
+        self.fields["protocol_type"].choices = available_protocols
+        if available_protocols:
+            default_protocol = VPNClient.ProtocolType.AWG2 if len(available_protocols) == 1 and available_protocols[0][0] == VPNClient.ProtocolType.AWG2 else available_protocols[0][0]
+            self.fields["protocol_type"].initial = default_protocol
+
+    def _available_protocol_choices(self):
+        if not self.server:
+            return []
+        active_profiles = ProtocolProfile.objects.filter(
+            server_protocol__server=self.server,
+            server_protocol__enabled=True,
+            status=ProtocolProfile.ProfileStatus.ACTIVE,
+        ).exclude(server_protocol__container_status__iexact="exited")
+        protocol_types = list(
+            active_profiles.values_list("protocol_type", flat=True).distinct()
+        )
+        protocol_label_map = dict(VPNClient.ProtocolType.choices)
+        ordered = [ptype for ptype, _label in VPNClient.ProtocolType.choices if ptype in protocol_types]
+        return [(ptype, protocol_label_map.get(ptype, ptype.upper())) for ptype in ordered]
+
     @classmethod
     def resolve_expires_at(cls, *, expires_preset, custom_expires_at):
         if expires_preset == cls.EXPIRATION_PRESET_CUSTOM:
@@ -139,6 +165,22 @@ class VPNClientCreateForm(forms.Form):
 
     def clean(self):
         cleaned_data = super().clean()
+        protocol_type = cleaned_data.get("protocol_type")
+        if self.server and protocol_type:
+            has_enabled_protocol = ServerProtocol.objects.filter(
+                server=self.server,
+                protocol_type=protocol_type,
+                enabled=True,
+            ).exclude(container_status__iexact="exited").exists()
+            has_active_profile = ProtocolProfile.objects.filter(
+                server_protocol__server=self.server,
+                server_protocol__protocol_type=protocol_type,
+                server_protocol__enabled=True,
+                protocol_type=protocol_type,
+                status=ProtocolProfile.ProfileStatus.ACTIVE,
+            ).exclude(server_protocol__container_status__iexact="exited").exists()
+            if not (has_enabled_protocol and has_active_profile):
+                self.add_error("protocol_type", "Протокол недоступен для создания клиента.")
         return self._clean_limits(cleaned_data)
 
 

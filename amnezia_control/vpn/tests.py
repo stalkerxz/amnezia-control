@@ -2318,3 +2318,52 @@ class VPNClientPortalAdminAndRenewalVisibilityTest(TestCase):
         response = self.client.get(f"/clients/renewal-requests/{request_obj.id}/attachment/")
         self.assertEqual(response.status_code, 302)
         self.assertIn("/login/", response.url)
+
+@override_settings(CONFIG_ENCRYPTION_KEY=Fernet.generate_key().decode())
+class VPNClientCreateFormProtocolAvailabilityTests(TestCase):
+    def setUp(self):
+        self.server = Server.objects.create(name="form-protocol-server")
+        self.awg_protocol = ServerProtocol.objects.create(
+            server=self.server,
+            protocol_type=ServerProtocol.ProtocolType.AWG,
+            enabled=False,
+            container_status="exited",
+        )
+        self.awg2_protocol = ServerProtocol.objects.create(
+            server=self.server,
+            protocol_type=ServerProtocol.ProtocolType.AWG2,
+            enabled=True,
+            container_status="running",
+        )
+        ProtocolProfile.objects.create(
+            server_protocol=self.awg_protocol,
+            name="default-awg",
+            protocol_type=ServerProtocol.ProtocolType.AWG,
+            config_template="[Interface]",
+            status=ProtocolProfile.ProfileStatus.ACTIVE,
+        )
+        ProtocolProfile.objects.create(
+            server_protocol=self.awg2_protocol,
+            name="default-awg2",
+            protocol_type=ServerProtocol.ProtocolType.AWG2,
+            config_template="[Interface]",
+            status=ProtocolProfile.ProfileStatus.ACTIVE,
+        )
+
+    def test_form_lists_only_available_protocols_and_defaults_to_awg2(self):
+        form = VPNClientCreateForm(server=self.server)
+        self.assertEqual(list(form.fields["protocol_type"].choices), [(VPNClient.ProtocolType.AWG2, "AWG2")])
+        self.assertEqual(form.fields["protocol_type"].initial, VPNClient.ProtocolType.AWG2)
+
+    def test_form_rejects_protocol_without_enabled_server_protocol(self):
+        form = VPNClientCreateForm(
+            data={
+                "name": "client-1",
+                "protocol_type": VPNClient.ProtocolType.AWG,
+                "expires_preset": VPNClientCreateForm.EXPIRATION_PRESET_UNLIMITED,
+                "traffic_limit_preset": VPNClientCreateForm.TRAFFIC_PRESET_UNLIMITED,
+            },
+            server=self.server,
+        )
+        self.assertFalse(form.is_valid())
+        self.assertIn("protocol_type", form.errors)

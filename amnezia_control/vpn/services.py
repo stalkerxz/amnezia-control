@@ -665,8 +665,17 @@ class VPNClientService:
     @staticmethod
     @transaction.atomic
     def create_client(*, server, name: str, protocol_type: str, actor, expires_at=None, traffic_limit_bytes=None, contact_email: str = ""):
+        protocol = ServerProtocol.objects.filter(
+            server=server,
+            protocol_type=protocol_type,
+            enabled=True,
+        ).exclude(container_status__iexact="exited").first()
+        if not protocol:
+            raise ValueError("Protocol is not enabled or container is not running")
+
         profile = ProtocolProfile.objects.filter(
             server_protocol__server=server,
+            server_protocol=protocol,
             protocol_type=protocol_type,
             status=ProtocolProfile.ProfileStatus.ACTIVE,
         ).first()

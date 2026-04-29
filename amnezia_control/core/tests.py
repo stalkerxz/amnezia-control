@@ -2,7 +2,6 @@ from django.contrib.auth import get_user_model
 from django.conf import settings
 from django.test import TestCase
 from django.urls import reverse
-from django.utils.translation import LANGUAGE_SESSION_KEY
 from django.utils import timezone
 
 from audit.models import AuditLog
@@ -169,5 +168,13 @@ class SettingsViewTest(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(self.client.session.get(LANGUAGE_SESSION_KEY), "en")
+        self.assertEqual(self.client.session.get("django_language"), "en")
         self.assertEqual(response.cookies[settings.LANGUAGE_COOKIE_NAME].value, "en")
+
+    def test_settings_page_handles_duplicate_system_settings_rows(self):
+        self.client.force_login(self.staff_user)
+        SystemSettings.objects.create(id=2)
+        SystemSettings.objects.create(id=3)
+
+        response = self.client.get(reverse("settings"))
+        self.assertEqual(response.status_code, 200)
