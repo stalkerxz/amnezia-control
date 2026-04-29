@@ -90,11 +90,12 @@ class VPNClientCreateForm(forms.Form):
     def __init__(self, *args, server=None, **kwargs):
         self.server = server
         super().__init__(*args, **kwargs)
-        available_protocols = self._available_protocol_choices()
-        self.fields["protocol_type"].choices = available_protocols
-        if available_protocols:
-            default_protocol = VPNClient.ProtocolType.AWG2 if len(available_protocols) == 1 and available_protocols[0][0] == VPNClient.ProtocolType.AWG2 else available_protocols[0][0]
-            self.fields["protocol_type"].initial = default_protocol
+        if "protocol_type" in self.fields:
+            available_protocols = self._available_protocol_choices()
+            self.fields["protocol_type"].choices = available_protocols
+            if available_protocols:
+                default_protocol = VPNClient.ProtocolType.AWG2 if len(available_protocols) == 1 and available_protocols[0][0] == VPNClient.ProtocolType.AWG2 else available_protocols[0][0]
+                self.fields["protocol_type"].initial = default_protocol
 
     def _available_protocol_choices(self):
         if not self.server:
