@@ -49,14 +49,21 @@ def server_list_view(request):
     else:
         health_filter = ""
 
-    servers = [
-        {
+    monitor_server_id = request.GET.get("monitor", "").strip()
+    servers = []
+    for server in servers_qs:
+        item = {
             "obj": server,
             "health_label": _health_label(server.health_status),
             "health_reasons": ServerService.evaluate_health(server)["reasons"][:2],
+            "metrics": None,
         }
-        for server in servers_qs
-    ]
+        if monitor_server_id and monitor_server_id.isdigit() and int(monitor_server_id) == server.id:
+            try:
+                item["metrics"] = ServerService.collect_load_metrics(server, request.user)
+            except Exception as exc:
+                item["metrics"] = {"errors": [f"Мониторинг недоступен: {exc}"], "docker": {"available": False, "containers": []}, "protocols": []}
+        servers.append(item)
     health_filters = [
         {"key": "", "label": "Все"},
         {"key": ServerService.HEALTH_HEALTHY, "label": "Здоровы"},

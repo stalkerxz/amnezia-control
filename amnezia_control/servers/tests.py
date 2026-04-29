@@ -276,3 +276,132 @@ class ServerListHealthLabelRenderingTest(TestCase):
         response = self.client.get(f"{reverse('servers-list')}?health=degraded")
         self.assertContains(response, "srv-degraded")
         self.assertNotContains(response, "srv-ok")
+
+
+class ServerMonitoringParserTest(TestCase):
+    def test_parse_load_average(self):
+        parsed = ServerService._parse_load_average(" 11:20:55 up 1 day,  load average: 0.11, 0.22, 0.33")
+        self.assertEqual(parsed["1"], 0.11)
+        self.assertEqual(parsed["5"], 0.22)
+        self.assertEqual(parsed["15"], 0.33)
+
+    def test_parse_memory_and_disk(self):
+        free_out = """              total        used        free      shared  buff/cache   available
+Mem:      1000000000   250000000   750000000
+Swap:             0          0          0
+"""
+        df_out = """Filesystem     1B-blocks      Used Available Use% Mounted on
+/dev/sda1   10000000000 5000000000 5000000000  50% /
+"""
+        mem = ServerService._parse_free_bytes(free_out)
+        disk = ServerService._parse_disk_root(df_out)
+        self.assertEqual(mem["used_percent"], 25.0)
+        self.assertEqual(disk["used_percent"], 50.0)
+
+
+    def test_parse_docker_ps_returns_list(self):
+        rows = ServerService._parse_docker_ps_statuses("web\tUp 1 hour\nwg\tUp 2 hours\n")
+        self.assertEqual(rows[0]["name"], "web")
+        self.assertEqual(rows[1]["status"], "Up 2 hours")
+    def test_parse_main_interface_and_netdev(self):
+        iface = ServerService._parse_main_interface("1.1.1.1 via 10.0.2.2 dev eth0 src 10.0.2.15")
+        net = ServerService._parse_net_dev_counters(
+            """Inter-|   Receive                                                |  Transmit\n face |bytes    packets errs drop fifo frame compressed multicast|bytes    packets errs drop fifo colls carrier compressed\n  eth0: 12345 0 0 0 0 0 0 0 67890 0 0 0 0 0 0 0\n""",
+            iface,
+        )
+        self.assertEqual(iface, "eth0")
+        self.assertEqual(net["rx_bytes"], 12345)
+        self.assertEqual(net["tx_bytes"], 67890)
+
+class ServerSyncDoesNotReenableDisabledProtocolTest(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user("admin-sync", password="123", is_staff=True)
+        self.server = Server.objects.create(name="sync-disabled")
+        self.protocol = ServerProtocol.objects.create(
+            server=self.server,
+            protocol_type=ServerProtocol.ProtocolType.AWG2,
+            container_name="test-container",
+            enabled=False,
+        )
+
+    @patch("servers.services.RuntimeCommandService.run")
+    def test_sync_preserves_manual_disabled_flag(self, run_mock):
+        class Result:
+            def __init__(self, stdout):
+                self.stdout = stdout
+
+        def side_effect(*args, **kwargs):
+            action = args[2]
+            mapping = {
+                "runtime.ps_all": Result("amnezia-awg\namnezia-awg2\n"),
+                "runtime.ps_running": Result("amnezia-awg\namnezia-awg2\n"),
+                "runtime.inspect.awg": Result('[{"State":{"Status":"running"},"NetworkSettings":{"Ports":{"51820/udp":[{"HostIp":"0.0.0.0","HostPort":"51820"}]}},"Config":{"Image":"awg","Env":[]},"Mounts":[]}]'),
+                "runtime.iface.awg": Result("awg0\n"),
+                "runtime.peers.awg": Result("awg0\tprivate\tpub\t51820\n"),
+                "runtime.conf.awg": Result("[Interface]\nAddress = 10.0.0.1/24\nListenPort = 51820\n"),
+                "runtime.inspect.awg2": Result('[{"State":{"Status":"running"},"NetworkSettings":{"Ports":{"51830/udp":[{"HostIp":"0.0.0.0","HostPort":"51830"}]}},"Config":{"Image":"awg2","Env":[]},"Mounts":[]}]'),
+                "runtime.iface.awg2": Result("awg0\n"),
+                "runtime.peers.awg2.all": Result("awg0\tprivate\tpub\t51830\n"),
+                "runtime.conf.awg2": Result("[Interface]\nAddress = 10.1.0.1/24\nListenPort = 51830\n"),
+            }
+            return mapping[action]
+
+        run_mock.side_effect = side_effect
+        ServerService.sync_runtime_state(server=self.server, actor=self.user)
+        self.protocol.refresh_from_db()
+        self.assertFalse(self.protocol.enabled)
+
+
+class ServerMonitoringCollectMetricsTest(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user("admin-monitor", password="123", is_staff=True)
+        self.server = Server.objects.create(name="monitor-server")
+        ServerProtocol.objects.create(
+            server=self.server,
+            protocol_type=ServerProtocol.ProtocolType.AWG,
+            enabled=True,
+            container_name="proto-awg",
+            runtime_metadata={"interface": "wg-test", "config_path": "/tmp/wg.conf"},
+        )
+
+    @patch("servers.services.RuntimeCommandService.run")
+    def test_collect_load_metrics_marks_protocol_containers(self, run_mock):
+        class Result:
+            def __init__(self, stdout):
+                self.stdout = stdout
+
+        def side_effect(*args, **kwargs):
+            action = args[2]
+            mapping = {
+                "monitoring.host_bundle": Result(
+                    "__HOSTNAME__\nhost1\n"
+                    "__UPTIME__\n 11:20:55 up 1 day,  load average: 0.11, 0.22, 0.33\n"
+                    "__NPROC__\n4\n"
+                    "__FREE__\nMem: 1000 250 750\n"
+                    "__DF__\nFilesystem 1B-blocks Used Available Use% Mounted on\n/dev/sda1 1000 500 500 50% /\n"
+                    "__ROUTE__\n1.1.1.1 via 10.0.2.2 dev eth0 src 10.0.2.15\n"
+                    "__NETDEV__\neth0: 12 0 0 0 0 0 0 0 34 0 0 0 0 0 0 0\n"
+                ),
+                "monitoring.docker": Result("proto-awg\tUp 1 hour\nother\tUp 2 hours\n"),
+                "monitoring.protocol.peers.awg": Result("1\n1\n"),
+            }
+            return mapping[action]
+
+        run_mock.side_effect = side_effect
+        metrics = ServerService.collect_load_metrics(self.server, self.user)
+        self.assertIsInstance(metrics["docker"]["containers"], list)
+        self.assertTrue(metrics["docker"]["containers"][0]["is_protocol_container"])
+        self.assertFalse(metrics["docker"]["containers"][1]["is_protocol_container"])
+
+
+class ServerMonitoringViewFailureTest(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user("admin-monitor-fail", password="123", is_staff=True)
+        self.server = Server.objects.create(name="monitor-fail-server")
+
+    @patch("servers.views.ServerService.collect_load_metrics", side_effect=RuntimeError("ssh down"))
+    def test_server_list_monitoring_failure_does_not_crash(self, _collect_mock):
+        self.client.force_login(self.user)
+        response = self.client.get(f"{reverse('servers-list')}?monitor={self.server.id}")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Мониторинг недоступен")
