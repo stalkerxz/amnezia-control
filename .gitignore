@@ -1,16 +1,30 @@
-__pycache__/
-*.pyc
-.env
-.venv/
-staticfiles/
-*.sqlite3
-amnezia_control/celerybeat-schedule
-docker-compose.yml.bak.*
-backups/
-*.dump
-*.sql.gz
 
+# Local runtime / secrets / emergency backups
 # backup/restore artifacts
+*.conf
+*.dump
+*.env
+*.key
+*.pem
+*.pyc
+*.sql.gz
+*.sqlite3
+*.tar
+*.tar.gz
+*.zip
+.env
+.ssh/
+.venv/
+__pycache__/
+_local_hotfix_backup/
+amnezia-configs/
+amnezia-persistent/
+amnezia_control/celerybeat-schedule
+backups/
 backups/runs/
-backups/runs/**/SHA256SUMS
 backups/runs/**/*.tar.gz
+backups/runs/**/SHA256SUMS
+docker-compose.yml.bak.*
+docker-compose.yml.broken.*
+scripts/*.bak.*
+staticfiles/
