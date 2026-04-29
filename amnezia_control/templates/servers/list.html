@@ -16,7 +16,7 @@
 <div class="table-responsive card p-2">
   <table class="table table-hover align-middle mb-0">
     <thead>
-      <tr><th>Имя</th><th>SSH</th><th>Здоровье</th><th>Последняя sync</th></tr>
+      <tr><th>Имя</th><th>SSH</th><th>Здоровье</th><th>Мониторинг</th><th>Последняя sync</th></tr>
     </thead>
     <tbody>
       {% for s in servers %}
@@ -31,8 +31,35 @@
           <div class="small text-secondary mt-1">{{ s.health_reasons.0 }}</div>
           {% endif %}
         </td>
+        <td>
+          <a class="btn btn-sm btn-outline-primary" href="/servers/?{% if health_filter %}health={{ health_filter }}&{% endif %}monitor={{ s.obj.id }}">Обновить мониторинг</a>
+        </td>
         <td>{{ s.obj.last_runtime_sync_at|default:'—' }}</td>
       </tr>
+      {% if s.metrics %}
+      <tr>
+        <td colspan="5" class="bg-light-subtle">
+          {% if s.metrics.errors %}
+            <div class="alert alert-warning py-2 mb-2">{{ s.metrics.errors|join:'; ' }}</div>
+          {% endif %}
+          <div class="small"><strong>Host:</strong> {{ s.metrics.hostname }} | <strong>Uptime:</strong> {{ s.metrics.uptime|default:'—' }}</div>
+          <div class="small"><strong>Load:</strong> {{ s.metrics.load_average.1|default:'—' }} / {{ s.metrics.load_average.5|default:'—' }} / {{ s.metrics.load_average.15|default:'—' }} | <strong>CPU:</strong> {{ s.metrics.cpu_cores|default:'—' }}</div>
+          <div class="small"><strong>RAM:</strong> total {{ s.metrics.memory.total|default:'—' }}, used {{ s.metrics.memory.used|default:'—' }}, free {{ s.metrics.memory.free|default:'—' }} ({{ s.metrics.memory.used_percent|default:'—' }}%)</div>
+          <div class="small"><strong>Disk /:</strong> total {{ s.metrics.disk_root.total|default:'—' }}, used {{ s.metrics.disk_root.used|default:'—' }}, free {{ s.metrics.disk_root.free|default:'—' }} ({{ s.metrics.disk_root.used_percent|default:'—' }}%)</div>
+          <div class="small"><strong>Net:</strong> {{ s.metrics.main_interface|default:'—' }} | RX {{ s.metrics.network.rx_bytes|default:'—' }} / TX {{ s.metrics.network.tx_bytes|default:'—' }}</div>
+          <div class="small"><strong>Docker:</strong>
+            {% if s.metrics.docker.available %}
+              amnezia-control={{ s.metrics.docker.containers.amnezia-control|default:'not running' }}, amnezia-awg2={{ s.metrics.docker.containers.amnezia-awg2|default:'not running' }}
+            {% else %}
+              недоступно
+            {% endif %}
+          </div>
+          {% if s.metrics.awg2 %}
+          <div class="small"><strong>AWG2 peers:</strong> FILE {{ s.metrics.awg2.file_peers }} / LIVE {{ s.metrics.awg2.live_peers }}</div>
+          {% endif %}
+        </td>
+      </tr>
+      {% endif %}
       {% endfor %}
     </tbody>
   </table>

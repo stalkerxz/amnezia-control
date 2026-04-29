@@ -276,3 +276,34 @@ class ServerListHealthLabelRenderingTest(TestCase):
         response = self.client.get(f"{reverse('servers-list')}?health=degraded")
         self.assertContains(response, "srv-degraded")
         self.assertNotContains(response, "srv-ok")
+
+
+class ServerMonitoringParserTest(TestCase):
+    def test_parse_load_average(self):
+        parsed = ServerService._parse_load_average(" 11:20:55 up 1 day,  load average: 0.11, 0.22, 0.33")
+        self.assertEqual(parsed["1"], 0.11)
+        self.assertEqual(parsed["5"], 0.22)
+        self.assertEqual(parsed["15"], 0.33)
+
+    def test_parse_memory_and_disk(self):
+        free_out = """              total        used        free      shared  buff/cache   available
+Mem:      1000000000   250000000   750000000
+Swap:             0          0          0
+"""
+        df_out = """Filesystem     1B-blocks      Used Available Use% Mounted on
+/dev/sda1   10000000000 5000000000 5000000000  50% /
+"""
+        mem = ServerService._parse_free_bytes(free_out)
+        disk = ServerService._parse_disk_root(df_out)
+        self.assertEqual(mem["used_percent"], 25.0)
+        self.assertEqual(disk["used_percent"], 50.0)
+
+    def test_parse_main_interface_and_netdev(self):
+        iface = ServerService._parse_main_interface("1.1.1.1 via 10.0.2.2 dev eth0 src 10.0.2.15")
+        net = ServerService._parse_net_dev_counters(
+            """Inter-|   Receive                                                |  Transmit\n face |bytes    packets errs drop fifo frame compressed multicast|bytes    packets errs drop fifo colls carrier compressed\n  eth0: 12345 0 0 0 0 0 0 0 67890 0 0 0 0 0 0 0\n""",
+            iface,
+        )
+        self.assertEqual(iface, "eth0")
+        self.assertEqual(net["rx_bytes"], 12345)
+        self.assertEqual(net["tx_bytes"], 67890)

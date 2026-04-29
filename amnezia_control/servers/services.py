@@ -24,6 +24,142 @@ class ServerService:
     HEALTH_UNHEALTHY = "unhealthy"
 
     @staticmethod
+    def _parse_load_average(uptime_text: str):
+        match = re.search(r"load average[s]?:\s*([0-9.,]+)\s*,\s*([0-9.,]+)\s*,\s*([0-9.,]+)", uptime_text)
+        if not match:
+            return None
+        return {
+            "1": float(match.group(1).replace(",", ".")),
+            "5": float(match.group(2).replace(",", ".")),
+            "15": float(match.group(3).replace(",", ".")),
+        }
+
+    @staticmethod
+    def _parse_free_bytes(free_output: str):
+        lines = [line.strip() for line in free_output.splitlines() if line.strip()]
+        mem_line = next((line for line in lines if line.lower().startswith("mem:")), "")
+        if not mem_line:
+            return None
+        parts = mem_line.split()
+        if len(parts) < 4:
+            return None
+        total = int(parts[1])
+        used = int(parts[2])
+        free = int(parts[3])
+        return {
+            "total": total,
+            "used": used,
+            "free": free,
+            "used_percent": round((used / total * 100), 2) if total else 0,
+        }
+
+    @staticmethod
+    def _parse_disk_root(df_output: str):
+        lines = [line.strip() for line in df_output.splitlines() if line.strip()]
+        if len(lines) < 2:
+            return None
+        parts = lines[-1].split()
+        if len(parts) < 6:
+            return None
+        total = int(parts[1])
+        used = int(parts[2])
+        free = int(parts[3])
+        return {
+            "total": total,
+            "used": used,
+            "free": free,
+            "used_percent": round((used / total * 100), 2) if total else 0,
+        }
+
+    @staticmethod
+    def _parse_main_interface(ip_route_output: str):
+        match = re.search(r"\bdev\s+(\S+)", ip_route_output)
+        return match.group(1) if match else ""
+
+    @staticmethod
+    def _parse_net_dev_counters(proc_net_dev_output: str, iface: str):
+        for line in proc_net_dev_output.splitlines():
+            if ":" not in line:
+                continue
+            name, data = line.split(":", 1)
+            if name.strip() != iface:
+                continue
+            cols = data.split()
+            if len(cols) < 16:
+                return None
+            return {"rx_bytes": int(cols[0]), "tx_bytes": int(cols[8])}
+        return None
+
+    @staticmethod
+    def _parse_docker_ps_statuses(docker_ps_output: str):
+        statuses = {}
+        for line in docker_ps_output.splitlines():
+            if "\t" not in line:
+                continue
+            name, status = line.split("\t", 1)
+            statuses[name.strip()] = status.strip()
+        return statuses
+
+    @classmethod
+    def collect_load_metrics(cls, server: Server, actor):
+        protocol_awg2 = server.protocols.filter(protocol_type=ServerProtocol.ProtocolType.AWG2, enabled=True).first()
+        metrics = {
+            "hostname": server.host,
+            "uptime": "",
+            "load_average": None,
+            "cpu_cores": None,
+            "memory": None,
+            "disk_root": None,
+            "main_interface": "",
+            "network": None,
+            "docker": {"available": True, "containers": {}},
+            "awg2": None,
+            "errors": [],
+        }
+        try:
+            metrics["hostname"] = RuntimeCommandService.run(server, actor, "monitoring.hostname", "hostname").stdout.strip() or server.host
+            uptime_out = RuntimeCommandService.run(server, actor, "monitoring.uptime", "uptime").stdout.strip()
+            metrics["uptime"] = uptime_out
+            metrics["load_average"] = cls._parse_load_average(uptime_out)
+            metrics["cpu_cores"] = int(RuntimeCommandService.run(server, actor, "monitoring.nproc", "nproc").stdout.strip())
+            metrics["memory"] = cls._parse_free_bytes(RuntimeCommandService.run(server, actor, "monitoring.free", "free -b").stdout)
+            metrics["disk_root"] = cls._parse_disk_root(RuntimeCommandService.run(server, actor, "monitoring.df", "df -B1 /").stdout)
+            route_out = RuntimeCommandService.run(server, actor, "monitoring.route", "ip route get 1.1.1.1").stdout.strip()
+            iface = cls._parse_main_interface(route_out)
+            metrics["main_interface"] = iface
+            if iface:
+                netdev_out = RuntimeCommandService.run(server, actor, "monitoring.netdev", "cat /proc/net/dev").stdout
+                metrics["network"] = cls._parse_net_dev_counters(netdev_out, iface)
+        except Exception as exc:
+            metrics["errors"].append(f"SSH monitoring failed: {exc}")
+            return metrics
+
+        try:
+            docker_out = RuntimeCommandService.run(server, actor, "monitoring.docker", "docker ps --format '{{.Names}}\t{{.Status}}'").stdout
+            statuses = cls._parse_docker_ps_statuses(docker_out)
+            metrics["docker"]["containers"] = {
+                "amnezia-control": statuses.get("amnezia-control", "not running"),
+                "amnezia-awg2": statuses.get("amnezia-awg2", "not running"),
+            }
+        except Exception as exc:
+            metrics["docker"] = {"available": False, "containers": {}}
+            metrics["errors"].append(f"Docker metrics unavailable: {exc}")
+
+        if protocol_awg2:
+            try:
+                peer_cmd = "docker exec amnezia-awg2 sh -lc 'grep -c " + '"^\\[Peer\\]"' + " /opt/amnezia/awg/awg0.conf; wg show awg0 peers | wc -l'"
+                peer_out = RuntimeCommandService.run(server, actor, "monitoring.awg2.peers", peer_cmd).stdout.splitlines()
+                if len(peer_out) >= 2:
+                    metrics["awg2"] = {
+                        "file_peers": int(peer_out[0].strip() or 0),
+                        "live_peers": int(peer_out[1].strip() or 0),
+                    }
+            except Exception as exc:
+                metrics["errors"].append(f"AWG2 metrics unavailable: {exc}")
+
+        return metrics
+
+    @staticmethod
     def update_health(server: Server, status: str) -> Server:
         server.health_status = status
         server.save(update_fields=["health_status", "updated_at"])
