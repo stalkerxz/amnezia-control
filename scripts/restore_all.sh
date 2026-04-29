@@ -32,7 +32,7 @@ while [ "$#" -gt 0 ]; do
       if [ -n "$BACKUP_DIR" ]; then
         fail "backup directory provided multiple times"
       fi
-      BACKUP_DIR="$1"
+      BACKUP_DIR="$(readlink -f "$1")"
       ;;
   esac
   shift
