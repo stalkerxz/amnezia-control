@@ -101,6 +101,19 @@ class ServerService:
             containers.append({"name": name.strip(), "status": status.strip()})
         return containers
 
+    @staticmethod
+    def _parse_labeled_sections(raw: str):
+        sections = {}
+        current = None
+        for line in raw.splitlines():
+            if line.startswith("__") and line.endswith("__"):
+                current = line.strip("_").lower()
+                sections[current] = []
+                continue
+            if current:
+                sections[current].append(line)
+        return {k: "\n".join(v).strip() for k, v in sections.items()}
+
     @classmethod
     def collect_load_metrics(cls, server: Server, actor):
         enabled_protocols = list(server.protocols.filter(enabled=True).order_by("protocol_type"))
@@ -118,18 +131,29 @@ class ServerService:
             "errors": [],
         }
         try:
-            metrics["hostname"] = RuntimeCommandService.run(server, actor, "monitoring.hostname", "hostname").stdout.strip() or server.host
-            uptime_out = RuntimeCommandService.run(server, actor, "monitoring.uptime", "uptime").stdout.strip()
+            host_bundle_cmd = (
+                "sh -lc 'echo __HOSTNAME__; hostname; "
+                "echo __UPTIME__; uptime; "
+                "echo __NPROC__; nproc; "
+                "echo __FREE__; free -b; "
+                "echo __DF__; df -B1 /; "
+                "echo __ROUTE__; ip route get 1.1.1.1; "
+                "echo __NETDEV__; cat /proc/net/dev'"
+            )
+            bundle_out = RuntimeCommandService.run(server, actor, "monitoring.host_bundle", host_bundle_cmd).stdout
+            sections = cls._parse_labeled_sections(bundle_out)
+            metrics["hostname"] = sections.get("hostname", "").strip() or server.host
+            uptime_out = sections.get("uptime", "")
             metrics["uptime"] = uptime_out
             metrics["load_average"] = cls._parse_load_average(uptime_out)
-            metrics["cpu_cores"] = int(RuntimeCommandService.run(server, actor, "monitoring.nproc", "nproc").stdout.strip())
-            metrics["memory"] = cls._parse_free_bytes(RuntimeCommandService.run(server, actor, "monitoring.free", "free -b").stdout)
-            metrics["disk_root"] = cls._parse_disk_root(RuntimeCommandService.run(server, actor, "monitoring.df", "df -B1 /").stdout)
-            route_out = RuntimeCommandService.run(server, actor, "monitoring.route", "ip route get 1.1.1.1").stdout.strip()
+            metrics["cpu_cores"] = int((sections.get("nproc", "0").splitlines() or ["0"])[0].strip())
+            metrics["memory"] = cls._parse_free_bytes(sections.get("free", ""))
+            metrics["disk_root"] = cls._parse_disk_root(sections.get("df", ""))
+            route_out = sections.get("route", "").strip()
             iface = cls._parse_main_interface(route_out)
             metrics["main_interface"] = iface
             if iface:
-                netdev_out = RuntimeCommandService.run(server, actor, "monitoring.netdev", "cat /proc/net/dev").stdout
+                netdev_out = sections.get("netdev", "")
                 metrics["network"] = cls._parse_net_dev_counters(netdev_out, iface)
         except Exception as exc:
             metrics["errors"].append(f"SSH monitoring failed: {exc}")

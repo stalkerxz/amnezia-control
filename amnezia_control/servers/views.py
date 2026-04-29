@@ -59,7 +59,10 @@ def server_list_view(request):
             "metrics": None,
         }
         if monitor_server_id and monitor_server_id.isdigit() and int(monitor_server_id) == server.id:
-            item["metrics"] = ServerService.collect_load_metrics(server, request.user)
+            try:
+                item["metrics"] = ServerService.collect_load_metrics(server, request.user)
+            except Exception as exc:
+                item["metrics"] = {"errors": [f"Мониторинг недоступен: {exc}"], "docker": {"available": False, "containers": []}, "protocols": []}
         servers.append(item)
     health_filters = [
         {"key": "", "label": "Все"},

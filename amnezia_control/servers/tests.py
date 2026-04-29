@@ -373,13 +373,15 @@ class ServerMonitoringCollectMetricsTest(TestCase):
         def side_effect(*args, **kwargs):
             action = args[2]
             mapping = {
-                "monitoring.hostname": Result("host1\n"),
-                "monitoring.uptime": Result(" 11:20:55 up 1 day,  load average: 0.11, 0.22, 0.33\n"),
-                "monitoring.nproc": Result("4\n"),
-                "monitoring.free": Result("Mem: 1000 250 750\n"),
-                "monitoring.df": Result("Filesystem 1B-blocks Used Available Use% Mounted on\n/dev/sda1 1000 500 500 50% /\n"),
-                "monitoring.route": Result("1.1.1.1 via 10.0.2.2 dev eth0 src 10.0.2.15\n"),
-                "monitoring.netdev": Result("eth0: 12 0 0 0 0 0 0 0 34 0 0 0 0 0 0 0\n"),
+                "monitoring.host_bundle": Result(
+                    "__HOSTNAME__\nhost1\n"
+                    "__UPTIME__\n 11:20:55 up 1 day,  load average: 0.11, 0.22, 0.33\n"
+                    "__NPROC__\n4\n"
+                    "__FREE__\nMem: 1000 250 750\n"
+                    "__DF__\nFilesystem 1B-blocks Used Available Use% Mounted on\n/dev/sda1 1000 500 500 50% /\n"
+                    "__ROUTE__\n1.1.1.1 via 10.0.2.2 dev eth0 src 10.0.2.15\n"
+                    "__NETDEV__\neth0: 12 0 0 0 0 0 0 0 34 0 0 0 0 0 0 0\n"
+                ),
                 "monitoring.docker": Result("proto-awg\tUp 1 hour\nother\tUp 2 hours\n"),
                 "monitoring.protocol.peers.awg": Result("1\n1\n"),
             }
@@ -390,3 +392,16 @@ class ServerMonitoringCollectMetricsTest(TestCase):
         self.assertIsInstance(metrics["docker"]["containers"], list)
         self.assertTrue(metrics["docker"]["containers"][0]["is_protocol_container"])
         self.assertFalse(metrics["docker"]["containers"][1]["is_protocol_container"])
+
+
+class ServerMonitoringViewFailureTest(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user("admin-monitor-fail", password="123", is_staff=True)
+        self.server = Server.objects.create(name="monitor-fail-server")
+
+    @patch("servers.views.ServerService.collect_load_metrics", side_effect=RuntimeError("ssh down"))
+    def test_server_list_monitoring_failure_does_not_crash(self, _collect_mock):
+        self.client.force_login(self.user)
+        response = self.client.get(f"{reverse('servers-list')}?monitor={self.server.id}")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Мониторинг недоступен")
