@@ -294,7 +294,7 @@ def clients_create_view(request):
         return redirect("clients-list")
 
     if request.method == "POST":
-        form = VPNClientCreateForm(request.POST)
+        form = VPNClientCreateForm(request.POST, server=server)
         if form.is_valid():
             try:
                 client = VPNClientService.create_client(
@@ -311,7 +311,7 @@ def clients_create_view(request):
             except Exception as exc:
                 messages.error(request, f"Ошибка создания клиента: {exc}")
     else:
-        form = VPNClientCreateForm()
+        form = VPNClientCreateForm(server=server)
     return render(request, "vpn/clients_create.html", {"form": form})
 
 
