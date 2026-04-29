@@ -102,7 +102,7 @@ class ServerService:
 
     @classmethod
     def collect_load_metrics(cls, server: Server, actor):
-        protocol_awg2 = server.protocols.filter(protocol_type=ServerProtocol.ProtocolType.AWG2, enabled=True).first()
+        enabled_protocols = list(server.protocols.filter(enabled=True).order_by("protocol_type"))
         metrics = {
             "hostname": server.host,
             "uptime": "",
@@ -112,8 +112,8 @@ class ServerService:
             "disk_root": None,
             "main_interface": "",
             "network": None,
-            "docker": {"available": True, "containers": {}},
-            "awg2": None,
+            "docker": {"available": True, "containers": []},
+            "protocols": [],
             "errors": [],
         }
         try:
@@ -134,28 +134,54 @@ class ServerService:
             metrics["errors"].append(f"SSH monitoring failed: {exc}")
             return metrics
 
+        protocol_container_names = {p.container_name for p in enabled_protocols if p.container_name}
         try:
-            docker_out = RuntimeCommandService.run(server, actor, "monitoring.docker", "docker ps --format '{{.Names}}\t{{.Status}}'").stdout
-            statuses = cls._parse_docker_ps_statuses(docker_out)
-            metrics["docker"]["containers"] = {
-                "amnezia-control": statuses.get("amnezia-control", "not running"),
-                "amnezia-awg2": statuses.get("amnezia-awg2", "not running"),
-            }
+            docker_out = RuntimeCommandService.run(server, actor, "monitoring.docker", "docker ps --format '{{.Names}}	{{.Status}}'").stdout
+            containers = cls._parse_docker_ps_statuses(docker_out)
+            for row in containers:
+                row["is_protocol_container"] = row["name"] in protocol_container_names
+            metrics["docker"]["containers"] = containers
         except Exception as exc:
-            metrics["docker"] = {"available": False, "containers": {}}
+            metrics["docker"] = {"available": False, "containers": []}
             metrics["errors"].append(f"Docker metrics unavailable: {exc}")
 
-        if protocol_awg2:
+        for protocol in enabled_protocols:
+            protocol_row = {
+                "protocol_type": protocol.protocol_type,
+                "container_name": protocol.container_name or "",
+                "interface": (protocol.runtime_metadata or {}).get("interface", ""),
+                "config_path": (protocol.runtime_metadata or {}).get("config_path", ""),
+                "peer_counts": None,
+                "available": False,
+                "error": "",
+            }
+            if not protocol_row["container_name"] or not protocol_row["interface"] or not protocol_row["config_path"]:
+                protocol_row["error"] = "Недостаточно данных runtime (container/interface/config_path)."
+                metrics["protocols"].append(protocol_row)
+                continue
             try:
-                peer_cmd = "docker exec amnezia-awg2 sh -lc 'grep -c " + '"^\\[Peer\\]"' + " /opt/amnezia/awg/awg0.conf; wg show awg0 peers | wc -l'"
-                peer_out = RuntimeCommandService.run(server, actor, "monitoring.awg2.peers", peer_cmd).stdout.splitlines()
+                peer_cmd = 'docker exec {container} sh -lc \'grep -c "^\\[Peer\\]" {config}; wg show {iface} peers | wc -l\'' .format(
+                    container=protocol_row["container_name"],
+                    config=protocol_row["config_path"],
+                    iface=protocol_row["interface"],
+                )
+                peer_out = RuntimeCommandService.run(
+                    server,
+                    actor,
+                    f"monitoring.protocol.peers.{protocol.protocol_type}",
+                    peer_cmd,
+                ).stdout.splitlines()
                 if len(peer_out) >= 2:
-                    metrics["awg2"] = {
+                    protocol_row["peer_counts"] = {
                         "file_peers": int(peer_out[0].strip() or 0),
                         "live_peers": int(peer_out[1].strip() or 0),
                     }
+                    protocol_row["available"] = True
+                else:
+                    protocol_row["error"] = "Некорректный ответ команды peers."
             except Exception as exc:
-                metrics["errors"].append(f"AWG2 metrics unavailable: {exc}")
+                protocol_row["error"] = str(exc)
+            metrics["protocols"].append(protocol_row)
 
         return metrics
 

@@ -298,6 +298,11 @@ Swap:             0          0          0
         self.assertEqual(mem["used_percent"], 25.0)
         self.assertEqual(disk["used_percent"], 50.0)
 
+
+    def test_parse_docker_ps_returns_list(self):
+        rows = ServerService._parse_docker_ps_statuses("web\tUp 1 hour\nwg\tUp 2 hours\n")
+        self.assertEqual(rows[0]["name"], "web")
+        self.assertEqual(rows[1]["status"], "Up 2 hours")
     def test_parse_main_interface_and_netdev(self):
         iface = ServerService._parse_main_interface("1.1.1.1 via 10.0.2.2 dev eth0 src 10.0.2.15")
         net = ServerService._parse_net_dev_counters(

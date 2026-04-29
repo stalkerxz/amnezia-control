@@ -49,14 +49,23 @@
           <div class="small"><strong>Net:</strong> {{ s.metrics.main_interface|default:'—' }} | RX {{ s.metrics.network.rx_bytes|default:'—' }} / TX {{ s.metrics.network.tx_bytes|default:'—' }}</div>
           <div class="small"><strong>Docker:</strong>
             {% if s.metrics.docker.available %}
-              amnezia-control={{ s.metrics.docker.containers.amnezia-control|default:'not running' }}, amnezia-awg2={{ s.metrics.docker.containers.amnezia-awg2|default:'not running' }}
+              {% for c in s.metrics.docker.containers %}<span class="me-2">{{ c.name }}={{ c.status }}{% if c.is_protocol_container %} (protocol){% endif %}</span>{% empty %}нет активных контейнеров{% endfor %}
             {% else %}
               недоступно
             {% endif %}
           </div>
-          {% if s.metrics.awg2 %}
-          <div class="small"><strong>AWG2 peers:</strong> FILE {{ s.metrics.awg2.file_peers }} / LIVE {{ s.metrics.awg2.live_peers }}</div>
-          {% endif %}
+          <div class="small mt-1"><strong>Протоколы:</strong></div>
+          {% for p in s.metrics.protocols %}
+          <div class="small">{{ p.protocol_type|upper }} · container={{ p.container_name|default:'—' }} · iface={{ p.interface|default:'—' }} · cfg={{ p.config_path|default:'—' }}
+            {% if p.available %}
+              · FILE {{ p.peer_counts.file_peers }} / LIVE {{ p.peer_counts.live_peers }}
+            {% else %}
+              · недоступно{% if p.error %}: {{ p.error }}{% endif %}
+            {% endif %}
+          </div>
+          {% empty %}
+          <div class="small text-secondary">Нет включённых протоколов</div>
+          {% endfor %}
         </td>
       </tr>
       {% endif %}
