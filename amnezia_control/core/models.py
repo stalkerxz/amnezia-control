@@ -1,5 +1,4 @@
 from django.db import models
-from django.core.exceptions import MultipleObjectsReturned
 
 
 class SystemSettings(models.Model):
@@ -17,8 +16,12 @@ class SystemSettings(models.Model):
 
     @classmethod
     def get_solo(cls):
-        try:
-            obj, _ = cls.objects.get_or_create(pk=1)
-        except MultipleObjectsReturned:
-            obj = cls.objects.order_by("pk").first()
-        return obj
+        by_primary = cls.objects.filter(pk=1).first()
+        if by_primary:
+            return by_primary
+
+        existing = cls.objects.order_by("pk").first()
+        if existing:
+            return existing
+
+        return cls.objects.create(pk=1)

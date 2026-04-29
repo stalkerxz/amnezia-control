@@ -173,8 +173,8 @@ class SettingsViewTest(TestCase):
 
     def test_settings_page_handles_duplicate_system_settings_rows(self):
         self.client.force_login(self.staff_user)
-        SystemSettings.objects.create()
-        SystemSettings.objects.create()
+        SystemSettings.objects.create(id=2)
+        SystemSettings.objects.create(id=3)
 
         response = self.client.get(reverse("settings"))
         self.assertEqual(response.status_code, 200)
