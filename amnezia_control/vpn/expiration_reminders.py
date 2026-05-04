@@ -1,6 +1,9 @@
 import hashlib
+import json
 import logging
 import math
+import urllib.error
+import urllib.request
 from dataclasses import dataclass
 from datetime import timedelta
 
@@ -13,6 +16,9 @@ from django.utils import timezone
 from .models import ClientExpirationReminderLog, VPNClient
 
 logger = logging.getLogger(__name__)
+
+TELEGRAM_API_BASE_URL = "https://api.telegram.org"
+TELEGRAM_MESSAGE_LIMIT = 4096
 
 
 @dataclass(frozen=True)
@@ -27,44 +33,97 @@ class ExpirationReminderItem:
 
 
 class ClientExpirationReminderService:
+    SUPPORTED_CHANNELS = ("email", "telegram")
+
     @classmethod
     def send_reminders(cls) -> dict:
-        if not getattr(settings, "EXPIRATION_REMINDER_ENABLED", True):
+        channels = cls.get_channels()
+        channel_status = cls.build_channel_status(channels)
+        base_result = {
+            "enabled": bool(getattr(settings, "EXPIRATION_REMINDER_ENABLED", True)),
+            "emails_sent": 0,
+            "clients": 0,
+            "items": 0,
+            "logs_created": 0,
+            "channels": channel_status,
+        }
+        if not base_result["enabled"]:
             logger.info("Client expiration reminders are disabled")
-            return {"enabled": False, "emails_sent": 0, "clients": 0, "logs_created": 0}
+            return base_result
 
         thresholds = cls.get_threshold_days()
         if not thresholds:
             logger.warning("Client expiration reminder thresholds are empty")
-            return {"enabled": True, "emails_sent": 0, "clients": 0, "logs_created": 0}
+            return base_result
 
-        recipients = cls.get_recipients()
-        if not recipients:
-            logger.warning("Client expiration reminders skipped: no admin recipients configured")
-            return {"enabled": True, "emails_sent": 0, "clients": 0, "logs_created": 0}
+        if not channels:
+            logger.warning("Client expiration reminders skipped: no reminder channels enabled")
+            return base_result
 
         items = cls.collect_pending_items(thresholds=thresholds)
         if not items:
-            return {"enabled": True, "emails_sent": 0, "clients": 0, "logs_created": 0}
+            return base_result
 
-        subject = f"[Amnezia Control] Истекают VPN-клиенты: {len({item.client.id for item in items})}"
-        body = cls.build_email_body(items=items)
-        send_mail(
-            subject=subject,
-            message=body,
-            from_email=getattr(settings, "DEFAULT_FROM_EMAIL", None),
-            recipient_list=recipients,
-            fail_silently=False,
-        )
+        client_count = len({item.client.id for item in items})
+        base_result.update({"clients": client_count, "items": len(items)})
 
-        logs_created = cls.create_logs(items=items, recipients=recipients)
+        sent_recipients = []
+        if "email" in channels:
+            recipients = cls.get_recipients()
+            if not recipients:
+                channel_status["email"]["error"] = "No admin email recipients configured"
+                logger.warning("Client expiration email reminders skipped: no admin recipients configured")
+            else:
+                try:
+                    subject = f"[Amnezia Control] Истекают VPN-клиенты: {client_count}"
+                    body = cls.build_email_body(items=items)
+                    send_mail(
+                        subject=subject,
+                        message=body,
+                        from_email=getattr(settings, "DEFAULT_FROM_EMAIL", None),
+                        recipient_list=recipients,
+                        fail_silently=False,
+                    )
+                    channel_status["email"]["sent"] = True
+                    base_result["emails_sent"] = 1
+                    sent_recipients.extend(f"email:{recipient}" for recipient in recipients)
+                except Exception as exc:  # pragma: no cover - exact backend exceptions vary
+                    channel_status["email"]["error"] = str(exc)
+                    logger.warning("Client expiration email reminders failed: %s", exc)
+
+        if "telegram" in channels:
+            telegram_result = cls.send_telegram_reminder(items=items)
+            channel_status["telegram"].update(telegram_result)
+            if telegram_result["sent"]:
+                sent_recipients.extend(f"telegram:{chat_id}" for chat_id in cls.get_telegram_chat_ids())
+
+        delivered = any(status["enabled"] and status["sent"] for status in channel_status.values())
+        if delivered:
+            base_result["logs_created"] = cls.create_logs(items=items, recipients=sent_recipients)
+        else:
+            logger.warning("Client expiration reminders were not logged because no enabled channel delivered")
+        return base_result
+
+    @classmethod
+    def build_channel_status(cls, channels: list[str]) -> dict:
         return {
-            "enabled": True,
-            "emails_sent": 1,
-            "clients": len({item.client.id for item in items}),
-            "items": len(items),
-            "logs_created": logs_created,
+            channel: {"enabled": channel in channels, "sent": False, "error": ""}
+            for channel in cls.SUPPORTED_CHANNELS
         }
+
+    @classmethod
+    def get_channels(cls) -> list[str]:
+        raw_value = getattr(settings, "EXPIRATION_REMINDER_CHANNELS", ["email"])
+        if isinstance(raw_value, str):
+            parts = raw_value.split(",")
+        else:
+            parts = raw_value
+        channels = []
+        for value in parts:
+            channel = str(value).strip().lower()
+            if channel in cls.SUPPORTED_CHANNELS and channel not in channels:
+                channels.append(channel)
+        return channels
 
     @staticmethod
     def get_threshold_days() -> list[int]:
@@ -94,6 +153,13 @@ class ClientExpirationReminderService:
             return recipients
         admins = getattr(settings, "ADMINS", ())
         return [email for _name, email in admins if email]
+
+    @staticmethod
+    def get_telegram_chat_ids() -> list[str]:
+        configured = getattr(settings, "TELEGRAM_ADMIN_CHAT_IDS", [])
+        if isinstance(configured, str):
+            return [chat_id.strip() for chat_id in configured.split(",") if chat_id.strip()]
+        return [str(chat_id).strip() for chat_id in configured if str(chat_id).strip()]
 
     @classmethod
     def collect_pending_items(cls, *, thresholds: list[int]) -> list[ExpirationReminderItem]:
@@ -142,6 +208,22 @@ class ClientExpirationReminderService:
             "",
             "Сгруппировано по порогам напоминаний.",
         ]
+        lines.extend(cls.build_item_lines(items=items, bullet_prefix=" - ", link_prefix="   link: "))
+        return "\n".join(lines)
+
+    @classmethod
+    def build_telegram_message(cls, *, items: list[ExpirationReminderItem]) -> str:
+        lines = [
+            "Истекают VPN-клиенты",
+            "",
+            "Сгруппировано по порогам напоминаний.",
+        ]
+        lines.extend(cls.build_item_lines(items=items, bullet_prefix="• ", link_prefix="  link: "))
+        return "\n".join(lines)
+
+    @classmethod
+    def build_item_lines(cls, *, items: list[ExpirationReminderItem], bullet_prefix: str, link_prefix: str) -> list[str]:
+        lines = []
         base_url = cls.get_base_url()
         items_by_threshold = {
             threshold: [item for item in items if item.threshold_days == threshold]
@@ -153,18 +235,92 @@ class ClientExpirationReminderService:
                 client = item.client
                 remaining = str(timedelta(seconds=item.remaining_seconds))
                 lines.append(
-                    " - "
-                    f"ID: {client.id}; "
-                    f"name: {client.name}; "
-                    f"protocol_type: {client.protocol_type}; "
-                    f"expires_at: {timezone.localtime(client.expires_at).isoformat()}; "
-                    f"remaining: {remaining} ({item.remaining_days} дн.); "
-                    f"status: {client.status}"
+                    bullet_prefix
+                    + f"ID: {client.id}; "
+                    + f"name: {client.name}; "
+                    + f"protocol_type: {client.protocol_type}; "
+                    + f"expires_at: {timezone.localtime(client.expires_at).isoformat()}; "
+                    + f"remaining: {remaining} ({item.remaining_days} дн.); "
+                    + f"status: {client.status}"
                 )
                 if base_url:
                     detail_path = reverse("clients-detail", kwargs={"pk": client.id})
-                    lines.append(f"   link: {base_url}{detail_path}")
-        return "\n".join(lines)
+                    lines.append(f"{link_prefix}{base_url}{detail_path}")
+        return lines
+
+    @classmethod
+    def send_telegram_reminder(cls, *, items: list[ExpirationReminderItem]) -> dict:
+        token = getattr(settings, "TELEGRAM_BOT_TOKEN", "").strip()
+        if not token:
+            return {"sent": False, "error": "TELEGRAM_BOT_TOKEN is not configured"}
+        chat_ids = cls.get_telegram_chat_ids()
+        if not chat_ids:
+            return {"sent": False, "error": "TELEGRAM_ADMIN_CHAT_IDS is not configured"}
+
+        chunks = cls.split_telegram_message(cls.build_telegram_message(items=items))
+        delivered = 0
+        errors = []
+        for chat_id in chat_ids:
+            for chunk in chunks:
+                try:
+                    cls.post_telegram_message(token=token, chat_id=chat_id, text=chunk)
+                    delivered += 1
+                except Exception as exc:
+                    errors.append(f"chat_id={chat_id}: {exc}")
+                    logger.warning("Telegram expiration reminder failed for chat_id=%s: %s", chat_id, exc)
+                    break
+        return {"sent": delivered > 0, "error": "; ".join(errors)}
+
+    @staticmethod
+    def split_telegram_message(message: str, *, limit: int = TELEGRAM_MESSAGE_LIMIT) -> list[str]:
+        if len(message) <= limit:
+            return [message]
+        chunks = []
+        current_lines = []
+        current_length = 0
+        for line in message.splitlines():
+            extra_length = len(line) + (1 if current_lines else 0)
+            if current_lines and current_length + extra_length > limit:
+                chunks.append("\n".join(current_lines))
+                current_lines = []
+                current_length = 0
+            if len(line) > limit:
+                if current_lines:
+                    chunks.append("\n".join(current_lines))
+                    current_lines = []
+                    current_length = 0
+                for start in range(0, len(line), limit):
+                    chunks.append(line[start : start + limit])
+                continue
+            current_lines.append(line)
+            current_length += len(line) + (1 if current_length else 0)
+        if current_lines:
+            chunks.append("\n".join(current_lines))
+        return chunks
+
+    @staticmethod
+    def post_telegram_message(*, token: str, chat_id: str, text: str) -> None:
+        url = f"{TELEGRAM_API_BASE_URL}/bot{token}/sendMessage"
+        payload = json.dumps({"chat_id": chat_id, "text": text}).encode("utf-8")
+        request = urllib.request.Request(
+            url,
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=15) as response:
+                status = getattr(response, "status", None)
+                if status is None:
+                    status = response.getcode()
+                if status < 200 or status >= 300:
+                    body = response.read().decode("utf-8", errors="replace")[:500]
+                    raise RuntimeError(f"Telegram API returned HTTP {status}: {body}")
+        except urllib.error.HTTPError as exc:
+            body = exc.read().decode("utf-8", errors="replace")[:500]
+            raise RuntimeError(f"Telegram API returned HTTP {exc.code}: {body}") from exc
+        except urllib.error.URLError as exc:
+            raise RuntimeError(f"Telegram API request failed: {exc.reason}") from exc
 
     @staticmethod
     def get_base_url() -> str:
@@ -172,7 +328,7 @@ class ClientExpirationReminderService:
 
     @staticmethod
     def recipient_hash(recipients: list[str]) -> str:
-        normalized = ",".join(sorted(email.lower().strip() for email in recipients if email.strip()))
+        normalized = ",".join(sorted(recipient.lower().strip() for recipient in recipients if recipient.strip()))
         return hashlib.sha256(normalized.encode()).hexdigest()
 
     @classmethod
