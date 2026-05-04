@@ -87,7 +87,7 @@
           <form method="post" action="/clients/{{ client.id }}/action/enable/">{% csrf_token %}<button class="btn btn-outline-success">Включить</button></form>
           {% endif %}
 
-          {% if revision and qr_base64 %}<a class="btn btn-outline-primary" href="#qr-card">Показать QR</a>{% endif %}
+          {% if revision and qr_base64_amneziavpn %}<a class="btn btn-outline-primary" href="#qr-card">Показать QR</a>{% endif %}
         </div>
         {% if reissue_blocked %}<div class="small text-warning mt-2">{{ reissue_block_reason }}</div>{% endif %}
       </div>
@@ -144,8 +144,36 @@
       </div>
     </section>
 
-    {% if revision and qr_base64 %}
-    <section class="section-block" id="qr-card"><div class="section-body"><div class="section-header"><h2 class="h6">QR для подключения</h2></div><img src="data:image/png;base64,{{ qr_base64 }}" alt="QR" class="img-thumbnail" style="max-width:290px;"><p class="small text-secondary mt-2 mb-0">Старая версия QR перестаёт работать после переиздания.</p></div></section>
+    {% if revision and qr_base64_amneziavpn %}
+    <section class="section-block" id="qr-card">
+      <div class="section-body">
+        <div class="section-header">
+          <div>
+            <h2 class="h6 mb-1">QR для подключения</h2>
+            <div class="small text-secondary">По умолчанию показывается рекомендуемый формат для AmneziaVPN. AmneziaWG доступен как альтернатива.</div>
+          </div>
+        </div>
+        <ul class="nav nav-pills mb-3" id="clientQrTabs" role="tablist">
+          <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="client-qr-amneziavpn-tab" data-bs-toggle="pill" data-bs-target="#client-qr-amneziavpn" type="button" role="tab" aria-controls="client-qr-amneziavpn" aria-selected="true">QR для AmneziaVPN <span class="badge bg-success ms-1">рекомендуется</span></button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" id="client-qr-amneziawg-tab" data-bs-toggle="pill" data-bs-target="#client-qr-amneziawg" type="button" role="tab" aria-controls="client-qr-amneziawg" aria-selected="false">QR для AmneziaWG <span class="badge bg-secondary ms-1">альтернатива</span></button>
+          </li>
+        </ul>
+        <div class="tab-content" id="clientQrTabsContent">
+          <div class="tab-pane fade show active" id="client-qr-amneziavpn" role="tabpanel" aria-labelledby="client-qr-amneziavpn-tab" tabindex="0">
+            <div class="small fw-semibold mb-2">QR для AmneziaVPN — рекомендуется/default</div>
+            <img src="data:image/png;base64,{{ qr_base64_amneziavpn }}" alt="QR для AmneziaVPN" class="img-thumbnail" style="max-width:290px;">
+          </div>
+          <div class="tab-pane fade" id="client-qr-amneziawg" role="tabpanel" aria-labelledby="client-qr-amneziawg-tab" tabindex="0">
+            <div class="small fw-semibold mb-2">QR для AmneziaWG — альтернативный формат</div>
+            <img src="data:image/png;base64,{{ qr_base64_amneziawg }}" alt="QR для AmneziaWG" class="img-thumbnail" style="max-width:290px;">
+          </div>
+        </div>
+        <p class="small text-secondary mt-2 mb-0">Старая версия QR перестаёт работать после переиздания.</p>
+      </div>
+    </section>
     {% endif %}
 
     <section class="section-block">

@@ -1609,36 +1609,96 @@ class VPNClientAdminExportParityTest(TestCase):
         self.server = Server.objects.create(name="export-server", public_endpoint_host="vpn.example.com")
         self.protocol = ServerProtocol.objects.create(
             server=self.server,
-            protocol_type=ServerProtocol.ProtocolType.AWG,
-            container_name="amnezia-awg",
+            protocol_type=ServerProtocol.ProtocolType.AWG2,
+            container_name="amnezia-awg2",
             enabled=True,
-            runtime_metadata={"udp_port": 51820, "subnet": "10.66.0.0/24"},
+            runtime_metadata={
+                "udp_port": 51820,
+                "subnet": "10.66.0.0/24",
+                "awg2_metadata": {
+                    "Jc": "7",
+                    "Jmin": "8",
+                    "Jmax": "9",
+                    "S1": "1",
+                    "S2": "2",
+                    "S3": "3",
+                    "S4": "4",
+                    "H1": "3",
+                    "H2": "4",
+                    "H3": "5",
+                    "H4": "6",
+                },
+            },
         )
         self.profile = ProtocolProfile.objects.create(
             server_protocol=self.protocol,
             name="export-profile",
-            protocol_type=ServerProtocol.ProtocolType.AWG,
+            protocol_type=ServerProtocol.ProtocolType.AWG2,
             config_template="[Interface]",
         )
         self.vpn_client = VPNClient.objects.create(
             server=self.server,
             name="export-client",
-            protocol_type=VPNClient.ProtocolType.AWG,
+            protocol_type=VPNClient.ProtocolType.AWG2,
             profile=self.profile,
             created_by=self.user,
         )
         VPNClientService._store_revision(self.vpn_client, "[Interface]\nPrivateKey = test")
 
-    def test_admin_qr_modal_uses_portal_export_payload(self):
-        from unittest.mock import patch
+    def test_admin_client_detail_uses_target_specific_qrs(self):
+        from unittest.mock import call, patch
 
-        with patch("vpn.views.VPNClientService.portal_qr_png_base64", return_value="admin-qr") as portal_qr_mock:
-            with patch("vpn.views.VPNClientService.qr_png_base64") as legacy_qr_mock:
-                response = self.client.get(f"/clients/{self.vpn_client.id}/qr-modal/")
+        with patch(
+            "vpn.views.VPNClientService.portal_qr_png_base64_for_target",
+            side_effect=lambda client, target: f"{target}-qr",
+        ) as target_qr_mock:
+            with patch("vpn.views.VPNClientService.portal_qr_png_base64") as legacy_portal_qr_mock:
+                with patch("vpn.views.VPNClientService.qr_png_base64") as legacy_qr_mock:
+                    response = self.client.get(f"/clients/{self.vpn_client.id}/")
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "admin-qr")
-        portal_qr_mock.assert_called_once_with(self.vpn_client)
+        self.assertContains(response, "amneziavpn-qr")
+        self.assertContains(response, "amneziawg-qr")
+        self.assertContains(response, "QR для AmneziaVPN")
+        self.assertContains(response, "рекомендуется")
+        self.assertEqual(response.context["qr_base64_amneziavpn"], "amneziavpn-qr")
+        self.assertEqual(response.context["qr_base64_amneziawg"], "amneziawg-qr")
+        target_qr_mock.assert_has_calls(
+            [
+                call(self.vpn_client, "amneziavpn"),
+                call(self.vpn_client, "amneziawg"),
+            ]
+        )
+        self.assertEqual(target_qr_mock.call_count, 2)
+        legacy_portal_qr_mock.assert_not_called()
+        legacy_qr_mock.assert_not_called()
+
+    def test_admin_qr_modal_uses_target_specific_qrs(self):
+        from unittest.mock import call, patch
+
+        with patch(
+            "vpn.views.VPNClientService.portal_qr_png_base64_for_target",
+            side_effect=lambda client, target: f"{target}-qr",
+        ) as target_qr_mock:
+            with patch("vpn.views.VPNClientService.portal_qr_png_base64") as legacy_portal_qr_mock:
+                with patch("vpn.views.VPNClientService.qr_png_base64") as legacy_qr_mock:
+                    response = self.client.get(f"/clients/{self.vpn_client.id}/qr-modal/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "amneziavpn-qr")
+        self.assertContains(response, "amneziawg-qr")
+        self.assertContains(response, "QR для AmneziaVPN")
+        self.assertContains(response, "рекомендуется")
+        self.assertEqual(response.context["qr_base64_amneziavpn"], "amneziavpn-qr")
+        self.assertEqual(response.context["qr_base64_amneziawg"], "amneziawg-qr")
+        target_qr_mock.assert_has_calls(
+            [
+                call(self.vpn_client, "amneziavpn"),
+                call(self.vpn_client, "amneziawg"),
+            ]
+        )
+        self.assertEqual(target_qr_mock.call_count, 2)
+        legacy_portal_qr_mock.assert_not_called()
         legacy_qr_mock.assert_not_called()
 
     def test_admin_download_uses_portal_export_config(self):

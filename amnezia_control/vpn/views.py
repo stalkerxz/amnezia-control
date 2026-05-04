@@ -322,7 +322,12 @@ def clients_detail_view(request, pk: int):
     limits_form = VPNClientLimitsUpdateForm(client=client)
     revision = client.revisions.first()
     revision_count = client.revisions.count()
-    qr_base64 = VPNClientService.portal_qr_png_base64(client) if revision else ""
+    qr_base64_amneziavpn = (
+        VPNClientService.portal_qr_png_base64_for_target(client, "amneziavpn") if revision else ""
+    )
+    qr_base64_amneziawg = (
+        VPNClientService.portal_qr_png_base64_for_target(client, "amneziawg") if revision else ""
+    )
 
     protocol = client.server.protocols.filter(protocol_type=client.protocol_type).first()
     missing_endpoint = False
@@ -410,7 +415,8 @@ def clients_detail_view(request, pk: int):
             "client": client,
             "revision": revision,
             "revision_count": revision_count,
-            "qr_base64": qr_base64,
+            "qr_base64_amneziavpn": qr_base64_amneziavpn,
+            "qr_base64_amneziawg": qr_base64_amneziawg,
             "missing_endpoint": missing_endpoint,
             "missing_awg2_metadata": missing_awg2_metadata,
             "expires_display": timezone.localtime(client.expires_at).strftime("%d.%m.%Y %H:%M") if client.expires_at else "Не задано",
@@ -447,14 +453,20 @@ def clients_detail_view(request, pk: int):
 def client_qr_modal_view(request, pk: int):
     client = get_object_or_404(VPNClient, pk=pk)
     revision = client.revisions.first()
-    qr_base64 = VPNClientService.portal_qr_png_base64(client) if revision else ""
+    qr_base64_amneziavpn = (
+        VPNClientService.portal_qr_png_base64_for_target(client, "amneziavpn") if revision else ""
+    )
+    qr_base64_amneziawg = (
+        VPNClientService.portal_qr_png_base64_for_target(client, "amneziawg") if revision else ""
+    )
     return render(
         request,
         "vpn/partials/client_qr_modal_body.html",
         {
             "client": client,
             "revision": revision,
-            "qr_base64": qr_base64,
+            "qr_base64_amneziavpn": qr_base64_amneziavpn,
+            "qr_base64_amneziawg": qr_base64_amneziawg,
         },
     )
 
