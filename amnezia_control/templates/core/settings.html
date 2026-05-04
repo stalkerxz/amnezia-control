@@ -30,6 +30,35 @@
       </div>
     </section>
 
+
+    <section class="section-block section-flat section-quiet">
+      <div class="section-body py-2">
+        <div class="section-header"><h2 class="h6">{% trans "Напоминания об истечении VPN-клиентов" %}</h2></div>
+        <div class="kv-inline">
+          <div><div class="k">{% trans "Статус" %}</div><div class="v">{% if expiration_reminder_enabled %}{% trans "вкл" %}{% else %}{% trans "выкл" %}{% endif %}</div></div>
+          <div><div class="k">{% trans "Получатели" %}</div><div class="v">{% if expiration_reminder_recipients %}{{ expiration_reminder_recipients|join:", " }}{% else %}{% trans "не настроены" %}{% endif %}</div></div>
+          <div><div class="k">{% trans "Пороги" %}</div><div class="v">{% if expiration_reminder_thresholds %}{{ expiration_reminder_thresholds|join:", " }} {% trans "дн." %}{% else %}—{% endif %}</div></div>
+        </div>
+        {% if expiration_reminder_last_logs %}
+          <div class="table-responsive mt-3">
+            <table class="table table-sm mb-0">
+              <thead><tr><th>{% trans "Клиент" %}</th><th>{% trans "Порог" %}</th><th>{% trans "Дата истечения" %}</th><th>{% trans "Отправлено" %}</th></tr></thead>
+              <tbody>
+                {% for log in expiration_reminder_last_logs %}
+                  <tr>
+                    <td>#{{ log.client_id }} {{ log.client.name }}</td>
+                    <td>{{ log.threshold_days }} {% trans "дн." %}</td>
+                    <td>{{ log.expires_at_snapshot|date:'Y-m-d H:i' }}</td>
+                    <td>{{ log.sent_at|date:'Y-m-d H:i' }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% endif %}
+      </div>
+    </section>
+
     <section class="section-block section-flat section-quiet">
       <div class="section-body py-2">
         <div class="section-header"><h2 class="h6">{% trans "Параметры только для чтения" %}</h2></div>

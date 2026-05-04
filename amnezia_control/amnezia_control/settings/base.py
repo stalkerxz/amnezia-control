@@ -8,6 +8,14 @@ SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "unsafe-dev-secret")
 DEBUG = os.getenv("DJANGO_DEBUG", "0") == "1"
 ALLOWED_HOSTS = [h.strip() for h in os.getenv("DJANGO_ALLOWED_HOSTS", "*").split(",") if h.strip()]
 
+
+def _csv_env(name, default=""):
+    return [item.strip() for item in os.getenv(name, default).split(",") if item.strip()]
+
+
+def _bool_env(name, default="1"):
+    return os.getenv(name, default).lower() in {"1", "true", "yes", "on"}
+
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -119,13 +127,28 @@ CELERY_BEAT_SCHEDULE = {
         "task": "notifications.tasks.notify_client_access_limits_task",
         "schedule": crontab(minute="15", hour="8"),
     },
+    "client-expiration-reminders": {
+        "task": "vpn.tasks.send_expiration_reminders_task",
+        "schedule": crontab(minute="30", hour="8"),
+    },
 }
 
 CONFIG_ENCRYPTION_KEY = os.getenv("CONFIG_ENCRYPTION_KEY", "")
 
 
 EMAIL_BACKEND = os.getenv("EMAIL_BACKEND", "django.core.mail.backends.smtp.EmailBackend")
+EMAIL_HOST = os.getenv("EMAIL_HOST", "localhost")
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", "25"))
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = _bool_env("EMAIL_USE_TLS", "0")
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "no-reply@amnezia-control.local")
+ADMINS = [(email, email) for email in _csv_env("DJANGO_ADMINS", "")]
+SITE_URL = os.getenv("SITE_URL", "").rstrip("/")
+PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", "").rstrip("/")
+EXPIRATION_REMINDER_ENABLED = _bool_env("EXPIRATION_REMINDER_ENABLED", "1")
+EXPIRATION_REMINDER_DAYS = _csv_env("EXPIRATION_REMINDER_DAYS", "7,3,1")
+ADMIN_EXPIRATION_REMINDER_EMAILS = _csv_env("ADMIN_EXPIRATION_REMINDER_EMAILS", "")
 NOTIFICATIONS_ENABLED = os.getenv("NOTIFICATIONS_ENABLED", "1") == "1"
 NOTIFICATIONS_CHANNELS = [channel.strip() for channel in os.getenv("NOTIFICATIONS_CHANNELS", "email").split(",") if channel.strip()]
 NOTIFICATIONS_EMAIL_FROM = os.getenv("NOTIFICATIONS_EMAIL_FROM", DEFAULT_FROM_EMAIL)

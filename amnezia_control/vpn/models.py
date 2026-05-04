@@ -64,3 +64,23 @@ class ClientConfigRevision(models.Model):
     class Meta:
         unique_together = ("client", "revision_number", "protocol_type")
         ordering = ("-revision_number",)
+
+
+class ClientExpirationReminderLog(models.Model):
+    client = models.ForeignKey(VPNClient, on_delete=models.CASCADE, related_name="expiration_reminder_logs")
+    threshold_days = models.PositiveIntegerField()
+    expires_at_snapshot = models.DateTimeField()
+    sent_at = models.DateTimeField(auto_now_add=True)
+    recipient_hash = models.CharField(max_length=64, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["client", "threshold_days", "expires_at_snapshot"],
+                name="unique_client_expiration_reminder",
+            )
+        ]
+        ordering = ("-sent_at",)
+
+    def __str__(self):
+        return f"{self.client_id}:{self.threshold_days}:{self.expires_at_snapshot.isoformat()}"

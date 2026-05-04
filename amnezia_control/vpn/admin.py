@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.utils.translation import gettext_lazy as _
-from .models import ClientConfigRevision, VPNClient
+from .models import ClientConfigRevision, ClientExpirationReminderLog, VPNClient
 
 
 @admin.register(VPNClient)
@@ -54,3 +54,13 @@ class ClientConfigRevisionAdmin(admin.ModelAdmin):
     autocomplete_fields = ("client",)
     readonly_fields = ("client", "revision_number", "protocol_type", "config_hash", "created_at")
     exclude = ("config_blob_encrypted",)
+
+
+@admin.register(ClientExpirationReminderLog)
+class ClientExpirationReminderLogAdmin(admin.ModelAdmin):
+    list_display = ("id", "client", "threshold_days", "expires_at_snapshot", "sent_at")
+    list_filter = ("threshold_days", "sent_at")
+    search_fields = ("client__name", "client__id")
+    autocomplete_fields = ("client",)
+    readonly_fields = ("client", "threshold_days", "expires_at_snapshot", "sent_at", "recipient_hash")
+    ordering = ("-sent_at",)

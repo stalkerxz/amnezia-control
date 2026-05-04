@@ -73,6 +73,28 @@ make logs
 make down
 ```
 
+
+## Email-напоминания администраторам об истечении VPN-клиентов
+Администраторы могут получать одно сгруппированное письмо о VPN-клиентах, срок действия которых скоро закончится. Логика выбирает только активных клиентов с заполненным `expires_at`, не включает уже истёкших клиентов и сохраняет факт отправки в базе, чтобы не слать дубли для той же пары клиент/порог/дата истечения. Если клиенту продлили срок и `expires_at` изменился, напоминание для новой даты может быть отправлено снова.
+
+Настройки окружения:
+- `EXPIRATION_REMINDER_ENABLED` — включает/выключает отправку, по умолчанию `1`/`true`.
+- `EXPIRATION_REMINDER_DAYS` — пороги в днях через запятую, по умолчанию `7,3,1`.
+- `ADMIN_EXPIRATION_REMINDER_EMAILS` — получатели через запятую. Если пусто, используется Django `ADMINS`, если он настроен.
+- `SITE_URL` или `PUBLIC_BASE_URL` — базовый URL для абсолютных ссылок на карточки клиентов в письме. Не задавайте production-домен в коде; используйте переменные окружения.
+- `DEFAULT_FROM_EMAIL` — отправитель писем.
+- `EMAIL_BACKEND` — Django email backend.
+- `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `EMAIL_USE_TLS` — SMTP-настройки Django, если используется SMTP backend.
+- `DJANGO_ADMINS` — опциональный fallback-список email-адресов администраторов через запятую для `ADMINS`.
+
+Запуск вручную:
+```bash
+cd amnezia_control
+python manage.py send_expiration_reminders
+```
+
+В `docker compose` уже есть Celery worker/beat, а beat ежедневно запускает `vpn.tasks.send_expiration_reminders_task` (`08:30`). Если проект развёрнут без Celery beat, добавьте cron/systemd timer для команды выше один раз в сутки.
+
 ## Автоматическое применение лимитов клиентов
 В продакшене лимиты теперь запускаются автоматически через **Celery Beat**:
 - `worker` выполняет задачу `vpn.tasks.enforce_client_limits_task`;
