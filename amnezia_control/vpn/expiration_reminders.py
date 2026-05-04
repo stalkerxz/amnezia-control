@@ -112,22 +112,27 @@ class ClientExpirationReminderService:
         items = []
         for client in clients:
             remaining_seconds = max(0, int((client.expires_at - now).total_seconds()))
-            for threshold in thresholds:
-                if client.expires_at > now + timedelta(days=threshold):
-                    continue
-                if ClientExpirationReminderLog.objects.filter(
+            covering_thresholds = [
+                threshold
+                for threshold in thresholds
+                if client.expires_at <= now + timedelta(days=threshold)
+            ]
+            if not covering_thresholds:
+                continue
+            threshold = min(covering_thresholds)
+            if ClientExpirationReminderLog.objects.filter(
+                client=client,
+                threshold_days=threshold,
+                expires_at_snapshot=client.expires_at,
+            ).exists():
+                continue
+            items.append(
+                ExpirationReminderItem(
                     client=client,
                     threshold_days=threshold,
-                    expires_at_snapshot=client.expires_at,
-                ).exists():
-                    continue
-                items.append(
-                    ExpirationReminderItem(
-                        client=client,
-                        threshold_days=threshold,
-                        remaining_seconds=remaining_seconds,
-                    )
+                    remaining_seconds=remaining_seconds,
                 )
+            )
         return items
 
     @classmethod

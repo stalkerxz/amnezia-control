@@ -2474,7 +2474,7 @@ class ClientExpirationReminderTest(TestCase):
             expires_at=expires_at,
         )
 
-    def test_clients_expiring_in_configured_days_are_included(self):
+    def test_clients_expiring_in_configured_days_are_included_once_at_closest_threshold(self):
         now = timezone.now()
         self._make_client(name="expires-seven", expires_at=now + timezone.timedelta(days=7))
         self._make_client(name="expires-three", expires_at=now + timezone.timedelta(days=3))
@@ -2484,14 +2484,24 @@ class ClientExpirationReminderTest(TestCase):
 
         self.assertEqual(result["emails_sent"], 1)
         self.assertEqual(result["clients"], 3)
+        self.assertEqual(result["items"], 3)
         self.assertEqual(len(mail.outbox), 1)
         body = mail.outbox[0].body
         self.assertIn("expires-seven", body)
         self.assertIn("expires-three", body)
         self.assertIn("expires-one", body)
+        self.assertEqual(body.count("expires-seven"), 1)
+        self.assertEqual(body.count("expires-three"), 1)
+        self.assertEqual(body.count("expires-one"), 1)
         self.assertIn("protocol_type: awg", body)
         self.assertIn("status: active", body)
         self.assertIn("https://control.example.com/clients/", body)
+        thresholds_by_name = dict(
+            ClientExpirationReminderLog.objects.values_list("client__name", "threshold_days")
+        )
+        self.assertEqual(thresholds_by_name["expires-seven"], 7)
+        self.assertEqual(thresholds_by_name["expires-three"], 3)
+        self.assertEqual(thresholds_by_name["expires-one"], 1)
 
     def test_expired_clients_are_not_included_as_upcoming(self):
         now = timezone.now()
