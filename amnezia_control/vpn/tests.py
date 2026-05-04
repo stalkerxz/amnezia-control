@@ -1,6 +1,10 @@
+from io import StringIO
+
 from cryptography.fernet import Fernet
 from audit.models import AuditLog
 from django.contrib.auth import get_user_model
+from django.core import mail
+from django.core.management import call_command
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import SimpleTestCase, TestCase, override_settings
 from django.utils import timezone
@@ -10,8 +14,9 @@ from servers.services import ServerService
 from portal.models import ClientRenewalRequest
 from portal.services import PortalAccessService
 
+from .expiration_reminders import ClientExpirationReminderService
 from .forms import VPNClientCreateForm, VPNClientLimitsUpdateForm
-from .models import VPNClient
+from .models import ClientExpirationReminderLog, VPNClient
 from .services import AWG2Adapter, AdapterFactory, PeerState, RuntimeCommandService, VPNClientLimitsService, VPNClientService
 
 
@@ -2427,3 +2432,135 @@ class VPNClientCreateFormProtocolAvailabilityTests(TestCase):
         )
         self.assertFalse(form.is_valid())
         self.assertIn("protocol_type", form.errors)
+
+
+@override_settings(
+    CONFIG_ENCRYPTION_KEY=Fernet.generate_key().decode(),
+    EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    DEFAULT_FROM_EMAIL="no-reply@example.com",
+    ADMIN_EXPIRATION_REMINDER_EMAILS=["admin@example.com"],
+    ADMINS=(),
+    EXPIRATION_REMINDER_ENABLED=True,
+    EXPIRATION_REMINDER_DAYS=[7, 3, 1],
+    SITE_URL="https://control.example.com",
+    PUBLIC_BASE_URL="",
+)
+class ClientExpirationReminderTest(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user("reminder-admin", password="123", is_staff=True)
+        self.server = Server.objects.create(name="reminder-server")
+        self.protocol = ServerProtocol.objects.create(
+            server=self.server,
+            protocol_type=ServerProtocol.ProtocolType.AWG,
+            container_name="amnezia-awg",
+            enabled=True,
+        )
+        self.profile = ProtocolProfile.objects.create(
+            server_protocol=self.protocol,
+            name="reminder-profile",
+            protocol_type=ServerProtocol.ProtocolType.AWG,
+            config_template="[Interface]",
+        )
+        mail.outbox = []
+
+    def _make_client(self, *, name, expires_at, status=VPNClient.Status.ACTIVE):
+        return VPNClient.objects.create(
+            server=self.server,
+            name=name,
+            protocol_type=VPNClient.ProtocolType.AWG,
+            status=status,
+            profile=self.profile,
+            created_by=self.user,
+            expires_at=expires_at,
+        )
+
+    def test_clients_expiring_in_configured_days_are_included_once_at_closest_threshold(self):
+        now = timezone.now()
+        self._make_client(name="expires-seven", expires_at=now + timezone.timedelta(days=7))
+        self._make_client(name="expires-three", expires_at=now + timezone.timedelta(days=3))
+        self._make_client(name="expires-one", expires_at=now + timezone.timedelta(days=1))
+
+        result = ClientExpirationReminderService.send_reminders()
+
+        self.assertEqual(result["emails_sent"], 1)
+        self.assertEqual(result["clients"], 3)
+        self.assertEqual(result["items"], 3)
+        self.assertEqual(len(mail.outbox), 1)
+        body = mail.outbox[0].body
+        self.assertIn("expires-seven", body)
+        self.assertIn("expires-three", body)
+        self.assertIn("expires-one", body)
+        self.assertEqual(body.count("expires-seven"), 1)
+        self.assertEqual(body.count("expires-three"), 1)
+        self.assertEqual(body.count("expires-one"), 1)
+        self.assertIn("protocol_type: awg", body)
+        self.assertIn("status: active", body)
+        self.assertIn("https://control.example.com/clients/", body)
+        thresholds_by_name = dict(
+            ClientExpirationReminderLog.objects.values_list("client__name", "threshold_days")
+        )
+        self.assertEqual(thresholds_by_name["expires-seven"], 7)
+        self.assertEqual(thresholds_by_name["expires-three"], 3)
+        self.assertEqual(thresholds_by_name["expires-one"], 1)
+
+    def test_expired_clients_are_not_included_as_upcoming(self):
+        now = timezone.now()
+        self._make_client(name="already-expired", expires_at=now - timezone.timedelta(minutes=1))
+        self._make_client(name="upcoming", expires_at=now + timezone.timedelta(days=1))
+
+        ClientExpirationReminderService.send_reminders()
+
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertNotIn("already-expired", mail.outbox[0].body)
+        self.assertIn("upcoming", mail.outbox[0].body)
+
+    def test_clients_without_expires_at_are_ignored(self):
+        self._make_client(name="no-expiration", expires_at=None)
+        self._make_client(name="with-expiration", expires_at=timezone.now() + timezone.timedelta(days=1))
+
+        ClientExpirationReminderService.send_reminders()
+
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertNotIn("no-expiration", mail.outbox[0].body)
+        self.assertIn("with-expiration", mail.outbox[0].body)
+
+    def test_duplicate_reminders_are_not_sent_for_same_client_threshold_and_expiration(self):
+        self._make_client(name="dedup-client", expires_at=timezone.now() + timezone.timedelta(days=3))
+
+        first_result = ClientExpirationReminderService.send_reminders()
+        second_result = ClientExpirationReminderService.send_reminders()
+
+        self.assertEqual(first_result["emails_sent"], 1)
+        self.assertEqual(second_result["emails_sent"], 0)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(ClientExpirationReminderLog.objects.count(), first_result["logs_created"])
+
+    def test_after_expires_at_changes_reminder_can_be_sent_again(self):
+        client = self._make_client(name="extended-client", expires_at=timezone.now() + timezone.timedelta(days=3))
+        ClientExpirationReminderService.send_reminders()
+        client.expires_at = timezone.now() + timezone.timedelta(days=5)
+        client.save(update_fields=["expires_at"])
+
+        result = ClientExpirationReminderService.send_reminders()
+
+        self.assertEqual(result["emails_sent"], 1)
+        self.assertEqual(len(mail.outbox), 2)
+        self.assertIn("extended-client", mail.outbox[1].body)
+
+    @override_settings(ADMIN_EXPIRATION_REMINDER_EMAILS=[], ADMINS=())
+    def test_no_recipients_configured_does_not_crash(self):
+        self._make_client(name="no-recipient-client", expires_at=timezone.now() + timezone.timedelta(days=1))
+
+        result = ClientExpirationReminderService.send_reminders()
+
+        self.assertEqual(result["emails_sent"], 0)
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_management_command_returns_success(self):
+        self._make_client(name="command-client", expires_at=timezone.now() + timezone.timedelta(days=1))
+        out = StringIO()
+
+        call_command("send_expiration_reminders", stdout=out)
+
+        self.assertIn("Expiration reminders completed", out.getvalue())
+        self.assertEqual(len(mail.outbox), 1)

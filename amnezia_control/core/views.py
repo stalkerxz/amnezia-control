@@ -17,7 +17,8 @@ from jobs.services import classify_job_signal
 from servers.models import Server, ServerProtocol
 from servers.services import ServerService
 from portal.models import ClientRenewalRequest
-from vpn.models import VPNClient
+from vpn.expiration_reminders import ClientExpirationReminderService
+from vpn.models import ClientExpirationReminderLog, VPNClient
 
 from .forms import SystemSettingsForm
 from .models import SystemSettings
@@ -250,6 +251,7 @@ def settings_view(request):
         form = SystemSettingsForm(instance=system_settings)
 
     app_version = os.getenv("APP_VERSION") or os.getenv("RELEASE") or os.getenv("GIT_SHA") or "unknown"
+    reminder_recipients = ClientExpirationReminderService.get_recipients()
     context = {
         "form": form,
         "limits_enforce_every_minutes": getattr(settings, "LIMITS_ENFORCE_EVERY_MINUTES", "—"),
@@ -257,5 +259,9 @@ def settings_view(request):
         "debug_enabled": bool(getattr(settings, "DEBUG", False)),
         "app_version": app_version,
         "python_version": os.sys.version.split(" ")[0],
+        "expiration_reminder_enabled": bool(getattr(settings, "EXPIRATION_REMINDER_ENABLED", True)),
+        "expiration_reminder_recipients": reminder_recipients,
+        "expiration_reminder_thresholds": ClientExpirationReminderService.get_threshold_days(),
+        "expiration_reminder_last_logs": ClientExpirationReminderLog.objects.select_related("client").order_by("-sent_at")[:5],
     }
     return render(request, "core/settings.html", context)
