@@ -36,7 +36,9 @@
         <div class="section-header"><h2 class="h6">{% trans "Напоминания об истечении VPN-клиентов" %}</h2></div>
         <div class="kv-inline">
           <div><div class="k">{% trans "Статус" %}</div><div class="v">{% if expiration_reminder_enabled %}{% trans "вкл" %}{% else %}{% trans "выкл" %}{% endif %}</div></div>
-          <div><div class="k">{% trans "Получатели" %}</div><div class="v">{% if expiration_reminder_recipients %}{{ expiration_reminder_recipients|join:", " }}{% else %}{% trans "не настроены" %}{% endif %}</div></div>
+          <div><div class="k">{% trans "Каналы" %}</div><div class="v">{% if expiration_reminder_channels %}{{ expiration_reminder_channels|join:", " }}{% else %}{% trans "не настроены" %}{% endif %}</div></div>
+          <div><div class="k">{% trans "Email получатели" %}</div><div class="v">{% if expiration_reminder_recipients %}{{ expiration_reminder_recipients|join:", " }}{% else %}{% trans "не настроены" %}{% endif %}</div></div>
+          <div><div class="k">{% trans "Telegram chat ids" %}</div><div class="v">{{ expiration_reminder_telegram_chat_count }}</div></div>
           <div><div class="k">{% trans "Пороги" %}</div><div class="v">{% if expiration_reminder_thresholds %}{{ expiration_reminder_thresholds|join:", " }} {% trans "дн." %}{% else %}—{% endif %}</div></div>
         </div>
         {% if expiration_reminder_last_logs %}

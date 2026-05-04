@@ -252,6 +252,8 @@ def settings_view(request):
 
     app_version = os.getenv("APP_VERSION") or os.getenv("RELEASE") or os.getenv("GIT_SHA") or "unknown"
     reminder_recipients = ClientExpirationReminderService.get_recipients()
+    reminder_channels = ClientExpirationReminderService.get_channels()
+    telegram_chat_ids = ClientExpirationReminderService.get_telegram_chat_ids()
     context = {
         "form": form,
         "limits_enforce_every_minutes": getattr(settings, "LIMITS_ENFORCE_EVERY_MINUTES", "—"),
@@ -260,7 +262,9 @@ def settings_view(request):
         "app_version": app_version,
         "python_version": os.sys.version.split(" ")[0],
         "expiration_reminder_enabled": bool(getattr(settings, "EXPIRATION_REMINDER_ENABLED", True)),
+        "expiration_reminder_channels": reminder_channels,
         "expiration_reminder_recipients": reminder_recipients,
+        "expiration_reminder_telegram_chat_count": len(telegram_chat_ids),
         "expiration_reminder_thresholds": ClientExpirationReminderService.get_threshold_days(),
         "expiration_reminder_last_logs": ClientExpirationReminderLog.objects.select_related("client").order_by("-sent_at")[:5],
     }
