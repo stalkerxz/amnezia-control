@@ -258,18 +258,23 @@ class ClientExpirationReminderService:
             return {"sent": False, "error": "TELEGRAM_ADMIN_CHAT_IDS is not configured"}
 
         chunks = cls.split_telegram_message(cls.build_telegram_message(items=items))
-        delivered = 0
         errors = []
         for chat_id in chat_ids:
             for chunk in chunks:
                 try:
                     cls.post_telegram_message(token=token, chat_id=chat_id, text=chunk)
-                    delivered += 1
                 except Exception as exc:
-                    errors.append(f"chat_id={chat_id}: {exc}")
-                    logger.warning("Telegram expiration reminder failed for chat_id=%s: %s", chat_id, exc)
+                    error = cls.redact_secret(str(exc), token)
+                    errors.append(f"chat_id={chat_id}: {error}")
+                    logger.warning("Telegram expiration reminder failed for chat_id=%s: %s", chat_id, error)
                     break
-        return {"sent": delivered > 0, "error": "; ".join(errors)}
+        return {"sent": not errors, "error": "; ".join(errors)}
+
+    @staticmethod
+    def redact_secret(value: str, secret: str) -> str:
+        if secret:
+            return value.replace(secret, "[redacted]")
+        return value
 
     @staticmethod
     def split_telegram_message(message: str, *, limit: int = TELEGRAM_MESSAGE_LIMIT) -> list[str]:

@@ -2699,6 +2699,62 @@ class ClientExpirationReminderTest(TestCase):
     @override_settings(
         EXPIRATION_REMINDER_CHANNELS=["telegram"],
         TELEGRAM_BOT_TOKEN="123456:test-token",
+        TELEGRAM_ADMIN_CHAT_IDS=["111", "222"],
+    )
+    @patch("vpn.expiration_reminders.urllib.request.urlopen")
+    def test_telegram_partial_chat_failure_is_not_sent_and_creates_no_logs_when_telegram_only(self, mock_urlopen):
+        mock_urlopen.side_effect = [self._TelegramResponse(), urllib.error.URLError("chat 222 blocked")]
+        self._make_client(name="partial-telegram", expires_at=timezone.now() + timezone.timedelta(days=1))
+
+        result = ClientExpirationReminderService.send_reminders()
+
+        self.assertFalse(result["channels"]["telegram"]["sent"])
+        self.assertIn("chat_id=222", result["channels"]["telegram"]["error"])
+        self.assertNotIn("123456:test-token", result["channels"]["telegram"]["error"])
+        self.assertEqual(result["logs_created"], 0)
+        self.assertEqual(ClientExpirationReminderLog.objects.count(), 0)
+        self.assertEqual(mock_urlopen.call_count, 2)
+
+    @override_settings(
+        EXPIRATION_REMINDER_CHANNELS=["telegram"],
+        TELEGRAM_BOT_TOKEN="123456:test-token",
+        TELEGRAM_ADMIN_CHAT_IDS=["111", "222"],
+    )
+    @patch("vpn.expiration_reminders.urllib.request.urlopen")
+    def test_telegram_multiple_chat_success_creates_logs(self, mock_urlopen):
+        mock_urlopen.side_effect = [self._TelegramResponse(), self._TelegramResponse()]
+        self._make_client(name="multi-chat-success", expires_at=timezone.now() + timezone.timedelta(days=1))
+
+        result = ClientExpirationReminderService.send_reminders()
+
+        self.assertTrue(result["channels"]["telegram"]["sent"])
+        self.assertEqual(result["channels"]["telegram"]["error"], "")
+        self.assertEqual(result["logs_created"], 1)
+        self.assertEqual(ClientExpirationReminderLog.objects.count(), 1)
+        self.assertEqual(mock_urlopen.call_count, 2)
+
+    @override_settings(
+        EXPIRATION_REMINDER_CHANNELS=["email", "telegram"],
+        TELEGRAM_BOT_TOKEN="123456:test-token",
+        TELEGRAM_ADMIN_CHAT_IDS=["111", "222"],
+    )
+    @patch("vpn.expiration_reminders.urllib.request.urlopen")
+    def test_email_success_with_telegram_partial_chat_failure_still_creates_logs(self, mock_urlopen):
+        mock_urlopen.side_effect = [self._TelegramResponse(), urllib.error.URLError("chat 222 blocked")]
+        self._make_client(name="email-with-partial-telegram", expires_at=timezone.now() + timezone.timedelta(days=1))
+
+        result = ClientExpirationReminderService.send_reminders()
+
+        self.assertTrue(result["channels"]["email"]["sent"])
+        self.assertFalse(result["channels"]["telegram"]["sent"])
+        self.assertIn("chat_id=222", result["channels"]["telegram"]["error"])
+        self.assertEqual(result["logs_created"], 1)
+        self.assertEqual(ClientExpirationReminderLog.objects.count(), 1)
+        self.assertEqual(len(mail.outbox), 1)
+
+    @override_settings(
+        EXPIRATION_REMINDER_CHANNELS=["telegram"],
+        TELEGRAM_BOT_TOKEN="123456:test-token",
         TELEGRAM_ADMIN_CHAT_IDS=["123456789"],
     )
     @patch("vpn.expiration_reminders.urllib.request.urlopen")
