@@ -239,7 +239,8 @@ class ServerService:
         for protocol_type, container_name in cls.CONTAINERS.items():
             protocol = protocol_map.get(protocol_type)
             if not protocol:
-                blocking_issues.append(f"{protocol_type.upper()}: протокол не обнаружен после синхронизации")
+                continue
+            if not protocol.enabled:
                 continue
 
             metadata = protocol.runtime_metadata or {}
