@@ -104,6 +104,18 @@ class SSHExecutorTest(TestCase):
             )
             SafeSSHExecutor.ensure_known_host("127.0.0.1", 2222)
 
+
+    def test_allow_monitoring_host_bundle_command(self):
+        executor = SafeSSHExecutor(host="127.0.0.1", username="u")
+        executor._validate(
+            "sh -lc 'echo __HOSTNAME__; hostname; echo __UPTIME__; uptime; echo __NPROC__; nproc; echo __FREE__; free -b; echo __DF__; df -B1 /; echo __ROUTE__; ip route get 1.1.1.1; echo __NETDEV__; cat /proc/net/dev'"
+        )
+
+    def test_reject_arbitrary_sh_lc_command(self):
+        executor = SafeSSHExecutor(host="127.0.0.1", username="u")
+        with self.assertRaises(ValueError):
+            executor._validate("sh -lc 'echo hello'")
+
     def test_reject_non_allowlisted_command(self):
         executor = SafeSSHExecutor(host="127.0.0.1", username="u")
         with self.assertRaises(ValueError):
