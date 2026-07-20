@@ -154,6 +154,47 @@ class BaseProtocolAdapter:
     def _wg_cmd(self, subcommand: str) -> str:
         return f"docker exec {self.container} {self.command_bin} {subcommand}"
 
+    def _persist_runtime(self, actor):
+        """
+        Persist live AWG2 interface state into its bind-mounted config.
+
+        `wg/awg set` changes only the live interface. Without `awg-quick
+        save`, a new, disabled, restored, reissued, or deleted peer is lost
+        after a container restart or runtime reconciliation.
+        """
+        if self.protocol_type != VPNClient.ProtocolType.AWG2:
+            return
+
+        config_path = str(
+            self.protocol.runtime_metadata.get("config_path", "")
+        ).strip()
+
+        # Older tests and incomplete discovery states may not have a path.
+        # Runtime sync must populate it in production before client changes.
+        if not config_path:
+            return
+
+        allowed_path = re.fullmatch(
+            r"(?:/etc/amnezia|/opt/amnezia|/etc/wireguard)"
+            r"/[a-zA-Z0-9_./-]+",
+            config_path,
+        )
+        if not allowed_path:
+            raise RuntimeError(
+                f"Unsafe AWG2 runtime config path: {config_path}"
+            )
+
+        command = (
+            f"docker exec {self.container} "
+            f"awg-quick save {config_path}"
+        )
+        self._run(
+            actor,
+            f"{self.protocol_type}.save_runtime",
+            command,
+            sensitive_output=True,
+        )
+
     def interface_name(self, actor) -> str:
         out = self._run(actor, f"{self.protocol_type}.iface", self._wg_cmd("show interfaces")).stdout.strip()
         if not out:
@@ -393,6 +434,7 @@ class BaseProtocolAdapter:
             f"set {iface} peer {public_key} preshared-key /dev/stdin allowed-ips {address}/32"
         )
         self._run(actor, f"{self.protocol_type}.add_peer", add_peer_cmd, sensitive_output=True)
+        self._persist_runtime(actor)
         return {
             "private_key": private_key,
             "public_key": public_key,
@@ -411,12 +453,14 @@ class BaseProtocolAdapter:
                 f"set {iface} peer {peer_public_key} preshared-key /dev/stdin allowed-ips {allowed_ips}"
             )
             self._run(actor, f"{self.protocol_type}.add_existing_peer", cmd, sensitive_output=True)
+            self._persist_runtime(actor)
             return
         self._run(
             actor,
             f"{self.protocol_type}.add_existing_peer",
             self._wg_cmd(f"set {iface} peer {peer_public_key} allowed-ips {allowed_ips}"),
         )
+        self._persist_runtime(actor)
 
     def disable_peer(self, actor, peer_public_key: str):
         self.remove_peer(actor, peer_public_key)
@@ -424,6 +468,7 @@ class BaseProtocolAdapter:
     def remove_peer(self, actor, peer_public_key: str):
         iface = self.interface_name(actor)
         self._run(actor, f"{self.protocol_type}.remove_peer", self._wg_cmd(f"set {iface} peer {peer_public_key} remove"))
+        self._persist_runtime(actor)
 
 
 class AWGLegacyAdapter(BaseProtocolAdapter):
