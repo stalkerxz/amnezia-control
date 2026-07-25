@@ -10,6 +10,14 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="{% static 'css/app.css' %}" rel="stylesheet">
   <link href="{% static 'css/app-v2.css' %}" rel="stylesheet">
+  <style>
+    /* Runtime peer import is intentionally unavailable in the operator UI.
+       The backend endpoints remain intact for controlled maintenance only. */
+    form[action="/clients/import/"],
+    form[action$="/import-peers/"] {
+      display: none !important;
+    }
+  </style>
 </head>
 <body class="app-shell{% if not user.is_authenticated %} app-auth-shell{% endif %}">
 <a class="skip-link" href="#mainContent">Перейти к содержимому</a>
