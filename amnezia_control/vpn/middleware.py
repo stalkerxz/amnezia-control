@@ -12,7 +12,7 @@ from .preflight import ClientCreationPreflightService
 class ClientCreationPreflightMiddleware:
     """Fail closed for operator-side client creation when runtime is not ready."""
 
-    server_create_pattern = re.compile(r"^/servers/(?P<server_id>\d+)/create-client/(?P<protocol>awg2?|awg)/$")
+    server_create_pattern = re.compile(r"^/servers/(?P<server_id>\d+)/create-client/(?P<protocol>awg2?)/$")
 
     def __init__(self, get_response):
         self.get_response = get_response
@@ -21,7 +21,7 @@ class ClientCreationPreflightMiddleware:
         if request.method == "POST" and request.user.is_authenticated and request.user.is_staff:
             target = self._creation_target(request)
             if target:
-                server, protocol_type, fallback = target
+                server, protocol_type, fallback_name, fallback_kwargs = target
                 try:
                     result = ClientCreationPreflightService.check(
                         server=server,
@@ -30,13 +30,13 @@ class ClientCreationPreflightMiddleware:
                     )
                 except Exception as exc:
                     messages.error(request, f"Создание клиента заблокировано: проверка готовности не выполнена ({exc}).")
-                    return redirect(fallback)
+                    return redirect(fallback_name, **fallback_kwargs)
 
                 if not result["ready"]:
                     failed = [item["label"] for item in result["checks"] if item["blocking"] and not item["ok"]]
                     details = ", ".join(failed[:5]) or "неизвестная ошибка готовности"
                     messages.error(request, f"Создание клиента заблокировано. Не пройдены проверки: {details}.")
-                    return redirect(fallback)
+                    return redirect(fallback_name, **fallback_kwargs)
 
         return self.get_response(request)
 
@@ -47,7 +47,7 @@ class ClientCreationPreflightMiddleware:
             protocol_type = (request.POST.get("protocol_type") or VPNClient.ProtocolType.AWG2).strip().lower()
             if not server or protocol_type not in {VPNClient.ProtocolType.AWG, VPNClient.ProtocolType.AWG2}:
                 return None
-            return server, protocol_type, "clients-create"
+            return server, protocol_type, "clients-create", {}
 
         match = cls.server_create_pattern.match(request.path)
         if not match:
@@ -55,4 +55,4 @@ class ClientCreationPreflightMiddleware:
         server = Server.objects.filter(pk=int(match.group("server_id")), is_enabled=True).first()
         if not server:
             return None
-        return server, match.group("protocol"), "servers-detail"
+        return server, match.group("protocol"), "servers-detail", {"pk": server.pk}
