@@ -67,9 +67,12 @@ class ClientCreationPreflightService:
 
     @staticmethod
     def _worker_state() -> tuple[bool, str]:
-        timeout = float(getattr(settings, "CLIENT_PREFLIGHT_WORKER_TIMEOUT", 0.8))
         try:
-            inspector = current_app.control.inspect(timeout=timeout)
+            timeout = float(getattr(settings, "CLIENT_PREFLIGHT_WORKER_TIMEOUT", 0.8))
+        except (TypeError, ValueError):
+            timeout = 0.8
+        try:
+            inspector = current_app.control.inspect(timeout=max(0.1, timeout))
             replies = inspector.ping() or {}
         except Exception as exc:
             return False, f"Celery worker не ответил: {exc}"
