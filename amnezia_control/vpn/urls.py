@@ -1,4 +1,7 @@
+from django.conf import settings
 from django.urls import path
+
+from .preflight_views import client_creation_preflight_view
 from .views import (
     client_action_view,
     client_download_config_view,
@@ -17,7 +20,7 @@ from .views import (
 urlpatterns = [
     path("", clients_list_view, name="clients-list"),
     path("new/", clients_create_view, name="clients-create"),
-    path("import/", clients_import_view, name="clients-import"),
+    path("preflight/", client_creation_preflight_view, name="clients-preflight"),
     path("renewal-requests/", renewal_requests_list_view, name="renewal-requests-list"),
     path(
         "renewal-requests/<int:pk>/attachment/",
@@ -32,3 +35,6 @@ urlpatterns = [
     path("<int:pk>/action/<str:action>/", client_action_view, name="clients-action"),
     path("<int:pk>/limits/update/", client_update_limits_view, name="clients-limits-update"),
 ]
+
+if settings.ENABLE_RUNTIME_PEER_IMPORT:
+    urlpatterns.append(path("import/", clients_import_view, name="clients-import"))
