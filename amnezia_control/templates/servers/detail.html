@@ -4,17 +4,14 @@
   <div>
     <p class="page-kicker">Операторская · Сервер</p>
     <h1 class="h3 mb-1">Контур сервера: {{ server.name }}</h1>
-    <p class="text-secondary mb-0">Контроль готовности runtime, диагностика протоколов и запуск рабочих действий оператора.</p>
+    <p class="text-secondary mb-0">Контроль готовности runtime, диагностика протоколов и безопасные действия оператора.</p>
   </div>
   <div class="d-flex gap-2 flex-wrap">
     <form method="post" action="{% url 'servers-sync-runtime' pk=server.id %}">
       {% csrf_token %}
       <button class="btn btn-primary">Синхронизировать состояние</button>
     </form>
-    <form method="post" action="{% url 'servers-import-peers' pk=server.id %}">
-      {% csrf_token %}
-      <button class="btn btn-outline-secondary">Импортировать peers</button>
-    </form>
+    <a class="btn btn-success" href="{% url 'clients-create' %}">Создать клиента</a>
     <a class="btn btn-outline-secondary" href="{% url 'jobs-list' %}">Открыть задания</a>
   </div>
 </div>
@@ -31,9 +28,14 @@
   </div>
 </section>
 
-<div class="section-block section-flat mb-3">
+<section class="section-block section-flat mb-3">
   <div class="section-body">
-    <h2 class="h6 mb-2">Операторский контекст и действия</h2>
+    <div class="section-header">
+      <div>
+        <h2 class="h6 mb-1">Операторский контекст</h2>
+        <div class="small text-secondary">Импорт peers отключён. Создание клиента выполняется только через форму с обязательной preflight-проверкой.</div>
+      </div>
+    </div>
     <ul class="small text-secondary mb-3">
       {% for reason in server_health_reasons %}
       <li>{{ reason }}</li>
@@ -41,35 +43,20 @@
       <li>Нет данных о проверке. Запустите синхронизацию runtime.</li>
       {% endfor %}
     </ul>
-    <div class="d-flex flex-wrap gap-2 mb-3">
+    <div class="d-flex flex-wrap gap-2">
       <form method="post" action="{% url 'servers-sync-runtime' pk=server.id %}">
         {% csrf_token %}
-        <button class="btn btn-primary btn-sm">1. Проверить состояние runtime</button>
+        <button class="btn btn-primary btn-sm">Проверить состояние runtime</button>
       </form>
-      <form method="post" action="{% url 'servers-import-peers' pk=server.id %}">
-        {% csrf_token %}
-        <button class="btn btn-outline-secondary btn-sm">2. Импортировать клиентов из peers</button>
-      </form>
+      <a class="btn btn-success btn-sm" href="{% url 'clients-create' %}">Перейти к безопасному созданию клиента</a>
     </div>
-    <p class="text-secondary small mb-2">Создание клиента доступно после проверки диагностики протоколов.</p>
-    <form method="post" class="row g-2 align-items-end">
-      {% csrf_token %}
-      <div class="col-lg-5">
-        <label class="form-label" for="client-name">Имя клиента</label>
-        <input class="form-control" id="client-name" name="name" type="text" maxlength="120" placeholder="например, operator-laptop" required>
-      </div>
-      <div class="col-lg-7 d-flex gap-2">
-        <button class="btn btn-success" formaction="{% url 'servers-create-client' pk=server.id protocol_type='awg' %}">Создать AWG клиент</button>
-        <button class="btn btn-info" formaction="{% url 'servers-create-client' pk=server.id protocol_type='awg2' %}">Создать AWG2 клиент</button>
-      </div>
-    </form>
   </div>
-</div>
+</section>
 
 <div class="section-block section-flat mb-2">
   <div class="section-body py-2">
     <h2 class="h6 mb-2">Диагностика протоколов и готовности</h2>
-    <p class="text-secondary mb-0">Отслеживайте подсеть, endpoint и ключи AWG/AWG2 перед рабочими действиями.</p>
+    <p class="text-secondary mb-0">Подсеть, endpoint, контейнер и ключи AWG/AWG2 должны быть готовы до выпуска нового доступа.</p>
   </div>
 </div>
 
@@ -102,7 +89,7 @@
           {% endif %}
         </td>
         <td>
-          <div><code>{{ row.protocol.runtime_metadata.public_host|default:'—' }}:{{ row.protocol.runtime_metadata.endpoint_port|default:'—' }}</code></div>
+          <div><code>{{ row.protocol.runtime_metadata.public_host|default:'—' }}:{{ row.protocol.runtime_metadata.udp_port|default:'—' }}</code></div>
           {% if row.protocol.runtime_metadata.endpoint_host_ready and row.protocol.runtime_metadata.endpoint_port_ready %}
             <span class="badge status-badge status-success mt-1">Endpoint заполнен</span>
           {% else %}
@@ -111,10 +98,8 @@
         </td>
         <td>
           <div>{{ row.peer_source_label }}</div>
-          {% if row.peer_source_hint %}
-          <div class="small text-secondary">{{ row.peer_source_hint }}</div>
-          {% endif %}
-          <div class="small text-secondary">Конфигурация: {{ row.protocol.runtime_metadata.config_path|default:"—" }}</div>
+          {% if row.peer_source_hint %}<div class="small text-secondary">{{ row.peer_source_hint }}</div>{% endif %}
+          <div class="small text-secondary">Конфигурация: {{ row.protocol.runtime_metadata.config_path|default:'—' }}</div>
         </td>
         <td>
           {% if row.protocol.protocol_type == 'awg2' %}
