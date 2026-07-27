@@ -16,6 +16,7 @@ def _csv_env(name, default=""):
 def _bool_env(name, default="1"):
     return os.getenv(name, default).lower() in {"1", "true", "yes", "on"}
 
+
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -43,6 +44,7 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
+    "vpn.middleware.ClientCreationPreflightMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
@@ -135,6 +137,11 @@ CELERY_BEAT_SCHEDULE = {
 
 CONFIG_ENCRYPTION_KEY = os.getenv("CONFIG_ENCRYPTION_KEY", "")
 
+# Runtime peer import is destructive in the current production topology and is
+# disabled by default. It may only be enabled explicitly for controlled
+# maintenance after a verified backup.
+ENABLE_RUNTIME_PEER_IMPORT = _bool_env("ENABLE_RUNTIME_PEER_IMPORT", "0")
+CLIENT_PREFLIGHT_WORKER_TIMEOUT = float(os.getenv("CLIENT_PREFLIGHT_WORKER_TIMEOUT", "0.8"))
 
 EMAIL_BACKEND = os.getenv("EMAIL_BACKEND", "django.core.mail.backends.smtp.EmailBackend")
 EMAIL_HOST = os.getenv("EMAIL_HOST", "localhost")
@@ -169,6 +176,5 @@ SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 SESSION_COOKIE_HTTPONLY = True
 CSRF_COOKIE_HTTPONLY = True
 X_FRAME_OPTIONS = "DENY"
-
 
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
