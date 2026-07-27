@@ -301,6 +301,10 @@ def clients_create_view(request):
                     server=server,
                     name=form.cleaned_data["name"],
                     protocol_type=form.cleaned_data["protocol_type"],
+                    routing_mode=(
+                        form.cleaned_data.get("routing_mode")
+                        or VPNClientCreateForm.ROUTING_MODE_FULL
+                    ),
                     expires_at=form.cleaned_data["expires_at"],
                     traffic_limit_bytes=form.cleaned_data["traffic_limit_bytes"],
                     contact_email=form.cleaned_data["contact_email"],

@@ -47,6 +47,18 @@
     </div>
 
     <div class="col-lg-6">
+      <label class="form-label" for="{{ form.routing_mode.id_for_label }}">{{ form.routing_mode.label }}</label>
+      {{ form.routing_mode }}
+      <div class="form-text">
+        FULL направляет весь трафик через VPN.
+        SELECTIVE — только маршруты из профиля Selectel.
+      </div>
+      {% for error in form.routing_mode.errors %}
+        <div class="text-danger small mt-1">{{ error }}</div>
+      {% endfor %}
+    </div>
+
+    <div class="col-lg-6">
       <label class="form-label" for="{{ form.contact_email.id_for_label }}">{{ form.contact_email.label }}</label>
       {{ form.contact_email }}
       <div class="form-text">Используется для клиентских email-уведомлений по заявкам на продление.</div>

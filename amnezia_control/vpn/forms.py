@@ -41,6 +41,16 @@ class VPNClientCreateForm(forms.Form):
     name = forms.CharField(label="Имя клиента", max_length=120)
     contact_email = forms.EmailField(required=False, label="Контактный email")
     protocol_type = forms.ChoiceField(label="Протокол", choices=VPNClient.ProtocolType.choices)
+
+    ROUTING_MODE_FULL = "full"
+    ROUTING_MODE_SELECTIVE = "selective"
+
+    routing_mode = forms.ChoiceField(
+        label="Режим маршрутизации",
+        choices=((ROUTING_MODE_FULL, "FULL — весь трафик через VPN"),),
+        initial=ROUTING_MODE_FULL,
+        required=False,
+    )
     expires_preset = forms.ChoiceField(
         label="Срок действия",
         choices=(
@@ -96,6 +106,41 @@ class VPNClientCreateForm(forms.Form):
             if available_protocols:
                 default_protocol = VPNClient.ProtocolType.AWG2 if len(available_protocols) == 1 and available_protocols[0][0] == VPNClient.ProtocolType.AWG2 else available_protocols[0][0]
                 self.fields["protocol_type"].initial = default_protocol
+
+        if "routing_mode" in self.fields:
+            choices = [
+                (
+                    self.ROUTING_MODE_FULL,
+                    "FULL — весь трафик через VPN",
+                )
+            ]
+
+            selective_exists = False
+            if self.server:
+                selective_exists = (
+                    ProtocolProfile.objects.filter(
+                        server_protocol__server=self.server,
+                        server_protocol__protocol_type=VPNClient.ProtocolType.AWG2,
+                        server_protocol__enabled=True,
+                        protocol_type=VPNClient.ProtocolType.AWG2,
+                        status=ProtocolProfile.ProfileStatus.ACTIVE,
+                        config_template__icontains="# routing-mode: selective",
+                    )
+                    .exclude(
+                        server_protocol__container_status__iexact="exited"
+                    )
+                    .exists()
+                )
+
+            if selective_exists:
+                choices.append(
+                    (
+                        self.ROUTING_MODE_SELECTIVE,
+                        "SELECTIVE — выбранные сервисы через VPN",
+                    )
+                )
+
+            self.fields["routing_mode"].choices = choices
 
     def _available_protocol_choices(self):
         if not self.server:
@@ -167,6 +212,11 @@ class VPNClientCreateForm(forms.Form):
     def clean(self):
         cleaned_data = super().clean()
         protocol_type = cleaned_data.get("protocol_type")
+        routing_mode = (
+            cleaned_data.get("routing_mode")
+            or self.ROUTING_MODE_FULL
+        )
+        cleaned_data["routing_mode"] = routing_mode
         if self.server and protocol_type:
             has_enabled_protocol = ServerProtocol.objects.filter(
                 server=self.server,
@@ -182,12 +232,42 @@ class VPNClientCreateForm(forms.Form):
             ).exclude(server_protocol__container_status__iexact="exited").exists()
             if not (has_enabled_protocol and has_active_profile):
                 self.add_error("protocol_type", "Протокол недоступен для создания клиента.")
+
+        if routing_mode == self.ROUTING_MODE_SELECTIVE:
+            if protocol_type != VPNClient.ProtocolType.AWG2:
+                self.add_error(
+                    "routing_mode",
+                    "SELECTIVE доступен только для AWG2.",
+                )
+            elif self.server:
+                selective_exists = (
+                    ProtocolProfile.objects.filter(
+                        server_protocol__server=self.server,
+                        server_protocol__protocol_type=VPNClient.ProtocolType.AWG2,
+                        server_protocol__enabled=True,
+                        protocol_type=VPNClient.ProtocolType.AWG2,
+                        status=ProtocolProfile.ProfileStatus.ACTIVE,
+                        config_template__icontains="# routing-mode: selective",
+                    )
+                    .exclude(
+                        server_protocol__container_status__iexact="exited"
+                    )
+                    .exists()
+                )
+
+                if not selective_exists:
+                    self.add_error(
+                        "routing_mode",
+                        "На сервере нет активного SELECTIVE-профиля AWG2.",
+                    )
+
         return self._clean_limits(cleaned_data)
 
 
 class VPNClientLimitsUpdateForm(VPNClientCreateForm):
     name = None
     protocol_type = None
+    routing_mode = None
 
     def __init__(self, *args, client=None, **kwargs):
         super().__init__(*args, **kwargs)

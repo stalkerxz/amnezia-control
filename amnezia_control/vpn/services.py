@@ -582,6 +582,75 @@ class VPNClientService:
         )
 
     @staticmethod
+    def _profile_is_selective(profile: ProtocolProfile) -> bool:
+        return any(
+            line.strip().lower() == "# routing-mode: selective"
+            for line in (profile.config_template or "").splitlines()
+        )
+
+    @staticmethod
+    def resolve_profile_allowed_ips(profile: ProtocolProfile) -> str:
+        if not VPNClientService._profile_is_selective(profile):
+            return "0.0.0.0/0, ::/0"
+
+        networks = []
+
+        for line_number, raw_line in enumerate(
+            (profile.config_template or "").splitlines(),
+            start=1,
+        ):
+            value = raw_line.split("#", 1)[0].strip()
+
+            if not value:
+                continue
+
+            try:
+                network = ipaddress.ip_network(value, strict=False)
+            except ValueError as exc:
+                raise RuntimeError(
+                    f"Selective profile {profile.name!r}: "
+                    f"invalid CIDR at line {line_number}: {value}"
+                ) from exc
+
+            if network.version != 4:
+                raise RuntimeError(
+                    f"Selective profile {profile.name!r}: "
+                    f"IPv6 is not supported yet: {network}"
+                )
+
+            if any(
+                (
+                    network.is_private,
+                    network.is_loopback,
+                    network.is_multicast,
+                    network.is_reserved,
+                    network.is_unspecified,
+                    network.is_link_local,
+                )
+            ):
+                raise RuntimeError(
+                    f"Selective profile {profile.name!r}: "
+                    f"special network is not allowed: {network}"
+                )
+
+            networks.append(network)
+
+        if not networks:
+            raise RuntimeError(
+                f"Selective profile {profile.name!r} contains no IPv4 routes"
+            )
+
+        collapsed = list(ipaddress.collapse_addresses(networks))
+
+        if len(collapsed) > 2000:
+            raise RuntimeError(
+                f"Selective profile {profile.name!r} contains too many routes: "
+                f"{len(collapsed)}"
+            )
+
+        return ", ".join(str(network) for network in collapsed)
+
+    @staticmethod
     def build_awg2_client_config(
         *,
         private_key: str,
@@ -590,6 +659,7 @@ class VPNClientService:
         server_public_key: str,
         awg2_metadata: dict,
         preshared_key: str = "",
+        allowed_ips: str = "0.0.0.0/0, ::/0",
     ) -> str:
         required = ("Jc", "Jmin", "Jmax", "S1", "S2", "S3", "S4", "H1", "H2", "H3", "H4")
         optional = ("I1", "I2", "I3", "I4", "I5")
@@ -606,7 +676,7 @@ class VPNClientService:
         peer_lines.extend(
             [
                 f"Endpoint = {endpoint}",
-                "AllowedIPs = 0.0.0.0/0, ::/0",
+                f"AllowedIPs = {allowed_ips}",
                 "PersistentKeepalive = 25",
             ]
         )
@@ -709,7 +779,17 @@ class VPNClientService:
 
     @staticmethod
     @transaction.atomic
-    def create_client(*, server, name: str, protocol_type: str, actor, expires_at=None, traffic_limit_bytes=None, contact_email: str = ""):
+    def create_client(
+        *,
+        server,
+        name: str,
+        protocol_type: str,
+        actor,
+        routing_mode: str | None = None,
+        expires_at=None,
+        traffic_limit_bytes=None,
+        contact_email: str = "",
+    ):
         protocol = ServerProtocol.objects.filter(
             server=server,
             protocol_type=protocol_type,
@@ -718,14 +798,49 @@ class VPNClientService:
         if not protocol:
             raise ValueError("Protocol is not enabled or container is not running")
 
-        profile = ProtocolProfile.objects.filter(
-            server_protocol__server=server,
-            server_protocol=protocol,
-            protocol_type=protocol_type,
-            status=ProtocolProfile.ProfileStatus.ACTIVE,
-        ).first()
+        profiles = list(
+            ProtocolProfile.objects.filter(
+                server_protocol__server=server,
+                server_protocol=protocol,
+                protocol_type=protocol_type,
+                status=ProtocolProfile.ProfileStatus.ACTIVE,
+            ).order_by("id")
+        )
+
+        routing_mode = routing_mode or "full"
+
+        if routing_mode == "selective":
+            if protocol_type != VPNClient.ProtocolType.AWG2:
+                raise ValueError(
+                    "Selective routing is available only for AWG2"
+                )
+
+            profile = next(
+                (
+                    item
+                    for item in profiles
+                    if VPNClientService._profile_is_selective(item)
+                ),
+                None,
+            )
+
+        elif routing_mode == "full":
+            profile = next(
+                (
+                    item
+                    for item in profiles
+                    if not VPNClientService._profile_is_selective(item)
+                ),
+                None,
+            )
+
+        else:
+            raise ValueError("Unknown routing mode")
+
         if not profile:
-            raise ValueError("No active profile for protocol")
+            raise ValueError(
+                f"No active {routing_mode} profile for protocol"
+            )
 
         client = VPNClient.objects.create(
             server=server,
@@ -761,6 +876,9 @@ class VPNClientService:
                 preshared_key=generated.get("preshared_key", ""),
             )
         else:
+            allowed_ips = VPNClientService.resolve_profile_allowed_ips(
+                client.profile
+            )
             config = VPNClientService.build_awg2_client_config(
                 private_key=generated["private_key"],
                 address=generated["address"],
@@ -768,6 +886,7 @@ class VPNClientService:
                 server_public_key=generated["server_public_key"],
                 awg2_metadata=adapter.protocol.runtime_metadata.get("awg2_metadata", {}),
                 preshared_key=generated.get("preshared_key", ""),
+                allowed_ips=allowed_ips,
             )
 
         rev = VPNClientService._store_revision(client, config)
