@@ -326,12 +326,33 @@ def clients_detail_view(request, pk: int):
     limits_form = VPNClientLimitsUpdateForm(client=client)
     revision = client.revisions.first()
     revision_count = client.revisions.count()
-    qr_base64_amneziavpn = (
-        VPNClientService.portal_qr_png_base64_for_target(client, "amneziavpn") if revision else ""
-    )
-    qr_base64_amneziawg = (
-        VPNClientService.portal_qr_png_base64_for_target(client, "amneziawg") if revision else ""
-    )
+    qr_base64_amneziavpn = ""
+    qr_base64_amneziawg = ""
+    qr_unavailable_message = ""
+
+    def build_qr_for_target(target: str) -> str:
+        nonlocal qr_unavailable_message
+
+        if not revision:
+            return ""
+
+        try:
+            return VPNClientService.portal_qr_png_base64_for_target(
+                client,
+                target,
+            )
+        except ValueError as exc:
+            if "Invalid version" not in str(exc):
+                raise
+
+            qr_unavailable_message = (
+                "QR-код недоступен: конфигурация слишком большая. "
+                "Скачайте файл .conf и импортируйте его в приложение."
+            )
+            return ""
+
+    qr_base64_amneziavpn = build_qr_for_target("amneziavpn")
+    qr_base64_amneziawg = build_qr_for_target("amneziawg")
 
     protocol = client.server.protocols.filter(protocol_type=client.protocol_type).first()
     missing_endpoint = False
@@ -378,6 +399,8 @@ def clients_detail_view(request, pk: int):
         warning_items.append("Телеметрия трафика недоступна.")
     if not revision:
         warning_items.append("Для клиента отсутствует выпущенная ревизия конфига.")
+    if qr_unavailable_message:
+        warning_items.append(qr_unavailable_message)
 
     recent_audit_logs = AuditLog.objects.select_related("actor").filter(entity_type="VPNClient", entity_id=str(client.id)).order_by("-created_at")[:5]
     latest_operator_action = recent_audit_logs[0] if recent_audit_logs else None
