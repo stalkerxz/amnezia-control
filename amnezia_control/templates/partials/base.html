@@ -12,7 +12,7 @@
   <link href="{% static 'css/app-v2.css' %}" rel="stylesheet">
   <style>
     /* Runtime peer import is intentionally unavailable in the operator UI.
-       The backend endpoints remain intact for controlled maintenance only. */
+       Routes are disabled by default; this also hides stale cached controls. */
     form[action="/clients/import/"],
     form[action$="/import-peers/"] {
       display: none !important;
