@@ -1,3 +1,5 @@
+import uuid
+
 from django.db import models
 from django.conf import settings
 from servers.models import ProtocolProfile, Server
@@ -84,3 +86,34 @@ class ClientExpirationReminderLog(models.Model):
 
     def __str__(self):
         return f"{self.client_id}:{self.threshold_days}:{self.expires_at_snapshot.isoformat()}"
+
+
+class XHTTPDevice(models.Model):
+    class Status(models.TextChoices):
+        ACTIVE = "active", "Активно"
+        DISABLED = "disabled", "Отключено"
+        DELETED = "deleted", "Удалено"
+
+    client = models.ForeignKey(VPNClient, on_delete=models.CASCADE, related_name="xhttp_devices")
+    name = models.CharField(max_length=120)
+    client_uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    xray_email = models.CharField(max_length=120, unique=True)
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.ACTIVE)
+    config_blob_encrypted = models.TextField()
+    config_hash = models.CharField(max_length=64)
+    last_applied_at = models.DateTimeField(null=True, blank=True)
+    last_error = models.CharField(max_length=255, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["client", "name"],
+                name="unique_xhttp_device_name_per_client",
+            )
+        ]
+        ordering = ("-created_at",)
+
+    def __str__(self):
+        return f"{self.client} — {self.name}"
