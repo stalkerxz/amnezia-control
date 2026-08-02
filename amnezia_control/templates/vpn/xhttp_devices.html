@@ -1,0 +1,105 @@
+{% extends 'partials/base.html' %}
+{% block title %}XHTTP CDN — amnezia-control{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+  <div>
+    <h1 class="h3 mb-1">XHTTP через Yandex CDN</h1>
+    <p class="text-secondary mb-0">Резервные Happ-профили для работы во время сетевых ограничений.</p>
+  </div>
+  <span class="badge text-bg-warning">Аварийный канал</span>
+</div>
+
+<div class="alert alert-info">
+  Каждый профиль получает отдельный UUID. Отключение или перевыпуск одного устройства не влияет на остальные устройства клиента.
+</div>
+
+<section class="card mb-3">
+  <div class="card-body">
+    <h2 class="h6 mb-3">Добавить устройство</h2>
+    <form method="post" class="row g-3 align-items-end">
+      {% csrf_token %}
+      <div class="col-lg-5">
+        <label class="form-label" for="id_client">{{ form.client.label }}</label>
+        {{ form.client }}
+        {% for error in form.client.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+      </div>
+      <div class="col-lg-5">
+        <label class="form-label" for="id_name">{{ form.name.label }}</label>
+        {{ form.name }}
+        {% for error in form.name.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+      </div>
+      <div class="col-lg-2 d-grid">
+        <button class="btn btn-primary" type="submit">Создать XHTTP</button>
+      </div>
+      {% for error in form.non_field_errors %}<div class="col-12 text-danger small">{{ error }}</div>{% endfor %}
+    </form>
+  </div>
+</section>
+
+<section class="card">
+  <div class="card-body p-0">
+    <div class="d-flex justify-content-between align-items-center px-3 pt-3">
+      <h2 class="h6 mb-0">Устройства</h2>
+      <span class="text-secondary small">{{ devices|length }} шт.</span>
+    </div>
+    {% if devices %}
+      <div class="table-responsive mt-2">
+        <table class="table table-hover align-middle mb-0">
+          <thead>
+            <tr>
+              <th>Клиент / устройство</th>
+              <th>Статус</th>
+              <th>UUID</th>
+              <th>Применено</th>
+              <th class="text-end">Действия</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for device in devices %}
+              <tr>
+                <td>
+                  <div class="fw-semibold">{{ device.name }}</div>
+                  <div class="small text-secondary">#{{ device.client_id }} {{ device.client.name }} · {{ device.client.server.name }}</div>
+                  {% if device.last_error %}<div class="small text-danger mt-1">{{ device.last_error }}</div>{% endif %}
+                </td>
+                <td>
+                  {% if device.status == 'active' %}
+                    <span class="badge text-bg-success">Активно</span>
+                  {% else %}
+                    <span class="badge text-bg-secondary">Отключено</span>
+                    {% if device.disable_reason != 'none' %}<div class="small text-secondary mt-1">{{ device.get_disable_reason_display }}</div>{% endif %}
+                  {% endif %}
+                </td>
+                <td><code class="user-select-all">{{ device.client_uuid }}</code></td>
+                <td>
+                  {% if device.last_applied_at %}{{ device.last_applied_at|date:'d.m.Y H:i:s' }}{% else %}—{% endif %}
+                </td>
+                <td>
+                  <div class="d-flex flex-wrap gap-1 justify-content-end">
+                    <a class="btn btn-sm btn-outline-primary" href="{% url 'xhttp-device-download' device.id %}">Скачать JSON</a>
+                    {% if device.status == 'active' %}
+                      <form method="post" action="{% url 'xhttp-device-action' device.id 'check' %}">{% csrf_token %}<button class="btn btn-sm btn-outline-info">Проверить</button></form>
+                      <form method="post" action="{% url 'xhttp-device-action' device.id 'disable' %}">{% csrf_token %}<button class="btn btn-sm btn-outline-warning">Отключить</button></form>
+                    {% else %}
+                      <form method="post" action="{% url 'xhttp-device-action' device.id 'enable' %}">{% csrf_token %}<button class="btn btn-sm btn-outline-success">Включить</button></form>
+                    {% endif %}
+                    <form method="post" action="{% url 'xhttp-device-action' device.id 'rotate' %}" onsubmit="return confirm('Старый UUID перестанет работать. Продолжить?');">{% csrf_token %}<button class="btn btn-sm btn-outline-secondary">Перевыпустить</button></form>
+                    <form method="post" action="{% url 'xhttp-device-action' device.id 'delete' %}" onsubmit="return confirm('Удалить устройство и отозвать UUID?');">{% csrf_token %}<button class="btn btn-sm btn-outline-danger">Удалить</button></form>
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="p-3 text-secondary">XHTTP-устройства ещё не созданы.</div>
+    {% endif %}
+  </div>
+</section>
+
+<script>
+  document.querySelectorAll('input').forEach((element) => element.classList.add('form-control'));
+  document.querySelectorAll('select').forEach((element) => element.classList.add('form-select'));
+</script>
+{% endblock %}

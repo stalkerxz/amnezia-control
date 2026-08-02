@@ -16,6 +16,7 @@ def _csv_env(name, default=""):
 def _bool_env(name, default="1"):
     return os.getenv(name, default).lower() in {"1", "true", "yes", "on"}
 
+
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -135,6 +136,12 @@ CELERY_BEAT_SCHEDULE = {
 
 CONFIG_ENCRYPTION_KEY = os.getenv("CONFIG_ENCRYPTION_KEY", "")
 
+XHTTP_CDN_DOMAIN = os.getenv("XHTTP_CDN_DOMAIN", "cdn.vpn.protopopov.pro").strip()
+XHTTP_PATH = os.getenv("XHTTP_PATH", "/api/ad4f850643d5e660f09d31f9").strip()
+XHTTP_SC_MAX_EACH_POST_BYTES = int(os.getenv("XHTTP_SC_MAX_EACH_POST_BYTES", "2048"))
+XHTTP_SC_MIN_POSTS_INTERVAL_MS = int(os.getenv("XHTTP_SC_MIN_POSTS_INTERVAL_MS", "30"))
+XHTTP_UPLINK_CHUNK_SIZE = int(os.getenv("XHTTP_UPLINK_CHUNK_SIZE", "1800"))
+XHTTP_SERVER_MAX_HEADER_BYTES = int(os.getenv("XHTTP_SERVER_MAX_HEADER_BYTES", "65536"))
 
 EMAIL_BACKEND = os.getenv("EMAIL_BACKEND", "django.core.mail.backends.smtp.EmailBackend")
 EMAIL_HOST = os.getenv("EMAIL_HOST", "localhost")
@@ -169,6 +176,5 @@ SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 SESSION_COOKIE_HTTPONLY = True
 CSRF_COOKIE_HTTPONLY = True
 X_FRAME_OPTIONS = "DENY"
-
 
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
