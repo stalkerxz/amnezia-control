@@ -79,16 +79,15 @@ class XHTTPDeviceAdmin(admin.ModelAdmin):
         "updated_at",
     )
     list_filter = ("status", "disable_reason", "client__server")
-    search_fields = ("name", "client__name", "client_uuid", "xray_email")
-    autocomplete_fields = ("client",)
-    readonly_fields = (
-        "client_uuid",
-        "xray_email",
-        "config_hash",
-        "last_applied_at",
-        "last_error",
-        "created_at",
-        "updated_at",
-    )
+    search_fields = ("name", "client__name", "=client_uuid", "xray_email")
     exclude = ("config_blob_encrypted",)
     ordering = ("-created_at",)
+
+    def get_readonly_fields(self, request, obj=None):
+        return tuple(field.name for field in self.model._meta.fields if field.name != "config_blob_encrypted")
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
