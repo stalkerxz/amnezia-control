@@ -24,16 +24,7 @@ def _reconcile_xhttp_client(client: VPNClient) -> dict:
     return {"client_id": client.id, "enabled": 0, "disabled": candidates}
 
 
-@shared_task
-def reconcile_xhttp_client_task(client_id: int):
-    client = VPNClient.objects.prefetch_related("xhttp_devices").filter(pk=client_id).first()
-    if not client:
-        return {"client_id": client_id, "missing": True}
-    return _reconcile_xhttp_client(client)
-
-
-@shared_task
-def reconcile_xhttp_devices_task():
+def _reconcile_all_xhttp_devices() -> dict:
     totals = {"clients": 0, "enabled": 0, "disabled": 0, "errors": []}
     clients = (
         VPNClient.objects.filter(xhttp_devices__isnull=False)
@@ -53,10 +44,23 @@ def reconcile_xhttp_devices_task():
 
 
 @shared_task
+def reconcile_xhttp_client_task(client_id: int):
+    client = VPNClient.objects.prefetch_related("xhttp_devices").filter(pk=client_id).first()
+    if not client:
+        return {"client_id": client_id, "missing": True}
+    return _reconcile_xhttp_client(client)
+
+
+@shared_task
+def reconcile_xhttp_devices_task():
+    return _reconcile_all_xhttp_devices()
+
+
+@shared_task
 def enforce_client_limits_task():
     traffic = VPNClientLimitsService.sync_traffic_usage(actor=None)
     limits = VPNClientLimitsService.enforce_limits(actor=None)
-    xhttp = reconcile_xhttp_devices_task.run()
+    xhttp = _reconcile_all_xhttp_devices()
     return {"traffic": traffic, "limits": limits, "xhttp": xhttp}
 
 
