@@ -3,6 +3,7 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from django.http import HttpResponse, HttpResponseNotAllowed
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.text import slugify
+from django.views.decorators.http import require_GET
 
 from .models import XHTTPDevice
 from .xhttp_forms import XHTTPDeviceCreateForm
@@ -53,6 +54,7 @@ def xhttp_devices_view(request):
 
 @login_required
 @user_passes_test(_admin_required)
+@require_GET
 def xhttp_device_download_view(request, pk: int):
     device = get_object_or_404(
         XHTTPDevice.objects.select_related("client"),
@@ -66,6 +68,8 @@ def xhttp_device_download_view(request, pk: int):
     filename_base = slugify(f"{device.client.name}-{device.name}") or f"xhttp-device-{device.id}"
     response = HttpResponse(config, content_type="application/json; charset=utf-8")
     response["Content-Disposition"] = f'attachment; filename="{filename_base}.json"'
+    response["Cache-Control"] = "no-store, max-age=0"
+    response["Pragma"] = "no-cache"
     response["X-Content-Type-Options"] = "nosniff"
     return response
 
