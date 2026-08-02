@@ -10,7 +10,7 @@ from django.utils import timezone
 
 from audit.services import AuditService
 from .models import VPNClient, XHTTPDevice
-from .services import ConfigCryptoService, RuntimeCommandService
+from .services import ConfigCryptoService, RuntimeCommandService, VPNClientService
 
 
 @dataclass(frozen=True)
@@ -94,6 +94,13 @@ class XHTTPDeviceService:
         return f"xhttp-{client_uuid.hex}"
 
     @staticmethod
+    def _assert_client_available(client: VPNClient):
+        if client.status != VPNClient.Status.ACTIVE:
+            raise RuntimeError("XHTTP можно включить только для активного VPN-клиента.")
+        if VPNClientService.get_limit_state(client) != VPNClient.LimitState.ACTIVE:
+            raise RuntimeError("XHTTP недоступен: срок или лимит родительского клиента исчерпан.")
+
+    @staticmethod
     def build_happ_config(*, client_uuid: uuid.UUID, device_name: str) -> str:
         runtime = XHTTPClientSettings.from_django_settings()
         config = {
@@ -121,12 +128,7 @@ class XHTTPDeviceService:
                             {
                                 "address": runtime.cdn_domain,
                                 "port": 443,
-                                "users": [
-                                    {
-                                        "id": str(client_uuid),
-                                        "encryption": "none",
-                                    }
-                                ],
+                                "users": [{"id": str(client_uuid), "encryption": "none"}],
                             }
                         ]
                     },
@@ -179,20 +181,25 @@ class XHTTPDeviceService:
 
     @classmethod
     def create_device(cls, *, client: VPNClient, name: str, actor) -> XHTTPDevice:
+        cls._assert_client_available(client)
+        normalized_name = name.strip()
+        if not normalized_name:
+            raise ValueError("Название устройства не может быть пустым.")
         client_uuid = uuid.uuid4()
         xray_email = cls._xray_email(client_uuid)
         adapter = XHTTPRuntimeAdapter(client.server)
         adapter.add(client_uuid=client_uuid, xray_email=xray_email, actor=actor)
 
         try:
-            plaintext = cls.build_happ_config(client_uuid=client_uuid, device_name=name)
+            plaintext = cls.build_happ_config(client_uuid=client_uuid, device_name=normalized_name)
             with transaction.atomic():
                 device = XHTTPDevice(
                     client=client,
-                    name=name,
+                    name=normalized_name,
                     client_uuid=client_uuid,
                     xray_email=xray_email,
                     status=XHTTPDevice.Status.ACTIVE,
+                    disable_reason=XHTTPDevice.DisableReason.NONE,
                     last_applied_at=timezone.now(),
                     last_error="",
                 )
@@ -215,17 +222,22 @@ class XHTTPDeviceService:
 
     @classmethod
     def rotate(cls, *, device: XHTTPDevice, actor):
+        if device.status == XHTTPDevice.Status.DELETED:
+            raise RuntimeError("Удалённое устройство нельзя перевыпустить.")
+        cls._assert_client_available(device.client)
         old_uuid = device.client_uuid
         old_email = device.xray_email
         new_uuid = uuid.uuid4()
         new_email = cls._xray_email(new_uuid)
         adapter = XHTTPRuntimeAdapter(device.client.server)
 
-        adapter.remove(client_uuid=old_uuid, xray_email=old_email, actor=actor)
+        if device.status == XHTTPDevice.Status.ACTIVE:
+            adapter.remove(client_uuid=old_uuid, xray_email=old_email, actor=actor)
         try:
             adapter.add(client_uuid=new_uuid, xray_email=new_email, actor=actor)
         except Exception:
-            adapter.add(client_uuid=old_uuid, xray_email=old_email, actor=actor)
+            if device.status == XHTTPDevice.Status.ACTIVE:
+                adapter.add(client_uuid=old_uuid, xray_email=old_email, actor=actor)
             raise
 
         try:
@@ -234,6 +246,7 @@ class XHTTPDeviceService:
                 device.client_uuid = new_uuid
                 device.xray_email = new_email
                 device.status = XHTTPDevice.Status.ACTIVE
+                device.disable_reason = XHTTPDevice.DisableReason.NONE
                 device.last_applied_at = timezone.now()
                 device.last_error = ""
                 cls._store_config(device=device, plaintext=plaintext)
@@ -242,6 +255,7 @@ class XHTTPDeviceService:
                         "client_uuid",
                         "xray_email",
                         "status",
+                        "disable_reason",
                         "config_blob_encrypted",
                         "config_hash",
                         "last_applied_at",
@@ -253,27 +267,48 @@ class XHTTPDeviceService:
         except Exception:
             try:
                 adapter.remove(client_uuid=new_uuid, xray_email=new_email, actor=actor)
-                adapter.add(client_uuid=old_uuid, xray_email=old_email, actor=actor)
+                if device.status == XHTTPDevice.Status.ACTIVE:
+                    adapter.add(client_uuid=old_uuid, xray_email=old_email, actor=actor)
             except Exception:
                 pass
             raise
 
     @classmethod
-    def disable(cls, *, device: XHTTPDevice, actor):
-        if device.status == XHTTPDevice.Status.DISABLED:
-            return
+    def disable(
+        cls,
+        *,
+        device: XHTTPDevice,
+        actor,
+        reason: str = XHTTPDevice.DisableReason.MANUAL,
+    ):
+        if reason not in XHTTPDevice.DisableReason.values:
+            raise ValueError("Некорректная причина отключения XHTTP-устройства.")
         if device.status == XHTTPDevice.Status.DELETED:
             raise RuntimeError("Удалённое устройство нельзя отключить повторно.")
+        if device.status == XHTTPDevice.Status.DISABLED:
+            if reason == XHTTPDevice.DisableReason.MANUAL and device.disable_reason != reason:
+                device.disable_reason = reason
+                device.save(update_fields=["disable_reason", "updated_at"])
+            return
         XHTTPRuntimeAdapter(device.client.server).remove(
             client_uuid=device.client_uuid,
             xray_email=device.xray_email,
             actor=actor,
         )
         device.status = XHTTPDevice.Status.DISABLED
+        device.disable_reason = reason
         device.last_applied_at = timezone.now()
         device.last_error = ""
-        device.save(update_fields=["status", "last_applied_at", "last_error", "updated_at"])
-        AuditService.log(actor, "xhttp.device.disable", "XHTTPDevice", device.id)
+        device.save(
+            update_fields=[
+                "status",
+                "disable_reason",
+                "last_applied_at",
+                "last_error",
+                "updated_at",
+            ]
+        )
+        AuditService.log(actor, "xhttp.device.disable", "XHTTPDevice", device.id, {"reason": reason})
 
     @classmethod
     def enable(cls, *, device: XHTTPDevice, actor):
@@ -281,15 +316,25 @@ class XHTTPDeviceService:
             return
         if device.status == XHTTPDevice.Status.DELETED:
             raise RuntimeError("Удалённое устройство нельзя включить.")
+        cls._assert_client_available(device.client)
         XHTTPRuntimeAdapter(device.client.server).add(
             client_uuid=device.client_uuid,
             xray_email=device.xray_email,
             actor=actor,
         )
         device.status = XHTTPDevice.Status.ACTIVE
+        device.disable_reason = XHTTPDevice.DisableReason.NONE
         device.last_applied_at = timezone.now()
         device.last_error = ""
-        device.save(update_fields=["status", "last_applied_at", "last_error", "updated_at"])
+        device.save(
+            update_fields=[
+                "status",
+                "disable_reason",
+                "last_applied_at",
+                "last_error",
+                "updated_at",
+            ]
+        )
         AuditService.log(actor, "xhttp.device.enable", "XHTTPDevice", device.id)
 
     @classmethod
@@ -301,15 +346,43 @@ class XHTTPDeviceService:
                 actor=actor,
             )
         device.status = XHTTPDevice.Status.DELETED
+        device.disable_reason = XHTTPDevice.DisableReason.MANUAL
         device.last_applied_at = timezone.now()
         device.last_error = ""
-        device.save(update_fields=["status", "last_applied_at", "last_error", "updated_at"])
+        device.save(
+            update_fields=[
+                "status",
+                "disable_reason",
+                "last_applied_at",
+                "last_error",
+                "updated_at",
+            ]
+        )
         AuditService.log(actor, "xhttp.device.delete", "XHTTPDevice", device.id)
 
     @classmethod
     def check_runtime(cls, *, device: XHTTPDevice, actor):
+        if device.status != XHTTPDevice.Status.ACTIVE:
+            raise RuntimeError("Проверка runtime доступна только для активного XHTTP-устройства.")
         return XHTTPRuntimeAdapter(device.client.server).check(
             client_uuid=device.client_uuid,
             xray_email=device.xray_email,
             actor=actor,
         )
+
+    @classmethod
+    def disable_for_client(cls, *, client: VPNClient, actor):
+        for device in client.xhttp_devices.filter(status=XHTTPDevice.Status.ACTIVE):
+            cls.disable(
+                device=device,
+                actor=actor,
+                reason=XHTTPDevice.DisableReason.CLIENT,
+            )
+
+    @classmethod
+    def enable_for_client(cls, *, client: VPNClient, actor):
+        for device in client.xhttp_devices.filter(
+            status=XHTTPDevice.Status.DISABLED,
+            disable_reason=XHTTPDevice.DisableReason.CLIENT,
+        ):
+            cls.enable(device=device, actor=actor)
