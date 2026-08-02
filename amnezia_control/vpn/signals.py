@@ -14,7 +14,6 @@ def schedule_xhttp_reconciliation(sender, instance: VPNClient, raw=False, update
         "limit_state",
         "expires_at",
         "traffic_limit_bytes",
-        "traffic_used_bytes",
     }
     if update_fields is not None and not (set(update_fields) & relevant_fields):
         return
