@@ -24,18 +24,12 @@ class Migration(migrations.Migration):
                         verbose_name="ID",
                     ),
                 ),
-                (
-                    "name",
-                    models.CharField(max_length=120),
-                ),
+                ("name", models.CharField(max_length=120)),
                 (
                     "client_uuid",
                     models.UUIDField(default=uuid.uuid4, editable=False, unique=True),
                 ),
-                (
-                    "xray_email",
-                    models.CharField(max_length=120, unique=True),
-                ),
+                ("xray_email", models.CharField(max_length=120, unique=True)),
                 (
                     "status",
                     models.CharField(
@@ -45,6 +39,18 @@ class Migration(migrations.Migration):
                             ("deleted", "Удалено"),
                         ],
                         default="active",
+                        max_length=16,
+                    ),
+                ),
+                (
+                    "disable_reason",
+                    models.CharField(
+                        choices=[
+                            ("none", "Нет"),
+                            ("manual", "Вручную"),
+                            ("client", "Отключён родительский клиент"),
+                        ],
+                        default="none",
                         max_length=16,
                     ),
                 ),
@@ -63,9 +69,7 @@ class Migration(migrations.Migration):
                     ),
                 ),
             ],
-            options={
-                "ordering": ("-created_at",),
-            },
+            options={"ordering": ("-created_at",)},
         ),
         migrations.AddConstraint(
             model_name="xhttpdevice",
