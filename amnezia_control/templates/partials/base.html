@@ -17,6 +17,7 @@
     <div class="sidebar-section mt-3 mb-2">{% trans "Навигация" %}</div>
     <nav class="nav flex-column gap-1">
       <a class="nav-link {% if request.path|slice:':9' == '/clients/' and request.path|slice:':26' != '/clients/renewal-requests/' %}active{% endif %}" href="/clients/">Клиенты</a>
+      <a class="nav-link {% if request.path|slice:':7' == '/xhttp/' %}active{% endif %}" href="/xhttp/">XHTTP CDN</a>
       <a class="nav-link {% if request.path|slice:':26' == '/clients/renewal-requests/' %}active{% endif %}" href="/clients/renewal-requests/">Продления</a>
       <a class="nav-link {% if request.path|slice:':9' == '/servers/' %}active{% endif %}" href="/servers/">Сервер</a>
       <a class="nav-link {% if request.path|slice:':6' == '/jobs/' %}active{% endif %}" href="/jobs/">Задания</a>
