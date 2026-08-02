@@ -94,11 +94,21 @@ class XHTTPDevice(models.Model):
         DISABLED = "disabled", "Отключено"
         DELETED = "deleted", "Удалено"
 
+    class DisableReason(models.TextChoices):
+        NONE = "none", "Нет"
+        MANUAL = "manual", "Вручную"
+        CLIENT = "client", "Отключён родительский клиент"
+
     client = models.ForeignKey(VPNClient, on_delete=models.CASCADE, related_name="xhttp_devices")
     name = models.CharField(max_length=120)
     client_uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     xray_email = models.CharField(max_length=120, unique=True)
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.ACTIVE)
+    disable_reason = models.CharField(
+        max_length=16,
+        choices=DisableReason.choices,
+        default=DisableReason.NONE,
+    )
     config_blob_encrypted = models.TextField()
     config_hash = models.CharField(max_length=64)
     last_applied_at = models.DateTimeField(null=True, blank=True)
