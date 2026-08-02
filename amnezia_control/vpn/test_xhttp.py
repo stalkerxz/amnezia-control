@@ -1,4 +1,7 @@
+import importlib.util
 import json
+from importlib.machinery import SourceFileLoader
+from pathlib import Path
 import uuid
 from unittest.mock import patch
 
@@ -22,6 +25,15 @@ XHTTP_TEST_SETTINGS = {
     "XHTTP_UPLINK_CHUNK_SIZE": 1800,
     "XHTTP_SERVER_MAX_HEADER_BYTES": 65536,
 }
+
+
+def load_xhttp_helper_module():
+    path = Path(__file__).resolve().parents[2] / "scripts" / "amnezia-control-xhttp"
+    loader = SourceFileLoader("amnezia_control_xhttp_helper", str(path))
+    spec = importlib.util.spec_from_loader(loader.name, loader)
+    module = importlib.util.module_from_spec(spec)
+    loader.exec_module(module)
+    return module
 
 
 @override_settings(**XHTTP_TEST_SETTINGS)
@@ -150,6 +162,48 @@ class XHTTPDeviceServiceTest(TestCase):
         device.refresh_from_db()
         self.assertEqual(device.status, XHTTPDevice.Status.DISABLED)
         add_mock.assert_called_once()
+
+
+class XHTTPHelperMutationTest(SimpleTestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.helper = load_xhttp_helper_module()
+        cls.client_uuid = "12345678-1234-4234-9234-1234567890ab"
+        cls.email = "xhttp-123456781234423492341234567890ab"
+
+    def config(self):
+        return {
+            "inbounds": [
+                {
+                    "tag": "vless-xhttp-yandex",
+                    "protocol": "vless",
+                    "listen": "127.0.0.1",
+                    "port": 8080,
+                    "settings": {"clients": []},
+                    "streamSettings": {
+                        "network": "xhttp",
+                        "xhttpSettings": {"path": "/api/ad4f850643d5e660f09d31f9"},
+                    },
+                }
+            ]
+        }
+
+    def test_add_check_remove_are_idempotent(self):
+        config = self.config()
+        self.assertTrue(self.helper.mutate(config, "add", self.client_uuid, self.email))
+        self.assertFalse(self.helper.mutate(config, "add", self.client_uuid, self.email))
+        self.assertFalse(self.helper.mutate(config, "check", self.client_uuid, self.email))
+        self.assertTrue(self.helper.mutate(config, "remove", self.client_uuid, self.email))
+        self.assertFalse(self.helper.mutate(config, "remove", self.client_uuid, self.email))
+
+    def test_conflicting_email_is_rejected(self):
+        config = self.config()
+        config["inbounds"][0]["settings"]["clients"].append(
+            {"id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "email": self.email}
+        )
+        with self.assertRaises(self.helper.ManagedError):
+            self.helper.mutate(config, "add", self.client_uuid, self.email)
 
 
 class XHTTPCommandAllowlistTest(SimpleTestCase):
