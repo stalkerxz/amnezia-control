@@ -13,6 +13,7 @@ urlpatterns = [
     path("health/", health_view, name="health"),
     path("servers/", include("servers.urls")),
     path("clients/", include("vpn.urls")),
+    path("xhttp/", include("vpn.xhttp_urls")),
     path("audit/", include("audit.urls")),
     path("jobs/", include("jobs.urls")),
     path("portal/", include("portal.urls")),

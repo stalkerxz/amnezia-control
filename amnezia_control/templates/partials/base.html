@@ -40,6 +40,10 @@
         <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
         <span class="nav-label">Клиенты</span>
       </a>
+      <a class="nav-link {% if request.path|slice:':7' == '/xhttp/' %}active{% endif %}" href="/xhttp/" {% if request.path|slice:':7' == '/xhttp/' %}aria-current="page"{% endif %} title="XHTTP CDN">
+        <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M5 12a7 7 0 0 1 14 0v5a3 3 0 0 1-3 3h-1"/><path d="M5 12v5a3 3 0 0 0 3 3h1"/><path d="M9 16h6"/><path d="M12 3v5"/></svg></span>
+        <span class="nav-label">XHTTP CDN</span>
+      </a>
       <a class="nav-link {% if request.path|slice:':26' == '/clients/renewal-requests/' %}active{% endif %}" href="/clients/renewal-requests/" {% if request.path|slice:':26' == '/clients/renewal-requests/' %}aria-current="page"{% endif %} title="Продления">
         <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 11a8.1 8.1 0 1 0 2 5.3"/><path d="M20 4v7h-7"/><path d="M12 8v5l3 2"/></svg></span>
         <span class="nav-label">Продления</span>
@@ -97,6 +101,7 @@
             {% if request.path == '/' %}Операционный центр
             {% elif request.path|slice:':26' == '/clients/renewal-requests/' %}Продления
             {% elif request.path|slice:':9' == '/clients/' %}Клиенты
+            {% elif request.path|slice:':7' == '/xhttp/' %}XHTTP CDN
             {% elif request.path|slice:':9' == '/servers/' %}Серверы
             {% elif request.path|slice:':6' == '/jobs/' %}Задания
             {% elif request.path|slice:':7' == '/audit/' %}Аудит
@@ -107,6 +112,7 @@
             {% if request.path == '/' %}Сводка состояния сервиса
             {% elif request.path|slice:':26' == '/clients/renewal-requests/' %}Очередь обращений и продлений
             {% elif request.path|slice:':9' == '/clients/' %}Доступы, лимиты и конфигурации
+            {% elif request.path|slice:':7' == '/xhttp/' %}Резервные подключения через CDN
             {% elif request.path|slice:':9' == '/servers/' %}Инфраструктура и runtime
             {% elif request.path|slice:':6' == '/jobs/' %}Фоновые операции и диагностика
             {% elif request.path|slice:':7' == '/audit/' %}История действий операторов
