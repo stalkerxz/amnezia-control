@@ -4,6 +4,9 @@ from .portal_views import (
     CustomerLoginView,
     CustomerLogoutView,
     customer_portal_home_view,
+    customer_vpn_download_view,
+    customer_vpn_qr_view,
+    customer_xhttp_download_view,
 )
 
 
@@ -17,6 +20,21 @@ urlpatterns = [
         "logout/",
         CustomerLogoutView.as_view(),
         name="customer-portal-logout",
+    ),
+    path(
+        "vpn/<int:pk>/download/",
+        customer_vpn_download_view,
+        name="customer-portal-vpn-download",
+    ),
+    path(
+        "vpn/<int:pk>/qr/",
+        customer_vpn_qr_view,
+        name="customer-portal-vpn-qr",
+    ),
+    path(
+        "xhttp/<int:pk>/download/",
+        customer_xhttp_download_view,
+        name="customer-portal-xhttp-download",
     ),
     path(
         "",

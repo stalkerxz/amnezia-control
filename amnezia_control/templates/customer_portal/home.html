@@ -192,7 +192,8 @@
                   </div>
 
 
-                  <div>
+                  <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
+
                     {% if client.status == 'active' %}
                       <span class="badge text-bg-success">
                         Активно
@@ -202,6 +203,27 @@
                         {{ client.get_status_display }}
                       </span>
                     {% endif %}
+
+                    {% if client.cabinet_download_allowed %}
+
+                      <a
+                        href="{% url 'customer-portal-vpn-download' client.pk %}"
+                        class="btn btn-sm btn-primary"
+                      >
+                        Скачать .conf
+                      </a>
+
+                      <a
+                        href="{% url 'customer-portal-vpn-qr' client.pk %}"
+                        class="btn btn-sm btn-outline-primary"
+                        target="_blank"
+                        rel="noopener"
+                      >
+                        QR-код
+                      </a>
+
+                    {% endif %}
+
                   </div>
 
                 </div>
@@ -255,7 +277,7 @@
                   </div>
 
 
-                  <div>
+                  <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
 
                     {% if xhttp.status == 'active' %}
                       <span class="badge text-bg-success">
@@ -265,6 +287,17 @@
                       <span class="badge text-bg-secondary">
                         {{ xhttp.get_status_display }}
                       </span>
+                    {% endif %}
+
+                    {% if xhttp.cabinet_download_allowed %}
+
+                      <a
+                        href="{% url 'customer-portal-xhttp-download' xhttp.pk %}"
+                        class="btn btn-sm btn-primary"
+                      >
+                        Скачать JSON
+                      </a>
+
                     {% endif %}
 
                   </div>
@@ -305,10 +338,9 @@
 
 
 <div class="alert alert-secondary mt-4 mb-0">
-  В Phase 5B здесь появятся безопасные кнопки
-  повторного скачивания уже выпущенных
-  AWG2-конфигураций, QR-кодов и VLESS/XHTTP JSON.
-  Перевыпуск ключей для скачивания не требуется.
+  Повторное скачивание использует уже сохранённые
+  конфигурации. UUID, ключи, IP-адреса и runtime-peer
+  при скачивании не перевыпускаются.
 </div>
 
 {% endblock %}
