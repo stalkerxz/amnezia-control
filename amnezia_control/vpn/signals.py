@@ -47,7 +47,13 @@ def schedule_device_xhttp_reconciliation(
 
     def enqueue():
         from .tasks import (
+            reconcile_vpn_device_task,
             reconcile_xhttp_device_task,
+        )
+
+        _safe_delay(
+            reconcile_vpn_device_task,
+            device_id,
         )
 
         _safe_delay(
@@ -87,7 +93,13 @@ def schedule_account_xhttp_reconciliation(
 
     def enqueue():
         from .tasks import (
+            reconcile_vpn_account_task,
             reconcile_xhttp_account_task,
+        )
+
+        _safe_delay(
+            reconcile_vpn_account_task,
+            account_id,
         )
 
         _safe_delay(
@@ -113,6 +125,11 @@ def schedule_legacy_xhttp_reconciliation(
     """
 
     if raw:
+        return
+
+    # Device-owned rows are reconciled from CustomerAccount/ClientDevice.
+    # This signal remains only for legacy client-owned XHTTP rows.
+    if instance.device_id is not None:
         return
 
     relevant_fields = {

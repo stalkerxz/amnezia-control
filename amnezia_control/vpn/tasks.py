@@ -1,5 +1,8 @@
 from celery import shared_task
 
+from customers.lifecycle_services import (
+    CustomerConnectionLifecycleService,
+)
 from customers.models import (
     ClientDevice,
     CustomerAccount,
@@ -13,6 +16,77 @@ from vpn.services import (
     VPNClientService,
 )
 from vpn.xhttp_services import XHTTPDeviceService
+
+
+def _reconcile_vpn_device(
+    client_device: ClientDevice,
+) -> dict:
+    return (
+        CustomerConnectionLifecycleService
+        .reconcile_vpn_device(
+            device=client_device,
+            actor=None,
+        )
+    )
+
+
+def _reconcile_all_vpn_devices() -> dict:
+    totals = {
+        "devices": 0,
+        "processed": 0,
+        "enabled": 0,
+        "disabled": 0,
+        "unchanged": 0,
+        "errors": [],
+    }
+
+    owners = (
+        ClientDevice.objects
+        .filter(
+            vpn_clients__isnull=False,
+        )
+        .select_related(
+            "account",
+        )
+        .prefetch_related(
+            "vpn_clients",
+            "vpn_clients__revisions",
+        )
+        .distinct()
+    )
+
+    for owner in owners:
+        totals["devices"] += 1
+
+        result = _reconcile_vpn_device(
+            owner
+        )
+
+        totals["processed"] += (
+            result["processed"]
+        )
+
+        totals["enabled"] += (
+            result["enabled"]
+        )
+
+        totals["disabled"] += (
+            result["disabled"]
+        )
+
+        totals["unchanged"] += (
+            result["unchanged"]
+        )
+
+        for error in result["errors"]:
+            totals["errors"].append(
+                {
+                    "device_id": owner.pk,
+                    **error,
+                }
+            )
+
+    return totals
 
 
 def _reconcile_xhttp_device(
@@ -187,6 +261,114 @@ def _reconcile_all_xhttp_devices() -> dict:
 
 
 @shared_task
+def reconcile_vpn_device_task(
+    device_id: int,
+):
+    device = (
+        ClientDevice.objects
+        .select_related(
+            "account",
+        )
+        .prefetch_related(
+            "vpn_clients",
+            "vpn_clients__revisions",
+        )
+        .filter(pk=device_id)
+        .first()
+    )
+
+    if not device:
+        return {
+            "device_id": device_id,
+            "missing": True,
+        }
+
+    return _reconcile_vpn_device(
+        device
+    )
+
+
+@shared_task
+def reconcile_vpn_account_task(
+    account_id: int,
+):
+    account = (
+        CustomerAccount.objects
+        .filter(pk=account_id)
+        .first()
+    )
+
+    if not account:
+        return {
+            "account_id": account_id,
+            "missing": True,
+        }
+
+    result = {
+        "account_id": account_id,
+        "devices": 0,
+        "processed": 0,
+        "enabled": 0,
+        "disabled": 0,
+        "unchanged": 0,
+        "errors": [],
+    }
+
+    devices = (
+        account.devices
+        .select_related(
+            "account",
+        )
+        .filter(
+            vpn_clients__isnull=False,
+        )
+        .prefetch_related(
+            "vpn_clients",
+            "vpn_clients__revisions",
+        )
+        .distinct()
+    )
+
+    for device in devices:
+        result["devices"] += 1
+
+        item = _reconcile_vpn_device(
+            device
+        )
+
+        result["processed"] += (
+            item["processed"]
+        )
+
+        result["enabled"] += (
+            item["enabled"]
+        )
+
+        result["disabled"] += (
+            item["disabled"]
+        )
+
+        result["unchanged"] += (
+            item["unchanged"]
+        )
+
+        for error in item["errors"]:
+            result["errors"].append(
+                {
+                    "device_id": device.pk,
+                    **error,
+                }
+            )
+
+    return result
+
+
+@shared_task
+def reconcile_vpn_devices_task():
+    return _reconcile_all_vpn_devices()
+
+
+@shared_task
 def reconcile_xhttp_device_task(
     device_id: int,
 ):
@@ -299,11 +481,16 @@ def enforce_client_limits_task():
         .enforce_limits(actor=None)
     )
 
+    vpn_owners = (
+        _reconcile_all_vpn_devices()
+    )
+
     xhttp = _reconcile_all_xhttp_devices()
 
     return {
         "traffic": traffic,
         "limits": limits,
+        "vpn_owners": vpn_owners,
         "xhttp": xhttp,
     }
 

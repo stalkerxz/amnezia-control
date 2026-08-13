@@ -25,6 +25,7 @@ class VPNClient(models.Model):
         MANUAL = "manual", "Вручную"
         EXPIRED = "expired", "Истек срок"
         TRAFFIC_EXCEEDED = "traffic_exceeded", "Превышен лимит трафика"
+        OWNER = "owner", "Недоступен аккаунт/устройство"
 
     server = models.ForeignKey(Server, on_delete=models.CASCADE, related_name="clients")
     name = models.CharField(max_length=120)
