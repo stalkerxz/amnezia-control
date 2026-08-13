@@ -8,7 +8,25 @@ from vpn.models import VPNClient
 
 
 class ClientPortalAccess(models.Model):
-    client = models.OneToOneField(VPNClient, on_delete=models.CASCADE, related_name="portal_access")
+    # Legacy technical owner.
+    # Kept during the migration away from VPNClient-level portal access.
+    client = models.OneToOneField(
+        VPNClient,
+        on_delete=models.CASCADE,
+        related_name="portal_access",
+    )
+
+    # Transitional account attribution.
+    # ForeignKey rather than OneToOne is intentional: after manual account
+    # merges several historical VPNClient portal links may map to one account.
+    account = models.ForeignKey(
+        "customers.CustomerAccount",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="legacy_portal_accesses",
+    )
+
     token_hash = models.CharField(max_length=64, unique=True)
     token_encrypted = models.TextField(blank=True, null=True)
     enabled = models.BooleanField(default=True)
@@ -40,7 +58,23 @@ class ClientRenewalRequest(models.Model):
         DONE = "done", "Выполнена"
         DISMISSED = "dismissed", "Отклонена"
 
-    client = models.ForeignKey(VPNClient, on_delete=models.CASCADE, related_name="renewal_requests")
+    # Legacy technical owner.
+    client = models.ForeignKey(
+        VPNClient,
+        on_delete=models.CASCADE,
+        related_name="renewal_requests",
+    )
+
+    # New subscription/account attribution.
+    # Nullable during Phase 6 so existing data is preserved.
+    account = models.ForeignKey(
+        "customers.CustomerAccount",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="renewal_requests",
+    )
+
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.NEW)
     note = models.TextField(blank=True)
     operator_note = models.TextField(blank=True)
