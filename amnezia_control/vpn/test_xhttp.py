@@ -270,3 +270,244 @@ class XHTTPDeviceViewTest(TestCase):
             payload["outbounds"][0]["settings"]["vnext"][0]["users"][0]["id"],
             str(device.client_uuid),
         )
+
+
+@override_settings(**XHTTP_TEST_SETTINGS)
+class XHTTPClientDeviceOwnershipTest(TestCase):
+    def setUp(self):
+        from customers.models import (
+            ClientDevice,
+            CustomerAccount,
+        )
+
+        self.user = (
+            get_user_model()
+            .objects.create_user(
+                "xhttp-device-owner",
+                password="123",
+                is_staff=True,
+            )
+        )
+
+        self.server = Server.objects.create(
+            name="xhttp-device-server",
+            host="203.0.113.20",
+            ssh_username="amnezia",
+            is_enabled=True,
+        )
+
+        self.account = CustomerAccount.objects.create(
+            display_name="Device Owner",
+            email="owner@example.com",
+            created_by=self.user,
+        )
+
+        self.client_device = ClientDevice.objects.create(
+            account=self.account,
+            name="iPhone 15 Pro",
+            platform=ClientDevice.Platform.IOS,
+        )
+
+    @patch("vpn.xhttp_services.XHTTPRuntimeAdapter.add")
+    def test_create_xhttp_directly_for_client_device(
+        self,
+        add_mock,
+    ):
+        device = XHTTPDeviceService.create_device(
+            device=self.client_device,
+            server=self.server,
+            name="VLESS CDN",
+            actor=self.user,
+        )
+
+        add_mock.assert_called_once()
+
+        self.assertEqual(
+            device.device_id,
+            self.client_device.pk,
+        )
+
+        self.assertEqual(
+            device.server_id,
+            self.server.pk,
+        )
+
+        self.assertIsNone(
+            device.client_id,
+        )
+
+        self.assertEqual(
+            device.status,
+            XHTTPDevice.Status.ACTIVE,
+        )
+
+        plaintext = (
+            XHTTPDeviceService.latest_config(
+                device
+            )
+        )
+
+        self.assertIn(
+            str(device.client_uuid),
+            plaintext,
+        )
+
+    @patch("vpn.xhttp_services.XHTTPRuntimeAdapter.add")
+    def test_disabled_account_rejects_new_xhttp(
+        self,
+        add_mock,
+    ):
+        from customers.models import CustomerAccount
+
+        self.account.status = (
+            CustomerAccount.Status.DISABLED
+        )
+
+        self.account.save(
+            update_fields=["status"]
+        )
+
+        with self.assertRaisesRegex(
+            RuntimeError,
+            "активного аккаунта",
+        ):
+            XHTTPDeviceService.create_device(
+                device=self.client_device,
+                server=self.server,
+                name="Blocked",
+                actor=self.user,
+            )
+
+        add_mock.assert_not_called()
+
+    @patch("vpn.xhttp_services.XHTTPRuntimeAdapter.add")
+    def test_disabled_device_rejects_new_xhttp(
+        self,
+        add_mock,
+    ):
+        from customers.models import ClientDevice
+
+        self.client_device.status = (
+            ClientDevice.Status.DISABLED
+        )
+
+        self.client_device.save(
+            update_fields=["status"]
+        )
+
+        with self.assertRaisesRegex(
+            RuntimeError,
+            "активного устройства",
+        ):
+            XHTTPDeviceService.create_device(
+                device=self.client_device,
+                server=self.server,
+                name="Blocked",
+                actor=self.user,
+            )
+
+        add_mock.assert_not_called()
+
+    @patch("vpn.xhttp_services.XHTTPRuntimeAdapter.add")
+    def test_xhttp_view_creates_device_owned_connection(
+        self,
+        add_mock,
+    ):
+        self.client.force_login(
+            self.user
+        )
+
+        response = self.client.post(
+            reverse("xhttp-devices"),
+            {
+                "device": self.client_device.pk,
+                "server": self.server.pk,
+                "name": "CDN Reserve",
+            },
+        )
+
+        self.assertEqual(
+            response.status_code,
+            302,
+        )
+
+        created = XHTTPDevice.objects.get(
+            name="CDN Reserve",
+        )
+
+        self.assertEqual(
+            created.device_id,
+            self.client_device.pk,
+        )
+
+        self.assertEqual(
+            created.server_id,
+            self.server.pk,
+        )
+
+        self.assertIsNone(
+            created.client_id,
+        )
+
+    @patch("vpn.xhttp_services.XHTTPRuntimeAdapter.add")
+    @patch("vpn.xhttp_services.XHTTPRuntimeAdapter.remove")
+    def test_device_reconciliation_preserves_manual_disable(
+        self,
+        remove_mock,
+        add_mock,
+    ):
+        device = XHTTPDeviceService.create_device(
+            device=self.client_device,
+            server=self.server,
+            name="Manual Device",
+            actor=self.user,
+        )
+
+        XHTTPDeviceService.disable(
+            device=device,
+            actor=self.user,
+        )
+
+        device.refresh_from_db()
+
+        self.assertEqual(
+            device.disable_reason,
+            XHTTPDevice.DisableReason.MANUAL,
+        )
+
+        XHTTPDeviceService.enable_for_device(
+            client_device=self.client_device,
+            actor=None,
+        )
+
+        device.refresh_from_db()
+
+        self.assertEqual(
+            device.status,
+            XHTTPDevice.Status.DISABLED,
+        )
+
+
+class XHTTPOwnerOperatorAccessTest(TestCase):
+    def test_owner_can_open_xhttp_without_staff_flag(self):
+        User = get_user_model()
+
+        operator = User.objects.create_user(
+            username="xhttp-owner-operator",
+            password="test-password",
+            is_owner=True,
+            is_staff=False,
+        )
+
+        self.client.force_login(
+            operator
+        )
+
+        response = self.client.get(
+            reverse("xhttp-devices")
+        )
+
+        self.assertEqual(
+            response.status_code,
+            200,
+        )

@@ -124,12 +124,23 @@
       {% if account.status != 'deleted' %}
 
         {% if account.status == 'active' and device.status == 'active' %}
-          <a
-            href="{% url 'customers-device-vpn-create' device.pk %}"
-            class="btn btn-sm btn-primary"
-          >
-            Добавить VPN
-          </a>
+          <div class="d-flex gap-2 flex-wrap">
+
+            <a
+              href="{% url 'customers-device-vpn-create' device.pk %}"
+              class="btn btn-sm btn-primary"
+            >
+              Добавить AWG2
+            </a>
+
+            <a
+              href="{% url 'xhttp-devices' %}?device={{ device.pk }}"
+              class="btn btn-sm btn-outline-primary"
+            >
+              Добавить VLESS/XHTTP
+            </a>
+
+          </div>
         {% endif %}
 
         {% if candidate_accounts %}
@@ -262,10 +273,149 @@
     {% else %}
 
       <div class="text-secondary py-3">
-        У устройства пока нет VPN-конфигураций.
+        У устройства пока нет AWG/AWG2-конфигураций.
       </div>
 
     {% endif %}
+
+
+    <div class="mt-4">
+
+      <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
+
+        <div>
+          <div class="fw-semibold">
+            VLESS / XHTTP
+          </div>
+
+          <div class="small text-secondary">
+            Независимое подключение через CDN
+          </div>
+        </div>
+
+        <span class="badge text-bg-secondary">
+          {{ device.xhttp_devices.all|length }}
+        </span>
+
+      </div>
+
+
+      {% if device.xhttp_devices.all %}
+
+        <div class="table-responsive">
+
+          <table class="table align-middle mb-0">
+
+            <thead>
+              <tr>
+                <th>Подключение</th>
+                <th>Сервер</th>
+                <th>Статус</th>
+                <th>UUID</th>
+                <th class="text-end">
+                  Действия
+                </th>
+              </tr>
+            </thead>
+
+            <tbody>
+
+              {% for xhttp in device.xhttp_devices.all %}
+
+                <tr>
+
+                  <td>
+                    <div class="fw-semibold">
+                      {{ xhttp.name }}
+                    </div>
+
+                    <div class="small text-secondary">
+                      VLESS / XHTTP CDN
+                    </div>
+                  </td>
+
+
+                  <td>
+                    {% if xhttp.server %}
+                      {{ xhttp.server.name }}
+                    {% elif xhttp.client %}
+                      {{ xhttp.client.server.name }}
+                      <span class="small text-warning">
+                        legacy
+                      </span>
+                    {% else %}
+                      —
+                    {% endif %}
+                  </td>
+
+
+                  <td>
+                    {% if xhttp.status == 'active' %}
+                      <span class="badge text-bg-success">
+                        Активно
+                      </span>
+                    {% else %}
+                      <span class="badge text-bg-secondary">
+                        {{ xhttp.get_status_display }}
+                      </span>
+
+                      {% if xhttp.disable_reason != 'none' %}
+                        <div class="small text-secondary mt-1">
+                          {{ xhttp.get_disable_reason_display }}
+                        </div>
+                      {% endif %}
+                    {% endif %}
+                  </td>
+
+
+                  <td>
+                    <code class="user-select-all">
+                      {{ xhttp.client_uuid }}
+                    </code>
+                  </td>
+
+
+                  <td class="text-end">
+
+                    <div class="d-flex justify-content-end gap-1 flex-wrap">
+
+                      <a
+                        href="{% url 'xhttp-device-download' xhttp.pk %}"
+                        class="btn btn-sm btn-outline-primary"
+                      >
+                        Скачать JSON
+                      </a>
+
+                      <a
+                        href="{% url 'xhttp-devices' %}?device={{ device.pk }}"
+                        class="btn btn-sm btn-outline-secondary"
+                      >
+                        Управление
+                      </a>
+
+                    </div>
+
+                  </td>
+
+                </tr>
+
+              {% endfor %}
+
+            </tbody>
+
+          </table>
+
+        </div>
+
+      {% else %}
+
+        <div class="text-secondary py-2">
+          VLESS/XHTTP-подключение пока не создано.
+        </div>
+
+      {% endif %}
+
+    </div>
 
   </div>
 </section>

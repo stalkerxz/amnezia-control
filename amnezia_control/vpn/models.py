@@ -108,22 +108,34 @@ class XHTTPDevice(models.Model):
     class DisableReason(models.TextChoices):
         NONE = "none", "Нет"
         MANUAL = "manual", "Вручную"
-        CLIENT = "client", "Отключён родительский клиент"
+        CLIENT = "client", "Недоступен аккаунт/устройство"
 
     # Transitional legacy relation.
     # Phase 4 keeps it temporarily so existing XHTTP rows and the old
     # operator flow continue to work while services move to ClientDevice.
+    # Legacy compatibility relation.
+    # New XHTTP/VLESS connections no longer require a VPNClient.
     client = models.ForeignKey(
         VPNClient,
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name="xhttp_devices",
     )
 
-    # New owner of the VLESS/XHTTP connection.
-    # Nullable during the compatibility phase; the following data
-    # migration fills it from client.device whenever possible.
+    # Logical owner of the VLESS/XHTTP connection.
     device = models.ForeignKey(
         "customers.ClientDevice",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="xhttp_devices",
+    )
+
+    # Runtime server is explicit. XHTTP must not infer its Xray host
+    # from an unrelated AWG/AWG2 VPNClient.
+    server = models.ForeignKey(
+        "servers.Server",
         on_delete=models.PROTECT,
         null=True,
         blank=True,
@@ -151,9 +163,14 @@ class XHTTPDevice(models.Model):
             models.UniqueConstraint(
                 fields=["client", "name"],
                 name="unique_xhttp_device_name_per_client",
-            )
+            ),
+            models.UniqueConstraint(
+                fields=["device", "name"],
+                name="unique_xhttp_name_per_device",
+            ),
         ]
         ordering = ("-created_at",)
 
     def __str__(self):
-        return f"{self.client} — {self.name}"
+        owner = self.device or self.client
+        return f"{owner or 'XHTTP'} — {self.name}"

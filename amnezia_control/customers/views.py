@@ -16,7 +16,7 @@ from django.views.decorators.http import (
 
 from servers.models import Server
 from vpn.forms import VPNClientCreateForm
-from vpn.models import VPNClient
+from vpn.models import VPNClient, XHTTPDevice
 from vpn.services import VPNClientService
 
 from .forms import (
@@ -379,13 +379,32 @@ def customer_detail_view(request, pk):
         )
     )
 
+    xhttp_devices = (
+        XHTTPDevice.objects
+        .exclude(
+            status=XHTTPDevice.Status.DELETED,
+        )
+        .select_related(
+            "server",
+            "client",
+        )
+        .order_by(
+            "name",
+            "id",
+        )
+    )
+
     devices = (
         ClientDevice.objects
         .prefetch_related(
             Prefetch(
                 "vpn_clients",
                 queryset=vpn_clients,
-            )
+            ),
+            Prefetch(
+                "xhttp_devices",
+                queryset=xhttp_devices,
+            ),
         )
         .order_by("name", "id")
     )

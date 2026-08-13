@@ -1631,3 +1631,249 @@ class CustomerDeviceVPNCreationTest(TestCase):
         )
 
         create_client.assert_not_called()
+
+
+from django.contrib.auth import (
+    get_user_model as _phase4_get_user_model,
+)
+from django.test import (
+    TestCase as _Phase4TestCase,
+)
+from django.urls import (
+    reverse as _phase4_reverse,
+)
+
+
+class CustomerXHTTPIntegrationTest(_Phase4TestCase):
+    def setUp(self):
+        from customers.models import (
+            ClientDevice,
+            CustomerAccount,
+        )
+        from servers.models import Server
+        from vpn.models import XHTTPDevice
+
+        User = _phase4_get_user_model()
+
+        self.operator = User.objects.create_user(
+            username="phase4-customer-operator",
+            password="test-password",
+        )
+
+        self.source = CustomerAccount.objects.create(
+            display_name="Phase 4 Customer",
+            email="phase4@example.com",
+            created_by=self.operator,
+        )
+
+        self.device = ClientDevice.objects.create(
+            account=self.source,
+            name="Phase 4 iPhone",
+            platform=ClientDevice.Platform.IOS,
+        )
+
+        self.server = Server.objects.create(
+            name="Phase 4 XHTTP Server",
+            host="203.0.113.50",
+            ssh_username="amnezia",
+            is_enabled=True,
+        )
+
+        self.xhttp = XHTTPDevice.objects.create(
+            client=None,
+            device=self.device,
+            server=self.server,
+            name="Device CDN",
+            xray_email=(
+                "xhttp-"
+                "11111111111111111111111111111111"
+            ),
+            config_blob_encrypted="encrypted-test-config",
+            config_hash="0" * 64,
+        )
+
+    def test_customer_detail_renders_device_xhttp(self):
+        self.client.force_login(
+            self.operator
+        )
+
+        response = self.client.get(
+            _phase4_reverse(
+                "customers-detail",
+                args=[self.source.pk],
+            )
+        )
+
+        self.assertEqual(
+            response.status_code,
+            200,
+        )
+
+        self.assertContains(
+            response,
+            "VLESS / XHTTP",
+        )
+
+        self.assertContains(
+            response,
+            "Device CDN",
+        )
+
+        self.assertContains(
+            response,
+            _phase4_reverse(
+                "xhttp-device-download",
+                args=[self.xhttp.pk],
+            ),
+        )
+
+        self.assertContains(
+            response,
+            (
+                _phase4_reverse(
+                    "xhttp-devices"
+                )
+                + f"?device={self.device.pk}"
+            ),
+        )
+
+    def test_deleted_xhttp_is_hidden_from_customer_detail(self):
+        from vpn.models import XHTTPDevice
+
+        self.xhttp.status = (
+            XHTTPDevice.Status.DELETED
+        )
+
+        self.xhttp.save(
+            update_fields=["status"]
+        )
+
+        self.client.force_login(
+            self.operator
+        )
+
+        response = self.client.get(
+            _phase4_reverse(
+                "customers-detail",
+                args=[self.source.pk],
+            )
+        )
+
+        self.assertEqual(
+            response.status_code,
+            200,
+        )
+
+        self.assertNotContains(
+            response,
+            "Device CDN",
+        )
+
+    def test_move_device_preserves_xhttp_connection(self):
+        from customers.models import CustomerAccount
+        from customers.services import (
+            move_device_to_account,
+        )
+
+        target = CustomerAccount.objects.create(
+            display_name="Phase 4 Move Target",
+        )
+
+        original_xhttp_id = self.xhttp.pk
+        original_device_id = self.xhttp.device_id
+        original_server_id = self.xhttp.server_id
+        original_uuid = self.xhttp.client_uuid
+
+        move_device_to_account(
+            device_id=self.device.pk,
+            target_account_id=target.pk,
+        )
+
+        self.device.refresh_from_db()
+        self.xhttp.refresh_from_db()
+
+        self.assertEqual(
+            self.device.account_id,
+            target.pk,
+        )
+
+        self.assertEqual(
+            self.xhttp.pk,
+            original_xhttp_id,
+        )
+
+        self.assertEqual(
+            self.xhttp.device_id,
+            original_device_id,
+        )
+
+        self.assertEqual(
+            self.xhttp.server_id,
+            original_server_id,
+        )
+
+        self.assertEqual(
+            self.xhttp.client_uuid,
+            original_uuid,
+        )
+
+        self.assertIsNone(
+            self.xhttp.client_id,
+        )
+
+    def test_merge_accounts_preserves_xhttp_connection(self):
+        from customers.models import CustomerAccount
+        from customers.services import (
+            merge_customer_accounts,
+        )
+
+        target = CustomerAccount.objects.create(
+            display_name="Phase 4 Merge Target",
+        )
+
+        original_device_id = self.xhttp.device_id
+        original_server_id = self.xhttp.server_id
+        original_uuid = self.xhttp.client_uuid
+
+        moved = merge_customer_accounts(
+            source_account_id=self.source.pk,
+            target_account_id=target.pk,
+        )
+
+        self.assertEqual(
+            moved,
+            1,
+        )
+
+        self.device.refresh_from_db()
+        self.xhttp.refresh_from_db()
+        self.source.refresh_from_db()
+
+        self.assertEqual(
+            self.device.account_id,
+            target.pk,
+        )
+
+        self.assertEqual(
+            self.xhttp.device_id,
+            original_device_id,
+        )
+
+        self.assertEqual(
+            self.xhttp.server_id,
+            original_server_id,
+        )
+
+        self.assertEqual(
+            self.xhttp.client_uuid,
+            original_uuid,
+        )
+
+        self.assertIsNone(
+            self.xhttp.client_id,
+        )
+
+        self.assertEqual(
+            self.source.status,
+            CustomerAccount.Status.DELETED,
+        )

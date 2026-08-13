@@ -9,6 +9,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from audit.services import AuditService
+from customers.models import ClientDevice, CustomerAccount
 from .models import VPNClient, XHTTPDevice
 from .services import ConfigCryptoService, RuntimeCommandService, VPNClientService
 
@@ -95,10 +96,85 @@ class XHTTPDeviceService:
 
     @staticmethod
     def _assert_client_available(client: VPNClient):
+        """Legacy compatibility check for old client-owned XHTTP rows."""
         if client.status != VPNClient.Status.ACTIVE:
-            raise RuntimeError("XHTTP можно включить только для активного VPN-клиента.")
-        if VPNClientService.get_limit_state(client) != VPNClient.LimitState.ACTIVE:
-            raise RuntimeError("XHTTP недоступен: срок или лимит родительского клиента исчерпан.")
+            raise RuntimeError(
+                "XHTTP можно включить только для активного VPN-клиента."
+            )
+        if (
+            VPNClientService.get_limit_state(client)
+            != VPNClient.LimitState.ACTIVE
+        ):
+            raise RuntimeError(
+                "XHTTP недоступен: срок или лимит "
+                "родительского клиента исчерпан."
+            )
+
+    @staticmethod
+    def is_device_available(device: ClientDevice) -> bool:
+        account = device.account
+
+        if device.status != ClientDevice.Status.ACTIVE:
+            return False
+
+        if account.status != CustomerAccount.Status.ACTIVE:
+            return False
+
+        if (
+            account.expires_at is not None
+            and account.expires_at <= timezone.now()
+        ):
+            return False
+
+        return True
+
+    @classmethod
+    def _assert_device_available(cls, device: ClientDevice):
+        if device.status != ClientDevice.Status.ACTIVE:
+            raise RuntimeError(
+                "XHTTP доступен только для активного устройства."
+            )
+
+        account = device.account
+
+        if account.status != CustomerAccount.Status.ACTIVE:
+            raise RuntimeError(
+                "XHTTP доступен только для активного аккаунта."
+            )
+
+        if (
+            account.expires_at is not None
+            and account.expires_at <= timezone.now()
+        ):
+            raise RuntimeError(
+                "XHTTP недоступен: срок аккаунта истёк."
+            )
+
+    @staticmethod
+    def _runtime_server(device: XHTTPDevice):
+        if device.server_id is not None:
+            return device.server
+
+        if device.client_id is not None:
+            return device.client.server
+
+        raise RuntimeError(
+            "Для XHTTP-подключения не указан runtime-сервер."
+        )
+
+    @classmethod
+    def _assert_owner_available(cls, device: XHTTPDevice):
+        if device.device_id is not None:
+            cls._assert_device_available(device.device)
+            return
+
+        if device.client_id is not None:
+            cls._assert_client_available(device.client)
+            return
+
+        raise RuntimeError(
+            "У XHTTP-подключения отсутствует владелец."
+        )
 
     @staticmethod
     def build_happ_config(*, client_uuid: uuid.UUID, device_name: str) -> str:
@@ -180,22 +256,97 @@ class XHTTPDeviceService:
         device.config_hash = hashlib.sha256(plaintext.encode("utf-8")).hexdigest()
 
     @classmethod
-    def create_device(cls, *, client: VPNClient, name: str, actor) -> XHTTPDevice:
-        cls._assert_client_available(client)
+    def create_device(
+        cls,
+        *,
+        name: str,
+        actor,
+        device: ClientDevice | None = None,
+        server=None,
+        client: VPNClient | None = None,
+    ) -> XHTTPDevice:
         normalized_name = name.strip()
+
         if not normalized_name:
-            raise ValueError("Название устройства не может быть пустым.")
+            raise ValueError(
+                "Название устройства не может быть пустым."
+            )
+
+        # New architecture: ClientDevice + explicit Server.
+        if device is not None:
+            cls._assert_device_available(device)
+
+            if server is None:
+                raise ValueError(
+                    "Для XHTTP необходимо выбрать сервер."
+                )
+
+            if not server.is_enabled:
+                raise RuntimeError(
+                    "Выбранный XHTTP-сервер отключён."
+                )
+
+            if (
+                client is not None
+                and client.device_id is not None
+                and client.device_id != device.pk
+            ):
+                raise ValueError(
+                    "VPNClient принадлежит другому устройству."
+                )
+
+            if XHTTPDevice.objects.filter(
+                device=device,
+                name=normalized_name,
+            ).exists():
+                raise ValueError(
+                    "У этого устройства уже есть "
+                    "XHTTP-подключение с таким названием."
+                )
+
+        # Legacy compatibility path.
+        elif client is not None:
+            cls._assert_client_available(client)
+
+            device = client.device
+            server = server or client.server
+
+            if XHTTPDevice.objects.filter(
+                client=client,
+                name=normalized_name,
+            ).exists():
+                raise ValueError(
+                    "У этого VPN-клиента уже есть "
+                    "XHTTP-подключение с таким названием."
+                )
+
+        else:
+            raise ValueError(
+                "Не указано устройство для XHTTP."
+            )
 
         client_uuid = uuid.uuid4()
         xray_email = cls._xray_email(client_uuid)
-        adapter = XHTTPRuntimeAdapter(client.server)
-        adapter.add(client_uuid=client_uuid, xray_email=xray_email, actor=actor)
+
+        adapter = XHTTPRuntimeAdapter(server)
+
+        adapter.add(
+            client_uuid=client_uuid,
+            xray_email=xray_email,
+            actor=actor,
+        )
 
         try:
-            plaintext = cls.build_happ_config(client_uuid=client_uuid, device_name=normalized_name)
+            plaintext = cls.build_happ_config(
+                client_uuid=client_uuid,
+                device_name=normalized_name,
+            )
+
             with transaction.atomic():
-                device = XHTTPDevice(
+                xhttp_device = XHTTPDevice(
                     client=client,
+                    device=device,
+                    server=server,
                     name=normalized_name,
                     client_uuid=client_uuid,
                     xray_email=xray_email,
@@ -204,28 +355,60 @@ class XHTTPDeviceService:
                     last_applied_at=timezone.now(),
                     last_error="",
                 )
-                cls._store_config(device=device, plaintext=plaintext)
-                device.save()
+
+                cls._store_config(
+                    device=xhttp_device,
+                    plaintext=plaintext,
+                )
+
+                xhttp_device.save()
+
+                details = {
+                    "device_id": (
+                        device.pk
+                        if device is not None
+                        else None
+                    ),
+                    "server_id": (
+                        server.pk
+                        if server is not None
+                        else None
+                    ),
+                    "legacy_client_id": (
+                        client.pk
+                        if client is not None
+                        else None
+                    ),
+                }
+
                 AuditService.log(
                     actor,
                     "xhttp.device.create",
                     "XHTTPDevice",
-                    device.id,
-                    {"client_id": client.id},
+                    xhttp_device.id,
+                    details,
                 )
-                return device
+
+                return xhttp_device
+
         except Exception:
             try:
-                adapter.remove(client_uuid=client_uuid, xray_email=xray_email, actor=actor)
+                adapter.remove(
+                    client_uuid=client_uuid,
+                    xray_email=xray_email,
+                    actor=actor,
+                )
             except Exception:
                 pass
+
             raise
+
 
     @classmethod
     def rotate(cls, *, device: XHTTPDevice, actor):
         if device.status == XHTTPDevice.Status.DELETED:
             raise RuntimeError("Удалённое устройство нельзя перевыпустить.")
-        cls._assert_client_available(device.client)
+        cls._assert_owner_available(device)
 
         was_active = device.status == XHTTPDevice.Status.ACTIVE
         old_uuid = device.client_uuid
@@ -233,7 +416,7 @@ class XHTTPDeviceService:
         old_reason = device.disable_reason
         new_uuid = uuid.uuid4()
         new_email = cls._xray_email(new_uuid)
-        adapter = XHTTPRuntimeAdapter(device.client.server)
+        adapter = XHTTPRuntimeAdapter(cls._runtime_server(device))
 
         if was_active:
             adapter.add(client_uuid=new_uuid, xray_email=new_email, actor=actor)
@@ -294,7 +477,7 @@ class XHTTPDeviceService:
                 device.save(update_fields=["disable_reason", "updated_at"])
             return
 
-        adapter = XHTTPRuntimeAdapter(device.client.server)
+        adapter = XHTTPRuntimeAdapter(cls._runtime_server(device))
         adapter.remove(client_uuid=device.client_uuid, xray_email=device.xray_email, actor=actor)
         try:
             device.status = XHTTPDevice.Status.DISABLED
@@ -324,9 +507,9 @@ class XHTTPDeviceService:
             return
         if device.status == XHTTPDevice.Status.DELETED:
             raise RuntimeError("Удалённое устройство нельзя включить.")
-        cls._assert_client_available(device.client)
+        cls._assert_owner_available(device)
 
-        adapter = XHTTPRuntimeAdapter(device.client.server)
+        adapter = XHTTPRuntimeAdapter(cls._runtime_server(device))
         adapter.add(client_uuid=device.client_uuid, xray_email=device.xray_email, actor=actor)
         try:
             device.status = XHTTPDevice.Status.ACTIVE
@@ -356,7 +539,7 @@ class XHTTPDeviceService:
             return
 
         was_active = device.status == XHTTPDevice.Status.ACTIVE
-        adapter = XHTTPRuntimeAdapter(device.client.server)
+        adapter = XHTTPRuntimeAdapter(cls._runtime_server(device))
         adapter.remove(client_uuid=device.client_uuid, xray_email=device.xray_email, actor=actor)
         try:
             device.status = XHTTPDevice.Status.DELETED
@@ -385,15 +568,53 @@ class XHTTPDeviceService:
     def check_runtime(cls, *, device: XHTTPDevice, actor):
         if device.status != XHTTPDevice.Status.ACTIVE:
             raise RuntimeError("Проверка runtime доступна только для активного XHTTP-устройства.")
-        return XHTTPRuntimeAdapter(device.client.server).check(
+        return XHTTPRuntimeAdapter(cls._runtime_server(device)).check(
             client_uuid=device.client_uuid,
             xray_email=device.xray_email,
             actor=actor,
         )
 
     @classmethod
+    def disable_for_device(
+        cls,
+        *,
+        client_device: ClientDevice,
+        actor,
+    ):
+        for xhttp_device in client_device.xhttp_devices.filter(
+            status=XHTTPDevice.Status.ACTIVE,
+        ):
+            cls.disable(
+                device=xhttp_device,
+                actor=actor,
+                reason=XHTTPDevice.DisableReason.CLIENT,
+            )
+
+    @classmethod
+    def enable_for_device(
+        cls,
+        *,
+        client_device: ClientDevice,
+        actor,
+    ):
+        if not cls.is_device_available(client_device):
+            return
+
+        for xhttp_device in client_device.xhttp_devices.filter(
+            status=XHTTPDevice.Status.DISABLED,
+            disable_reason=XHTTPDevice.DisableReason.CLIENT,
+        ):
+            cls.enable(
+                device=xhttp_device,
+                actor=actor,
+            )
+
+    @classmethod
     def disable_for_client(cls, *, client: VPNClient, actor):
-        for device in client.xhttp_devices.filter(status=XHTTPDevice.Status.ACTIVE):
+        for device in client.xhttp_devices.filter(
+            device__isnull=True,
+            status=XHTTPDevice.Status.ACTIVE,
+        ):
             cls.disable(
                 device=device,
                 actor=actor,
@@ -403,6 +624,7 @@ class XHTTPDeviceService:
     @classmethod
     def enable_for_client(cls, *, client: VPNClient, actor):
         for device in client.xhttp_devices.filter(
+            device__isnull=True,
             status=XHTTPDevice.Status.DISABLED,
             disable_reason=XHTTPDevice.DisableReason.CLIENT,
         ):
