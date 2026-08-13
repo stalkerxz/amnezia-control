@@ -857,3 +857,181 @@ class CustomerAccountOperationHTTPTest(TestCase):
             self.source.status,
             CustomerAccount.Status.DELETED,
         )
+
+
+class CustomerAccountOperatorUITest(TestCase):
+    def setUp(self):
+        User = get_user_model()
+
+        self.operator = User.objects.create_user(
+            username="ui-operator",
+            password="test-password",
+        )
+
+        self.source = CustomerAccount.objects.create(
+            display_name="UI Source",
+            email="source@example.com",
+        )
+
+        self.target = CustomerAccount.objects.create(
+            display_name="UI Target",
+            email="target@example.com",
+        )
+
+        self.deleted_target = CustomerAccount.objects.create(
+            display_name="UI Deleted Target",
+            status=CustomerAccount.Status.DELETED,
+        )
+
+        self.device = ClientDevice.objects.create(
+            account=self.source,
+            name="UI iPhone",
+            platform=ClientDevice.Platform.IOS,
+        )
+
+    def test_detail_renders_move_and_merge_controls(self):
+        self.client.force_login(self.operator)
+
+        response = self.client.get(
+            reverse(
+                "customers-detail",
+                args=[self.source.pk],
+            )
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        self.assertContains(
+            response,
+            reverse(
+                "customers-device-move",
+                args=[self.device.pk],
+            ),
+        )
+
+        self.assertContains(
+            response,
+            reverse(
+                "customers-merge",
+                args=[self.source.pk],
+            ),
+        )
+
+        self.assertContains(
+            response,
+            "UI Target",
+        )
+
+        self.assertContains(
+            response,
+            "Перенести",
+        )
+
+        self.assertContains(
+            response,
+            "Объединить аккаунты",
+        )
+
+    def test_deleted_accounts_are_not_operation_targets(self):
+        self.client.force_login(self.operator)
+
+        response = self.client.get(
+            reverse(
+                "customers-detail",
+                args=[self.source.pk],
+            )
+        )
+
+        candidate_ids = list(
+            response.context["candidate_accounts"]
+            .values_list("pk", flat=True)
+        )
+
+        self.assertIn(
+            self.target.pk,
+            candidate_ids,
+        )
+
+        self.assertNotIn(
+            self.source.pk,
+            candidate_ids,
+        )
+
+        self.assertNotIn(
+            self.deleted_target.pk,
+            candidate_ids,
+        )
+
+    def test_deleted_source_has_no_operation_forms(self):
+        self.source.status = CustomerAccount.Status.DELETED
+        self.source.save(update_fields=["status"])
+
+        self.client.force_login(self.operator)
+
+        response = self.client.get(
+            reverse(
+                "customers-detail",
+                args=[self.source.pk],
+            )
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        self.assertNotContains(
+            response,
+            reverse(
+                "customers-device-move",
+                args=[self.device.pk],
+            ),
+        )
+
+        self.assertNotContains(
+            response,
+            reverse(
+                "customers-merge",
+                args=[self.source.pk],
+            ),
+        )
+
+        self.assertContains(
+            response,
+            "Операции управления для него отключены",
+        )
+
+    def test_account_with_login_does_not_offer_merge(self):
+        User = get_user_model()
+
+        customer_user = User.objects.create_user(
+            username="ui-customer-login",
+            password="test-password",
+            is_owner=False,
+        )
+
+        self.source.user = customer_user
+        self.source.save(update_fields=["user"])
+
+        self.client.force_login(self.operator)
+
+        response = self.client.get(
+            reverse(
+                "customers-detail",
+                args=[self.source.pk],
+            )
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        self.assertContains(
+            response,
+            "Автоматическое объединение запрещено",
+        )
+
+        self.assertNotContains(
+            response,
+            'action="'
+            + reverse(
+                "customers-merge",
+                args=[self.source.pk],
+            )
+            + '"',
+        )

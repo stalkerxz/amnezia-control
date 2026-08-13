@@ -86,11 +86,19 @@ def customer_detail_view(request, pk):
         pk=pk,
     )
 
+    candidate_accounts = (
+        CustomerAccount.objects
+        .exclude(pk=account.pk)
+        .exclude(status=CustomerAccount.Status.DELETED)
+        .order_by("display_name", "id")
+    )
+
     return render(
         request,
         "customers/customer_detail.html",
         {
             "account": account,
+            "candidate_accounts": candidate_accounts,
         },
     )
 

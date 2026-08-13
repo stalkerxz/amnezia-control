@@ -3,6 +3,7 @@
 {% block title %}{{ account.display_name }} · amnezia-control{% endblock %}
 
 {% block content %}
+
 <div class="page-header d-flex justify-content-between align-items-start gap-2 flex-wrap">
   <div>
     <p class="page-kicker">Операторская · Аккаунт клиента</p>
@@ -18,15 +19,20 @@
   </div>
 
   <div class="action-cluster">
-    <a class="btn btn-outline-secondary" href="{% url 'customers-list' %}">
+    <a
+      class="btn btn-outline-secondary"
+      href="{% url 'customers-list' %}"
+    >
       Все аккаунты
     </a>
   </div>
 </div>
 
+
 <section class="section-block section-quiet">
   <div class="section-body">
     <div class="summary-strip">
+
       <div class="summary-item span-3">
         <div class="label">Статус</div>
         <div class="value">
@@ -68,25 +74,100 @@
           {% endif %}
         </div>
       </div>
+
     </div>
   </div>
 </section>
 
-{% for device in account.devices.all %}
+
+{% if account.status == 'deleted' %}
 <section class="section-block">
   <div class="section-body">
-    <div class="section-header-compact">
+    <div class="alert alert-warning mb-0">
+      Этот аккаунт является удалённой или объединённой записью.
+      Операции управления для него отключены.
+    </div>
+  </div>
+</section>
+{% endif %}
+
+
+{% for device in account.devices.all %}
+
+<section class="section-block">
+  <div class="section-body">
+
+    <div class="section-header-compact d-flex justify-content-between align-items-start gap-3 flex-wrap">
+
       <div>
         <h2 class="h5 mb-1">{{ device.name }}</h2>
+
         <div class="text-secondary small">
-          {{ device.get_platform_display }} · {{ device.get_status_display }}
+          {{ device.get_platform_display }}
+          ·
+          {{ device.get_status_display }}
         </div>
       </div>
+
+
+      {% if account.status != 'deleted' %}
+
+        {% if candidate_accounts %}
+
+        <form
+          method="post"
+          action="{% url 'customers-device-move' device.pk %}"
+          class="d-flex gap-2 align-items-center flex-wrap"
+        >
+          {% csrf_token %}
+
+          <label
+            class="visually-hidden"
+            for="move-target-{{ device.pk }}"
+          >
+            Перенести устройство
+          </label>
+
+          <select
+            id="move-target-{{ device.pk }}"
+            name="target_account_id"
+            class="form-select form-select-sm"
+            required
+          >
+            <option value="">
+              Перенести в аккаунт…
+            </option>
+
+            {% for target in candidate_accounts %}
+              <option value="{{ target.pk }}">
+                {{ target.display_name }}
+                {% if target.email %}
+                  · {{ target.email }}
+                {% endif %}
+              </option>
+            {% endfor %}
+          </select>
+
+          <button
+            type="submit"
+            class="btn btn-sm btn-outline-warning"
+          >
+            Перенести
+          </button>
+        </form>
+
+        {% endif %}
+
+      {% endif %}
+
     </div>
 
+
     {% if device.vpn_clients.all %}
+
       <div class="table-responsive">
         <table class="table align-middle mb-0">
+
           <thead>
             <tr>
               <th>Конфигурация</th>
@@ -99,18 +180,36 @@
           </thead>
 
           <tbody>
+
             {% for client in device.vpn_clients.all %}
+
               <tr>
+
                 <td>
-                  <div class="fw-semibold">{{ client.name }}</div>
-                  <div class="small text-secondary">ID {{ client.id }}</div>
+                  <div class="fw-semibold">
+                    {{ client.name }}
+                  </div>
+
+                  <div class="small text-secondary">
+                    ID {{ client.id }}
+                  </div>
                 </td>
 
-                <td>{{ client.get_protocol_type_display }}</td>
+                <td>
+                  {{ client.get_protocol_type_display }}
+                </td>
 
-                <td>{{ client.profile.name }}</td>
+                <td>
+                  {% if client.profile %}
+                    {{ client.profile.name }}
+                  {% else %}
+                    —
+                  {% endif %}
+                </td>
 
-                <td>{{ client.get_status_display }}</td>
+                <td>
+                  {{ client.get_status_display }}
+                </td>
 
                 <td>
                   {% if client.runtime_address %}
@@ -121,38 +220,171 @@
                 </td>
 
                 <td class="text-end">
+
                   <a
                     href="{% url 'clients-detail' client.pk %}"
                     class="btn btn-sm btn-outline-primary"
                   >
                     VPN-клиент
                   </a>
+
                 </td>
+
               </tr>
+
             {% endfor %}
+
           </tbody>
+
         </table>
       </div>
+
     {% else %}
+
       <div class="text-secondary py-3">
         У устройства пока нет VPN-конфигураций.
       </div>
+
     {% endif %}
+
   </div>
 </section>
+
 {% empty %}
+
 <section class="section-block">
   <div class="section-body text-center text-secondary py-4">
     У аккаунта пока нет устройств.
   </div>
 </section>
+
 {% endfor %}
+
+
+{% if account.status != 'deleted' %}
+
+<section class="section-block">
+
+  <div class="section-body">
+
+    <div class="section-header-compact">
+      <div>
+        <p class="page-kicker mb-1">
+          Управление аккаунтом
+        </p>
+
+        <h2 class="h5 mb-1">
+          Объединение аккаунтов
+        </h2>
+
+        <div class="text-secondary small">
+          Все устройства исходного аккаунта будут перенесены
+          в выбранный аккаунт. VPN-ключи, IP-адреса и
+          конфигурации не перевыпускаются.
+        </div>
+      </div>
+    </div>
+
+
+    {% if account.user %}
+
+      <div class="alert alert-warning mb-0">
+        Этот аккаунт привязан к пользовательскому логину.
+        Автоматическое объединение запрещено.
+      </div>
+
+    {% elif candidate_accounts %}
+
+      <form
+        method="post"
+        action="{% url 'customers-merge' account.pk %}"
+        class="row g-3 align-items-end"
+        onsubmit="return confirm('Объединить аккаунт «{{ account.display_name|escapejs }}» с выбранным аккаунтом? Все устройства будут перенесены. VPN-конфигурации останутся без изменений.');"
+      >
+
+        {% csrf_token %}
+
+        <div class="col-12 col-lg-8">
+
+          <label
+            class="form-label"
+            for="merge-target"
+          >
+            Целевой аккаунт
+          </label>
+
+          <select
+            id="merge-target"
+            name="target_account_id"
+            class="form-select"
+            required
+          >
+
+            <option value="">
+              Выберите аккаунт…
+            </option>
+
+            {% for target in candidate_accounts %}
+
+              <option value="{{ target.pk }}">
+                {{ target.display_name }}
+                {% if target.email %}
+                  · {{ target.email }}
+                {% endif %}
+              </option>
+
+            {% endfor %}
+
+          </select>
+
+        </div>
+
+
+        <div class="col-12 col-lg-4">
+
+          <button
+            type="submit"
+            class="btn btn-danger w-100"
+          >
+            Объединить аккаунты
+          </button>
+
+        </div>
+
+      </form>
+
+      <div class="small text-secondary mt-3">
+        Исходный аккаунт не удаляется физически:
+        после объединения он сохраняется как tombstone
+        со статусом «Удалён».
+      </div>
+
+    {% else %}
+
+      <div class="text-secondary">
+        Нет другого доступного аккаунта для объединения.
+      </div>
+
+    {% endif %}
+
+  </div>
+
+</section>
+
+{% endif %}
+
 
 <section class="section-block section-quiet">
   <div class="section-body">
+
     <div class="small text-secondary">
-      Режим просмотра. Перемещение устройств, объединение аккаунтов и создание новых конфигураций здесь пока отключены.
+      Управление аккаунтами выполняется отдельно от технических
+      VPN-конфигураций. Перенос устройства или объединение
+      аккаунтов не изменяет уже выданные VPN-ключи,
+      адреса и сохранённые конфигурации.
     </div>
+
   </div>
 </section>
+
 {% endblock %}
