@@ -153,7 +153,8 @@ def ensure_service_active() -> None:
 
 def write_temp(config: dict, original_stat: os.stat_result) -> Path:
     fd, raw_path = tempfile.mkstemp(
-        prefix=".config.json.amnezia-control-",
+        prefix=".config.amnezia-control-",
+        suffix=".json",
         dir=str(CONFIG_PATH.parent),
         text=True,
     )
