@@ -110,7 +110,26 @@ class XHTTPDevice(models.Model):
         MANUAL = "manual", "Вручную"
         CLIENT = "client", "Отключён родительский клиент"
 
-    client = models.ForeignKey(VPNClient, on_delete=models.CASCADE, related_name="xhttp_devices")
+    # Transitional legacy relation.
+    # Phase 4 keeps it temporarily so existing XHTTP rows and the old
+    # operator flow continue to work while services move to ClientDevice.
+    client = models.ForeignKey(
+        VPNClient,
+        on_delete=models.CASCADE,
+        related_name="xhttp_devices",
+    )
+
+    # New owner of the VLESS/XHTTP connection.
+    # Nullable during the compatibility phase; the following data
+    # migration fills it from client.device whenever possible.
+    device = models.ForeignKey(
+        "customers.ClientDevice",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="xhttp_devices",
+    )
+
     name = models.CharField(max_length=120)
     client_uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     xray_email = models.CharField(max_length=120, unique=True)
