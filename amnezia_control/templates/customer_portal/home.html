@@ -132,6 +132,128 @@
 </div>
 
 
+<section class="card mb-4">
+
+  <div class="card-body">
+
+    <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
+
+      <div>
+
+        <div class="text-secondary small">
+          Подписка
+        </div>
+
+        <h2 class="h5 mb-1">
+          Продление доступа
+        </h2>
+
+        <div class="text-secondary small">
+          Одна заявка продлевает весь аккаунт
+          и все его устройства.
+        </div>
+
+      </div>
+
+      {% if open_renewal_request %}
+        <span class="badge text-bg-info">
+          {{ open_renewal_request.get_status_display }}
+        </span>
+      {% endif %}
+
+    </div>
+
+
+    {% if open_renewal_request %}
+
+      <div class="alert alert-info mb-0">
+
+        <div class="fw-semibold">
+          Заявка уже открыта
+        </div>
+
+        <div class="small mt-1">
+          Создана:
+          {{ open_renewal_request.created_at|date:"d.m.Y H:i" }}
+        </div>
+
+        {% if open_renewal_request.operator_note %}
+          <div class="small mt-2">
+            Комментарий оператора:
+            {{ open_renewal_request.operator_note }}
+          </div>
+        {% endif %}
+
+      </div>
+
+    {% elif renewal_allowed %}
+
+      {% if latest_renewal_request %}
+
+        <div class="small text-secondary mb-3">
+          Последняя заявка:
+          {{ latest_renewal_request.get_status_display }}
+          ·
+          {{ latest_renewal_request.updated_at|date:"d.m.Y H:i" }}
+        </div>
+
+      {% endif %}
+
+
+      <form
+        method="post"
+        enctype="multipart/form-data"
+        action="{% url 'customer-portal-renewal-request' %}"
+        class="row g-3 align-items-end"
+      >
+
+        {% csrf_token %}
+
+        <div class="col-12 col-lg-8">
+
+          <label
+            class="form-label"
+            for="{{ renewal_form.attachment.id_for_label }}"
+          >
+            Подтверждающий файл
+          </label>
+
+          {{ renewal_form.attachment }}
+
+          <div class="form-text">
+            Необязательно. JPG/JPEG/PDF, до 5 МБ.
+          </div>
+
+        </div>
+
+
+        <div class="col-12 col-lg-4">
+
+          <button
+            type="submit"
+            class="btn btn-outline-primary w-100"
+          >
+            Запросить продление
+          </button>
+
+        </div>
+
+      </form>
+
+    {% else %}
+
+      <div class="text-secondary">
+        Для отключённого аккаунта отправка
+        новой заявки недоступна.
+      </div>
+
+    {% endif %}
+
+  </div>
+
+</section>
+
+
 {% for device in account.devices.all %}
 
   <section class="card mb-3">

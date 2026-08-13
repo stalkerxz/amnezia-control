@@ -4,6 +4,9 @@ from .access_views import (
     customer_access_create_view,
     customer_access_manage_view,
 )
+from .renewal_views import (
+    customer_renewal_action_view,
+)
 from .views import (
     customer_create_view,
     customer_detail_view,
@@ -45,6 +48,11 @@ urlpatterns = [
         "<int:pk>/access/manage/",
         customer_access_manage_view,
         name="customers-access-manage",
+    ),
+    path(
+        "<int:pk>/renewal/action/",
+        customer_renewal_action_view,
+        name="customers-renewal-action",
     ),
     path(
         "<int:pk>/merge/",

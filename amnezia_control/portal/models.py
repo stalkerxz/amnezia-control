@@ -47,8 +47,25 @@ class ClientPortalAccess(models.Model):
 
 def renewal_attachment_upload_to(instance, filename: str) -> str:
     extension = Path(filename).suffix.lower()
-    safe_extension = extension if extension in {".jpg", ".jpeg", ".pdf"} else ""
-    return f"portal/renewal_attachments/client_{instance.client_id}/{uuid4().hex}{safe_extension}"
+
+    safe_extension = (
+        extension
+        if extension in {".jpg", ".jpeg", ".pdf"}
+        else ""
+    )
+
+    if instance.account_id is not None:
+        owner = f"account_{instance.account_id}"
+    elif instance.client_id is not None:
+        owner = f"client_{instance.client_id}"
+    else:
+        owner = "unassigned"
+
+    return (
+        "portal/renewal_attachments/"
+        f"{owner}/"
+        f"{uuid4().hex}{safe_extension}"
+    )
 
 
 class ClientRenewalRequest(models.Model):
@@ -59,9 +76,12 @@ class ClientRenewalRequest(models.Model):
         DISMISSED = "dismissed", "Отклонена"
 
     # Legacy technical owner.
+    # New account-level renewal requests do not require VPNClient.
     client = models.ForeignKey(
         VPNClient,
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name="renewal_requests",
     )
 
@@ -99,13 +119,34 @@ class ClientRenewalRequest(models.Model):
         constraints = [
             models.UniqueConstraint(
                 fields=("client",),
-                condition=Q(status__in=["new", "in_progress"]),
+                condition=Q(
+                    status__in=[
+                        "new",
+                        "in_progress",
+                    ]
+                ),
                 name="uniq_open_renewal_request_per_client",
-            )
+            ),
+            models.UniqueConstraint(
+                fields=("account",),
+                condition=Q(
+                    account__isnull=False,
+                    status__in=[
+                        "new",
+                        "in_progress",
+                    ],
+                ),
+                name="uniq_open_renewal_request_per_account",
+            ),
         ]
 
     def __str__(self):
-        return f"renewal:{self.client_id}:{self.status}"
+        if self.account_id is not None:
+            owner = f"account:{self.account_id}"
+        else:
+            owner = f"client:{self.client_id}"
+
+        return f"renewal:{owner}:{self.status}"
 
     @property
     def is_open(self) -> bool:

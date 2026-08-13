@@ -1,5 +1,6 @@
 import base64
 
+from django.contrib import messages
 from django.contrib.auth import (
     views as auth_views,
 )
@@ -17,8 +18,14 @@ from django.shortcuts import (
 from django.urls import reverse_lazy
 from django.utils import timezone
 from django.utils.text import slugify
-from django.views.decorators.http import require_GET
+from django.views.decorators.http import (
+    require_GET,
+    require_POST,
+)
 
+from audit.services import AuditService
+from portal.forms import PortalRenewalRequestForm
+from portal.services import RenewalRequestService
 from vpn.models import VPNClient, XHTTPDevice
 from vpn.services import VPNClientService
 from vpn.xhttp_services import XHTTPDeviceService
@@ -190,6 +197,25 @@ def customer_portal_home_view(request):
         or expired
     )
 
+    open_renewal_request = (
+        RenewalRequestService
+        .get_open_for_account(
+            account=account,
+        )
+    )
+
+    latest_renewal_request = (
+        RenewalRequestService
+        .get_latest_for_account(
+            account=account,
+        )
+    )
+
+    renewal_allowed = bool(
+        account.status
+        == CustomerAccount.Status.ACTIVE
+    )
+
     for device in account.devices.all():
         for client in device.vpn_clients.all():
             has_revision = bool(
@@ -228,6 +254,16 @@ def customer_portal_home_view(request):
             "account": account,
             "expired": expired,
             "blocked": blocked,
+            "renewal_allowed": renewal_allowed,
+            "open_renewal_request": (
+                open_renewal_request
+            ),
+            "latest_renewal_request": (
+                latest_renewal_request
+            ),
+            "renewal_form": (
+                PortalRenewalRequestForm()
+            ),
         },
     )
 
@@ -560,4 +596,109 @@ def customer_xhttp_download_view(
 
     return _secret_response_headers(
         response
+    )
+
+
+@login_required(
+    login_url="/cabinet/login/",
+)
+@require_POST
+def customer_renewal_request_view(
+    request,
+):
+    account = _customer_account_for_user(
+        request.user
+    )
+
+    if account is None:
+        raise PermissionDenied(
+            "Клиентский аккаунт недоступен."
+        )
+
+    if (
+        account.status
+        != CustomerAccount.Status.ACTIVE
+    ):
+        raise PermissionDenied(
+            "Заявка на продление "
+            "для отключённого аккаунта недоступна."
+        )
+
+    form = PortalRenewalRequestForm(
+        request.POST,
+        request.FILES,
+    )
+
+    if not form.is_valid():
+        for errors in form.errors.values():
+            for error in errors:
+                messages.error(
+                    request,
+                    error,
+                )
+
+        return redirect(
+            "customer-portal-home"
+        )
+
+    request_obj, created = (
+        RenewalRequestService
+        .create_or_get_open_for_account(
+            account=account,
+            attachment=(
+                form.cleaned_data.get(
+                    "attachment"
+                )
+            ),
+        )
+    )
+
+    if created:
+        AuditService.log(
+            request.user,
+            "customer.renewal.request",
+            "CustomerAccount",
+            account.pk,
+            {
+                "renewal_request_id": (
+                    request_obj.pk
+                ),
+                "requested_at": (
+                    timezone.now().isoformat()
+                ),
+                "ip": (
+                    request.META.get(
+                        "REMOTE_ADDR",
+                        "",
+                    )
+                ),
+                "user_agent": (
+                    request.META.get(
+                        "HTTP_USER_AGENT",
+                        "",
+                    )[:255]
+                ),
+            },
+        )
+
+        messages.success(
+            request,
+            (
+                "Заявка на продление отправлена. "
+                "Она относится ко всему аккаунту "
+                "и всем его устройствам."
+            ),
+        )
+
+    else:
+        messages.info(
+            request,
+            (
+                "Открытая заявка уже существует. "
+                "Новая заявка не создана."
+            ),
+        )
+
+    return redirect(
+        "customer-portal-home"
     )

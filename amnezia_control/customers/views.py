@@ -14,6 +14,7 @@ from django.views.decorators.http import (
     require_http_methods,
 )
 
+from portal.models import ClientRenewalRequest
 from servers.models import Server
 from vpn.forms import VPNClientCreateForm
 from vpn.models import VPNClient, XHTTPDevice
@@ -419,6 +420,24 @@ def customer_detail_view(request, pk):
         pk=pk,
     )
 
+    open_renewal_request = (
+        account.renewal_requests
+        .filter(
+            status__in=[
+                ClientRenewalRequest.Status.NEW,
+                ClientRenewalRequest.Status.IN_PROGRESS,
+            ],
+        )
+        .order_by("-created_at")
+        .first()
+    )
+
+    latest_renewal_request = (
+        account.renewal_requests
+        .order_by("-created_at")
+        .first()
+    )
+
     candidate_accounts = (
         CustomerAccount.objects
         .exclude(pk=account.pk)
@@ -432,6 +451,12 @@ def customer_detail_view(request, pk):
         {
             "account": account,
             "candidate_accounts": candidate_accounts,
+            "open_renewal_request": (
+                open_renewal_request
+            ),
+            "latest_renewal_request": (
+                latest_renewal_request
+            ),
         },
     )
 

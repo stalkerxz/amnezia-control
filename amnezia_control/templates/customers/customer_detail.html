@@ -141,6 +141,265 @@
 {% endif %}
 
 
+{% if account.status != 'deleted' %}
+
+<section class="section-block">
+
+  <div class="section-body">
+
+    <div class="section-header-compact">
+
+      <div>
+
+        <p class="page-kicker mb-1">
+          Подписка
+        </p>
+
+        <h2 class="h5 mb-1">
+          Продление аккаунта
+        </h2>
+
+        <div class="text-secondary small">
+          Продление меняет срок CustomerAccount
+          и зеркально срок всех его VPN-подключений.
+          Ключи, IP и конфигурации не перевыпускаются.
+        </div>
+
+      </div>
+
+    </div>
+
+
+    <div class="mb-3">
+
+      <span class="text-secondary">
+        Текущий срок:
+      </span>
+
+      <strong>
+        {% if account.expires_at %}
+          {{ account.expires_at|date:"d.m.Y H:i" }}
+        {% else %}
+          Без срока
+        {% endif %}
+      </strong>
+
+    </div>
+
+
+    {% if open_renewal_request %}
+
+      <div class="alert alert-info">
+
+        <div class="fw-semibold">
+          {{ open_renewal_request.get_status_display }}
+        </div>
+
+        <div class="small mt-1">
+          Заявка #{{ open_renewal_request.pk }}
+          ·
+          {{ open_renewal_request.created_at|date:"d.m.Y H:i" }}
+        </div>
+
+        {% if open_renewal_request.attachment %}
+          <div class="small mt-2">
+            <a
+              href="{% url 'renewal-request-attachment-download' open_renewal_request.pk %}"
+              target="_blank"
+              rel="noopener"
+            >
+              {{ open_renewal_request.attachment_display_name }}
+            </a>
+          </div>
+        {% endif %}
+
+      </div>
+
+
+      {% if open_renewal_request.status == 'new' %}
+
+        <form
+          method="post"
+          action="{% url 'customers-renewal-action' account.pk %}"
+          class="mb-3"
+        >
+
+          {% csrf_token %}
+
+          <input
+            type="hidden"
+            name="renewal_request_id"
+            value="{{ open_renewal_request.pk }}"
+          >
+
+          <input
+            type="hidden"
+            name="action"
+            value="in_progress"
+          >
+
+          <button
+            type="submit"
+            class="btn btn-outline-primary"
+          >
+            Взять в работу
+          </button>
+
+        </form>
+
+      {% endif %}
+
+
+      <form
+        method="post"
+        action="{% url 'customers-renewal-action' account.pk %}"
+        class="row g-3 align-items-end mb-3"
+      >
+
+        {% csrf_token %}
+
+        <input
+          type="hidden"
+          name="renewal_request_id"
+          value="{{ open_renewal_request.pk }}"
+        >
+
+        <input
+          type="hidden"
+          name="action"
+          value="extend"
+        >
+
+
+        <div class="col-12 col-lg-3">
+
+          <label
+            class="form-label"
+            for="extension-days"
+          >
+            Продлить на дней
+          </label>
+
+          <input
+            id="extension-days"
+            type="number"
+            min="1"
+            max="365"
+            name="extension_days"
+            value="30"
+            required
+            class="form-control"
+          >
+
+        </div>
+
+
+        <div class="col-12 col-lg-6">
+
+          <label
+            class="form-label"
+            for="renewal-note"
+          >
+            Комментарий
+          </label>
+
+          <input
+            id="renewal-note"
+            type="text"
+            name="operator_note"
+            class="form-control"
+            maxlength="1000"
+          >
+
+        </div>
+
+
+        <div class="col-12 col-lg-3">
+
+          <button
+            type="submit"
+            class="btn btn-success w-100"
+          >
+            Продлить и закрыть
+          </button>
+
+        </div>
+
+      </form>
+
+
+      <form
+        method="post"
+        action="{% url 'customers-renewal-action' account.pk %}"
+        onsubmit="return confirm('Отклонить заявку на продление?');"
+      >
+
+        {% csrf_token %}
+
+        <input
+          type="hidden"
+          name="renewal_request_id"
+          value="{{ open_renewal_request.pk }}"
+        >
+
+        <input
+          type="hidden"
+          name="action"
+          value="dismiss"
+        >
+
+        <input
+          type="text"
+          name="operator_note"
+          class="form-control mb-2"
+          maxlength="1000"
+          placeholder="Причина / комментарий"
+        >
+
+        <button
+          type="submit"
+          class="btn btn-outline-danger"
+        >
+          Отклонить заявку
+        </button>
+
+      </form>
+
+    {% elif latest_renewal_request %}
+
+      <div class="alert alert-secondary mb-0">
+
+        Последняя заявка:
+        <strong>
+          {{ latest_renewal_request.get_status_display }}
+        </strong>
+
+        ·
+        {{ latest_renewal_request.updated_at|date:"d.m.Y H:i" }}
+
+        {% if latest_renewal_request.operator_note %}
+          <div class="small mt-2">
+            {{ latest_renewal_request.operator_note }}
+          </div>
+        {% endif %}
+
+      </div>
+
+    {% else %}
+
+      <div class="text-secondary">
+        Заявок на продление пока нет.
+      </div>
+
+    {% endif %}
+
+  </div>
+
+</section>
+
+{% endif %}
+
+
 {% for device in account.devices.all %}
 
 <section class="section-block">

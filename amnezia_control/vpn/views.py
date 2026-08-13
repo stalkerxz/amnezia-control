@@ -708,7 +708,18 @@ def renewal_requests_list_view(request):
     server_filter = (request.GET.get("server") or "").strip()
     operator_filter = (request.GET.get("operator") or "").strip()
     only_my_actions = (request.GET.get("only_my_actions") or "").strip() == "1"
-    requests_qs = ClientRenewalRequest.objects.select_related("client", "client__server", "processed_by").order_by("-created_at")
+    # Legacy VPNClient renewal list.
+    # Account-only requests are managed from CustomerAccount detail.
+    requests_qs = (
+        ClientRenewalRequest.objects
+        .filter(client__isnull=False)
+        .select_related(
+            "client",
+            "client__server",
+            "processed_by",
+        )
+        .order_by("-created_at")
+    )
     if status_filter == "open":
         requests_qs = requests_qs.filter(status__in=[ClientRenewalRequest.Status.NEW, ClientRenewalRequest.Status.IN_PROGRESS])
     elif status_filter in {ClientRenewalRequest.Status.NEW, ClientRenewalRequest.Status.IN_PROGRESS, ClientRenewalRequest.Status.DONE, ClientRenewalRequest.Status.DISMISSED}:
