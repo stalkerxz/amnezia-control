@@ -168,7 +168,7 @@ def clients_list_view(request):
             pass
         elif status:
             clients = clients.filter(status=status)
-        else:
+        elif quick != VPNClientListFilterForm.QUICK_DELETED:
             clients = clients.exclude(status=VPNClient.Status.DELETED)
         if source == "imported":
             clients = clients.filter(imported_from_runtime=True)

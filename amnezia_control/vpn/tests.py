@@ -1,4 +1,5 @@
 import json
+from datetime import timedelta
 from io import BytesIO, StringIO
 from unittest.mock import patch
 import urllib.error
@@ -328,25 +329,27 @@ class VPNClientFlowTest(TestCase):
         from unittest.mock import patch
 
         self.awg2_protocol.runtime_metadata["subnet"] = "10.77.0.0/29"
+        self.awg2_protocol.runtime_metadata["interface_addresses"] = ["10.77.0.1/24"]
         self.awg2_protocol.save(update_fields=["runtime_metadata"])
 
-        class R:
-            def __init__(self, stdout):
-                self.stdout = stdout
+        peers = [
+            PeerState(
+                public_key="peerA",
+                allowed_ips="10.77.0.2/32,10.77.0.3/32",
+            ),
+            PeerState(
+                public_key="peerB",
+                allowed_ips="10.77.0.4/32",
+            ),
+        ]
 
-        def run_side_effect(*args, **kwargs):
-            action = args[2]
-            mapping = {
-                "awg2.list": R(
-                    "peerA\tpsk\tep\t10.77.0.2/32,10.77.0.3/32\t0\t0\t0\t25\n"
-                    "peerB\tpsk\tep\t10.77.0.4/32\t0\t0\t0\t25\n"
-                )
-            }
-            return mapping[action]
+        adapter = AdapterFactory.get_for_server(
+            self.server,
+            VPNClient.ProtocolType.AWG2,
+        )
 
-        with patch("vpn.services.RuntimeCommandService.run", side_effect=run_side_effect):
-            adapter = AdapterFactory.get_for_server(self.server, VPNClient.ProtocolType.AWG2)
-            self.assertEqual(adapter._next_address(self.user), "10.77.0.1")
+        with patch.object(adapter, "list_peers", return_value=peers):
+            self.assertEqual(adapter._next_address(self.user), "10.77.0.5")
 
     def test_awg2_client_creation_falls_back_to_config_peers_when_dump_fails(self):
         from unittest.mock import patch
@@ -366,12 +369,14 @@ class VPNClientFlowTest(TestCase):
             mapping = {
                 "awg2.iface": R("wg0\n"),
                 "awg2.genkey": R("client2-private-key==\n"),
+                "awg2.genpsk": R("client2-preshared-key==\n"),
                 "awg2.pubkey": R("client2-public-key==\n"),
                 "awg2.list_fallback_conf": R(
                     "[Interface]\nAddress = 10.77.0.1/24\n"
                     "[Peer]\nPublicKey = oldpeer\nAllowedIPs = 10.77.0.10/32\n"
                 ),
                 "awg2.add_peer": R(""),
+                "awg2.save_runtime": R(""),
                 "awg2.server_pub": R("server2-public-key==\n"),
             }
             return mapping[action]
@@ -715,10 +720,15 @@ class VPNClientLimitsTest(TestCase):
     def test_peer_transfer_map_returns_zero_values(self):
         from unittest.mock import patch
 
-        adapter = AdapterFactory.get_for_server(self.server, VPNClient.ProtocolType.AWG)
-        peers = [PeerState(public_key="p1", allowed_ips="10.66.0.10/32", transfer_rx=0, transfer_tx=0)]
+        class R:
+            stdout = "p1\tpsk\tendpoint\t10.66.0.10/32\t0\t0\t0\t25\n"
 
-        with patch.object(adapter, "list_peers", return_value=peers):
+        adapter = AdapterFactory.get_for_server(
+            self.server,
+            VPNClient.ProtocolType.AWG,
+        )
+
+        with patch.object(adapter, "_run", return_value=R()):
             transfer_map = adapter.peer_transfer_map(actor=self.user)
 
         self.assertEqual(transfer_map, {"p1": 0})
@@ -959,6 +969,7 @@ class VPNClientLimitsTest(TestCase):
             mapping = {
                 "awg.iface": R("awg0\n"),
                 "awg.genkey": R("client-private-key==\n"),
+                "awg.genpsk": R("client-preshared-key==\n"),
                 "awg.pubkey": R("client-public-key==\n"),
                 "awg.add_peer": R(""),
                 "awg.server_pub": R("server-public-key==\n"),
@@ -1261,7 +1272,7 @@ class VPNClientSoftDeleteVisibilityTest(TestCase):
         self.active_client.refresh_from_db()
         self.assertEqual(self.active_client.status, VPNClient.Status.DELETED)
         self.assertTrue(VPNClient.objects.filter(pk=self.active_client.pk).exists())
-        self.assertContains(response, "Клиент помечен как удаленный и скрыт из основного списка")
+        self.assertContains(response, "Клиент помечен как удалённый и скрыт из основного списка")
         self.assertNotContains(response, self.active_client.name)
 
     def test_single_restore_from_deleted_changes_status_to_disabled(self):
