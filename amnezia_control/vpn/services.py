@@ -8,7 +8,8 @@ from collections import defaultdict
 from dataclasses import dataclass
 
 import qrcode
-from cryptography.fernet import Fernet
+from qrcode.exceptions import DataOverflowError
+from cryptography.fernet import Fernet, InvalidToken
 from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
@@ -1030,6 +1031,46 @@ class VPNClientService:
         if target == "amneziavpn":
             return VPNClientService.latest_config(client)
         return VPNClientService.portal_export_config(client)
+
+    @staticmethod
+    def qr_payload_supported(payload: str) -> bool:
+        qr = qrcode.QRCode()
+
+        try:
+            qr.add_data(payload)
+            qr.make(fit=True)
+        except (DataOverflowError, ValueError):
+            return False
+
+        return True
+
+    @staticmethod
+    def portal_qr_available_for_target(
+        client: VPNClient,
+        target: str,
+    ) -> bool:
+        try:
+            payload = (
+                VPNClientService
+                .portal_export_config_for_target(
+                    client,
+                    target,
+                )
+            )
+        except (
+            RuntimeError,
+            InvalidToken,
+            ValueError,
+            UnicodeError,
+        ):
+            return False
+
+        return (
+            VPNClientService
+            .qr_payload_supported(
+                payload
+            )
+        )
 
     @staticmethod
     def portal_qr_png_base64_for_target(client: VPNClient, target: str) -> str:

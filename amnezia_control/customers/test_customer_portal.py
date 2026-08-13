@@ -534,6 +534,180 @@ PersistentKeepalive = 25
             ),
         )
 
+    def test_home_survives_invalid_encrypted_vpn_config(
+        self,
+    ):
+        self.revision.config_blob_encrypted = (
+            "NOT-A-VALID-FERNET-TOKEN"
+        )
+
+        self.revision.save(
+            update_fields=[
+                "config_blob_encrypted",
+            ]
+        )
+
+        self._login_customer()
+
+        response = self.client.get(
+            reverse(
+                "customer-portal-home"
+            )
+        )
+
+        self.assertEqual(
+            response.status_code,
+            200,
+        )
+
+        self.assertNotContains(
+            response,
+            reverse(
+                "customer-portal-vpn-qr",
+                args=[
+                    self.vpn.pk
+                ],
+            ),
+        )
+
+        self.assertContains(
+            response,
+            (
+                "QR недоступен "
+                "для этого профиля"
+            ),
+        )
+
+    def test_qr_capacity_check_rejects_oversized_payload(
+        self,
+    ):
+        from vpn.services import (
+            VPNClientService,
+        )
+
+        self.assertTrue(
+            VPNClientService
+            .qr_payload_supported(
+                "small-payload"
+            )
+        )
+
+        self.assertFalse(
+            VPNClientService
+            .qr_payload_supported(
+                "X" * 12000
+            )
+        )
+
+    def test_home_hides_oversized_qr_but_keeps_conf_download(
+        self,
+    ):
+        import hashlib
+
+        from vpn.services import (
+            ConfigCryptoService,
+        )
+
+        large_allowed_ips = ", ".join(
+            [
+                "198.51.100.1/32"
+                for _ in range(1000)
+            ]
+        )
+
+        large_config = (
+            self.vpn_plaintext.replace(
+                (
+                    "AllowedIPs = "
+                    "0.0.0.0/0, ::/0"
+                ),
+                (
+                    "AllowedIPs = "
+                    + large_allowed_ips
+                ),
+            )
+        )
+
+        self.revision.config_blob_encrypted = (
+            ConfigCryptoService.encrypt(
+                large_config
+            )
+        )
+
+        self.revision.config_hash = (
+            hashlib.sha256(
+                large_config.encode()
+            ).hexdigest()
+        )
+
+        self.revision.save(
+            update_fields=[
+                "config_blob_encrypted",
+                "config_hash",
+            ]
+        )
+
+        self._login_customer()
+
+        response = self.client.get(
+            reverse(
+                "customer-portal-home"
+            )
+        )
+
+        self.assertEqual(
+            response.status_code,
+            200,
+        )
+
+        self.assertContains(
+            response,
+            reverse(
+                "customer-portal-vpn-download",
+                args=[
+                    self.vpn.pk
+                ],
+            ),
+        )
+
+        self.assertNotContains(
+            response,
+            reverse(
+                "customer-portal-vpn-qr",
+                args=[
+                    self.vpn.pk
+                ],
+            ),
+        )
+
+        self.assertContains(
+            response,
+            (
+                "QR недоступен "
+                "для этого профиля"
+            ),
+        )
+
+        qr_response = self.client.get(
+            reverse(
+                "customer-portal-vpn-qr",
+                args=[
+                    self.vpn.pk
+                ],
+            )
+        )
+
+        self.assertEqual(
+            qr_response.status_code,
+            409,
+        )
+
+        self.assertContains(
+            qr_response,
+            "Используйте файл .conf",
+            status_code=409,
+        )
+
     def test_home_hides_download_buttons_when_account_blocked(
         self,
     ):

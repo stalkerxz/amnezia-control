@@ -235,6 +235,15 @@ def customer_portal_home_view(request):
                 == VPNClient.LimitState.ACTIVE
             )
 
+            client.cabinet_qr_allowed = bool(
+                client.cabinet_download_allowed
+                and VPNClientService
+                .portal_qr_available_for_target(
+                    client,
+                    "amneziawg",
+                )
+            )
+
         for xhttp in device.xhttp_devices.all():
             xhttp.cabinet_download_allowed = bool(
                 not blocked

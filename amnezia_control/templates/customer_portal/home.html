@@ -335,14 +335,27 @@
                         Скачать .conf
                       </a>
 
-                      <a
-                        href="{% url 'customer-portal-vpn-qr' client.pk %}"
-                        class="btn btn-sm btn-outline-primary"
-                        target="_blank"
-                        rel="noopener"
-                      >
-                        QR-код
-                      </a>
+                      {% if client.cabinet_qr_allowed %}
+
+                        <a
+                          href="{% url 'customer-portal-vpn-qr' client.pk %}"
+                          class="btn btn-sm btn-outline-primary"
+                          target="_blank"
+                          rel="noopener"
+                        >
+                          QR-код
+                        </a>
+
+                      {% else %}
+
+                        <span
+                          class="small text-secondary"
+                        >
+                          QR недоступен для этого профиля —
+                          используйте .conf
+                        </span>
+
+                      {% endif %}
 
                     {% endif %}
 
