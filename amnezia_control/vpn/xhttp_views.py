@@ -26,7 +26,11 @@ def _admin_required(user):
     return (
         user.is_authenticated
         and (
-            getattr(user, "is_owner", False)
+            getattr(
+                user,
+                "is_owner",
+                False,
+            )
             or user.is_staff
         )
     )
@@ -36,68 +40,85 @@ def _admin_required(user):
 @user_passes_test(_admin_required)
 def xhttp_devices_view(request):
     if request.method == "POST":
-        form = XHTTPDeviceCreateForm(request.POST)
+        form = XHTTPDeviceCreateForm(
+            request.POST
+        )
 
         if form.is_valid():
             try:
-                device = form.cleaned_data.get("device")
-                server = form.cleaned_data.get("server")
-                client = form.cleaned_data.get("client")
-
-                xhttp_device = XHTTPDeviceService.create_device(
-                    device=device,
-                    server=server,
-                    client=client,
-                    name=form.cleaned_data["name"],
-                    actor=request.user,
+                xhttp_device = (
+                    XHTTPDeviceService
+                    .create_device(
+                        device=(
+                            form.cleaned_data[
+                                "device"
+                            ]
+                        ),
+                        server=(
+                            form.cleaned_data[
+                                "server"
+                            ]
+                        ),
+                        name=(
+                            form.cleaned_data[
+                                "name"
+                            ]
+                        ),
+                        actor=request.user,
+                    )
                 )
 
                 messages.success(
                     request,
                     (
-                        f"XHTTP-подключение "
-                        f"«{xhttp_device.name}» создано."
+                        "XHTTP-подключение "
+                        f"«{xhttp_device.name}» "
+                        "создано."
                     ),
                 )
 
-                return redirect("xhttp-devices")
+                return redirect(
+                    "xhttp-devices"
+                )
 
             except Exception as exc:
                 messages.error(
                     request,
-                    "Не удалось создать XHTTP-подключение: "
-                    f"{exc}",
+                    (
+                        "Не удалось создать "
+                        "XHTTP-подключение: "
+                        f"{exc}"
+                    ),
                 )
 
     else:
         initial = {}
 
         device_id = (
-            request.GET.get("device")
+            request.GET.get(
+                "device"
+            )
             or ""
         ).strip()
 
         if device_id.isdigit():
-            initial["device"] = int(device_id)
-
-        # Compatibility for old deep links.
-        client_id = (
-            request.GET.get("client")
-            or ""
-        ).strip()
-
-        if client_id.isdigit():
-            initial["client"] = int(client_id)
+            initial["device"] = int(
+                device_id
+            )
 
         server = (
             Server.objects
-            .filter(is_enabled=True)
+            .filter(
+                is_enabled=True,
+            )
             .order_by("pk")
             .first()
         )
 
         if server is not None:
-            initial["server"] = server.pk
+            initial["server"] = (
+                server.pk
+            )
 
         form = XHTTPDeviceCreateForm(
             initial=initial,
@@ -109,11 +130,11 @@ def xhttp_devices_view(request):
             "device",
             "device__account",
             "server",
-            "client",
-            "client__server",
         )
         .exclude(
-            status=XHTTPDevice.Status.DELETED,
+            status=(
+                XHTTPDevice.Status.DELETED
+            ),
         )
         .order_by(
             "device__account__display_name",
@@ -136,36 +157,45 @@ def xhttp_devices_view(request):
 @login_required
 @user_passes_test(_admin_required)
 @require_GET
-def xhttp_device_download_view(request, pk: int):
+def xhttp_device_download_view(
+    request,
+    pk: int,
+):
     device = get_object_or_404(
         XHTTPDevice.objects.select_related(
             "device",
             "device__account",
-            "client",
+            "server",
         ),
         pk=pk,
     )
 
-    if device.status == XHTTPDevice.Status.DELETED:
+    if (
+        device.status
+        == XHTTPDevice.Status.DELETED
+    ):
         messages.error(
             request,
-            "Конфигурация удалённого подключения недоступна.",
+            (
+                "Конфигурация удалённого "
+                "подключения недоступна."
+            ),
         )
-        return redirect("xhttp-devices")
 
-    config = XHTTPDeviceService.latest_config(
-        device
+        return redirect(
+            "xhttp-devices"
+        )
+
+    config = (
+        XHTTPDeviceService.latest_config(
+            device
+        )
     )
 
-    if device.device_id:
-        owner_name = (
-            f"{device.device.account.display_name}-"
-            f"{device.device.name}"
-        )
-    elif device.client_id:
-        owner_name = device.client.name
-    else:
-        owner_name = "xhttp"
+    owner_name = (
+        f"{device.device.account.display_name}-"
+        f"{device.device.name}"
+    )
 
     filename_base = (
         slugify(
@@ -182,12 +212,19 @@ def xhttp_device_download_view(request, pk: int):
     )
 
     response["Content-Disposition"] = (
-        f'attachment; filename="{filename_base}.json"'
+        "attachment; "
+        f'filename="{filename_base}.json"'
     )
 
-    response["Cache-Control"] = "no-store, max-age=0"
+    response["Cache-Control"] = (
+        "no-store, max-age=0"
+    )
+
     response["Pragma"] = "no-cache"
-    response["X-Content-Type-Options"] = "nosniff"
+
+    response[
+        "X-Content-Type-Options"
+    ] = "nosniff"
 
     return response
 
@@ -200,15 +237,15 @@ def xhttp_device_action_view(
     action: str,
 ):
     if request.method != "POST":
-        return HttpResponseNotAllowed(["POST"])
+        return HttpResponseNotAllowed(
+            ["POST"]
+        )
 
     device = get_object_or_404(
         XHTTPDevice.objects.select_related(
             "device",
             "device__account",
             "server",
-            "client",
-            "client__server",
         ),
         pk=pk,
     )
@@ -216,19 +253,31 @@ def xhttp_device_action_view(
     actions = {
         "rotate": (
             XHTTPDeviceService.rotate,
-            "UUID перевыпущен. Скачайте новый конфиг.",
+            (
+                "UUID перевыпущен. "
+                "Скачайте новый конфиг."
+            ),
         ),
         "disable": (
             XHTTPDeviceService.disable,
-            "XHTTP-подключение отключено.",
+            (
+                "XHTTP-подключение "
+                "отключено."
+            ),
         ),
         "enable": (
             XHTTPDeviceService.enable,
-            "XHTTP-подключение включено.",
+            (
+                "XHTTP-подключение "
+                "включено."
+            ),
         ),
         "delete": (
             XHTTPDeviceService.soft_delete,
-            "XHTTP-подключение удалено.",
+            (
+                "XHTTP-подключение "
+                "удалено."
+            ),
         ),
         "check": (
             XHTTPDeviceService.check_runtime,
@@ -239,16 +288,23 @@ def xhttp_device_action_view(
         ),
     }
 
-    handler = actions.get(action)
+    handler = actions.get(
+        action
+    )
 
     if not handler:
         messages.error(
             request,
             "Неизвестное действие XHTTP.",
         )
-        return redirect("xhttp-devices")
 
-    callback, success_message = handler
+        return redirect(
+            "xhttp-devices"
+        )
+
+    callback, success_message = (
+        handler
+    )
 
     try:
         callback(
@@ -258,6 +314,7 @@ def xhttp_device_action_view(
 
         if device.last_error:
             device.last_error = ""
+
             device.save(
                 update_fields=[
                     "last_error",
@@ -271,7 +328,9 @@ def xhttp_device_action_view(
         )
 
     except Exception as exc:
-        device.last_error = str(exc)[:255]
+        device.last_error = str(
+            exc
+        )[:255]
 
         device.save(
             update_fields=[
@@ -282,8 +341,13 @@ def xhttp_device_action_view(
 
         messages.error(
             request,
-            "Операция XHTTP не выполнена: "
-            f"{exc}",
+            (
+                "Операция XHTTP "
+                "не выполнена: "
+                f"{exc}"
+            ),
         )
 
-    return redirect("xhttp-devices")
+    return redirect(
+        "xhttp-devices"
+    )

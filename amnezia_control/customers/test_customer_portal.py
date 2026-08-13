@@ -395,7 +395,6 @@ PersistentKeepalive = 25
         )
 
         self.xhttp = XHTTPDevice.objects.create(
-            client=None,
             device=self.device,
             server=self.server,
             name="Phase 5B CDN",
@@ -473,7 +472,6 @@ PersistentKeepalive = 25
 
         self.other_xhttp = (
             XHTTPDevice.objects.create(
-                client=None,
                 device=self.other_device,
                 server=self.server,
                 name="Other CDN",

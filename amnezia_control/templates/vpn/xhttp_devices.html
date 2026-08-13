@@ -42,8 +42,6 @@
     >
       {% csrf_token %}
 
-      {{ form.client }}
-
       <div class="col-lg-4">
         <label
           class="form-label"
@@ -163,23 +161,11 @@
                     {{ device.name }}
                   </div>
 
-                  {% if device.device %}
-                    <div class="small text-secondary">
-                      {{ device.device.account.display_name }}
-                      ·
-                      {{ device.device.name }}
-                    </div>
-                  {% elif device.client %}
-                    <div class="small text-warning">
-                      Legacy VPNClient:
-                      #{{ device.client_id }}
-                      {{ device.client.name }}
-                    </div>
-                  {% else %}
-                    <div class="small text-danger">
-                      Владелец не указан
-                    </div>
-                  {% endif %}
+                  <div class="small text-secondary">
+                    {{ device.device.account.display_name }}
+                    ·
+                    {{ device.device.name }}
+                  </div>
 
                   {% if device.last_error %}
                     <div class="small text-danger mt-1">
@@ -190,16 +176,7 @@
 
 
                 <td>
-                  {% if device.server %}
-                    {{ device.server.name }}
-                  {% elif device.client %}
-                    {{ device.client.server.name }}
-                    <div class="small text-warning">
-                      legacy
-                    </div>
-                  {% else %}
-                    —
-                  {% endif %}
+                  {{ device.server.name }}
                 </td>
 
 

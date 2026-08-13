@@ -7,8 +7,6 @@ from customers.models import (
     CustomerAccount,
 )
 
-from .models import VPNClient
-
 
 def _safe_delay(task, *args):
     try:
@@ -105,59 +103,6 @@ def schedule_account_xhttp_reconciliation(
         _safe_delay(
             reconcile_xhttp_account_task,
             account_id,
-        )
-
-    transaction.on_commit(enqueue)
-
-
-@receiver(post_save, sender=VPNClient)
-def schedule_legacy_xhttp_reconciliation(
-    sender,
-    instance: VPNClient,
-    raw=False,
-    update_fields=None,
-    **kwargs,
-):
-    """
-    Compatibility only.
-
-    Device-owned XHTTP rows are ignored by the legacy reconciliation path.
-    """
-
-    if raw:
-        return
-
-    # Device-owned rows are reconciled from CustomerAccount/ClientDevice.
-    # This signal remains only for legacy client-owned XHTTP rows.
-    if instance.device_id is not None:
-        return
-
-    relevant_fields = {
-        "status",
-        "limit_state",
-        "expires_at",
-        "traffic_limit_bytes",
-    }
-
-    if (
-        update_fields is not None
-        and not (
-            set(update_fields)
-            & relevant_fields
-        )
-    ):
-        return
-
-    client_id = instance.pk
-
-    def enqueue():
-        from .tasks import (
-            reconcile_xhttp_client_task,
-        )
-
-        _safe_delay(
-            reconcile_xhttp_client_task,
-            client_id,
         )
 
     transaction.on_commit(enqueue)

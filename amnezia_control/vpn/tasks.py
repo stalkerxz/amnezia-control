@@ -10,10 +10,9 @@ from customers.models import (
 from vpn.expiration_reminders import (
     ClientExpirationReminderService,
 )
-from vpn.models import VPNClient, XHTTPDevice
+from vpn.models import XHTTPDevice
 from vpn.services import (
     VPNClientLimitsService,
-    VPNClientService,
 )
 from vpn.xhttp_services import XHTTPDeviceService
 
@@ -141,58 +140,9 @@ def _reconcile_xhttp_device(
     }
 
 
-def _reconcile_xhttp_client(
-    client: VPNClient,
-) -> dict:
-    """Compatibility reconciliation for legacy client-only rows."""
-
-    legacy_devices = client.xhttp_devices.filter(
-        device__isnull=True,
-    )
-
-    available = (
-        client.status == VPNClient.Status.ACTIVE
-        and VPNClientService.get_limit_state(client)
-        == VPNClient.LimitState.ACTIVE
-    )
-
-    if available:
-        candidates = legacy_devices.filter(
-            status=XHTTPDevice.Status.DISABLED,
-            disable_reason=XHTTPDevice.DisableReason.CLIENT,
-        ).count()
-
-        XHTTPDeviceService.enable_for_client(
-            client=client,
-            actor=None,
-        )
-
-        return {
-            "client_id": client.id,
-            "enabled": candidates,
-            "disabled": 0,
-        }
-
-    candidates = legacy_devices.filter(
-        status=XHTTPDevice.Status.ACTIVE,
-    ).count()
-
-    XHTTPDeviceService.disable_for_client(
-        client=client,
-        actor=None,
-    )
-
-    return {
-        "client_id": client.id,
-        "enabled": 0,
-        "disabled": candidates,
-    }
-
-
 def _reconcile_all_xhttp_devices() -> dict:
     totals = {
         "devices": 0,
-        "legacy_clients": 0,
         "enabled": 0,
         "disabled": 0,
         "errors": [],
@@ -223,36 +173,6 @@ def _reconcile_all_xhttp_devices() -> dict:
             totals["errors"].append(
                 {
                     "device_id": owner.id,
-                    "error": str(exc)[:200],
-                }
-            )
-
-    legacy_clients = (
-        VPNClient.objects
-        .filter(
-            xhttp_devices__isnull=False,
-            xhttp_devices__device__isnull=True,
-        )
-        .select_related("server")
-        .prefetch_related("xhttp_devices")
-        .distinct()
-    )
-
-    for client in legacy_clients:
-        totals["legacy_clients"] += 1
-
-        try:
-            result = _reconcile_xhttp_client(
-                client
-            )
-
-            totals["enabled"] += result["enabled"]
-            totals["disabled"] += result["disabled"]
-
-        except Exception as exc:
-            totals["errors"].append(
-                {
-                    "client_id": client.id,
                     "error": str(exc)[:200],
                 }
             )
@@ -440,28 +360,6 @@ def reconcile_xhttp_account_task(
             )
 
     return result
-
-
-@shared_task
-def reconcile_xhttp_client_task(
-    client_id: int,
-):
-    client = (
-        VPNClient.objects
-        .prefetch_related("xhttp_devices")
-        .filter(pk=client_id)
-        .first()
-    )
-
-    if not client:
-        return {
-            "client_id": client_id,
-            "missing": True,
-        }
-
-    return _reconcile_xhttp_client(
-        client
-    )
 
 
 @shared_task

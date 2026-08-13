@@ -1849,7 +1849,6 @@ class CustomerXHTTPIntegrationTest(_Phase4TestCase):
         )
 
         self.xhttp = XHTTPDevice.objects.create(
-            client=None,
             device=self.device,
             server=self.server,
             name="Device CDN",
@@ -1986,8 +1985,9 @@ class CustomerXHTTPIntegrationTest(_Phase4TestCase):
             original_uuid,
         )
 
-        self.assertIsNone(
-            self.xhttp.client_id,
+        self.assertEqual(
+            self.xhttp.device.account_id,
+            target.pk,
         )
 
     def test_merge_accounts_preserves_xhttp_connection(self):
@@ -2038,8 +2038,9 @@ class CustomerXHTTPIntegrationTest(_Phase4TestCase):
             original_uuid,
         )
 
-        self.assertIsNone(
-            self.xhttp.client_id,
+        self.assertEqual(
+            self.xhttp.device.account_id,
+            target.pk,
         )
 
         self.assertEqual(

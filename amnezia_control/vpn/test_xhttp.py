@@ -10,6 +10,10 @@ from django.contrib.auth import get_user_model
 from django.test import SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 
+from customers.models import (
+    ClientDevice,
+    CustomerAccount,
+)
 from jobs.executors import SafeSSHExecutor
 from servers.models import ProtocolProfile, Server, ServerProtocol
 from vpn.models import VPNClient, XHTTPDevice
@@ -45,26 +49,14 @@ class XHTTPDeviceServiceTest(TestCase):
             host="203.0.113.10",
             ssh_username="amnezia",
         )
-        self.protocol = ServerProtocol.objects.create(
-            server=self.server,
-            protocol_type=ServerProtocol.ProtocolType.AWG,
-            enabled=True,
-            container_name="amnezia-awg",
-            container_status="running",
-            runtime_metadata={"udp_port": 51820, "subnet": "10.66.0.0/24"},
-        )
-        self.profile = ProtocolProfile.objects.create(
-            server_protocol=self.protocol,
-            name="default-awg",
-            protocol_type=ServerProtocol.ProtocolType.AWG,
-            config_template="[Interface]",
-        )
-        self.client_record = VPNClient.objects.create(
-            server=self.server,
-            name="Alexey",
-            protocol_type=VPNClient.ProtocolType.AWG,
-            profile=self.profile,
+        self.account = CustomerAccount.objects.create(
+            display_name="Alexey",
             created_by=self.user,
+        )
+        self.client_device = ClientDevice.objects.create(
+            account=self.account,
+            name="iPhone",
+            platform=ClientDevice.Platform.IOS,
         )
 
     def test_happ_config_contains_working_packet_up_profile(self):
@@ -97,7 +89,8 @@ class XHTTPDeviceServiceTest(TestCase):
     @patch("vpn.xhttp_services.XHTTPRuntimeAdapter.add")
     def test_create_device_persists_encrypted_config(self, add_mock):
         device = XHTTPDeviceService.create_device(
-            client=self.client_record,
+            device=self.client_device,
+            server=self.server,
             name="iPhone",
             actor=self.user,
         )
@@ -114,7 +107,8 @@ class XHTTPDeviceServiceTest(TestCase):
     @patch("vpn.xhttp_services.XHTTPRuntimeAdapter.remove")
     def test_rotate_revokes_old_uuid_and_updates_config(self, remove_mock, add_mock):
         device = XHTTPDeviceService.create_device(
-            client=self.client_record,
+            device=self.client_device,
+            server=self.server,
             name="MacBook",
             actor=self.user,
         )
@@ -135,22 +129,37 @@ class XHTTPDeviceServiceTest(TestCase):
         self.assertIn(str(device.client_uuid), XHTTPDeviceService.latest_config(device))
 
     @patch("vpn.xhttp_services.XHTTPRuntimeAdapter.add")
-    def test_create_rejected_for_disabled_parent_client(self, add_mock):
-        self.client_record.status = VPNClient.Status.DISABLED
-        self.client_record.save(update_fields=["status"])
-        with self.assertRaisesRegex(RuntimeError, "активного VPN-клиента"):
+    def test_create_rejected_for_disabled_parent_account(
+        self,
+        add_mock,
+    ):
+        self.account.status = (
+            CustomerAccount.Status.DISABLED
+        )
+
+        self.account.save(
+            update_fields=["status"]
+        )
+
+        with self.assertRaisesRegex(
+            RuntimeError,
+            "активного аккаунта",
+        ):
             XHTTPDeviceService.create_device(
-                client=self.client_record,
+                device=self.client_device,
+                server=self.server,
                 name="Blocked",
                 actor=self.user,
             )
+
         add_mock.assert_not_called()
 
     @patch("vpn.xhttp_services.XHTTPRuntimeAdapter.add")
     @patch("vpn.xhttp_services.XHTTPRuntimeAdapter.remove")
     def test_parent_reconciliation_preserves_manual_disable(self, remove_mock, add_mock):
         device = XHTTPDeviceService.create_device(
-            client=self.client_record,
+            device=self.client_device,
+            server=self.server,
             name="Manual off",
             actor=self.user,
         )
@@ -158,7 +167,10 @@ class XHTTPDeviceServiceTest(TestCase):
         device.refresh_from_db()
         self.assertEqual(device.disable_reason, XHTTPDevice.DisableReason.MANUAL)
 
-        XHTTPDeviceService.enable_for_client(client=self.client_record, actor=None)
+        XHTTPDeviceService.enable_for_device(
+            client_device=self.client_device,
+            actor=None,
+        )
         device.refresh_from_db()
         self.assertEqual(device.status, XHTTPDevice.Status.DISABLED)
         add_mock.assert_called_once()
@@ -231,33 +243,29 @@ class XHTTPDeviceViewTest(TestCase):
     def setUp(self):
         self.user = get_user_model().objects.create_user("staff", password="123", is_staff=True)
         self.server = Server.objects.create(name="view-server", host="203.0.113.11")
-        protocol = ServerProtocol.objects.create(
-            server=self.server,
-            protocol_type=ServerProtocol.ProtocolType.AWG,
-            enabled=True,
-            container_name="amnezia-awg",
-            container_status="running",
-        )
-        profile = ProtocolProfile.objects.create(
-            server_protocol=protocol,
-            name="view-profile",
-            protocol_type=ServerProtocol.ProtocolType.AWG,
-            config_template="[Interface]",
-        )
-        self.client_record = VPNClient.objects.create(
-            server=self.server,
-            name="Portal client",
-            protocol_type=VPNClient.ProtocolType.AWG,
-            profile=profile,
+        self.account = CustomerAccount.objects.create(
+            display_name="Portal client",
             created_by=self.user,
         )
-        self.client.login(username="staff", password="123")
+        self.client_device = ClientDevice.objects.create(
+            account=self.account,
+            name="Portal iPhone",
+            platform=ClientDevice.Platform.IOS,
+        )
+        self.client.login(
+            username="staff",
+            password="123",
+        )
 
     @patch("vpn.xhttp_services.XHTTPRuntimeAdapter.add")
     def test_create_and_download_happ_json(self, add_mock):
         response = self.client.post(
             reverse("xhttp-devices"),
-            {"client": self.client_record.id, "name": "iPhone"},
+            {
+                "device": self.client_device.pk,
+                "server": self.server.pk,
+                "name": "iPhone",
+            },
         )
         self.assertRedirects(response, reverse("xhttp-devices"))
         device = XHTTPDevice.objects.get()
@@ -332,8 +340,16 @@ class XHTTPClientDeviceOwnershipTest(TestCase):
             self.server.pk,
         )
 
-        self.assertIsNone(
-            device.client_id,
+        self.assertFalse(
+            XHTTPDevice._meta
+            .get_field("device")
+            .null
+        )
+
+        self.assertFalse(
+            XHTTPDevice._meta
+            .get_field("server")
+            .null
         )
 
         self.assertEqual(
@@ -445,9 +461,6 @@ class XHTTPClientDeviceOwnershipTest(TestCase):
             self.server.pk,
         )
 
-        self.assertIsNone(
-            created.client_id,
-        )
 
     @patch("vpn.xhttp_services.XHTTPRuntimeAdapter.add")
     @patch("vpn.xhttp_services.XHTTPRuntimeAdapter.remove")

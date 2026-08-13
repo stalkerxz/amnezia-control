@@ -71,23 +71,59 @@ class XHTTPDeviceAdmin(admin.ModelAdmin):
     list_display = (
         "id",
         "name",
-        "client",
+        "device",
+        "server",
         "status",
         "disable_reason",
         "client_uuid",
         "last_applied_at",
         "updated_at",
     )
-    list_filter = ("status", "disable_reason", "client__server")
-    search_fields = ("name", "client__name", "=client_uuid", "xray_email")
-    exclude = ("config_blob_encrypted",)
-    ordering = ("-created_at",)
 
-    def get_readonly_fields(self, request, obj=None):
-        return tuple(field.name for field in self.model._meta.fields if field.name != "config_blob_encrypted")
+    list_filter = (
+        "status",
+        "disable_reason",
+        "server",
+    )
 
-    def has_add_permission(self, request):
+    search_fields = (
+        "name",
+        "device__name",
+        "device__account__display_name",
+        "server__name",
+        "=client_uuid",
+        "xray_email",
+    )
+
+    exclude = (
+        "config_blob_encrypted",
+    )
+
+    ordering = (
+        "-created_at",
+    )
+
+    def get_readonly_fields(
+        self,
+        request,
+        obj=None,
+    ):
+        return tuple(
+            field.name
+            for field in self.model._meta.fields
+            if field.name
+            != "config_blob_encrypted"
+        )
+
+    def has_add_permission(
+        self,
+        request,
+    ):
         return False
 
-    def has_delete_permission(self, request, obj=None):
+    def has_delete_permission(
+        self,
+        request,
+        obj=None,
+    ):
         return False

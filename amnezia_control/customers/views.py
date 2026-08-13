@@ -418,7 +418,6 @@ def customer_detail_view(request, pk):
         )
         .select_related(
             "server",
-            "client",
         )
         .order_by(
             "name",
