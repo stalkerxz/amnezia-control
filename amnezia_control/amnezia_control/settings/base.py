@@ -27,6 +27,7 @@ INSTALLED_APPS = [
     "django.contrib.humanize",
     "core",
     "accounts",
+    "customers",
     "servers",
     "vpn",
     "audit",
