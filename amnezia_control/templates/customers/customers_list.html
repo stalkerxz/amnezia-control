@@ -13,7 +13,17 @@
   </div>
 
   <div class="action-cluster">
-    <a class="btn btn-outline-secondary" href="/clients/">
+    <a
+      class="btn btn-primary"
+      href="{% url 'customers-create' %}"
+    >
+      Создать аккаунт
+    </a>
+
+    <a
+      class="btn btn-outline-secondary"
+      href="/clients/"
+    >
       VPN-конфигурации
     </a>
   </div>
@@ -30,7 +40,7 @@
       <div class="summary-item span-9">
         <div class="label">Режим</div>
         <div class="meta">
-          Read-only. Объединение legacy-клиентов и перенос устройств пока отключены.
+          Управление аккаунтами и устройствами. VPN-подключения остаются отдельным техническим слоем.
         </div>
       </div>
     </div>

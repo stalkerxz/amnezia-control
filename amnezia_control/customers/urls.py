@@ -1,7 +1,10 @@
 from django.urls import path
 
 from .views import (
+    customer_create_view,
     customer_detail_view,
+    customer_device_create_view,
+    customer_device_vpn_create_view,
     customers_list_view,
     merge_customer_view,
     move_device_view,
@@ -9,6 +12,21 @@ from .views import (
 
 urlpatterns = [
     path("", customers_list_view, name="customers-list"),
+    path(
+        "new/",
+        customer_create_view,
+        name="customers-create",
+    ),
+    path(
+        "<int:pk>/devices/new/",
+        customer_device_create_view,
+        name="customers-device-create",
+    ),
+    path(
+        "devices/<int:device_id>/vpn/new/",
+        customer_device_vpn_create_view,
+        name="customers-device-vpn-create",
+    ),
     path(
         "devices/<int:device_id>/move/",
         move_device_view,

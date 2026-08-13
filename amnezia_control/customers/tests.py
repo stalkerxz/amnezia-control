@@ -1035,3 +1035,599 @@ class CustomerAccountOperatorUITest(TestCase):
             )
             + '"',
         )
+
+
+class CustomerAccountCreationUITest(TestCase):
+    def setUp(self):
+        User = get_user_model()
+
+        self.operator = User.objects.create_user(
+            username="phase3-account-operator",
+            password="test-password",
+        )
+
+    def test_account_create_page_requires_operator(self):
+        User = get_user_model()
+
+        customer_user = User.objects.create_user(
+            username="phase3-non-owner",
+            password="test-password",
+            is_owner=False,
+        )
+
+        self.client.force_login(customer_user)
+
+        response = self.client.get(
+            reverse("customers-create")
+        )
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_operator_can_create_customer_account(self):
+        self.client.force_login(self.operator)
+
+        before = CustomerAccount.objects.count()
+
+        response = self.client.post(
+            reverse("customers-create"),
+            {
+                "display_name": "New Customer",
+                "email": "new@example.com",
+                "expires_at": "",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+
+        self.assertEqual(
+            CustomerAccount.objects.count(),
+            before + 1,
+        )
+
+        account = CustomerAccount.objects.get(
+            display_name="New Customer"
+        )
+
+        self.assertEqual(
+            account.email,
+            "new@example.com",
+        )
+
+        self.assertEqual(
+            account.status,
+            CustomerAccount.Status.ACTIVE,
+        )
+
+        self.assertEqual(
+            account.created_by_id,
+            self.operator.pk,
+        )
+
+        self.assertEqual(
+            response.url,
+            reverse(
+                "customers-detail",
+                args=[account.pk],
+            ),
+        )
+
+        self.assertEqual(
+            account.devices.count(),
+            0,
+        )
+
+
+class CustomerDeviceCreationUITest(TestCase):
+    def setUp(self):
+        User = get_user_model()
+
+        self.operator = User.objects.create_user(
+            username="phase3-device-operator",
+            password="test-password",
+        )
+
+        self.account = CustomerAccount.objects.create(
+            display_name="Device Customer",
+            created_by=self.operator,
+        )
+
+    def test_device_create_page_is_rendered(self):
+        self.client.force_login(self.operator)
+
+        response = self.client.get(
+            reverse(
+                "customers-device-create",
+                args=[self.account.pk],
+            )
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        self.assertTemplateUsed(
+            response,
+            "customers/device_form.html",
+        )
+
+        self.assertContains(
+            response,
+            "Device Customer",
+        )
+
+        self.assertContains(
+            response,
+            "Добавить устройство",
+        )
+
+    def test_operator_can_add_device(self):
+        self.client.force_login(self.operator)
+
+        response = self.client.post(
+            reverse(
+                "customers-device-create",
+                args=[self.account.pk],
+            ),
+            {
+                "name": "iPhone 15 Pro",
+                "platform": ClientDevice.Platform.IOS,
+                "notes": "Основной телефон",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+
+        device = ClientDevice.objects.get(
+            account=self.account,
+            name="iPhone 15 Pro",
+        )
+
+        self.assertEqual(
+            device.platform,
+            ClientDevice.Platform.IOS,
+        )
+
+        self.assertEqual(
+            device.status,
+            ClientDevice.Status.ACTIVE,
+        )
+
+        self.assertEqual(
+            device.notes,
+            "Основной телефон",
+        )
+
+        self.assertEqual(
+            response.url,
+            reverse(
+                "customers-detail",
+                args=[self.account.pk],
+            ),
+        )
+
+    def test_cannot_add_device_to_deleted_account(self):
+        self.account.status = CustomerAccount.Status.DELETED
+        self.account.save(
+            update_fields=["status"]
+        )
+
+        self.client.force_login(self.operator)
+
+        before = ClientDevice.objects.count()
+
+        response = self.client.post(
+            reverse(
+                "customers-device-create",
+                args=[self.account.pk],
+            ),
+            {
+                "name": "Forbidden Device",
+                "platform": ClientDevice.Platform.IOS,
+                "notes": "",
+            },
+        )
+
+        self.assertEqual(response.status_code, 403)
+
+        self.assertEqual(
+            ClientDevice.objects.count(),
+            before,
+        )
+
+    def test_account_and_device_creation_do_not_create_vpn_clients(self):
+        from vpn.models import VPNClient
+
+        self.client.force_login(self.operator)
+
+        vpn_before = VPNClient.objects.count()
+
+        response = self.client.post(
+            reverse(
+                "customers-device-create",
+                args=[self.account.pk],
+            ),
+            {
+                "name": "MacBook Pro",
+                "platform": ClientDevice.Platform.MACOS,
+                "notes": "",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+
+        self.assertEqual(
+            VPNClient.objects.count(),
+            vpn_before,
+        )
+
+
+class CustomerDeviceVPNCreationTest(TestCase):
+    def setUp(self):
+        from datetime import timedelta
+
+        from servers.models import (
+            ProtocolProfile,
+            Server,
+            ServerProtocol,
+        )
+
+        User = get_user_model()
+
+        self.operator = User.objects.create_user(
+            username="phase3-vpn-operator",
+            password="test-password",
+        )
+
+        from django.utils import timezone
+
+        self.account = CustomerAccount.objects.create(
+            display_name="VPN Customer",
+            email="vpn@example.com",
+            expires_at=timezone.now() + timedelta(days=30),
+            created_by=self.operator,
+        )
+
+        self.device = ClientDevice.objects.create(
+            account=self.account,
+            name="iPhone 15 Pro",
+            platform=ClientDevice.Platform.IOS,
+        )
+
+        self.server = Server.objects.create(
+            name="Phase 3 VPN Server",
+            is_enabled=True,
+        )
+
+        self.protocol = ServerProtocol.objects.create(
+            server=self.server,
+            protocol_type=ServerProtocol.ProtocolType.AWG2,
+            enabled=True,
+            container_name="amnezia-awg2",
+            container_status="running",
+        )
+
+        self.full_profile = ProtocolProfile.objects.create(
+            server_protocol=self.protocol,
+            name="FULL",
+            protocol_type=ServerProtocol.ProtocolType.AWG2,
+            config_template=(
+                "# routing-mode: full\n"
+                "0.0.0.0/0"
+            ),
+        )
+
+        self.selective_profile = ProtocolProfile.objects.create(
+            server_protocol=self.protocol,
+            name="SELECTIVE",
+            protocol_type=ServerProtocol.ProtocolType.AWG2,
+            config_template=(
+                "# routing-mode: selective\n"
+                "8.8.8.8/32"
+            ),
+        )
+
+    def test_connection_page_offers_full_and_selective(self):
+        self.client.force_login(self.operator)
+
+        response = self.client.get(
+            reverse(
+                "customers-device-vpn-create",
+                args=[self.device.pk],
+            )
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        self.assertTemplateUsed(
+            response,
+            "customers/vpn_connection_form.html",
+        )
+
+        self.assertContains(
+            response,
+            "FULL",
+        )
+
+        self.assertContains(
+            response,
+            "SELECTIVE",
+        )
+
+        self.assertContains(
+            response,
+            "VPN Customer",
+        )
+
+        self.assertContains(
+            response,
+            "iPhone 15 Pro",
+        )
+
+    def test_non_owner_cannot_create_device_vpn(self):
+        User = get_user_model()
+
+        customer_user = User.objects.create_user(
+            username="phase3-vpn-customer",
+            password="test-password",
+            is_owner=False,
+        )
+
+        self.client.force_login(customer_user)
+
+        response = self.client.get(
+            reverse(
+                "customers-device-vpn-create",
+                args=[self.device.pk],
+            )
+        )
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_inactive_device_cannot_get_new_vpn(self):
+        self.device.status = ClientDevice.Status.DISABLED
+        self.device.save(update_fields=["status"])
+
+        self.client.force_login(self.operator)
+
+        response = self.client.post(
+            reverse(
+                "customers-device-vpn-create",
+                args=[self.device.pk],
+            ),
+            {
+                "routing_mode": "full",
+            },
+        )
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_expired_account_cannot_get_new_vpn(self):
+        from datetime import timedelta
+        from django.utils import timezone
+
+        self.account.expires_at = (
+            timezone.now() - timedelta(minutes=1)
+        )
+        self.account.save(update_fields=["expires_at"])
+
+        self.client.force_login(self.operator)
+
+        response = self.client.post(
+            reverse(
+                "customers-device-vpn-create",
+                args=[self.device.pk],
+            ),
+            {
+                "routing_mode": "full",
+            },
+        )
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_vpn_service_associates_client_with_device(self):
+        from unittest.mock import patch
+
+        from vpn.models import VPNClient
+        from vpn.services import VPNClientService
+
+        with patch.object(
+            VPNClientService,
+            "reissue_config",
+        ) as reissue:
+            client = VPNClientService.create_client(
+                server=self.server,
+                name="Service-Device-FULL",
+                protocol_type=VPNClient.ProtocolType.AWG2,
+                routing_mode="full",
+                actor=self.operator,
+                expires_at=self.account.expires_at,
+                contact_email=self.account.email,
+                device=self.device,
+            )
+
+        self.assertEqual(
+            client.device_id,
+            self.device.pk,
+        )
+
+        self.assertEqual(
+            client.profile_id,
+            self.full_profile.pk,
+        )
+
+        self.assertEqual(
+            client.contact_email,
+            self.account.email,
+        )
+
+        reissue.assert_called_once()
+
+    def test_vpn_service_rejects_inactive_device(self):
+        from unittest.mock import patch
+
+        from vpn.models import VPNClient
+        from vpn.services import VPNClientService
+
+        self.device.status = ClientDevice.Status.DISABLED
+        self.device.save(update_fields=["status"])
+
+        with patch.object(
+            VPNClientService,
+            "reissue_config",
+        ):
+            with self.assertRaises(ValueError):
+                VPNClientService.create_client(
+                    server=self.server,
+                    name="Should-Not-Exist",
+                    protocol_type=VPNClient.ProtocolType.AWG2,
+                    routing_mode="full",
+                    actor=self.operator,
+                    device=self.device,
+                )
+
+        self.assertFalse(
+            VPNClient.objects.filter(
+                name="Should-Not-Exist",
+            ).exists()
+        )
+
+    def test_full_creation_passes_device_to_existing_service(self):
+        from types import SimpleNamespace
+        from unittest.mock import patch
+
+        self.client.force_login(self.operator)
+
+        with patch(
+            "customers.views.VPNClientService.create_client"
+        ) as create_client:
+            create_client.return_value = SimpleNamespace(
+                pk=4321,
+            )
+
+            response = self.client.post(
+                reverse(
+                    "customers-device-vpn-create",
+                    args=[self.device.pk],
+                ),
+                {
+                    "routing_mode": "full",
+                },
+            )
+
+        self.assertEqual(response.status_code, 302)
+
+        self.assertEqual(
+            response.url,
+            reverse(
+                "clients-detail",
+                args=[4321],
+            ),
+        )
+
+        kwargs = create_client.call_args.kwargs
+
+        self.assertEqual(
+            kwargs["device"].pk,
+            self.device.pk,
+        )
+
+        self.assertEqual(
+            kwargs["routing_mode"],
+            "full",
+        )
+
+        self.assertEqual(
+            kwargs["protocol_type"],
+            "awg2",
+        )
+
+        self.assertEqual(
+            kwargs["expires_at"],
+            self.account.expires_at,
+        )
+
+        self.assertEqual(
+            kwargs["contact_email"],
+            self.account.email,
+        )
+
+        self.assertTrue(
+            kwargs["name"].endswith(
+                f"-D{self.device.pk}-FULL"
+            )
+        )
+
+    def test_selective_creation_uses_selective_mode(self):
+        from types import SimpleNamespace
+        from unittest.mock import patch
+
+        self.client.force_login(self.operator)
+
+        with patch(
+            "customers.views.VPNClientService.create_client"
+        ) as create_client:
+            create_client.return_value = SimpleNamespace(
+                pk=5432,
+            )
+
+            response = self.client.post(
+                reverse(
+                    "customers-device-vpn-create",
+                    args=[self.device.pk],
+                ),
+                {
+                    "routing_mode": "selective",
+                },
+            )
+
+        self.assertEqual(response.status_code, 302)
+
+        kwargs = create_client.call_args.kwargs
+
+        self.assertEqual(
+            kwargs["routing_mode"],
+            "selective",
+        )
+
+        self.assertTrue(
+            kwargs["name"].endswith(
+                f"-D{self.device.pk}-SELECT"
+            )
+        )
+
+    def test_duplicate_active_routing_mode_is_blocked(self):
+        from unittest.mock import patch
+
+        from vpn.models import VPNClient
+
+        VPNClient.objects.create(
+            server=self.server,
+            name="Existing-FULL",
+            contact_email=self.account.email,
+            protocol_type=VPNClient.ProtocolType.AWG2,
+            profile=self.full_profile,
+            created_by=self.operator,
+            device=self.device,
+        )
+
+        self.client.force_login(self.operator)
+
+        with patch(
+            "customers.views.VPNClientService.create_client"
+        ) as create_client:
+            response = self.client.post(
+                reverse(
+                    "customers-device-vpn-create",
+                    args=[self.device.pk],
+                ),
+                {
+                    "routing_mode": "full",
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+
+        self.assertContains(
+            response,
+            "уже есть активное AWG2-подключение",
+        )
+
+        create_client.assert_not_called()

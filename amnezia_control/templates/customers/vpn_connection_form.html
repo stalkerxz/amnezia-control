@@ -1,0 +1,180 @@
+{% extends 'partials/base.html' %}
+
+{% block title %}Новое VPN-подключение · {{ device.name }}{% endblock %}
+
+{% block content %}
+
+<div class="page-header d-flex justify-content-between align-items-start gap-2 flex-wrap">
+
+  <div>
+    <p class="page-kicker">
+      Операторская · VPN-подключение
+    </p>
+
+    <h1 class="h3 mb-1">
+      Новое AWG2-подключение
+    </h1>
+
+    <p class="page-subtle mb-0">
+      {{ account.display_name }}
+      ·
+      {{ device.name }}
+    </p>
+  </div>
+
+  <div class="action-cluster">
+    <a
+      href="{% url 'customers-detail' account.pk %}"
+      class="btn btn-outline-secondary"
+    >
+      К аккаунту
+    </a>
+  </div>
+
+</div>
+
+
+<section class="section-block section-quiet">
+  <div class="section-body">
+
+    <div class="summary-strip">
+
+      <div class="summary-item span-3">
+        <div class="label">
+          Клиент
+        </div>
+        <div class="value">
+          {{ account.display_name }}
+        </div>
+      </div>
+
+      <div class="summary-item span-3">
+        <div class="label">
+          Устройство
+        </div>
+        <div class="value">
+          {{ device.name }}
+        </div>
+      </div>
+
+      <div class="summary-item span-3">
+        <div class="label">
+          Сервер
+        </div>
+        <div class="value">
+          {{ server.name }}
+        </div>
+      </div>
+
+      <div class="summary-item span-3">
+        <div class="label">
+          Срок
+        </div>
+        <div class="value">
+          {% if account.expires_at %}
+            {{ account.expires_at|date:"d.m.Y H:i" }}
+          {% else %}
+            Без срока
+          {% endif %}
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+</section>
+
+
+<section class="section-block">
+  <div class="section-body">
+
+    <form method="post" class="row g-3">
+      {% csrf_token %}
+
+      {% if form.non_field_errors %}
+        <div class="col-12">
+          <div class="alert alert-danger">
+            {% for error in form.non_field_errors %}
+              <div>{{ error }}</div>
+            {% endfor %}
+          </div>
+        </div>
+      {% endif %}
+
+
+      {% if form.protocol_type.errors %}
+        <div class="col-12">
+          <div class="alert alert-danger">
+            {% for error in form.protocol_type.errors %}
+              <div>{{ error }}</div>
+            {% endfor %}
+          </div>
+        </div>
+      {% endif %}
+
+
+      <div class="col-12 col-lg-7">
+
+        <label
+          for="{{ form.routing_mode.id_for_label }}"
+          class="form-label"
+        >
+          Режим подключения
+        </label>
+
+        {{ form.routing_mode }}
+
+        {% for error in form.routing_mode.errors %}
+          <div class="text-danger small mt-1">
+            {{ error }}
+          </div>
+        {% endfor %}
+
+        <div class="form-text">
+          FULL — весь трафик через VPN.
+          SELECTIVE — только выбранные маршруты/сервисы.
+        </div>
+
+      </div>
+
+
+      <div class="col-12">
+
+        <div class="alert alert-secondary mb-0">
+          Имя технического VPN-клиента, email и срок действия
+          формируются автоматически из аккаунта и устройства.
+          Новый peer создаётся существующим VPN-механизмом.
+        </div>
+
+      </div>
+
+
+      <div class="col-12">
+        <hr>
+      </div>
+
+
+      <div class="col-12 d-flex gap-2">
+
+        <button
+          type="submit"
+          class="btn btn-primary"
+        >
+          Создать AWG2
+        </button>
+
+        <a
+          href="{% url 'customers-detail' account.pk %}"
+          class="btn btn-outline-secondary"
+        >
+          Отмена
+        </a>
+
+      </div>
+
+    </form>
+
+  </div>
+</section>
+
+{% endblock %}

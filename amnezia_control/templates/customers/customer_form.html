@@ -1,0 +1,132 @@
+{% extends 'partials/base.html' %}
+
+{% block title %}Новый аккаунт · amnezia-control{% endblock %}
+
+{% block content %}
+
+<div class="page-header d-flex justify-content-between align-items-start gap-2 flex-wrap">
+  <div>
+    <p class="page-kicker">
+      Операторская · Аккаунты
+    </p>
+
+    <h1 class="h3 mb-1">
+      Новый аккаунт клиента
+    </h1>
+
+    <p class="page-subtle mb-0">
+      Один аккаунт может содержать несколько устройств
+      и несколько VPN-подключений.
+    </p>
+  </div>
+
+  <div class="action-cluster">
+    <a
+      href="{% url 'customers-list' %}"
+      class="btn btn-outline-secondary"
+    >
+      Отмена
+    </a>
+  </div>
+</div>
+
+
+<section class="section-block">
+  <div class="section-body">
+
+    <form method="post" class="row g-3">
+      {% csrf_token %}
+
+      {% if form.non_field_errors %}
+        <div class="col-12">
+          <div class="alert alert-danger">
+            {{ form.non_field_errors }}
+          </div>
+        </div>
+      {% endif %}
+
+
+      <div class="col-12 col-lg-6">
+        <label
+          for="{{ form.display_name.id_for_label }}"
+          class="form-label"
+        >
+          {{ form.display_name.label }}
+        </label>
+
+        {{ form.display_name }}
+
+        {% for error in form.display_name.errors %}
+          <div class="text-danger small mt-1">
+            {{ error }}
+          </div>
+        {% endfor %}
+      </div>
+
+
+      <div class="col-12 col-lg-6">
+        <label
+          for="{{ form.email.id_for_label }}"
+          class="form-label"
+        >
+          {{ form.email.label }}
+        </label>
+
+        {{ form.email }}
+
+        {% for error in form.email.errors %}
+          <div class="text-danger small mt-1">
+            {{ error }}
+          </div>
+        {% endfor %}
+      </div>
+
+
+      <div class="col-12 col-lg-6">
+        <label
+          for="{{ form.expires_at.id_for_label }}"
+          class="form-label"
+        >
+          {{ form.expires_at.label }}
+        </label>
+
+        {{ form.expires_at }}
+
+        <div class="form-text">
+          Можно оставить пустым — аккаунт будет без срока.
+        </div>
+
+        {% for error in form.expires_at.errors %}
+          <div class="text-danger small mt-1">
+            {{ error }}
+          </div>
+        {% endfor %}
+      </div>
+
+
+      <div class="col-12">
+        <hr>
+      </div>
+
+      <div class="col-12 d-flex gap-2">
+        <button
+          type="submit"
+          class="btn btn-primary"
+        >
+          Создать аккаунт
+        </button>
+
+        <a
+          href="{% url 'customers-list' %}"
+          class="btn btn-outline-secondary"
+        >
+          Отмена
+        </a>
+      </div>
+
+    </form>
+
+  </div>
+</section>
+
+{% endblock %}

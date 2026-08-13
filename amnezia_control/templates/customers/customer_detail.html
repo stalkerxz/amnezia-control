@@ -19,12 +19,23 @@
   </div>
 
   <div class="action-cluster">
+
+    {% if account.status != 'deleted' %}
+      <a
+        class="btn btn-primary"
+        href="{% url 'customers-device-create' account.pk %}"
+      >
+        Добавить устройство
+      </a>
+    {% endif %}
+
     <a
       class="btn btn-outline-secondary"
       href="{% url 'customers-list' %}"
     >
       Все аккаунты
     </a>
+
   </div>
 </div>
 
@@ -111,6 +122,15 @@
 
 
       {% if account.status != 'deleted' %}
+
+        {% if account.status == 'active' and device.status == 'active' %}
+          <a
+            href="{% url 'customers-device-vpn-create' device.pk %}"
+            class="btn btn-sm btn-primary"
+          >
+            Добавить VPN
+          </a>
+        {% endif %}
 
         {% if candidate_accounts %}
 

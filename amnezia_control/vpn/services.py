@@ -789,6 +789,7 @@ class VPNClientService:
         expires_at=None,
         traffic_limit_bytes=None,
         contact_email: str = "",
+        device=None,
     ):
         protocol = ServerProtocol.objects.filter(
             server=server,
@@ -842,6 +843,24 @@ class VPNClientService:
                 f"No active {routing_mode} profile for protocol"
             )
 
+        if device is not None:
+            from customers.models import (
+                ClientDevice,
+                CustomerAccount,
+            )
+
+            if device.status != ClientDevice.Status.ACTIVE:
+                raise ValueError(
+                    "Нельзя создавать VPN-подключение "
+                    "для неактивного устройства."
+                )
+
+            if device.account.status != CustomerAccount.Status.ACTIVE:
+                raise ValueError(
+                    "Нельзя создавать VPN-подключение "
+                    "для неактивного аккаунта."
+                )
+
         client = VPNClient.objects.create(
             server=server,
             name=name,
@@ -851,6 +870,7 @@ class VPNClientService:
             expires_at=expires_at,
             traffic_limit_bytes=traffic_limit_bytes,
             contact_email=(contact_email or "").strip(),
+            device=device,
         )
         VPNClientService.reissue_config(client=client, actor=actor)
         AuditService.log(actor, "client.create", "VPNClient", client.id, {"protocol_type": protocol_type})
