@@ -22,13 +22,24 @@
 
     {% if account.status != 'deleted' %}
 
-      {% if not account.user %}
+      {% if account.user %}
+
+        <a
+          class="btn btn-outline-primary"
+          href="{% url 'customers-access-manage' account.pk %}"
+        >
+          Управление кабинетом
+        </a>
+
+      {% else %}
+
         <a
           class="btn btn-outline-primary"
           href="{% url 'customers-access-create' account.pk %}"
         >
           Создать кабинет
         </a>
+
       {% endif %}
 
       <a
@@ -90,7 +101,23 @@
         <div class="label">Кабинет</div>
         <div class="value">
           {% if account.user %}
+
             {{ account.user.username }}
+
+            <div class="small">
+
+              {% if account.user.is_active %}
+                <span class="text-success">
+                  Доступ включён
+                </span>
+              {% else %}
+                <span class="text-warning">
+                  Вход отключён
+                </span>
+              {% endif %}
+
+            </div>
+
           {% else %}
             Не создан
           {% endif %}

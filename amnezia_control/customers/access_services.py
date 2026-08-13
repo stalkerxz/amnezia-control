@@ -87,3 +87,170 @@ def create_customer_login(
     )
 
     return user
+
+
+def _locked_customer_login(
+    *,
+    account_id,
+):
+    account = (
+        CustomerAccount.objects
+        .select_for_update()
+        .get(pk=account_id)
+    )
+
+    if (
+        account.status
+        == CustomerAccount.Status.DELETED
+    ):
+        raise CustomerAccessError(
+            "Удалённым аккаунтом управлять нельзя."
+        )
+
+    if account.user_id is None:
+        raise CustomerAccessError(
+            "У аккаунта нет клиентского логина."
+        )
+
+    user = (
+        User.objects
+        .select_for_update()
+        .get(pk=account.user_id)
+    )
+
+    if (
+        getattr(user, "is_owner", False)
+        or user.is_staff
+        or user.is_superuser
+    ):
+        raise CustomerAccessError(
+            "К аккаунту привязана операторская "
+            "учётная запись. Автоматическое "
+            "управление запрещено."
+        )
+
+    return account, user
+
+
+@transaction.atomic
+def change_customer_password(
+    *,
+    account_id,
+    password,
+    actor,
+):
+    account, user = _locked_customer_login(
+        account_id=account_id,
+    )
+
+    user.set_password(password)
+
+    user.save(
+        update_fields=[
+            "password",
+        ]
+    )
+
+    AuditService.log(
+        actor,
+        "customer.login.password_reset",
+        "CustomerAccount",
+        account.pk,
+        {
+            "user_id": user.pk,
+            "username": user.username,
+        },
+    )
+
+    return user
+
+
+@transaction.atomic
+def set_customer_login_enabled(
+    *,
+    account_id,
+    enabled,
+    actor,
+):
+    account, user = _locked_customer_login(
+        account_id=account_id,
+    )
+
+    enabled = bool(enabled)
+
+    if user.is_active != enabled:
+        user.is_active = enabled
+
+        user.save(
+            update_fields=[
+                "is_active",
+            ]
+        )
+
+        AuditService.log(
+            actor,
+            (
+                "customer.login.enable"
+                if enabled
+                else "customer.login.disable"
+            ),
+            "CustomerAccount",
+            account.pk,
+            {
+                "user_id": user.pk,
+                "username": user.username,
+            },
+        )
+
+    return user
+
+
+@transaction.atomic
+def detach_customer_login(
+    *,
+    account_id,
+    actor,
+):
+    account, user = _locked_customer_login(
+        account_id=account_id,
+    )
+
+    user_id = user.pk
+    username = user.username
+
+    # Revoke the credentials first.
+    user.is_active = False
+    user.set_unusable_password()
+
+    user.save(
+        update_fields=[
+            "is_active",
+            "password",
+        ]
+    )
+
+    # Then remove only the identity binding.
+    # Devices and protocol configurations belong to CustomerAccount /
+    # ClientDevice and are intentionally untouched.
+    account.user = None
+    account.updated_at = timezone.now()
+
+    account.save(
+        update_fields=[
+            "user",
+            "updated_at",
+        ]
+    )
+
+    AuditService.log(
+        actor,
+        "customer.login.detach",
+        "CustomerAccount",
+        account.pk,
+        {
+            "user_id": user_id,
+            "username": username,
+        },
+    )
+
+    return user

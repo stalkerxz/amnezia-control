@@ -2,6 +2,7 @@ from django.urls import path
 
 from .access_views import (
     customer_access_create_view,
+    customer_access_manage_view,
 )
 from .views import (
     customer_create_view,
@@ -39,6 +40,11 @@ urlpatterns = [
         "<int:pk>/access/",
         customer_access_create_view,
         name="customers-access-create",
+    ),
+    path(
+        "<int:pk>/access/manage/",
+        customer_access_manage_view,
+        name="customers-access-manage",
     ),
     path(
         "<int:pk>/merge/",

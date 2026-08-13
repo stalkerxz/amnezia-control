@@ -1,0 +1,329 @@
+{% extends 'partials/base.html' %}
+
+{% block title %}
+Управление кабинетом · {{ account.display_name }}
+{% endblock %}
+
+
+{% block content %}
+
+<div class="page-header d-flex justify-content-between align-items-start gap-3 flex-wrap">
+
+  <div>
+
+    <p class="page-kicker">
+      Операторская · Клиентский кабинет
+    </p>
+
+    <h1 class="h3 mb-1">
+      Управление доступом
+    </h1>
+
+    <p class="page-subtle mb-0">
+      {{ account.display_name }}
+    </p>
+
+  </div>
+
+
+  <a
+    href="{% url 'customers-detail' account.pk %}"
+    class="btn btn-outline-secondary"
+  >
+    К аккаунту
+  </a>
+
+</div>
+
+
+<section class="section-block section-quiet">
+
+  <div class="section-body">
+
+    <div class="summary-strip">
+
+      <div class="summary-item span-4">
+        <div class="label">
+          Логин
+        </div>
+
+        <div class="value">
+          {{ customer_user.username }}
+        </div>
+      </div>
+
+
+      <div class="summary-item span-4">
+        <div class="label">
+          Email
+        </div>
+
+        <div class="value">
+          {{ customer_user.email|default:"—" }}
+        </div>
+      </div>
+
+
+      <div class="summary-item span-4">
+        <div class="label">
+          Доступ
+        </div>
+
+        <div class="value">
+
+          {% if customer_user.is_active %}
+            <span class="text-success">
+              Включён
+            </span>
+          {% else %}
+            <span class="text-warning">
+              Отключён
+            </span>
+          {% endif %}
+
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+</section>
+
+
+<section class="section-block">
+
+  <div class="section-body">
+
+    <div class="section-header-compact">
+      <div>
+
+        <p class="page-kicker mb-1">
+          Пароль
+        </p>
+
+        <h2 class="h5 mb-1">
+          Установить новый пароль
+        </h2>
+
+        <div class="text-secondary small">
+          VPN-ключи, UUID и конфигурации
+          при смене пароля не изменяются.
+        </div>
+
+      </div>
+    </div>
+
+
+    <form
+      method="post"
+      class="row g-3"
+    >
+
+      {% csrf_token %}
+
+      <input
+        type="hidden"
+        name="action"
+        value="password"
+      >
+
+
+      {% if form.non_field_errors %}
+        <div class="col-12">
+          <div class="alert alert-danger">
+            {% for error in form.non_field_errors %}
+              <div>{{ error }}</div>
+            {% endfor %}
+          </div>
+        </div>
+      {% endif %}
+
+
+      <div class="col-12 col-lg-6">
+
+        <label
+          class="form-label"
+          for="{{ form.password1.id_for_label }}"
+        >
+          {{ form.password1.label }}
+        </label>
+
+        {{ form.password1 }}
+
+        {% for error in form.password1.errors %}
+          <div class="text-danger small mt-1">
+            {{ error }}
+          </div>
+        {% endfor %}
+
+      </div>
+
+
+      <div class="col-12 col-lg-6">
+
+        <label
+          class="form-label"
+          for="{{ form.password2.id_for_label }}"
+        >
+          {{ form.password2.label }}
+        </label>
+
+        {{ form.password2 }}
+
+        {% for error in form.password2.errors %}
+          <div class="text-danger small mt-1">
+            {{ error }}
+          </div>
+        {% endfor %}
+
+      </div>
+
+
+      <div class="col-12">
+
+        <button
+          type="submit"
+          class="btn btn-primary"
+        >
+          Изменить пароль
+        </button>
+
+      </div>
+
+    </form>
+
+  </div>
+
+</section>
+
+
+<section class="section-block">
+
+  <div class="section-body">
+
+    <div class="section-header-compact">
+
+      <div>
+
+        <p class="page-kicker mb-1">
+          Доступ
+        </p>
+
+        <h2 class="h5 mb-1">
+          Вход в кабинет
+        </h2>
+
+        <div class="text-secondary small">
+          Отключение логина не удаляет
+          CustomerAccount, устройства или подключения.
+        </div>
+
+      </div>
+
+    </div>
+
+
+    {% if customer_user.is_active %}
+
+      <form method="post">
+        {% csrf_token %}
+
+        <input
+          type="hidden"
+          name="action"
+          value="disable"
+        >
+
+        <button
+          type="submit"
+          class="btn btn-warning"
+          onclick="return confirm('Отключить клиенту вход в кабинет?');"
+        >
+          Отключить вход
+        </button>
+
+      </form>
+
+    {% else %}
+
+      <form method="post">
+        {% csrf_token %}
+
+        <input
+          type="hidden"
+          name="action"
+          value="enable"
+        >
+
+        <button
+          type="submit"
+          class="btn btn-success"
+        >
+          Включить вход
+        </button>
+
+      </form>
+
+    {% endif %}
+
+  </div>
+
+</section>
+
+
+<section class="section-block">
+
+  <div class="section-body">
+
+    <div class="section-header-compact">
+
+      <div>
+
+        <p class="page-kicker mb-1">
+          Отвязка
+        </p>
+
+        <h2 class="h5 mb-1">
+          Удалить привязку кабинета
+        </h2>
+
+        <div class="text-secondary small">
+          Старый пользователь будет заблокирован,
+          его пароль станет недействительным,
+          а CustomerAccount снова сможет получить новый логин.
+          Устройства, AWG2 и VLESS/XHTTP не удаляются.
+        </div>
+
+      </div>
+
+    </div>
+
+
+    <form
+      method="post"
+      onsubmit="return confirm('Отвязать клиентский логин? Старые учётные данные перестанут работать. VPN-конфигурации останутся без изменений.');"
+    >
+
+      {% csrf_token %}
+
+      <input
+        type="hidden"
+        name="action"
+        value="detach"
+      >
+
+      <button
+        type="submit"
+        class="btn btn-outline-danger"
+      >
+        Отвязать кабинет
+      </button>
+
+    </form>
+
+  </div>
+
+</section>
+
+{% endblock %}

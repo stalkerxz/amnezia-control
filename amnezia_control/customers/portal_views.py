@@ -27,7 +27,10 @@ from .models import ClientDevice, CustomerAccount
 
 
 def _customer_account_for_user(user):
-    if not user.is_authenticated:
+    if (
+        not user.is_authenticated
+        or not user.is_active
+    ):
         return None
 
     if (

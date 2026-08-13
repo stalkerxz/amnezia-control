@@ -123,3 +123,76 @@ class CustomerAccessCreateForm(forms.Form):
             )
 
         return cleaned_data
+
+
+class CustomerPasswordResetForm(forms.Form):
+    password1 = forms.CharField(
+        label="Новый пароль",
+        strip=False,
+        widget=forms.PasswordInput(
+            attrs={
+                "class": "form-control",
+                "autocomplete": "new-password",
+            }
+        ),
+    )
+
+    password2 = forms.CharField(
+        label="Повторите новый пароль",
+        strip=False,
+        widget=forms.PasswordInput(
+            attrs={
+                "class": "form-control",
+                "autocomplete": "new-password",
+            }
+        ),
+    )
+
+    def __init__(
+        self,
+        *args,
+        user=None,
+        **kwargs,
+    ):
+        super().__init__(
+            *args,
+            **kwargs,
+        )
+
+        self.user = user
+
+    def clean(self):
+        cleaned_data = super().clean()
+
+        password1 = cleaned_data.get(
+            "password1"
+        )
+
+        password2 = cleaned_data.get(
+            "password2"
+        )
+
+        if not password1 or not password2:
+            return cleaned_data
+
+        if password1 != password2:
+            self.add_error(
+                "password2",
+                "Пароли не совпадают.",
+            )
+
+            return cleaned_data
+
+        try:
+            validate_password(
+                password1,
+                user=self.user,
+            )
+
+        except ValidationError as exc:
+            self.add_error(
+                "password1",
+                exc,
+            )
+
+        return cleaned_data
