@@ -21,12 +21,23 @@
   <div class="action-cluster">
 
     {% if account.status != 'deleted' %}
+
+      {% if not account.user %}
+        <a
+          class="btn btn-outline-primary"
+          href="{% url 'customers-access-create' account.pk %}"
+        >
+          Создать кабинет
+        </a>
+      {% endif %}
+
       <a
         class="btn btn-primary"
         href="{% url 'customers-device-create' account.pk %}"
       >
         Добавить устройство
       </a>
+
     {% endif %}
 
     <a
@@ -79,7 +90,7 @@
         <div class="label">Кабинет</div>
         <div class="value">
           {% if account.user %}
-            Привязан
+            {{ account.user.username }}
           {% else %}
             Не создан
           {% endif %}

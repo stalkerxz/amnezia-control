@@ -1,5 +1,8 @@
 from django.urls import path
 
+from .access_views import (
+    customer_access_create_view,
+)
 from .views import (
     customer_create_view,
     customer_detail_view,
@@ -31,6 +34,11 @@ urlpatterns = [
         "devices/<int:device_id>/move/",
         move_device_view,
         name="customers-device-move",
+    ),
+    path(
+        "<int:pk>/access/",
+        customer_access_create_view,
+        name="customers-access-create",
     ),
     path(
         "<int:pk>/merge/",

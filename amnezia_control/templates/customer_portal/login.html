@@ -1,0 +1,101 @@
+{% extends 'customer_portal/base.html' %}
+
+{% block title %}
+Вход · VPN
+{% endblock %}
+
+
+{% block content %}
+
+<div class="row justify-content-center">
+
+  <div class="col-12 col-md-7 col-lg-5">
+
+    <div class="card">
+
+      <div class="card-body p-4">
+
+        <p class="text-secondary small mb-1">
+          Клиентский кабинет
+        </p>
+
+        <h1 class="h4 mb-4">
+          Вход
+        </h1>
+
+
+        <form method="post">
+
+          {% csrf_token %}
+
+          {% if form.non_field_errors %}
+            <div class="alert alert-danger">
+              {% for error in form.non_field_errors %}
+                <div>{{ error }}</div>
+              {% endfor %}
+            </div>
+          {% endif %}
+
+
+          <div class="mb-3">
+
+            <label
+              for="{{ form.username.id_for_label }}"
+              class="form-label"
+            >
+              Логин
+            </label>
+
+            <input
+              type="text"
+              name="username"
+              value="{{ form.username.value|default:'' }}"
+              autofocus
+              autocomplete="username"
+              required
+              class="form-control"
+              id="{{ form.username.id_for_label }}"
+            >
+
+          </div>
+
+
+          <div class="mb-4">
+
+            <label
+              for="{{ form.password.id_for_label }}"
+              class="form-label"
+            >
+              Пароль
+            </label>
+
+            <input
+              type="password"
+              name="password"
+              autocomplete="current-password"
+              required
+              class="form-control"
+              id="{{ form.password.id_for_label }}"
+            >
+
+          </div>
+
+
+          <button
+            type="submit"
+            class="btn btn-primary w-100"
+          >
+            Войти
+          </button>
+
+        </form>
+
+      </div>
+
+    </div>
+
+  </div>
+
+</div>
+
+{% endblock %}
