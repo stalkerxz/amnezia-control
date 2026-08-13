@@ -1,0 +1,158 @@
+{% extends 'partials/base.html' %}
+
+{% block title %}{{ account.display_name }} · amnezia-control{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-start gap-2 flex-wrap">
+  <div>
+    <p class="page-kicker">Операторская · Аккаунт клиента</p>
+    <h1 class="h3 mb-1">{{ account.display_name }}</h1>
+
+    <p class="page-subtle mb-0">
+      {% if account.email %}
+        {{ account.email }}
+      {% else %}
+        Email не указан
+      {% endif %}
+    </p>
+  </div>
+
+  <div class="action-cluster">
+    <a class="btn btn-outline-secondary" href="{% url 'customers-list' %}">
+      Все аккаунты
+    </a>
+  </div>
+</div>
+
+<section class="section-block section-quiet">
+  <div class="section-body">
+    <div class="summary-strip">
+      <div class="summary-item span-3">
+        <div class="label">Статус</div>
+        <div class="value">
+          {% if account.status == 'active' %}
+            Активен
+          {% elif account.status == 'disabled' %}
+            Отключён
+          {% elif account.status == 'deleted' %}
+            Удалён
+          {% else %}
+            {{ account.status }}
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="summary-item span-3">
+        <div class="label">Устройств</div>
+        <div class="value">{{ account.devices.all|length }}</div>
+      </div>
+
+      <div class="summary-item span-3">
+        <div class="label">Срок аккаунта</div>
+        <div class="value">
+          {% if account.expires_at %}
+            {{ account.expires_at|date:"d.m.Y" }}
+          {% else %}
+            Без срока
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="summary-item span-3">
+        <div class="label">Кабинет</div>
+        <div class="value">
+          {% if account.user %}
+            Привязан
+          {% else %}
+            Не создан
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+{% for device in account.devices.all %}
+<section class="section-block">
+  <div class="section-body">
+    <div class="section-header-compact">
+      <div>
+        <h2 class="h5 mb-1">{{ device.name }}</h2>
+        <div class="text-secondary small">
+          {{ device.get_platform_display }} · {{ device.get_status_display }}
+        </div>
+      </div>
+    </div>
+
+    {% if device.vpn_clients.all %}
+      <div class="table-responsive">
+        <table class="table align-middle mb-0">
+          <thead>
+            <tr>
+              <th>Конфигурация</th>
+              <th>Протокол</th>
+              <th>Профиль</th>
+              <th>Статус</th>
+              <th>IP</th>
+              <th class="text-end">Действие</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {% for client in device.vpn_clients.all %}
+              <tr>
+                <td>
+                  <div class="fw-semibold">{{ client.name }}</div>
+                  <div class="small text-secondary">ID {{ client.id }}</div>
+                </td>
+
+                <td>{{ client.get_protocol_type_display }}</td>
+
+                <td>{{ client.profile.name }}</td>
+
+                <td>{{ client.get_status_display }}</td>
+
+                <td>
+                  {% if client.runtime_address %}
+                    <code>{{ client.runtime_address }}</code>
+                  {% else %}
+                    <span class="text-secondary">—</span>
+                  {% endif %}
+                </td>
+
+                <td class="text-end">
+                  <a
+                    href="{% url 'clients-detail' client.pk %}"
+                    class="btn btn-sm btn-outline-primary"
+                  >
+                    VPN-клиент
+                  </a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="text-secondary py-3">
+        У устройства пока нет VPN-конфигураций.
+      </div>
+    {% endif %}
+  </div>
+</section>
+{% empty %}
+<section class="section-block">
+  <div class="section-body text-center text-secondary py-4">
+    У аккаунта пока нет устройств.
+  </div>
+</section>
+{% endfor %}
+
+<section class="section-block section-quiet">
+  <div class="section-body">
+    <div class="small text-secondary">
+      Режим просмотра. Перемещение устройств, объединение аккаунтов и создание новых конфигураций здесь пока отключены.
+    </div>
+  </div>
+</section>
+{% endblock %}

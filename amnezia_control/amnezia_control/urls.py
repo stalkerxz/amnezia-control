@@ -12,6 +12,7 @@ urlpatterns = [
     path("i18n/", include("django.conf.urls.i18n")),
     path("health/", health_view, name="health"),
     path("servers/", include("servers.urls")),
+    path("customers/", include("customers.urls")),
     path("clients/", include("vpn.urls")),
     path("xhttp/", include("vpn.xhttp_urls")),
     path("audit/", include("audit.urls")),

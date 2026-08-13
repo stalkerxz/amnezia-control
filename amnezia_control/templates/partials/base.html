@@ -36,6 +36,10 @@
         <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 10.8 12 3l9 7.8v9.7a.5.5 0 0 1-.5.5h-5.8v-6.5H9.3V21H3.5a.5.5 0 0 1-.5-.5z"/></svg></span>
         <span class="nav-label">Главная</span>
       </a>
+      <a class="nav-link {% if request.path|slice:':11' == '/customers/' %}active{% endif %}" href="/customers/" {% if request.path|slice:':11' == '/customers/' %}aria-current="page"{% endif %} title="Аккаунты">
+        <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="9" cy="8" r="4"/><path d="M2 21v-2a7 7 0 0 1 7-7h1"/><rect x="14" y="12" width="8" height="7" rx="2"/><path d="M16 12V9a2 2 0 0 1 4 0v3"/></svg></span>
+        <span class="nav-label">Аккаунты</span>
+      </a>
       <a class="nav-link {% if request.path|slice:':9' == '/clients/' and request.path|slice:':26' != '/clients/renewal-requests/' %}active{% endif %}" href="/clients/" {% if request.path|slice:':9' == '/clients/' and request.path|slice:':26' != '/clients/renewal-requests/' %}aria-current="page"{% endif %} title="Клиенты">
         <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
         <span class="nav-label">Клиенты</span>
@@ -100,6 +104,7 @@
           <div class="topbar-title">
             {% if request.path == '/' %}Операционный центр
             {% elif request.path|slice:':26' == '/clients/renewal-requests/' %}Продления
+            {% elif request.path|slice:':11' == '/customers/' %}Аккаунты
             {% elif request.path|slice:':9' == '/clients/' %}Клиенты
             {% elif request.path|slice:':7' == '/xhttp/' %}XHTTP CDN
             {% elif request.path|slice:':9' == '/servers/' %}Серверы
@@ -111,6 +116,7 @@
           <div class="topbar-subtitle">
             {% if request.path == '/' %}Сводка состояния сервиса
             {% elif request.path|slice:':26' == '/clients/renewal-requests/' %}Очередь обращений и продлений
+            {% elif request.path|slice:':11' == '/customers/' %}Клиенты, устройства и их подключения
             {% elif request.path|slice:':9' == '/clients/' %}Доступы, лимиты и конфигурации
             {% elif request.path|slice:':7' == '/xhttp/' %}Резервные подключения через CDN
             {% elif request.path|slice:':9' == '/servers/' %}Инфраструктура и runtime

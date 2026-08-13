@@ -1,0 +1,122 @@
+{% extends 'partials/base.html' %}
+
+{% block title %}Аккаунты клиентов · amnezia-control{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-start gap-2 flex-wrap">
+  <div>
+    <p class="page-kicker">Операторская · Аккаунты</p>
+    <h1 class="h3 mb-1">Аккаунты клиентов</h1>
+    <p class="page-subtle">
+      Уровень владельцев и устройств. VPN-конфигурации остаются отдельным техническим слоем.
+    </p>
+  </div>
+
+  <div class="action-cluster">
+    <a class="btn btn-outline-secondary" href="/clients/">
+      VPN-конфигурации
+    </a>
+  </div>
+</div>
+
+<section class="section-block section-quiet">
+  <div class="section-body">
+    <div class="summary-strip">
+      <div class="summary-item span-3">
+        <div class="label">Аккаунтов</div>
+        <div class="value">{{ accounts|length }}</div>
+      </div>
+
+      <div class="summary-item span-9">
+        <div class="label">Режим</div>
+        <div class="meta">
+          Read-only. Объединение legacy-клиентов и перенос устройств пока отключены.
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section-block">
+  <div class="section-body">
+    <div class="section-header-compact">
+      <div>
+        <h2 class="h6 mb-1">Клиенты</h2>
+        <div class="text-secondary small">
+          Один аккаунт может содержать несколько устройств и несколько VPN-конфигураций.
+        </div>
+      </div>
+    </div>
+
+    {% if accounts %}
+      <div class="table-responsive">
+        <table class="table align-middle mb-0">
+          <thead>
+            <tr>
+              <th>Аккаунт</th>
+              <th>Статус</th>
+              <th>Устройства</th>
+              <th>VPN-конфигурации</th>
+              <th>Срок</th>
+              <th class="text-end">Действие</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {% for account in accounts %}
+              <tr>
+                <td>
+                  <div class="fw-semibold">{{ account.display_name }}</div>
+
+                  {% if account.email %}
+                    <div class="small text-secondary">{{ account.email }}</div>
+                  {% else %}
+                    <div class="small text-secondary">Email не указан</div>
+                  {% endif %}
+                </td>
+
+                <td>
+                  {% if account.status == 'active' %}
+                    <span class="badge text-bg-success">Активен</span>
+                  {% elif account.status == 'disabled' %}
+                    <span class="badge text-bg-warning">Отключён</span>
+                  {% elif account.status == 'deleted' %}
+                    <span class="badge text-bg-secondary">Удалён</span>
+                  {% else %}
+                    <span class="badge text-bg-secondary">{{ account.status }}</span>
+                  {% endif %}
+                </td>
+
+                <td>{{ account.device_count }}</td>
+
+                <td>{{ account.vpn_config_count }}</td>
+
+                <td>
+                  {% if account.expires_at %}
+                    {{ account.expires_at|date:"d.m.Y H:i" }}
+                  {% else %}
+                    <span class="text-secondary">Без срока</span>
+                  {% endif %}
+                </td>
+
+                <td class="text-end">
+                  <a
+                    class="btn btn-sm btn-outline-primary"
+                    href="{% url 'customers-detail' account.pk %}"
+                  >
+                    Открыть
+                  </a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="py-4 text-center text-secondary">
+        Аккаунтов пока нет.
+      </div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}
