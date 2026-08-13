@@ -416,6 +416,138 @@ class CustomerAccountMergeSafetyTest(CustomerAccountServiceSafetyTest):
         )
 
 
+    def test_merge_reassigns_portal_and_renewal_account_ownership(
+        self,
+    ):
+        from customers.services import (
+            merge_customer_accounts,
+        )
+        from portal.models import (
+            ClientPortalAccess,
+            ClientRenewalRequest,
+        )
+
+        portal = ClientPortalAccess.objects.create(
+            client=self.vpn_client,
+            account=self.source_account,
+            token_hash="1" * 64,
+        )
+
+        renewal = ClientRenewalRequest.objects.create(
+            client=self.vpn_client,
+            account=self.source_account,
+            status=ClientRenewalRequest.Status.DONE,
+            note="historical renewal",
+        )
+
+        moved = merge_customer_accounts(
+            source_account_id=(
+                self.source_account.pk
+            ),
+            target_account_id=(
+                self.target_account.pk
+            ),
+        )
+
+        self.assertEqual(
+            moved,
+            1,
+        )
+
+        portal.refresh_from_db()
+        renewal.refresh_from_db()
+        self.device.refresh_from_db()
+        self.source_account.refresh_from_db()
+
+        self.assertEqual(
+            self.device.account_id,
+            self.target_account.pk,
+        )
+
+        self.assertEqual(
+            portal.account_id,
+            self.target_account.pk,
+        )
+
+        self.assertEqual(
+            renewal.account_id,
+            self.target_account.pk,
+        )
+
+        self.assertEqual(
+            self.source_account.status,
+            CustomerAccount.Status.DELETED,
+        )
+
+    def test_merge_rejects_two_open_account_renewals_atomically(
+        self,
+    ):
+        from customers.services import (
+            CustomerAccountOperationError,
+            merge_customer_accounts,
+        )
+        from portal.models import (
+            ClientRenewalRequest,
+        )
+
+        source_request = (
+            ClientRenewalRequest.objects.create(
+                client=self.vpn_client,
+                account=self.source_account,
+                status=(
+                    ClientRenewalRequest.Status.NEW
+                ),
+            )
+        )
+
+        target_request = (
+            ClientRenewalRequest.objects.create(
+                client=None,
+                account=self.target_account,
+                status=(
+                    ClientRenewalRequest.Status.IN_PROGRESS
+                ),
+            )
+        )
+
+        with self.assertRaises(
+            CustomerAccountOperationError
+        ):
+            merge_customer_accounts(
+                source_account_id=(
+                    self.source_account.pk
+                ),
+                target_account_id=(
+                    self.target_account.pk
+                ),
+            )
+
+        self.device.refresh_from_db()
+        self.source_account.refresh_from_db()
+        source_request.refresh_from_db()
+        target_request.refresh_from_db()
+
+        self.assertEqual(
+            self.device.account_id,
+            self.source_account.pk,
+        )
+
+        self.assertEqual(
+            self.source_account.status,
+            CustomerAccount.Status.ACTIVE,
+        )
+
+        self.assertEqual(
+            source_request.account_id,
+            self.source_account.pk,
+        )
+
+        self.assertEqual(
+            target_request.account_id,
+            self.target_account.pk,
+        )
+
+
 class CustomerAccountServiceGuardTest(TestCase):
     def setUp(self):
         User = get_user_model()
@@ -506,6 +638,43 @@ class CustomerAccountServiceGuardTest(TestCase):
         self.assertEqual(
             self.source.status,
             CustomerAccount.Status.ACTIVE,
+        )
+
+    def test_cannot_merge_deleted_source_account(
+        self,
+    ):
+        from customers.services import (
+            CustomerAccountOperationError,
+            merge_customer_accounts,
+        )
+
+        self.source.status = (
+            CustomerAccount.Status.DELETED
+        )
+
+        self.source.save(
+            update_fields=["status"]
+        )
+
+        with self.assertRaises(
+            CustomerAccountOperationError
+        ):
+            merge_customer_accounts(
+                source_account_id=self.source.pk,
+                target_account_id=self.target.pk,
+            )
+
+        self.device.refresh_from_db()
+        self.source.refresh_from_db()
+
+        self.assertEqual(
+            self.device.account_id,
+            self.source.pk,
+        )
+
+        self.assertEqual(
+            self.source.status,
+            CustomerAccount.Status.DELETED,
         )
 
     def test_cannot_move_device_into_deleted_account(self):
