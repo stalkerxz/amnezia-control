@@ -117,7 +117,12 @@ def dashboard_view(request):
         status__in=[ClientRenewalRequest.Status.NEW, ClientRenewalRequest.Status.IN_PROGRESS]
     ).count()
     recent_renewal_requests = list(
-        ClientRenewalRequest.objects.select_related("client").order_by("-created_at")[:5]
+        ClientRenewalRequest.objects
+        .select_related(
+            "account",
+            "client",
+        )
+        .order_by("-created_at")[:5]
     )
 
     jobs_last_24h = list(

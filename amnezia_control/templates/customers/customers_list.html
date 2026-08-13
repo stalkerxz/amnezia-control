@@ -51,9 +51,20 @@
   <div class="section-body">
     <div class="section-header-compact">
       <div>
-        <h2 class="h6 mb-1">Клиенты</h2>
+        <h2 class="h6 mb-1">
+          {% if renewal_filter == 'open' %}
+            Открытые заявки на продление
+          {% else %}
+            Клиенты
+          {% endif %}
+        </h2>
+
         <div class="text-secondary small">
-          Один аккаунт может содержать несколько устройств и несколько VPN-конфигураций.
+          {% if renewal_filter == 'open' %}
+            Показаны аккаунты, у которых есть новая или находящаяся в работе заявка на продление.
+          {% else %}
+            Один аккаунт может содержать несколько устройств и несколько VPN-конфигураций.
+          {% endif %}
         </div>
       </div>
     </div>
@@ -67,6 +78,7 @@
               <th>Статус</th>
               <th>Устройства</th>
               <th>VPN-конфигурации</th>
+              <th>Продление</th>
               <th>Срок</th>
               <th class="text-end">Действие</th>
             </tr>
@@ -102,6 +114,16 @@
                 <td>{{ account.vpn_config_count }}</td>
 
                 <td>
+                  {% if account.open_renewal_count %}
+                    <span class="badge text-bg-warning">
+                      Открыта
+                    </span>
+                  {% else %}
+                    <span class="text-secondary">—</span>
+                  {% endif %}
+                </td>
+
+                <td>
                   {% if account.expires_at %}
                     {{ account.expires_at|date:"d.m.Y H:i" }}
                   {% else %}
@@ -124,7 +146,11 @@
       </div>
     {% else %}
       <div class="py-4 text-center text-secondary">
-        Аккаунтов пока нет.
+        {% if renewal_filter == 'open' %}
+          Открытых заявок на продление нет.
+        {% else %}
+          Аккаунтов пока нет.
+        {% endif %}
       </div>
     {% endif %}
   </div>

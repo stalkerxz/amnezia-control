@@ -9,7 +9,7 @@
   <div class="action-cluster">
     <a class="btn btn-primary" href="/clients/new/">Создать клиента</a>
     <a class="btn btn-outline-primary" href="/servers/">Открыть серверы</a>
-    <a class="btn btn-outline-secondary" href="/clients/renewal-requests/">Очередь продлений</a>
+    <a class="btn btn-outline-secondary" href="/customers/?renewal=open">Очередь продлений</a>
   </div>
 </div>
 
@@ -34,7 +34,7 @@
     <span class="metric-card-value">{{ traffic_exceeded_clients_count }}</span>
     <span class="metric-card-meta">Ограничены по квоте</span>
   </a>
-  <a class="metric-card {% if renewal_open_count %}is-warning{% endif %}" href="/clients/renewal-requests/">
+  <a class="metric-card {% if renewal_open_count %}is-warning{% endif %}" href="/customers/?renewal=open">
     <span class="metric-card-label">Открытые продления</span>
     <span class="metric-card-value">{{ renewal_open_count }}</span>
     <span class="metric-card-meta">За 24 часа: {{ renewal_requests_last_24h }}</span>
@@ -136,7 +136,7 @@
         <div class="quick-action-grid">
           <a class="quick-action" href="/clients/new/"><span class="quick-action-symbol">+</span><span>Добавить клиента</span></a>
           <a class="quick-action" href="/servers/"><span class="quick-action-symbol">S</span><span>Открыть серверы</span></a>
-          <a class="quick-action" href="/clients/renewal-requests/"><span class="quick-action-symbol">↻</span><span>Обработать продления</span></a>
+          <a class="quick-action" href="/customers/?renewal=open"><span class="quick-action-symbol">↻</span><span>Обработать продления</span></a>
           <a class="quick-action" href="/jobs/"><span class="quick-action-symbol">✓</span><span>Проверить задания</span></a>
         </div>
       </div>
@@ -160,7 +160,7 @@
 
     <section class="section-block section-flat section-renewals">
       <div class="section-body">
-        <div class="section-header"><h2 class="h6">Очередь продлений</h2><a class="small text-decoration-none" href="/clients/renewal-requests/">Открыть очередь</a></div>
+        <div class="section-header"><h2 class="h6">Очередь продлений</h2><a class="small text-decoration-none" href="/customers/?renewal=open">Открыть очередь</a></div>
         <div class="kv-inline mb-2">
           <div><div class="k">Открытые</div><div class="v">{{ renewal_open_count }}</div></div>
           <div><div class="k">За 24 часа</div><div class="v">{{ renewal_requests_last_24h }}</div></div>
@@ -169,8 +169,33 @@
         <div class="queue-list queue-list-clean">
           {% for log in recent_renewal_requests %}
           <div class="queue-item">
-            <div><a class="title text-decoration-none" href="/clients/{{ log.client_id }}/">{{ log.client.name }}</a><div class="meta">{{ log.created_at|date:'d.m.Y H:i' }}</div></div>
-            <span class="badge status-badge status-neutral">{{ log.get_status_display }}</span>
+            <div>
+              {% if log.account_id %}
+                <a
+                  class="title text-decoration-none"
+                  href="/customers/{{ log.account_id }}/"
+                >
+                  {{ log.account.display_name }}
+                </a>
+              {% elif log.client_id %}
+                <a
+                  class="title text-decoration-none"
+                  href="/clients/{{ log.client_id }}/"
+                >
+                  {{ log.client.name }}
+                </a>
+              {% else %}
+                <span class="title">
+                  Заявка #{{ log.pk }}
+                </span>
+              {% endif %}
+              <div class="meta">
+                {{ log.created_at|date:'d.m.Y H:i' }}
+              </div>
+            </div>
+            <span class="badge status-badge status-neutral">
+              {{ log.get_status_display }}
+            </span>
           </div>
           {% empty %}
           <div class="empty-state compact-empty">Новых заявок нет.</div>

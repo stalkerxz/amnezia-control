@@ -437,6 +437,71 @@ class AccountRenewalFlowTest(TestCase):
             self.account.pk,
         )
 
+    def test_dashboard_handles_account_only_renewal(
+        self,
+    ):
+        request_obj = self._new_request()
+
+        self.assertIsNone(
+            request_obj.client_id
+        )
+
+        self.client.force_login(
+            self.operator
+        )
+
+        response = self.client.get(
+            reverse("dashboard")
+        )
+
+        self.assertEqual(
+            response.status_code,
+            200,
+        )
+
+        self.assertContains(
+            response,
+            self.account.display_name,
+        )
+
+        self.assertContains(
+            response,
+            reverse(
+                "customers-detail",
+                args=[self.account.pk],
+            ),
+        )
+
+        self.assertContains(
+            response,
+            "/customers/?renewal=open",
+        )
+
+        self.assertNotContains(
+            response,
+            "/clients/None/",
+        )
+
+        filtered = self.client.get(
+            reverse("customers-list")
+            + "?renewal=open"
+        )
+
+        self.assertEqual(
+            filtered.status_code,
+            200,
+        )
+
+        self.assertContains(
+            filtered,
+            self.account.display_name,
+        )
+
+        self.assertContains(
+            filtered,
+            "Открытые заявки на продление",
+        )
+
     def test_legacy_operator_list_hides_account_only_requests(
         self,
     ):

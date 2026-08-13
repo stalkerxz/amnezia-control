@@ -1,7 +1,7 @@
 from functools import wraps
 
 from django.contrib.auth.decorators import login_required
-from django.db.models import Count, Prefetch
+from django.db.models import Count, Prefetch, Q
 from django.http import (
     HttpResponseBadRequest,
     HttpResponseForbidden,
@@ -342,23 +342,54 @@ def customer_device_vpn_create_view(request, device_id):
 @operator_required
 @require_GET
 def customers_list_view(request):
+    renewal_filter = (
+        request.GET.get("renewal")
+        or ""
+    ).strip()
+
+    open_statuses = [
+        ClientRenewalRequest.Status.NEW,
+        ClientRenewalRequest.Status.IN_PROGRESS,
+    ]
+
     accounts = (
         CustomerAccount.objects
         .annotate(
-            device_count=Count("devices", distinct=True),
+            device_count=Count(
+                "devices",
+                distinct=True,
+            ),
             vpn_config_count=Count(
                 "devices__vpn_clients",
                 distinct=True,
             ),
+            open_renewal_count=Count(
+                "renewal_requests",
+                filter=Q(
+                    renewal_requests__status__in=(
+                        open_statuses
+                    ),
+                ),
+                distinct=True,
+            ),
         )
-        .order_by("display_name", "id")
+        .order_by(
+            "display_name",
+            "id",
+        )
     )
+
+    if renewal_filter == "open":
+        accounts = accounts.filter(
+            open_renewal_count__gt=0,
+        )
 
     return render(
         request,
         "customers/customers_list.html",
         {
             "accounts": accounts,
+            "renewal_filter": renewal_filter,
         },
     )
 
