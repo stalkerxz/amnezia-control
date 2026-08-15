@@ -216,44 +216,124 @@ class BaseProtocolAdapter:
     def server_public_key(self, actor, iface: str) -> str:
         return self._run(actor, f"{self.protocol_type}.server_pub", self._wg_cmd(f"show {iface} public-key")).stdout.strip()
 
+    @staticmethod
+    def _runtime_allowed_ips_valid(value: str) -> bool:
+        tokens = [
+            token.strip()
+            for token in (value or "").split(",")
+            if token.strip()
+        ]
+
+        if not tokens:
+            return False
+
+        try:
+            for token in tokens:
+                ipaddress.ip_network(
+                    token,
+                    strict=False,
+                )
+        except ValueError:
+            return False
+
+        return True
+
     def _parse_runtime_dump_peers(self, out: str):
         peers = []
-        runtime_interface = (self.protocol.runtime_metadata.get("interface") or "awg0").strip()
+        runtime_interface = (
+            self.protocol.runtime_metadata.get(
+                "interface"
+            )
+            or "awg0"
+        ).strip()
+
         for line in out.splitlines():
-            cols = [c.strip() for c in line.split("\t")]
+            cols = [
+                column.strip()
+                for column in line.split("\t")
+            ]
 
             # `wg show dump`:
-            #   public_key, preshared_key, endpoint, allowed_ips, latest_handshake, transfer_rx, transfer_tx, persistent_keepalive
+            # public_key, preshared_key, endpoint,
+            # allowed_ips, latest_handshake,
+            # transfer_rx, transfer_tx,
+            # persistent_keepalive
             #
-            # `wg show all dump`:
-            #   interface, public_key, preshared_key, endpoint, allowed_ips, latest_handshake, transfer_rx, transfer_tx, persistent_keepalive
+            # `wg show all dump` peer:
+            # interface, public_key, preshared_key,
+            # endpoint, allowed_ips,
+            # latest_handshake, transfer_rx,
+            # transfer_tx, persistent_keepalive
             #
-            # AWG2 in this environment returns live telemetry via `wg show all dump`,
-            # so support both layouts here.
+            # AWG2 also emits an extended interface
+            # metadata row. It can have many columns,
+            # so column count alone cannot identify
+            # a peer. Valid AllowedIPs are required.
 
-            if len(cols) >= 9 and cols[0] == runtime_interface:
+            if (
+                len(cols) >= 9
+                and cols[0] == runtime_interface
+            ):
                 public_key = cols[1]
                 allowed_ips = cols[4]
-                transfer_rx = int(cols[6]) if cols[6].isdigit() else 0
-                transfer_tx = int(cols[7]) if cols[7].isdigit() else 0
+
+                if not self._runtime_allowed_ips_valid(
+                    allowed_ips
+                ):
+                    continue
+
+                transfer_rx = (
+                    int(cols[6])
+                    if cols[6].isdigit()
+                    else 0
+                )
+
+                transfer_tx = (
+                    int(cols[7])
+                    if cols[7].isdigit()
+                    else 0
+                )
+
             elif len(cols) >= 8:
                 public_key = cols[0]
                 allowed_ips = cols[3]
-                transfer_rx = int(cols[5]) if cols[5].isdigit() else 0
-                transfer_tx = int(cols[6]) if cols[6].isdigit() else 0
+
+                if not self._runtime_allowed_ips_valid(
+                    allowed_ips
+                ):
+                    continue
+
+                transfer_rx = (
+                    int(cols[5])
+                    if cols[5].isdigit()
+                    else 0
+                )
+
+                transfer_tx = (
+                    int(cols[6])
+                    if cols[6].isdigit()
+                    else 0
+                )
+
             else:
                 continue
 
-            if public_key:
-                peers.append(
-                    PeerState(
-                        public_key=public_key,
-                        allowed_ips=allowed_ips,
-                        transfer_rx=transfer_rx,
-                        transfer_tx=transfer_tx,
-                        telemetry_state=PeerState.TELEMETRY_AVAILABLE,
-                    )
+            if not public_key:
+                continue
+
+            peers.append(
+                PeerState(
+                    public_key=public_key,
+                    allowed_ips=allowed_ips,
+                    transfer_rx=transfer_rx,
+                    transfer_tx=transfer_tx,
+                    telemetry_state=(
+                        PeerState
+                        .TELEMETRY_AVAILABLE
+                    ),
                 )
+            )
+
         return peers
 
     def _awg2_runtime_peers(self, actor):
@@ -518,8 +598,32 @@ class VPNClientPolicyService:
         return VPNClientService.get_limit_state(client, now=now)
 
     @classmethod
-    def reissue_block_reason(cls, client: VPNClient):
-        return cls.REISSUE_BLOCK_REASONS.get(cls.limit_state(client), "")
+    def reissue_block_reason(
+        cls,
+        client: VPNClient,
+    ):
+        if (
+            client.status
+            == VPNClient.Status.DELETED
+        ):
+            return (
+                "Переиздание запрещено: "
+                "клиент удалён."
+            )
+
+        if (
+            client.status
+            != VPNClient.Status.ACTIVE
+        ):
+            return (
+                "Переиздание запрещено: "
+                "сначала включите клиента."
+            )
+
+        return cls.REISSUE_BLOCK_REASONS.get(
+            cls.limit_state(client),
+            "",
+        )
 
     @classmethod
     def can_reissue(cls, client: VPNClient):
