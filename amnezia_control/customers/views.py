@@ -30,6 +30,7 @@ from .status_services import (
     set_customer_account_status,
     set_customer_device_status,
 )
+from .workspace import build_customer_workspace
 
 
 def operator_required(view_func):
@@ -315,12 +316,23 @@ def customer_device_vpn_create_view(request, device_id):
                     )
 
     else:
+        requested_routing_mode = (
+            request.GET.get("routing_mode")
+            or VPNClientCreateForm.ROUTING_MODE_FULL
+        ).strip()
+
+        if requested_routing_mode not in {
+            VPNClientCreateForm.ROUTING_MODE_FULL,
+            VPNClientCreateForm.ROUTING_MODE_SELECTIVE,
+        }:
+            requested_routing_mode = (
+                VPNClientCreateForm.ROUTING_MODE_FULL
+            )
+
         form = VPNClientCreateForm(
             initial={
                 "protocol_type": VPNClient.ProtocolType.AWG2,
-                "routing_mode": (
-                    VPNClientCreateForm.ROUTING_MODE_FULL
-                ),
+                "routing_mode": requested_routing_mode,
             },
             server=server,
         )
@@ -480,11 +492,14 @@ def customer_detail_view(request, pk):
         .order_by("display_name", "id")
     )
 
+    workspace = build_customer_workspace(account)
+
     return render(
         request,
         "customers/customer_detail.html",
         {
             "account": account,
+            "workspace": workspace,
             "candidate_accounts": candidate_accounts,
             "open_renewal_request": (
                 open_renewal_request

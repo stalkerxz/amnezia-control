@@ -442,6 +442,21 @@
 {% endif %}
 
 
+
+{% include 'customers/_operator_workspace.html' %}
+
+
+<details class="mb-4">
+
+  <summary
+    class="btn btn-outline-secondary"
+  >
+    Расширенное управление
+  </summary>
+
+  <div class="mt-3">
+
+
 {% for device in account.devices.all %}
 
 <section class="section-block">
@@ -812,6 +827,10 @@
 </section>
 
 {% endfor %}
+
+  </div>
+
+</details>
 
 
 {% if account.status != 'deleted' %}
