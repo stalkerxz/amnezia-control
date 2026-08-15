@@ -144,7 +144,7 @@ class BaseProtocolAdapter:
         "amnezia-control-awg2-save.lock"
     )
 
-    AWG2_RUNTIME_SAVE_LOCK_TIMEOUT_SECONDS = 30
+    AWG2_RUNTIME_SAVE_LOCK_TIMEOUT_SECONDS = 10
 
     def __init__(self, server: Server):
         self.server = server

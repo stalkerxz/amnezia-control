@@ -4,6 +4,7 @@ from unittest.mock import Mock
 
 from django.test import SimpleTestCase
 
+from jobs.executors import SafeSSHExecutor
 from vpn.services import (
     AWG2Adapter,
     AWGLegacyAdapter,
@@ -86,7 +87,7 @@ class AWG2PersistLockTest(
             (
                 "flock "
                 "-x "
-                "-w 30 "
+                "-w 10 "
                 "/run/lock/"
                 "amnezia-control-awg2-save.lock "
                 "docker exec "
@@ -218,3 +219,81 @@ class AWG2PersistLockTest(
         )
 
         adapter._run.assert_not_called()
+
+    def test_generated_lock_command_is_allowlisted(
+        self,
+    ):
+        adapter = (
+            self._awg2_adapter()
+        )
+
+        adapter._persist_runtime(
+            None
+        )
+
+        command = (
+            adapter
+            ._run
+            .call_args
+            .args[2]
+        )
+
+        executor = SafeSSHExecutor(
+            host="127.0.0.1",
+            username="root",
+        )
+
+        executor._validate(
+            command
+        )
+
+    def test_allowlist_rejects_wrong_lock_path(
+        self,
+    ):
+        executor = SafeSSHExecutor(
+            host="127.0.0.1",
+            username="root",
+        )
+
+        command = (
+            "flock "
+            "-x "
+            "-w 10 "
+            "/tmp/attacker.lock "
+            "docker exec "
+            "amnezia-awg2 "
+            "awg-quick save "
+            "/opt/amnezia/awg/"
+            "awg0.conf"
+        )
+
+        with self.assertRaises(
+            ValueError
+        ):
+            executor._validate(
+                command
+            )
+
+    def test_allowlist_rejects_arbitrary_locked_command(
+        self,
+    ):
+        executor = SafeSSHExecutor(
+            host="127.0.0.1",
+            username="root",
+        )
+
+        command = (
+            "flock "
+            "-x "
+            "-w 10 "
+            "/run/lock/"
+            "amnezia-control-awg2-save.lock "
+            "sh -c id"
+        )
+
+        with self.assertRaises(
+            ValueError
+        ):
+            executor._validate(
+                command
+            )
