@@ -22,6 +22,48 @@
 
     {% if account.status != 'deleted' %}
 
+      <form
+        method="post"
+        action="{% url 'customers-status' account.pk %}"
+        class="d-inline"
+        {% if account.status == 'active' %}
+          onsubmit="return confirm('Отключить аккаунт и все его VPN/XHTTP-подключения?');"
+        {% else %}
+          onsubmit="return confirm('Включить аккаунт и восстановить его подключения?');"
+        {% endif %}
+      >
+        {% csrf_token %}
+
+        {% if account.status == 'active' %}
+          <input
+            type="hidden"
+            name="status"
+            value="disabled"
+          >
+
+          <button
+            type="submit"
+            class="btn btn-outline-danger"
+          >
+            Отключить аккаунт
+          </button>
+
+        {% else %}
+          <input
+            type="hidden"
+            name="status"
+            value="active"
+          >
+
+          <button
+            type="submit"
+            class="btn btn-outline-success"
+          >
+            Включить аккаунт
+          </button>
+        {% endif %}
+      </form>
+
       {% if account.user %}
 
         <a
@@ -419,6 +461,50 @@
 
 
       {% if account.status != 'deleted' %}
+
+        {% if device.status != 'deleted' %}
+          <form
+            method="post"
+            action="{% url 'customers-device-status' device.pk %}"
+            class="d-inline"
+            {% if device.status == 'active' %}
+              onsubmit="return confirm('Отключить устройство и его подключения?');"
+            {% else %}
+              onsubmit="return confirm('Включить устройство и восстановить его подключения?');"
+            {% endif %}
+          >
+            {% csrf_token %}
+
+            {% if device.status == 'active' %}
+              <input
+                type="hidden"
+                name="status"
+                value="disabled"
+              >
+
+              <button
+                type="submit"
+                class="btn btn-sm btn-outline-danger"
+              >
+                Отключить устройство
+              </button>
+
+            {% else %}
+              <input
+                type="hidden"
+                name="status"
+                value="active"
+              >
+
+              <button
+                type="submit"
+                class="btn btn-sm btn-outline-success"
+              >
+                Включить устройство
+              </button>
+            {% endif %}
+          </form>
+        {% endif %}
 
         {% if account.status == 'active' and device.status == 'active' %}
           <div class="d-flex gap-2 flex-wrap">

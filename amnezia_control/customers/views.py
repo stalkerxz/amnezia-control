@@ -25,6 +25,11 @@ from .forms import (
     CustomerAccountCreateForm,
 )
 from .models import ClientDevice, CustomerAccount
+from .status_services import (
+    CustomerStatusOperationError,
+    set_customer_account_status,
+    set_customer_device_status,
+)
 
 
 def operator_required(view_func):
@@ -564,4 +569,94 @@ def merge_customer_view(request, pk):
     return redirect(
         "customers-detail",
         pk=target_account_id,
+    )
+
+
+@login_required
+@operator_required
+@require_POST
+def customer_status_view(
+    request,
+    pk,
+):
+    target_status = (
+        request.POST.get(
+            "status",
+            "",
+        )
+        .strip()
+    )
+
+    try:
+        set_customer_account_status(
+            account_id=pk,
+            target_status=(
+                target_status
+            ),
+            actor=request.user,
+        )
+
+    except CustomerAccount.DoesNotExist:
+        from django.http import Http404
+
+        raise Http404(
+            "Аккаунт не найден."
+        )
+
+    except CustomerStatusOperationError as exc:
+        return HttpResponseBadRequest(
+            str(exc)
+        )
+
+    return redirect(
+        "customers-detail",
+        pk=pk,
+    )
+
+
+@login_required
+@operator_required
+@require_POST
+def customer_device_status_view(
+    request,
+    device_id,
+):
+    target_status = (
+        request.POST.get(
+            "status",
+            "",
+        )
+        .strip()
+    )
+
+    try:
+        result = (
+            set_customer_device_status(
+                device_id=device_id,
+                target_status=(
+                    target_status
+                ),
+                actor=request.user,
+            )
+        )
+
+    except ClientDevice.DoesNotExist:
+        from django.http import Http404
+
+        raise Http404(
+            "Устройство не найдено."
+        )
+
+    except CustomerStatusOperationError as exc:
+        return HttpResponseBadRequest(
+            str(exc)
+        )
+
+    return redirect(
+        "customers-detail",
+        pk=(
+            result[
+                "device"
+            ].account_id
+        ),
     )
