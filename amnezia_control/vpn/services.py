@@ -139,6 +139,13 @@ class BaseProtocolAdapter:
     protocol_type = ""
     command_bin = "wg"
 
+    AWG2_RUNTIME_SAVE_LOCK = (
+        "/run/lock/"
+        "amnezia-control-awg2-save.lock"
+    )
+
+    AWG2_RUNTIME_SAVE_LOCK_TIMEOUT_SECONDS = 30
+
     def __init__(self, server: Server):
         self.server = server
         self.protocol = ServerProtocol.objects.filter(server=self.server, protocol_type=self.protocol_type).first()
@@ -186,8 +193,12 @@ class BaseProtocolAdapter:
             )
 
         command = (
-            f"docker exec {self.container} "
-            f"awg-quick save {config_path}"
+            "flock "
+            "-x "
+            f"-w {self.AWG2_RUNTIME_SAVE_LOCK_TIMEOUT_SECONDS} "
+            f"{shlex.quote(self.AWG2_RUNTIME_SAVE_LOCK)} "
+            f"docker exec {shlex.quote(self.container)} "
+            f"awg-quick save {shlex.quote(config_path)}"
         )
         self._run(
             actor,
