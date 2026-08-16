@@ -104,9 +104,19 @@ class OperatorXHTTPWorkspaceTest(
             "Альтернативное подключение",
         )
 
-        self.assertContains(
+        self.assertNotContains(
             response,
             "VLESS / XHTTP",
+        )
+
+        self.assertNotContains(
+            response,
+            "VLESS/XHTTP",
+        )
+
+        self.assertNotContains(
+            response,
+            "UUID",
         )
 
         self.assertContains(

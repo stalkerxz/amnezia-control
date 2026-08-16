@@ -155,6 +155,17 @@ class CustomerAccessManagementTest(TestCase):
             "Управление доступом",
         )
 
+        for technical_marker in (
+            "AWG2",
+            "VLESS/XHTTP",
+            "UUID",
+            "CustomerAccount",
+        ):
+            self.assertNotContains(
+                response,
+                technical_marker,
+            )
+
     def test_non_owner_cannot_manage_access(
         self,
     ):

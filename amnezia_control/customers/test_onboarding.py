@@ -108,10 +108,22 @@ class CustomerOnboardingTest(TestCase):
         self.assertContains(
             response,
             (
-                "VPN/XHTTP runtime "
-                "не изменяется"
+                "Подключения на этом этапе "
+                "не создаются и не изменяются."
             ),
         )
+
+        for technical_marker in (
+            "FULL",
+            "SELECTIVE",
+            "VLESS/XHTTP",
+            "AWG2",
+            "runtime",
+        ):
+            self.assertNotContains(
+                response,
+                technical_marker,
+            )
 
         list_response = self.client.get(
             reverse(

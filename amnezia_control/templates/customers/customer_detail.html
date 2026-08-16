@@ -27,7 +27,7 @@
         action="{% url 'customers-status' account.pk %}"
         class="d-inline"
         {% if account.status == 'active' %}
-          onsubmit="return confirm('Отключить аккаунт и все его VPN/XHTTP-подключения?');"
+          onsubmit="return confirm('Отключить аккаунт и все его подключения?');"
         {% else %}
           onsubmit="return confirm('Включить аккаунт и восстановить его подключения?');"
         {% endif %}
@@ -627,9 +627,10 @@
         </h2>
 
         <div class="text-secondary small">
-          Продление меняет срок CustomerAccount
-          и зеркально срок всех его VPN-подключений.
-          Ключи, IP и конфигурации не перевыпускаются.
+          Продление меняет срок действия клиента
+          и всех его подключений.
+          Сохранённые конфигурации при этом
+          не перевыпускаются.
         </div>
 
       </div>

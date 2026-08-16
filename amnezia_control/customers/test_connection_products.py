@@ -159,6 +159,19 @@ class CustomerConnectionProductTest(
             "Альтернативное подключение",
         )
 
+        for technical_marker in (
+            "AWG2",
+            "VLESS / XHTTP",
+            "VLESS/XHTTP",
+            "FULL",
+            "SELECTIVE",
+            "Runtime создаётся только после подтверждения",
+        ):
+            self.assertNotContains(
+                response,
+                technical_marker,
+            )
+
         self.assertContains(
             response,
             (
