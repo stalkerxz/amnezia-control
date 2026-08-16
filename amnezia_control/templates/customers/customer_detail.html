@@ -532,7 +532,7 @@
             </a>
 
             <a
-              href="{% url 'xhttp-devices' %}?device={{ device.pk }}"
+              href="{% url 'customers-device-xhttp-create' device.pk %}"
               class="btn btn-sm btn-outline-primary"
             >
               Добавить VLESS/XHTTP
@@ -785,7 +785,7 @@
                       </a>
 
                       <a
-                        href="{% url 'xhttp-devices' %}?device={{ device.pk }}"
+                        href="{% url 'customers-device-xhttp-create' device.pk %}"
                         class="btn btn-sm btn-outline-secondary"
                       >
                         Управление

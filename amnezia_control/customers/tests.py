@@ -1897,6 +1897,14 @@ class CustomerXHTTPIntegrationTest(_Phase4TestCase):
 
         self.assertContains(
             response,
+            _phase4_reverse(
+                "customers-device-xhttp-create",
+                args=[self.device.pk],
+            ),
+        )
+
+        self.assertNotContains(
+            response,
             (
                 _phase4_reverse(
                     "xhttp-devices"

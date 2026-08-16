@@ -355,6 +355,11 @@ class OperatorXHTTPWorkspaceTest(
                 ),
             )
 
+        self.assertNotContains(
+            response,
+            "/xhttp/?device=",
+        )
+
         self.assertContains(
             response,
             "Проверить",
