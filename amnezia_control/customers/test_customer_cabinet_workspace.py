@@ -261,17 +261,17 @@ class CustomerCabinetWorkspaceTest(
 
         self.assertContains(
             response,
-            "AWG2 FULL",
+            "Весь интернет через VPN",
         )
 
         self.assertContains(
             response,
-            "AWG2 SELECTIVE",
+            "Только выбранные сервисы",
         )
 
         self.assertContains(
             response,
-            "VLESS / XHTTP",
+            "Альтернативное подключение",
         )
 
         workspace = (
@@ -340,6 +340,19 @@ class CustomerCabinetWorkspaceTest(
             "Technical Server Name",
         )
 
+        for technical_marker in (
+            "AWG2 FULL",
+            "AWG2 SELECTIVE",
+            "VLESS / XHTTP",
+            "AmneziaWG",
+            "runtime-peer",
+            "UUID",
+        ):
+            self.assertNotContains(
+                response,
+                technical_marker,
+            )
+
     def test_cabinet_shows_own_download_links_only(
         self,
     ):
@@ -404,7 +417,7 @@ class CustomerCabinetWorkspaceTest(
 
         self.assertContains(
             response,
-            "AWG2 SELECTIVE",
+            "Только выбранные сервисы",
         )
 
         self.assertContains(
@@ -437,17 +450,17 @@ class CustomerCabinetWorkspaceTest(
 
         self.assertContains(
             response,
-            "AWG2 FULL",
+            "Весь интернет через VPN",
         )
 
         self.assertContains(
             response,
-            "AWG2 SELECTIVE",
+            "Только выбранные сервисы",
         )
 
         self.assertContains(
             response,
-            "VLESS / XHTTP",
+            "Альтернативное подключение",
         )
 
         self.assertContains(
