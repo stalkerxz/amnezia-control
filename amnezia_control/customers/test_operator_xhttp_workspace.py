@@ -101,7 +101,20 @@ class OperatorXHTTPWorkspaceTest(
 
         self.assertContains(
             response,
-            "Новое VLESS/XHTTP-подключение",
+            "Альтернативное подключение",
+        )
+
+        self.assertContains(
+            response,
+            "VLESS / XHTTP",
+        )
+
+        self.assertContains(
+            response,
+            reverse(
+                "customers-device-connection-create",
+                args=[self.device.pk],
+            ),
         )
 
         self.assertContains(
@@ -331,6 +344,19 @@ class OperatorXHTTPWorkspaceTest(
         )
 
         self.assertContains(
+            response,
+            reverse(
+                "customers-device-connection-create",
+                args=[self.device.pk],
+            ),
+        )
+
+        self.assertContains(
+            response,
+            "+ Подключение",
+        )
+
+        self.assertNotContains(
             response,
             reverse(
                 "customers-device-xhttp-create",

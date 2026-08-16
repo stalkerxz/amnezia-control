@@ -678,6 +678,102 @@ def _device_vpn_client_name(
 
 @login_required
 @operator_required
+@require_GET
+def customer_device_connection_create_view(
+    request,
+    device_id,
+):
+    device = get_object_or_404(
+        ClientDevice.objects.select_related(
+            "account"
+        ),
+        pk=device_id,
+    )
+
+    account = device.account
+
+    if (
+        account.status
+        != CustomerAccount.Status.ACTIVE
+    ):
+        return HttpResponseForbidden(
+            "Подключения можно создавать "
+            "только для активного аккаунта."
+        )
+
+    if (
+        device.status
+        != ClientDevice.Status.ACTIVE
+    ):
+        return HttpResponseForbidden(
+            "Подключения можно создавать "
+            "только для активного устройства."
+        )
+
+    if (
+        account.expires_at
+        and account.expires_at
+        <= timezone.now()
+    ):
+        return HttpResponseForbidden(
+            "Срок действия аккаунта истёк."
+        )
+
+    existing_awg2 = (
+        device.vpn_clients
+        .filter(
+            protocol_type=(
+                VPNClient.ProtocolType.AWG2
+            ),
+        )
+        .exclude(
+            status=VPNClient.Status.DELETED,
+        )
+        .select_related("profile")
+    )
+
+    has_full = False
+    has_selective = False
+
+    for client in existing_awg2:
+        if (
+            VPNClientService
+            ._profile_is_selective(
+                client.profile
+            )
+        ):
+            has_selective = True
+        else:
+            has_full = True
+
+    xhttp_total = (
+        device.xhttp_devices
+        .exclude(
+            status=XHTTPDevice.Status.DELETED,
+        )
+        .count()
+    )
+
+    return render(
+        request,
+        (
+            "customers/"
+            "connection_product_select.html"
+        ),
+        {
+            "account": account,
+            "device": device,
+            "has_full": has_full,
+            "has_selective": (
+                has_selective
+            ),
+            "xhttp_total": xhttp_total,
+        },
+    )
+
+
+@login_required
+@operator_required
 @require_http_methods(["GET", "POST"])
 def customer_device_vpn_create_view(request, device_id):
     device = get_object_or_404(

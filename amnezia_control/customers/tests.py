@@ -1493,7 +1493,7 @@ class CustomerDeviceVPNCreationTest(TestCase):
             ),
         )
 
-    def test_connection_page_offers_full_and_selective(self):
+    def test_connection_page_defaults_to_full_product(self):
         self.client.force_login(self.operator)
 
         response = self.client.get(
@@ -1512,12 +1512,22 @@ class CustomerDeviceVPNCreationTest(TestCase):
 
         self.assertContains(
             response,
-            "FULL",
+            "Весь интернет через VPN",
         )
 
         self.assertContains(
             response,
-            "SELECTIVE",
+            'name="routing_mode"',
+        )
+
+        self.assertContains(
+            response,
+            'value="full"',
+        )
+
+        self.assertNotContains(
+            response,
+            "Только выбранные сервисы",
         )
 
         self.assertContains(
@@ -1528,6 +1538,14 @@ class CustomerDeviceVPNCreationTest(TestCase):
         self.assertContains(
             response,
             "iPhone 15 Pro",
+        )
+
+        self.assertContains(
+            response,
+            reverse(
+                "customers-device-connection-create",
+                args=[self.device.pk],
+            ),
         )
 
     def test_non_owner_cannot_create_device_vpn(self):
@@ -1896,6 +1914,19 @@ class CustomerXHTTPIntegrationTest(_Phase4TestCase):
         )
 
         self.assertContains(
+            response,
+            _phase4_reverse(
+                "customers-device-connection-create",
+                args=[self.device.pk],
+            ),
+        )
+
+        self.assertContains(
+            response,
+            "+ Подключение",
+        )
+
+        self.assertNotContains(
             response,
             _phase4_reverse(
                 "customers-device-xhttp-create",

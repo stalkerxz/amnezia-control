@@ -1,138 +1,242 @@
 {% extends 'partials/base.html' %}
 
-{% block title %}Новое VPN-подключение · {{ device.name }}{% endblock %}
+{% block title %}
+{% if form.routing_mode.value == 'selective' %}
+Подключение выбранных сервисов
+{% else %}
+Подключение всего интернета
+{% endif %}
+· {{ device.name }}
+{% endblock %}
 
 {% block content %}
 
 <div class="page-header d-flex justify-content-between align-items-start gap-2 flex-wrap">
 
   <div>
+
     <p class="page-kicker">
-      Операторская · VPN-подключение
+      Операторская · AWG2
     </p>
 
-    <h1 class="h3 mb-1">
-      Новое AWG2-подключение
-    </h1>
+    {% if form.routing_mode.value == 'selective' %}
 
-    <p class="page-subtle mb-0">
-      {{ account.display_name }}
-      ·
-      {{ device.name }}
-    </p>
+      <h1 class="h3 mb-1">
+        Только выбранные сервисы
+      </h1>
+
+      <p class="page-subtle mb-0">
+        Через VPN будут направлены только
+        настроенные маршруты.
+      </p>
+
+    {% else %}
+
+      <h1 class="h3 mb-1">
+        Весь интернет через VPN
+      </h1>
+
+      <p class="page-subtle mb-0">
+        Весь интернет-трафик устройства
+        будет направлен через VPN.
+      </p>
+
+    {% endif %}
+
   </div>
 
+
   <div class="action-cluster">
+
     <a
-      href="{% url 'customers-detail' account.pk %}"
+      href="{% url 'customers-device-connection-create' device.pk %}"
       class="btn btn-outline-secondary"
     >
-      К аккаунту
+      Назад к выбору
     </a>
+
   </div>
 
 </div>
 
 
 <section class="section-block section-quiet">
+
   <div class="section-body">
 
     <div class="summary-strip">
 
       <div class="summary-item span-3">
+
         <div class="label">
           Клиент
         </div>
+
         <div class="value">
           {{ account.display_name }}
         </div>
+
       </div>
 
+
       <div class="summary-item span-3">
+
         <div class="label">
           Устройство
         </div>
+
         <div class="value">
           {{ device.name }}
         </div>
+
       </div>
 
+
       <div class="summary-item span-3">
+
         <div class="label">
           Сервер
         </div>
+
         <div class="value">
           {{ server.name }}
         </div>
+
       </div>
 
+
       <div class="summary-item span-3">
+
         <div class="label">
           Срок
         </div>
+
         <div class="value">
+
           {% if account.expires_at %}
             {{ account.expires_at|date:"d.m.Y H:i" }}
           {% else %}
             Без срока
           {% endif %}
+
         </div>
+
       </div>
 
     </div>
 
   </div>
+
 </section>
 
 
 <section class="section-block">
+
   <div class="section-body">
 
-    <form method="post" class="row g-3">
+    <form
+      method="post"
+      class="row g-3"
+    >
+
       {% csrf_token %}
 
+      <input
+        type="hidden"
+        name="routing_mode"
+        value="{{ form.routing_mode.value|default:'full' }}"
+      >
+
+
       {% if form.non_field_errors %}
+
         <div class="col-12">
+
           <div class="alert alert-danger">
+
             {% for error in form.non_field_errors %}
-              <div>{{ error }}</div>
+              <div>
+                {{ error }}
+              </div>
             {% endfor %}
+
           </div>
+
         </div>
+
+      {% endif %}
+
+
+      {% if form.routing_mode.errors %}
+
+        <div class="col-12">
+
+          <div class="alert alert-danger">
+
+            {% for error in form.routing_mode.errors %}
+              <div>
+                {{ error }}
+              </div>
+            {% endfor %}
+
+          </div>
+
+        </div>
+
       {% endif %}
 
 
       {% if form.protocol_type.errors %}
+
         <div class="col-12">
+
           <div class="alert alert-danger">
+
             {% for error in form.protocol_type.errors %}
-              <div>{{ error }}</div>
+              <div>
+                {{ error }}
+              </div>
             {% endfor %}
+
           </div>
+
         </div>
+
       {% endif %}
 
 
-      <div class="col-12 col-lg-7">
+      <div class="col-12">
 
-        <label
-          for="{{ form.routing_mode.id_for_label }}"
-          class="form-label"
-        >
-          Режим подключения
-        </label>
+        <div class="border rounded-3 p-4">
 
-        {{ form.routing_mode }}
+          {% if form.routing_mode.value == 'selective' %}
 
-        {% for error in form.routing_mode.errors %}
-          <div class="text-danger small mt-1">
-            {{ error }}
-          </div>
-        {% endfor %}
+            <div class="fw-semibold">
+              Будет создан профиль
+              «Только выбранные сервисы»
+            </div>
 
-        <div class="form-text">
-          FULL — весь трафик через VPN.
-          SELECTIVE — только выбранные маршруты/сервисы.
+            <div class="small text-secondary mt-2">
+              Используется существующий
+              SELECTIVE routing profile.
+              Ключ и IP будут выпущены автоматически.
+            </div>
+
+          {% else %}
+
+            <div class="fw-semibold">
+              Будет создан профиль
+              «Весь интернет через VPN»
+            </div>
+
+            <div class="small text-secondary mt-2">
+              Используется существующий
+              FULL routing profile.
+              Ключ и IP будут выпущены автоматически.
+            </div>
+
+          {% endif %}
+
         </div>
 
       </div>
@@ -141,9 +245,9 @@
       <div class="col-12">
 
         <div class="alert alert-secondary mb-0">
-          Имя технического VPN-клиента, email и срок действия
-          формируются автоматически из аккаунта и устройства.
-          Новый peer создаётся существующим VPN-механизмом.
+          Имя подключения, email и срок действия
+          наследуются от клиента и устройства.
+          Существующие подключения не изменяются.
         </div>
 
       </div>
@@ -154,17 +258,23 @@
       </div>
 
 
-      <div class="col-12 d-flex gap-2">
+      <div class="col-12 d-flex gap-2 flex-wrap">
 
         <button
           type="submit"
           class="btn btn-primary"
         >
-          Создать AWG2
+
+          {% if form.routing_mode.value == 'selective' %}
+            Создать подключение
+          {% else %}
+            Создать подключение
+          {% endif %}
+
         </button>
 
         <a
-          href="{% url 'customers-detail' account.pk %}"
+          href="{% url 'customers-device-connection-create' device.pk %}"
           class="btn btn-outline-secondary"
         >
           Отмена
@@ -175,6 +285,7 @@
     </form>
 
   </div>
+
 </section>
 
 {% endblock %}

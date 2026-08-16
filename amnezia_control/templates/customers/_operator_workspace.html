@@ -233,23 +233,9 @@
 
           <a
             class="btn btn-sm btn-primary"
-            href="{% url 'customers-device-vpn-create' row.device.pk %}?routing_mode=full"
+            href="{% url 'customers-device-connection-create' row.device.pk %}"
           >
-            + FULL
-          </a>
-
-          <a
-            class="btn btn-sm btn-outline-primary"
-            href="{% url 'customers-device-vpn-create' row.device.pk %}?routing_mode=selective"
-          >
-            + SELECT
-          </a>
-
-          <a
-            class="btn btn-sm btn-outline-primary"
-            href="{% url 'customers-device-xhttp-create' row.device.pk %}"
-          >
-            + XHTTP
+            + Подключение
           </a>
 
         {% endif %}

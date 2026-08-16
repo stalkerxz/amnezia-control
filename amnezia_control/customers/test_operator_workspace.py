@@ -352,10 +352,23 @@ class CustomerOperatorWorkspaceTest(
 
         self.assertContains(
             response,
-            "?routing_mode=full",
+            reverse(
+                "customers-device-connection-create",
+                args=[self.device.pk],
+            ),
         )
 
         self.assertContains(
+            response,
+            "+ Подключение",
+        )
+
+        self.assertNotContains(
+            response,
+            "?routing_mode=full",
+        )
+
+        self.assertNotContains(
             response,
             "?routing_mode=selective",
         )

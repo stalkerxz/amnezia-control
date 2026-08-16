@@ -10,6 +10,7 @@ from .renewal_views import (
 from .views import (
     customer_create_view,
     customer_detail_view,
+    customer_device_connection_create_view,
     customer_device_create_view,
     customer_device_edit_view,
     customer_device_status_view,
@@ -50,6 +51,11 @@ urlpatterns = [
         "<int:pk>/status/",
         customer_status_view,
         name="customers-status",
+    ),
+    path(
+        "devices/<int:device_id>/connections/new/",
+        customer_device_connection_create_view,
+        name="customers-device-connection-create",
     ),
     path(
         "devices/<int:device_id>/vpn/new/",
