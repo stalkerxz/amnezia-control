@@ -259,6 +259,87 @@
     </div>
 
 
+    {% if account.status != 'deleted' and candidate_accounts %}
+
+      <div class="border rounded-3 p-3 mb-4">
+
+        <div class="row g-3 align-items-end">
+
+          <div class="col-12 col-xl-5">
+
+            <div class="fw-semibold">
+              Перенести устройство
+            </div>
+
+            <div class="small text-secondary mt-1">
+              Перенос между аккаунтами не перевыпускает
+              VPN-ключи, IP-адреса и конфигурации.
+            </div>
+
+          </div>
+
+
+          <div class="col-12 col-xl-7">
+
+            <form
+              method="post"
+              action="{% url 'customers-device-move' row.device.pk %}"
+              class="d-flex gap-2 align-items-center flex-wrap"
+            >
+
+              {% csrf_token %}
+
+              <label
+                class="visually-hidden"
+                for="workspace-move-target-{{ row.device.pk }}"
+              >
+                Целевой аккаунт
+              </label>
+
+              <select
+                id="workspace-move-target-{{ row.device.pk }}"
+                name="target_account_id"
+                class="form-select form-select-sm flex-grow-1"
+                required
+              >
+
+                <option value="">
+                  Перенести в аккаунт…
+                </option>
+
+                {% for target in candidate_accounts %}
+
+                  <option value="{{ target.pk }}">
+                    {{ target.display_name }}
+
+                    {% if target.email %}
+                      · {{ target.email }}
+                    {% endif %}
+                  </option>
+
+                {% endfor %}
+
+              </select>
+
+              <button
+                type="submit"
+                class="btn btn-sm btn-outline-warning"
+                onclick="return confirm('Перенести устройство «{{ row.device.name|escapejs }}» в выбранный аккаунт? Ключи, IP и конфигурации останутся без изменений.');"
+              >
+                Перенести
+              </button>
+
+            </form>
+
+          </div>
+
+        </div>
+
+      </div>
+
+    {% endif %}
+
+
     <div class="row g-3">
 
       <!-- FULL -->

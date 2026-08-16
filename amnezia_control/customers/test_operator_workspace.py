@@ -310,6 +310,14 @@ class CustomerOperatorWorkspaceTest(
             self.operator
         )
 
+        target_account = (
+            CustomerAccount.objects.create(
+                display_name="Workspace Move Target",
+                email="workspace-target@example.com",
+                created_by=self.operator,
+            )
+        )
+
         response = self.client.get(
             reverse(
                 "customers-detail",
@@ -354,7 +362,30 @@ class CustomerOperatorWorkspaceTest(
 
         self.assertContains(
             response,
+            reverse(
+                "customers-device-move",
+                args=[self.device.pk],
+            ),
+        )
+
+        self.assertContains(
+            response,
+            "Перенести устройство",
+        )
+
+        self.assertContains(
+            response,
+            target_account.display_name,
+        )
+
+        self.assertNotContains(
+            response,
             "Расширенное управление",
+        )
+
+        self.assertContains(
+            response,
+            "Объединение аккаунтов",
         )
 
     def test_selective_create_link_preselects_mode(
