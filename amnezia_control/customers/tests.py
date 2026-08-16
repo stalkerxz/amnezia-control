@@ -1814,7 +1814,10 @@ class CustomerDeviceVPNCreationTest(TestCase):
 
         self.assertContains(
             response,
-            "уже есть активное AWG2-подключение",
+            (
+                "уже есть активное подключение "
+                "«Весь интернет через VPN»"
+            ),
         )
 
         create_client.assert_not_called()

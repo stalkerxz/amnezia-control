@@ -166,10 +166,9 @@ def customer_onboarding_view(request):
                     request,
                     (
                         "Клиент создан. "
-                        "Теперь выпустите нужные "
-                        "FULL, SELECTIVE или "
-                        "VLESS/XHTTP-подключения "
-                        "для первого устройства."
+                        "Теперь добавьте нужные "
+                        "подключения для первого "
+                        "устройства."
                     ),
                 )
 
@@ -401,7 +400,7 @@ def customer_device_xhttp_create_view(
         != CustomerAccount.Status.ACTIVE
     ):
         return HttpResponseForbidden(
-            "XHTTP-подключение можно создавать "
+            "Альтернативное подключение можно создавать "
             "только для активного аккаунта."
         )
 
@@ -410,7 +409,7 @@ def customer_device_xhttp_create_view(
         != ClientDevice.Status.ACTIVE
     ):
         return HttpResponseForbidden(
-            "XHTTP-подключение можно создавать "
+            "Альтернативное подключение можно создавать "
             "только для активного устройства."
         )
 
@@ -432,7 +431,8 @@ def customer_device_xhttp_create_view(
 
     if default_server is None:
         return HttpResponseBadRequest(
-            "Активный XHTTP-сервер не настроен."
+            "Сервер для альтернативного подключения "
+            "не настроен."
         )
 
     if request.method == "POST":
@@ -471,7 +471,7 @@ def customer_device_xhttp_create_view(
                 messages.success(
                     request,
                     (
-                        "VLESS/XHTTP-подключение "
+                        "Альтернативное подключение "
                         f"«{xhttp.name}» создано."
                     ),
                 )
@@ -486,7 +486,7 @@ def customer_device_xhttp_create_view(
                     None,
                     (
                         "Не удалось создать "
-                        "VLESS/XHTTP-подключение: "
+                        "альтернативное подключение: "
                         f"{exc}"
                     ),
                 )
@@ -538,26 +538,27 @@ def customer_xhttp_action_view(
         "check": (
             XHTTPDeviceService
             .check_runtime,
-            "XHTTP runtime проверен.",
+            "Состояние альтернативного подключения "
+            "проверено.",
         ),
         "disable": (
             XHTTPDeviceService.disable,
-            "XHTTP-подключение отключено.",
+            "Альтернативное подключение отключено.",
         ),
         "enable": (
             XHTTPDeviceService.enable,
-            "XHTTP-подключение включено.",
+            "Альтернативное подключение включено.",
         ),
         "rotate": (
             XHTTPDeviceService.rotate,
             (
-                "XHTTP UUID перевыпущен. "
-                "Нужно скачать новый конфиг."
+                "Параметры альтернативного подключения "
+                "обновлены. Нужно скачать новую конфигурацию."
             ),
         ),
         "delete": (
             XHTTPDeviceService.soft_delete,
-            "XHTTP-подключение удалено.",
+            "Альтернативное подключение удалено.",
         ),
     }
 
@@ -567,7 +568,8 @@ def customer_xhttp_action_view(
 
     if handler is None:
         return HttpResponseBadRequest(
-            "Неизвестное действие XHTTP."
+            "Неизвестное действие "
+            "с альтернативным подключением."
         )
 
     callback, success_message = (
@@ -614,8 +616,8 @@ def customer_xhttp_action_view(
         messages.error(
             request,
             (
-                "Операция XHTTP "
-                "не выполнена: "
+                "Операция с альтернативным "
+                "подключением не выполнена: "
                 f"{exc}"
             ),
         )
@@ -892,8 +894,8 @@ def customer_device_vpn_create_view(request, device_id):
                     "routing_mode",
                     (
                         "У этого устройства уже есть активное "
-                        f"AWG2-подключение режима "
-                        f"{'SELECTIVE' if wants_selective else 'FULL'}."
+                        f"подключение "
+                        f"{'«Только выбранные сервисы»' if wants_selective else '«Весь интернет через VPN»'}."
                     ),
                 )
             else:

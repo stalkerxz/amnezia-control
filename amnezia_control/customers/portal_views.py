@@ -563,7 +563,7 @@ def customer_xhttp_download_view(
         )
     ):
         raise PermissionDenied(
-            "VLESS/XHTTP-подключение недоступно."
+            "Альтернативное подключение недоступно."
         )
 
     try:
@@ -577,7 +577,7 @@ def customer_xhttp_download_view(
         return HttpResponse(
             (
                 "Для подключения ещё нет "
-                "сохранённого JSON-конфига."
+                "сохранённой конфигурации."
             ),
             status=404,
             content_type=(
