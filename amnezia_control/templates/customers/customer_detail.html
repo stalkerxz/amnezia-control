@@ -171,6 +171,431 @@
 </section>
 
 
+<section
+  class="section-block"
+  id="customer-readiness"
+>
+
+  <div class="section-body">
+
+    <div class="section-header-compact">
+
+      <div>
+
+        <p class="page-kicker mb-1">
+          Настройка клиента
+        </p>
+
+        <h2 class="h5 mb-1">
+          Готовность клиента
+        </h2>
+
+        <div class="text-secondary small">
+          Быстрая проверка полного пути:
+          аккаунт → кабинет → устройство → подключение.
+        </div>
+
+      </div>
+
+
+      <div>
+
+        {% if workspace.account_ready and account.user and account.user.is_active and workspace.active_device_total > 0 and workspace.active_connection_total > 0 %}
+
+          <span class="badge text-bg-success">
+            Клиент готов к использованию
+          </span>
+
+        {% elif account.status == 'deleted' %}
+
+          <span class="badge text-bg-secondary">
+            Недоступен
+          </span>
+
+        {% else %}
+
+          <span class="badge text-bg-warning">
+            Настройка не завершена
+          </span>
+
+        {% endif %}
+
+      </div>
+
+    </div>
+
+
+    <div class="row g-3">
+
+
+      <div class="col-12 col-md-6 col-xl-3">
+
+        <div class="border rounded-3 p-3 h-100">
+
+          <div class="d-flex justify-content-between gap-2 align-items-start">
+
+            <div>
+
+              <div class="small text-secondary">
+                Шаг 1
+              </div>
+
+              <div class="fw-semibold">
+                Клиент
+              </div>
+
+            </div>
+
+
+            {% if workspace.account_ready %}
+
+              <span class="badge text-bg-success">
+                ✓ Готово
+              </span>
+
+            {% else %}
+
+              <span class="badge text-bg-warning">
+                ! Требует внимания
+              </span>
+
+            {% endif %}
+
+          </div>
+
+
+          <div class="small text-secondary mt-3">
+
+            {% if account.status == 'deleted' %}
+
+              Аккаунт удалён или объединён.
+
+            {% elif account.status == 'disabled' %}
+
+              Аккаунт отключён.
+              Включите его кнопкой управления выше.
+
+            {% elif workspace.account_expired %}
+
+              Срок действия аккаунта истёк.
+
+            {% else %}
+
+              Аккаунт активен и может
+              использовать подключения.
+
+            {% endif %}
+
+          </div>
+
+        </div>
+
+      </div>
+
+
+      <div class="col-12 col-md-6 col-xl-3">
+
+        <div class="border rounded-3 p-3 h-100">
+
+          <div class="d-flex justify-content-between gap-2 align-items-start">
+
+            <div>
+
+              <div class="small text-secondary">
+                Шаг 2
+              </div>
+
+              <div class="fw-semibold">
+                Личный кабинет
+              </div>
+
+            </div>
+
+
+            {% if account.user and account.user.is_active %}
+
+              <span class="badge text-bg-success">
+                ✓ Готово
+              </span>
+
+            {% elif account.user %}
+
+              <span class="badge text-bg-warning">
+                ! Требует внимания
+              </span>
+
+            {% else %}
+
+              <span class="badge text-bg-primary">
+                → Следующее действие
+              </span>
+
+            {% endif %}
+
+          </div>
+
+
+          <div class="small text-secondary mt-3">
+
+            {% if account.user and account.user.is_active %}
+
+              Кабинет создан, вход разрешён.
+
+            {% elif account.user %}
+
+              Кабинет создан, но вход отключён.
+
+            {% else %}
+
+              Кабинет клиента ещё не создан.
+
+            {% endif %}
+
+          </div>
+
+
+          {% if account.status != 'deleted' %}
+
+            {% if account.user %}
+
+              <a
+                href="{% url 'customers-access-manage' account.pk %}"
+                class="btn btn-sm btn-outline-primary mt-3"
+              >
+                Управление кабинетом
+              </a>
+
+            {% else %}
+
+              <a
+                href="{% url 'customers-access-create' account.pk %}"
+                class="btn btn-sm btn-primary mt-3"
+              >
+                Создать кабинет
+              </a>
+
+            {% endif %}
+
+          {% endif %}
+
+        </div>
+
+      </div>
+
+
+      <div class="col-12 col-md-6 col-xl-3">
+
+        <div class="border rounded-3 p-3 h-100">
+
+          <div class="d-flex justify-content-between gap-2 align-items-start">
+
+            <div>
+
+              <div class="small text-secondary">
+                Шаг 3
+              </div>
+
+              <div class="fw-semibold">
+                Устройство
+              </div>
+
+            </div>
+
+
+            {% if workspace.active_device_total > 0 %}
+
+              <span class="badge text-bg-success">
+                ✓ Готово
+              </span>
+
+            {% elif workspace.device_total == 0 %}
+
+              <span class="badge text-bg-primary">
+                → Следующее действие
+              </span>
+
+            {% else %}
+
+              <span class="badge text-bg-warning">
+                ! Требует внимания
+              </span>
+
+            {% endif %}
+
+          </div>
+
+
+          <div class="small text-secondary mt-3">
+
+            {% if workspace.active_device_total > 0 %}
+
+              Активных устройств:
+              {{ workspace.active_device_total }}.
+
+            {% elif workspace.device_total == 0 %}
+
+              Устройства ещё не добавлены.
+
+            {% else %}
+
+              Устройства есть, но активных нет.
+
+            {% endif %}
+
+          </div>
+
+
+          {% if account.status != 'deleted' %}
+
+            {% if workspace.active_device_total == 0 %}
+
+              <a
+                href="{% url 'customers-device-create' account.pk %}"
+                class="btn btn-sm btn-primary mt-3"
+              >
+                Добавить устройство
+              </a>
+
+            {% else %}
+
+              <a
+                href="#customer-connections"
+                class="btn btn-sm btn-outline-primary mt-3"
+              >
+                К устройствам
+              </a>
+
+            {% endif %}
+
+          {% endif %}
+
+        </div>
+
+      </div>
+
+
+      <div class="col-12 col-md-6 col-xl-3">
+
+        <div class="border rounded-3 p-3 h-100">
+
+          <div class="d-flex justify-content-between gap-2 align-items-start">
+
+            <div>
+
+              <div class="small text-secondary">
+                Шаг 4
+              </div>
+
+              <div class="fw-semibold">
+                Подключения
+              </div>
+
+            </div>
+
+
+            {% if workspace.active_connection_total > 0 %}
+
+              <span class="badge text-bg-success">
+                ✓ Готово
+              </span>
+
+            {% elif workspace.active_device_total > 0 and workspace.account_ready %}
+
+              <span class="badge text-bg-primary">
+                → Следующее действие
+              </span>
+
+            {% elif workspace.connection_total > 0 %}
+
+              <span class="badge text-bg-warning">
+                ! Требует внимания
+              </span>
+
+            {% else %}
+
+              <span class="badge text-bg-secondary">
+                Ожидает
+              </span>
+
+            {% endif %}
+
+          </div>
+
+
+          <div class="small text-secondary mt-3">
+
+            {% if workspace.active_connection_total > 0 %}
+
+              Активных подключений:
+              {{ workspace.active_connection_total }}.
+
+            {% elif workspace.active_device_total > 0 and workspace.account_ready %}
+
+              Добавьте нужное подключение
+              в карточке устройства ниже.
+
+            {% elif workspace.connection_total > 0 %}
+
+              Подключения созданы,
+              но активных сейчас нет.
+
+            {% elif workspace.device_total == 0 %}
+
+              Сначала добавьте устройство.
+
+            {% elif not workspace.account_ready %}
+
+              Сначала восстановите доступ аккаунта.
+
+            {% else %}
+
+              Подключения пока не созданы.
+
+            {% endif %}
+
+          </div>
+
+
+          {% if account.status != 'deleted' and workspace.device_total > 0 %}
+
+            <a
+              href="#customer-connections"
+              class="btn btn-sm btn-outline-primary mt-3"
+            >
+              Перейти к подключениям
+            </a>
+
+          {% endif %}
+
+        </div>
+
+      </div>
+
+
+    </div>
+
+
+    {% if workspace.account_ready and account.user and account.user.is_active and workspace.active_device_total > 0 and workspace.active_connection_total > 0 %}
+
+      <div class="alert alert-success mt-3 mb-0">
+
+        <strong>
+          Клиент готов к использованию.
+        </strong>
+
+        Аккаунт активен, личный кабинет доступен,
+        есть активное устройство и хотя бы одно
+        активное подключение.
+
+      </div>
+
+    {% endif %}
+
+  </div>
+
+</section>
+
+
 {% if account.status == 'deleted' %}
 <section class="section-block">
   <div class="section-body">
@@ -443,7 +868,9 @@
 
 
 
-{% include 'customers/_operator_workspace.html' %}
+<div id="customer-connections">
+  {% include 'customers/_operator_workspace.html' %}
+</div>
 
 
 
