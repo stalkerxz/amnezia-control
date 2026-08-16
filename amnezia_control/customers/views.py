@@ -22,9 +22,16 @@ from vpn.services import VPNClientService
 
 from .forms import (
     ClientDeviceCreateForm,
+    ClientDeviceEditForm,
     CustomerAccountCreateForm,
+    CustomerAccountEditForm,
 )
 from .models import ClientDevice, CustomerAccount
+from .edit_services import (
+    CustomerMetadataEditError,
+    update_customer_account_metadata,
+    update_customer_device_metadata,
+)
 from .status_services import (
     CustomerStatusOperationError,
     set_customer_account_status,
@@ -69,6 +76,155 @@ def customer_create_view(request):
         request,
         "customers/customer_form.html",
         {
+            "form": form,
+        },
+    )
+
+
+@login_required
+@operator_required
+@require_http_methods(["GET", "POST"])
+def customer_edit_view(request, pk):
+    account = get_object_or_404(
+        CustomerAccount,
+        pk=pk,
+    )
+
+    if (
+        account.status
+        == CustomerAccount.Status.DELETED
+    ):
+        return HttpResponseForbidden(
+            "Удалённый аккаунт нельзя редактировать."
+        )
+
+    if request.method == "POST":
+        form = CustomerAccountEditForm(
+            request.POST,
+            instance=account,
+        )
+
+        if form.is_valid():
+            try:
+                account = (
+                    update_customer_account_metadata(
+                        account_id=account.pk,
+                        display_name=(
+                            form.cleaned_data[
+                                "display_name"
+                            ]
+                        ),
+                        email=(
+                            form.cleaned_data[
+                                "email"
+                            ]
+                        ),
+                        actor=request.user,
+                    )
+                )
+
+                return redirect(
+                    "customers-detail",
+                    pk=account.pk,
+                )
+
+            except CustomerMetadataEditError as exc:
+                form.add_error(
+                    None,
+                    str(exc),
+                )
+
+    else:
+        form = CustomerAccountEditForm(
+            instance=account,
+        )
+
+    return render(
+        request,
+        "customers/customer_edit_form.html",
+        {
+            "account": account,
+            "form": form,
+        },
+    )
+
+
+@login_required
+@operator_required
+@require_http_methods(["GET", "POST"])
+def customer_device_edit_view(
+    request,
+    device_id,
+):
+    device = get_object_or_404(
+        ClientDevice.objects.select_related(
+            "account"
+        ),
+        pk=device_id,
+    )
+
+    if (
+        device.status
+        == ClientDevice.Status.DELETED
+        or device.account.status
+        == CustomerAccount.Status.DELETED
+    ):
+        return HttpResponseForbidden(
+            "Удалённое устройство нельзя редактировать."
+        )
+
+    if request.method == "POST":
+        form = ClientDeviceEditForm(
+            request.POST,
+            instance=device,
+        )
+
+        if form.is_valid():
+            try:
+                device = (
+                    update_customer_device_metadata(
+                        device_id=device.pk,
+                        name=(
+                            form.cleaned_data[
+                                "name"
+                            ]
+                        ),
+                        platform=(
+                            form.cleaned_data[
+                                "platform"
+                            ]
+                        ),
+                        notes=(
+                            form.cleaned_data[
+                                "notes"
+                            ]
+                        ),
+                        actor=request.user,
+                    )
+                )
+
+                return redirect(
+                    "customers-detail",
+                    pk=device.account_id,
+                )
+
+            except CustomerMetadataEditError as exc:
+                form.add_error(
+                    None,
+                    str(exc),
+                )
+
+    else:
+        form = ClientDeviceEditForm(
+            instance=device,
+        )
+
+    return render(
+        request,
+        "customers/device_edit_form.html",
+        {
+            "account": device.account,
+            "device": device,
             "form": form,
         },
     )

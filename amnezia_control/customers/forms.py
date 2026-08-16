@@ -111,3 +111,103 @@ class ClientDeviceCreateForm(forms.ModelForm):
 
     def clean_notes(self):
         return (self.cleaned_data.get("notes") or "").strip()
+
+
+class CustomerAccountEditForm(forms.ModelForm):
+    class Meta:
+        model = CustomerAccount
+        fields = (
+            "display_name",
+            "email",
+        )
+        labels = {
+            "display_name": "Имя клиента",
+            "email": "Email",
+        }
+        widgets = {
+            "display_name": forms.TextInput(
+                attrs={
+                    "class": "form-control",
+                    "autofocus": True,
+                }
+            ),
+            "email": forms.EmailInput(
+                attrs={
+                    "class": "form-control",
+                }
+            ),
+        }
+
+    def clean_display_name(self):
+        value = (
+            self.cleaned_data.get(
+                "display_name"
+            )
+            or ""
+        ).strip()
+
+        if not value:
+            raise forms.ValidationError(
+                "Укажите имя клиента."
+            )
+
+        return value
+
+    def clean_email(self):
+        return (
+            self.cleaned_data.get("email")
+            or ""
+        ).strip()
+
+
+class ClientDeviceEditForm(forms.ModelForm):
+    class Meta:
+        model = ClientDevice
+        fields = (
+            "name",
+            "platform",
+            "notes",
+        )
+        labels = {
+            "name": "Название устройства",
+            "platform": "Платформа",
+            "notes": "Заметка",
+        }
+        widgets = {
+            "name": forms.TextInput(
+                attrs={
+                    "class": "form-control",
+                    "autofocus": True,
+                }
+            ),
+            "platform": forms.Select(
+                attrs={
+                    "class": "form-select",
+                }
+            ),
+            "notes": forms.Textarea(
+                attrs={
+                    "class": "form-control",
+                    "rows": 3,
+                }
+            ),
+        }
+
+    def clean_name(self):
+        value = (
+            self.cleaned_data.get("name")
+            or ""
+        ).strip()
+
+        if not value:
+            raise forms.ValidationError(
+                "Укажите название устройства."
+            )
+
+        return value
+
+    def clean_notes(self):
+        return (
+            self.cleaned_data.get("notes")
+            or ""
+        ).strip()

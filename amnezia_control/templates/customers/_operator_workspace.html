@@ -18,7 +18,17 @@
         </div>
       </div>
 
-      <div>
+      <div class="d-flex gap-2 align-items-center flex-wrap">
+
+        {% if account.status != 'deleted' %}
+          <a
+            href="{% url 'customers-edit' account.pk %}"
+            class="btn btn-sm btn-outline-secondary"
+          >
+            Редактировать клиента
+          </a>
+        {% endif %}
+
         {% if workspace.account_expired %}
           <span class="badge text-bg-danger">
             Срок аккаунта истёк
@@ -166,6 +176,13 @@
       <div class="d-flex gap-2 flex-wrap">
 
         {% if account.status != 'deleted' and row.device.status != 'deleted' %}
+
+          <a
+            href="{% url 'customers-device-edit' row.device.pk %}"
+            class="btn btn-sm btn-outline-secondary"
+          >
+            Изменить
+          </a>
 
           <form
             method="post"
