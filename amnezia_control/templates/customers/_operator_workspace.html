@@ -163,7 +163,6 @@
 
         <div class="small text-secondary mt-1">
           {{ row.device.get_platform_display }}
-          · ID {{ row.device.pk }}
           · Подключений: {{ row.connection_total }}
         </div>
 
@@ -364,10 +363,6 @@
                   <div class="fw-semibold">
                     Основное подключение
                   </div>
-
-                  <div class="small text-secondary">
-                    VPN #{{ client.pk }}
-                  </div>
                 </div>
 
                 {% if client.status == 'active' %}
@@ -382,20 +377,6 @@
                   <span class="badge text-bg-secondary">
                     {{ client.get_status_display }}
                   </span>
-                {% endif %}
-
-              </div>
-
-
-              <div class="small mt-2">
-
-                IP:
-                {% if client.runtime_address %}
-                  <code>
-                    {{ client.runtime_address }}
-                  </code>
-                {% else %}
-                  —
                 {% endif %}
 
               </div>
@@ -468,10 +449,6 @@
                   <div class="fw-semibold">
                     Подключение сервисов
                   </div>
-
-                  <div class="small text-secondary">
-                    VPN #{{ client.pk }}
-                  </div>
                 </div>
 
                 {% if client.status == 'active' %}
@@ -486,20 +463,6 @@
                   <span class="badge text-bg-secondary">
                     {{ client.get_status_display }}
                   </span>
-                {% endif %}
-
-              </div>
-
-
-              <div class="small mt-2">
-
-                IP:
-                {% if client.runtime_address %}
-                  <code>
-                    {{ client.runtime_address }}
-                  </code>
-                {% else %}
-                  —
                 {% endif %}
 
               </div>
@@ -592,16 +555,6 @@
                   </span>
                 {% endif %}
 
-              </div>
-
-
-              <div class="small mt-2">
-                Сервер:
-                {% if xhttp.server %}
-                  {{ xhttp.server.name }}
-                {% else %}
-                  —
-                {% endif %}
               </div>
 
 

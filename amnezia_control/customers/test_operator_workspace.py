@@ -363,6 +363,19 @@ class CustomerOperatorWorkspaceTest(
                 technical_marker,
             )
 
+        for hidden_metadata in (
+            f"· ID {self.device.pk}",
+            f"VPN #{self.full.pk}",
+            f"VPN #{self.selective.pk}",
+            self.full.runtime_address,
+            self.selective.runtime_address,
+            self.server.name,
+        ):
+            self.assertNotContains(
+                response,
+                hidden_metadata,
+            )
+
         self.assertContains(
             response,
             reverse(
