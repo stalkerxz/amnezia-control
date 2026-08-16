@@ -247,7 +247,7 @@
 
           <a
             class="btn btn-sm btn-outline-primary"
-            href="{% url 'xhttp-devices' %}?device={{ row.device.pk }}"
+            href="{% url 'customers-device-xhttp-create' row.device.pk %}"
           >
             + XHTTP
           </a>
@@ -543,6 +543,14 @@
               {% endif %}
 
 
+              {% if xhttp.last_error %}
+                <div class="small text-danger mt-1">
+                  Последняя ошибка:
+                  {{ xhttp.last_error }}
+                </div>
+              {% endif %}
+
+
               <div class="d-flex gap-2 flex-wrap mt-3">
 
                 <a
@@ -552,12 +560,96 @@
                   Скачать JSON
                 </a>
 
-                <a
-                  class="btn btn-sm btn-outline-secondary"
-                  href="{% url 'xhttp-devices' %}?device={{ row.device.pk }}"
+                {% if xhttp.status == 'active' %}
+
+                  <form
+                    method="post"
+                    action="{% url 'customers-xhttp-action' xhttp.pk 'check' %}"
+                    class="d-inline"
+                  >
+                    {% csrf_token %}
+
+                    <button
+                      type="submit"
+                      class="btn btn-sm btn-outline-secondary"
+                    >
+                      Проверить
+                    </button>
+                  </form>
+
+
+                  <form
+                    method="post"
+                    action="{% url 'customers-xhttp-action' xhttp.pk 'disable' %}"
+                    class="d-inline"
+                    onsubmit="return confirm('Отключить XHTTP-подключение?');"
+                  >
+                    {% csrf_token %}
+
+                    <button
+                      type="submit"
+                      class="btn btn-sm btn-outline-warning"
+                    >
+                      Отключить
+                    </button>
+                  </form>
+
+                {% elif xhttp.status == 'disabled' and row.can_add_connections %}
+
+                  <form
+                    method="post"
+                    action="{% url 'customers-xhttp-action' xhttp.pk 'enable' %}"
+                    class="d-inline"
+                  >
+                    {% csrf_token %}
+
+                    <button
+                      type="submit"
+                      class="btn btn-sm btn-outline-success"
+                    >
+                      Включить
+                    </button>
+                  </form>
+
+                {% endif %}
+
+
+                {% if row.can_add_connections %}
+
+                  <form
+                    method="post"
+                    action="{% url 'customers-xhttp-action' xhttp.pk 'rotate' %}"
+                    class="d-inline"
+                    onsubmit="return confirm('Перевыпустить XHTTP UUID? Старый JSON-конфиг перестанет работать.');"
+                  >
+                    {% csrf_token %}
+
+                    <button
+                      type="submit"
+                      class="btn btn-sm btn-outline-secondary"
+                    >
+                      Перевыпустить
+                    </button>
+                  </form>
+
+                {% endif %}
+
+
+                <form
+                  method="post"
+                  action="{% url 'customers-xhttp-action' xhttp.pk 'delete' %}"
+                  class="d-inline"
+                  onsubmit="return confirm('Удалить XHTTP-подключение?');"
                 >
-                  Управление
-                </a>
+                  {% csrf_token %}
+
+                  <button
+                    type="submit"
+                    class="btn btn-sm btn-outline-danger"
+                  >
+                    Удалить
+                  </button>
+                </form>
 
               </div>
 

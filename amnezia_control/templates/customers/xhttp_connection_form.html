@@ -1,0 +1,164 @@
+{% extends 'partials/base.html' %}
+
+{% block title %}
+Новый VLESS/XHTTP · {{ device.name }}
+{% endblock %}
+
+{% block content %}
+
+<div class="page-header d-flex justify-content-between align-items-start gap-2 flex-wrap">
+
+  <div>
+
+    <p class="page-kicker">
+      Операторская · Устройство
+    </p>
+
+    <h1 class="h3 mb-1">
+      Новое VLESS/XHTTP-подключение
+    </h1>
+
+    <p class="page-subtle mb-0">
+      {{ account.display_name }}
+      ·
+      {{ device.name }}
+    </p>
+
+  </div>
+
+
+  <div class="action-cluster">
+
+    <a
+      href="{% url 'customers-detail' account.pk %}"
+      class="btn btn-outline-secondary"
+    >
+      Отмена
+    </a>
+
+  </div>
+
+</div>
+
+
+<section class="section-block">
+
+  <div class="section-body">
+
+    <form method="post" class="row g-3">
+
+      {% csrf_token %}
+
+
+      {% if form.non_field_errors %}
+
+        <div class="col-12">
+
+          <div class="alert alert-danger">
+            {{ form.non_field_errors }}
+          </div>
+
+        </div>
+
+      {% endif %}
+
+
+      <div class="col-12 col-lg-6">
+
+        <label
+          for="{{ form.name.id_for_label }}"
+          class="form-label"
+        >
+          {{ form.name.label }}
+        </label>
+
+        {{ form.name }}
+
+        {% for error in form.name.errors %}
+          <div class="text-danger small mt-1">
+            {{ error }}
+          </div>
+        {% endfor %}
+
+      </div>
+
+
+      <div class="col-12 col-lg-6">
+
+        <label
+          for="{{ form.server.id_for_label }}"
+          class="form-label"
+        >
+          {{ form.server.label }}
+        </label>
+
+        {{ form.server }}
+
+        {% for error in form.server.errors %}
+          <div class="text-danger small mt-1">
+            {{ error }}
+          </div>
+        {% endfor %}
+
+      </div>
+
+
+      {% for error in form.device.errors %}
+
+        <div class="col-12">
+          <div class="alert alert-danger mb-0">
+            {{ error }}
+          </div>
+        </div>
+
+      {% endfor %}
+
+
+      <div class="col-12">
+
+        <div class="alert alert-secondary mb-0 small">
+
+          При создании будет выпущен отдельный
+          VLESS/XHTTP UUID и сохранён клиентский
+          JSON-конфиг для этого устройства.
+
+          FULL и SELECTIVE AWG2-подключения
+          устройства не изменяются.
+
+        </div>
+
+      </div>
+
+
+      <div class="col-12">
+
+        <hr>
+
+      </div>
+
+
+      <div class="col-12 d-flex gap-2">
+
+        <button
+          type="submit"
+          class="btn btn-primary"
+        >
+          Создать XHTTP
+        </button>
+
+        <a
+          href="{% url 'customers-detail' account.pk %}"
+          class="btn btn-outline-secondary"
+        >
+          Отмена
+        </a>
+
+      </div>
+
+    </form>
+
+  </div>
+
+</section>
+
+{% endblock %}

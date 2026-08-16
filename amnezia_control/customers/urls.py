@@ -14,8 +14,10 @@ from .views import (
     customer_device_edit_view,
     customer_device_status_view,
     customer_device_vpn_create_view,
+    customer_device_xhttp_create_view,
     customer_edit_view,
     customer_status_view,
+    customer_xhttp_action_view,
     customers_list_view,
     merge_customer_view,
     move_device_view,
@@ -49,6 +51,11 @@ urlpatterns = [
         name="customers-device-vpn-create",
     ),
     path(
+        "devices/<int:device_id>/xhttp/new/",
+        customer_device_xhttp_create_view,
+        name="customers-device-xhttp-create",
+    ),
+    path(
         "devices/<int:device_id>/edit/",
         customer_device_edit_view,
         name="customers-device-edit",
@@ -62,6 +69,11 @@ urlpatterns = [
         "devices/<int:device_id>/move/",
         move_device_view,
         name="customers-device-move",
+    ),
+    path(
+        "xhttp/<int:pk>/action/<str:action>/",
+        customer_xhttp_action_view,
+        name="customers-xhttp-action",
     ),
     path(
         "<int:pk>/access/",

@@ -1,5 +1,6 @@
 from functools import wraps
 
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count, Prefetch, Q
 from django.http import (
@@ -19,6 +20,8 @@ from servers.models import Server
 from vpn.forms import VPNClientCreateForm
 from vpn.models import VPNClient, XHTTPDevice
 from vpn.services import VPNClientService
+from vpn.xhttp_forms import XHTTPDeviceCreateForm
+from vpn.xhttp_services import XHTTPDeviceService
 
 from .forms import (
     ClientDeviceCreateForm,
@@ -268,6 +271,252 @@ def customer_device_create_view(request, pk):
             "account": account,
             "form": form,
         },
+    )
+
+
+@login_required
+@operator_required
+@require_http_methods(["GET", "POST"])
+def customer_device_xhttp_create_view(
+    request,
+    device_id,
+):
+    device = get_object_or_404(
+        ClientDevice.objects.select_related(
+            "account"
+        ),
+        pk=device_id,
+    )
+
+    account = device.account
+
+    if (
+        account.status
+        != CustomerAccount.Status.ACTIVE
+    ):
+        return HttpResponseForbidden(
+            "XHTTP-подключение можно создавать "
+            "только для активного аккаунта."
+        )
+
+    if (
+        device.status
+        != ClientDevice.Status.ACTIVE
+    ):
+        return HttpResponseForbidden(
+            "XHTTP-подключение можно создавать "
+            "только для активного устройства."
+        )
+
+    if (
+        account.expires_at
+        and account.expires_at
+        <= timezone.now()
+    ):
+        return HttpResponseForbidden(
+            "Срок действия аккаунта истёк."
+        )
+
+    default_server = (
+        Server.objects
+        .filter(is_enabled=True)
+        .order_by("pk")
+        .first()
+    )
+
+    if default_server is None:
+        return HttpResponseBadRequest(
+            "Активный XHTTP-сервер не настроен."
+        )
+
+    if request.method == "POST":
+        data = request.POST.copy()
+
+        # Device ownership comes exclusively
+        # from URL context, never from user input.
+        data["device"] = str(
+            device.pk
+        )
+
+        form = XHTTPDeviceCreateForm(
+            data
+        )
+
+        if form.is_valid():
+            try:
+                xhttp = (
+                    XHTTPDeviceService
+                    .create_device(
+                        device=device,
+                        server=(
+                            form.cleaned_data[
+                                "server"
+                            ]
+                        ),
+                        name=(
+                            form.cleaned_data[
+                                "name"
+                            ]
+                        ),
+                        actor=request.user,
+                    )
+                )
+
+                messages.success(
+                    request,
+                    (
+                        "VLESS/XHTTP-подключение "
+                        f"«{xhttp.name}» создано."
+                    ),
+                )
+
+                return redirect(
+                    "customers-detail",
+                    pk=account.pk,
+                )
+
+            except Exception as exc:
+                form.add_error(
+                    None,
+                    (
+                        "Не удалось создать "
+                        "VLESS/XHTTP-подключение: "
+                        f"{exc}"
+                    ),
+                )
+
+    else:
+        form = XHTTPDeviceCreateForm(
+            initial={
+                "device": device.pk,
+                "server": (
+                    default_server.pk
+                ),
+            }
+        )
+
+    return render(
+        request,
+        "customers/xhttp_connection_form.html",
+        {
+            "account": account,
+            "device": device,
+            "form": form,
+        },
+    )
+
+
+@login_required
+@operator_required
+@require_POST
+def customer_xhttp_action_view(
+    request,
+    pk,
+    action,
+):
+    xhttp = get_object_or_404(
+        XHTTPDevice.objects
+        .select_related(
+            "device",
+            "device__account",
+            "server",
+        ),
+        pk=pk,
+    )
+
+    account_id = (
+        xhttp.device.account_id
+    )
+
+    actions = {
+        "check": (
+            XHTTPDeviceService
+            .check_runtime,
+            "XHTTP runtime проверен.",
+        ),
+        "disable": (
+            XHTTPDeviceService.disable,
+            "XHTTP-подключение отключено.",
+        ),
+        "enable": (
+            XHTTPDeviceService.enable,
+            "XHTTP-подключение включено.",
+        ),
+        "rotate": (
+            XHTTPDeviceService.rotate,
+            (
+                "XHTTP UUID перевыпущен. "
+                "Нужно скачать новый конфиг."
+            ),
+        ),
+        "delete": (
+            XHTTPDeviceService.soft_delete,
+            "XHTTP-подключение удалено.",
+        ),
+    }
+
+    handler = actions.get(
+        action
+    )
+
+    if handler is None:
+        return HttpResponseBadRequest(
+            "Неизвестное действие XHTTP."
+        )
+
+    callback, success_message = (
+        handler
+    )
+
+    try:
+        callback(
+            device=xhttp,
+            actor=request.user,
+        )
+
+        xhttp.refresh_from_db()
+
+        if xhttp.last_error:
+            xhttp.last_error = ""
+
+            xhttp.save(
+                update_fields=[
+                    "last_error",
+                    "updated_at",
+                ]
+            )
+
+        messages.success(
+            request,
+            success_message,
+        )
+
+    except Exception as exc:
+        xhttp.refresh_from_db()
+
+        xhttp.last_error = str(
+            exc
+        )[:255]
+
+        xhttp.save(
+            update_fields=[
+                "last_error",
+                "updated_at",
+            ]
+        )
+
+        messages.error(
+            request,
+            (
+                "Операция XHTTP "
+                "не выполнена: "
+                f"{exc}"
+            ),
+        )
+
+    return redirect(
+        "customers-detail",
+        pk=account_id,
     )
 
 
