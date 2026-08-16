@@ -31,6 +31,7 @@ from vpn.services import VPNClientService
 from vpn.xhttp_services import XHTTPDeviceService
 
 from .models import ClientDevice, CustomerAccount
+from .workspace import build_customer_workspace
 
 
 def _customer_account_for_user(user):
@@ -256,11 +257,14 @@ def customer_portal_home_view(request):
                 )
             )
 
+    workspace = build_customer_workspace(account)
+
     return render(
         request,
         "customer_portal/home.html",
         {
             "account": account,
+            "workspace": workspace,
             "expired": expired,
             "blocked": blocked,
             "renewal_allowed": renewal_allowed,
