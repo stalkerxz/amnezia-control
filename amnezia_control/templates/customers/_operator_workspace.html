@@ -14,7 +14,9 @@
 
         <div class="text-secondary">
           Все подключения сгруппированы по устройствам:
-          FULL, SELECTIVE и VLESS/XHTTP.
+          «Весь интернет через VPN»,
+          «Только выбранные сервисы»
+          и «Альтернативное подключение».
         </div>
       </div>
 
@@ -92,7 +94,7 @@
       <div class="col-6 col-lg-3">
         <div class="border rounded-3 p-3 h-100">
           <div class="small text-secondary">
-            AWG2
+            Основные VPN-подключения
           </div>
 
           <div class="fs-4 fw-semibold">
@@ -100,8 +102,8 @@
           </div>
 
           <div class="small text-secondary">
-            FULL {{ workspace.full_total }}
-            · SELECT {{ workspace.selective_total }}
+            Весь интернет: {{ workspace.full_total }}
+            · Выбранные сервисы: {{ workspace.selective_total }}
           </div>
         </div>
       </div>
@@ -110,7 +112,7 @@
       <div class="col-6 col-lg-3">
         <div class="border rounded-3 p-3 h-100">
           <div class="small text-secondary">
-            VLESS / XHTTP
+            Альтернативные подключения
           </div>
 
           <div class="fs-4 fw-semibold">
@@ -118,7 +120,7 @@
           </div>
 
           <div class="small text-secondary">
-            CDN-подключения
+            Дополнительный способ подключения
           </div>
         </div>
       </div>
@@ -337,11 +339,11 @@
 
             <div>
               <div class="fw-semibold">
-                AWG2 FULL
+                Весь интернет через VPN
               </div>
 
               <div class="small text-secondary">
-                Весь трафик через VPN
+                Весь интернет-трафик устройства проходит через VPN
               </div>
             </div>
 
@@ -360,7 +362,7 @@
 
                 <div>
                   <div class="fw-semibold">
-                    FULL
+                    Основное подключение
                   </div>
 
                   <div class="small text-secondary">
@@ -405,7 +407,7 @@
                   class="btn btn-sm btn-outline-primary"
                   href="{% url 'clients-download-native' client.pk %}"
                 >
-                  Скачать AWG
+                  Скачать конфигурацию
                 </a>
 
                 <a
@@ -422,7 +424,7 @@
           {% empty %}
 
             <div class="text-secondary small">
-              FULL-конфигурация не создана.
+              Подключение для всего интернета не создано.
             </div>
 
           {% endfor %}
@@ -441,11 +443,11 @@
 
             <div>
               <div class="fw-semibold">
-                AWG2 SELECTIVE
+                Только выбранные сервисы
               </div>
 
               <div class="small text-secondary">
-                Только выбранные маршруты
+                Через VPN идут только настроенные сервисы и маршруты
               </div>
             </div>
 
@@ -464,7 +466,7 @@
 
                 <div>
                   <div class="fw-semibold">
-                    SELECTIVE
+                    Подключение сервисов
                   </div>
 
                   <div class="small text-secondary">
@@ -509,7 +511,7 @@
                   class="btn btn-sm btn-outline-primary"
                   href="{% url 'clients-download-native' client.pk %}"
                 >
-                  Скачать AWG
+                  Скачать конфигурацию
                 </a>
 
                 <a
@@ -526,7 +528,7 @@
           {% empty %}
 
             <div class="text-secondary small">
-              SELECTIVE-конфигурация не создана.
+              Подключение для выбранных сервисов не создано.
             </div>
 
           {% endfor %}
@@ -545,11 +547,11 @@
 
             <div>
               <div class="fw-semibold">
-                VLESS / XHTTP
+                Альтернативное подключение
               </div>
 
               <div class="small text-secondary">
-                CDN-подключение
+                Дополнительный способ подключения
               </div>
             </div>
 
@@ -572,7 +574,7 @@
                   </div>
 
                   <div class="small text-secondary">
-                    XHTTP #{{ xhttp.pk }}
+                    Подключение #{{ xhttp.pk }}
                   </div>
                 </div>
 
@@ -624,7 +626,7 @@
                   class="btn btn-sm btn-outline-primary"
                   href="{% url 'xhttp-device-download' xhttp.pk %}"
                 >
-                  Скачать JSON
+                  Скачать конфигурацию
                 </a>
 
                 {% if xhttp.status == 'active' %}
@@ -649,7 +651,7 @@
                     method="post"
                     action="{% url 'customers-xhttp-action' xhttp.pk 'disable' %}"
                     class="d-inline"
-                    onsubmit="return confirm('Отключить XHTTP-подключение?');"
+                    onsubmit="return confirm('Отключить альтернативное подключение?');"
                   >
                     {% csrf_token %}
 
@@ -687,7 +689,7 @@
                     method="post"
                     action="{% url 'customers-xhttp-action' xhttp.pk 'rotate' %}"
                     class="d-inline"
-                    onsubmit="return confirm('Перевыпустить XHTTP UUID? Старый JSON-конфиг перестанет работать.');"
+                    onsubmit="return confirm('Перевыпустить параметры альтернативного подключения? Ранее скачанная конфигурация перестанет работать.');"
                   >
                     {% csrf_token %}
 
@@ -706,7 +708,7 @@
                   method="post"
                   action="{% url 'customers-xhttp-action' xhttp.pk 'delete' %}"
                   class="d-inline"
-                  onsubmit="return confirm('Удалить XHTTP-подключение?');"
+                  onsubmit="return confirm('Удалить альтернативное подключение?');"
                 >
                   {% csrf_token %}
 
@@ -725,7 +727,7 @@
           {% empty %}
 
             <div class="text-secondary small">
-              XHTTP-подключение не создано.
+              Альтернативное подключение не создано.
             </div>
 
           {% endfor %}

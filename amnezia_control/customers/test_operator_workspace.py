@@ -337,18 +337,31 @@ class CustomerOperatorWorkspaceTest(
 
         self.assertContains(
             response,
+            "Весь интернет через VPN",
+        )
+
+        self.assertContains(
+            response,
+            "Только выбранные сервисы",
+        )
+
+        self.assertContains(
+            response,
+            "Альтернативное подключение",
+        )
+
+        for technical_marker in (
             "AWG2 FULL",
-        )
-
-        self.assertContains(
-            response,
             "AWG2 SELECTIVE",
-        )
-
-        self.assertContains(
-            response,
             "VLESS / XHTTP",
-        )
+            "Скачать AWG",
+            "Скачать JSON",
+            "XHTTP #",
+        ):
+            self.assertNotContains(
+                response,
+                technical_marker,
+            )
 
         self.assertContains(
             response,

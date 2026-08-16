@@ -1897,7 +1897,7 @@ class CustomerXHTTPIntegrationTest(_Phase4TestCase):
 
         self.assertContains(
             response,
-            "VLESS / XHTTP",
+            "Альтернативное подключение",
         )
 
         self.assertContains(
