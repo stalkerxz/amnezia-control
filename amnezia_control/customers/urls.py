@@ -16,6 +16,7 @@ from .views import (
     customer_device_vpn_create_view,
     customer_device_xhttp_create_view,
     customer_edit_view,
+    customer_onboarding_view,
     customer_status_view,
     customer_xhttp_action_view,
     customers_list_view,
@@ -25,6 +26,11 @@ from .views import (
 
 urlpatterns = [
     path("", customers_list_view, name="customers-list"),
+    path(
+        "onboarding/",
+        customer_onboarding_view,
+        name="customers-onboarding",
+    ),
     path(
         "new/",
         customer_create_view,

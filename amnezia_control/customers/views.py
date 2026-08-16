@@ -28,6 +28,7 @@ from .forms import (
     ClientDeviceEditForm,
     CustomerAccountCreateForm,
     CustomerAccountEditForm,
+    CustomerOnboardingForm,
 )
 from .models import ClientDevice, CustomerAccount
 from .edit_services import (
@@ -39,6 +40,10 @@ from .status_services import (
     CustomerStatusOperationError,
     set_customer_account_status,
     set_customer_device_status,
+)
+from .onboarding_services import (
+    CustomerOnboardingError,
+    create_customer_onboarding,
 )
 from .workspace import build_customer_workspace
 
@@ -78,6 +83,107 @@ def customer_create_view(request):
     return render(
         request,
         "customers/customer_form.html",
+        {
+            "form": form,
+        },
+    )
+
+
+@login_required
+@operator_required
+@require_http_methods(["GET", "POST"])
+def customer_onboarding_view(request):
+    if request.method == "POST":
+        form = CustomerOnboardingForm(
+            request.POST
+        )
+
+        if form.is_valid():
+            try:
+                result = create_customer_onboarding(
+                    display_name=(
+                        form.cleaned_data[
+                            "display_name"
+                        ]
+                    ),
+                    email=(
+                        form.cleaned_data[
+                            "email"
+                        ]
+                    ),
+                    expires_at=(
+                        form.cleaned_data[
+                            "expires_at"
+                        ]
+                    ),
+                    device_name=(
+                        form.cleaned_data[
+                            "device_name"
+                        ]
+                    ),
+                    device_platform=(
+                        form.cleaned_data[
+                            "device_platform"
+                        ]
+                    ),
+                    device_notes=(
+                        form.cleaned_data[
+                            "device_notes"
+                        ]
+                    ),
+                    create_login=bool(
+                        form.cleaned_data[
+                            "create_login"
+                        ]
+                    ),
+                    username=(
+                        form.cleaned_data.get(
+                            "username"
+                        )
+                        or ""
+                    ),
+                    password=(
+                        form.cleaned_data.get(
+                            "password1"
+                        )
+                        or ""
+                    ),
+                    actor=request.user,
+                )
+
+            except CustomerOnboardingError as exc:
+                form.add_error(
+                    None,
+                    str(exc),
+                )
+
+            else:
+                account = result[
+                    "account"
+                ]
+
+                messages.success(
+                    request,
+                    (
+                        "Клиент создан. "
+                        "Теперь выпустите нужные "
+                        "FULL, SELECTIVE или "
+                        "VLESS/XHTTP-подключения "
+                        "для первого устройства."
+                    ),
+                )
+
+                return redirect(
+                    "customers-detail",
+                    pk=account.pk,
+                )
+
+    else:
+        form = CustomerOnboardingForm()
+
+    return render(
+        request,
+        "customers/customer_onboarding_form.html",
         {
             "form": form,
         },

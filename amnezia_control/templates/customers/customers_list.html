@@ -8,24 +8,27 @@
     <p class="page-kicker">Операторская · Аккаунты</p>
     <h1 class="h3 mb-1">Аккаунты клиентов</h1>
     <p class="page-subtle">
-      Уровень владельцев и устройств. VPN-конфигурации остаются отдельным техническим слоем.
+      Клиенты, устройства, личные кабинеты и подключения
+      управляются из единого операторского контура.
     </p>
   </div>
 
   <div class="action-cluster">
+
     <a
       class="btn btn-primary"
-      href="{% url 'customers-create' %}"
+      href="{% url 'customers-onboarding' %}"
     >
-      Создать аккаунт
+      Новый клиент
     </a>
 
     <a
       class="btn btn-outline-secondary"
-      href="/clients/"
+      href="{% url 'customers-create' %}"
     >
-      VPN-конфигурации
+      Создать только аккаунт
     </a>
+
   </div>
 </div>
 
@@ -40,7 +43,7 @@
       <div class="summary-item span-9">
         <div class="label">Режим</div>
         <div class="meta">
-          Управление аккаунтами и устройствами. VPN-подключения остаются отдельным техническим слоем.
+          Основной workflow: аккаунт → устройство → подключения.
         </div>
       </div>
     </div>
