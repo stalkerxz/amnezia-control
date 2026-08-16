@@ -1,8 +1,18 @@
+from datetime import timedelta
 from functools import wraps
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.db.models import Count, Prefetch, Q
+from django.db.models import (
+    Case,
+    CharField,
+    Count,
+    F,
+    Prefetch,
+    Q,
+    Value,
+    When,
+)
 from django.http import (
     HttpResponseBadRequest,
     HttpResponseForbidden,
@@ -973,49 +983,416 @@ def customers_list_view(request):
         or ""
     ).strip()
 
-    open_statuses = [
+    search_query = (
+        request.GET.get("q")
+        or ""
+    ).strip()
+
+    status_filter = (
+        request.GET.get("status")
+        or ""
+    ).strip()
+
+    readiness_filter = (
+        request.GET.get("readiness")
+        or ""
+    ).strip()
+
+    sort_filter = (
+        request.GET.get("sort")
+        or "name"
+    ).strip()
+
+    valid_statuses = {
+        "",
+        CustomerAccount.Status.ACTIVE,
+        CustomerAccount.Status.DISABLED,
+        CustomerAccount.Status.DELETED,
+    }
+
+    if status_filter not in valid_statuses:
+        status_filter = ""
+
+    valid_readiness = {
+        "",
+        "attention",
+        "ready",
+        "no_cabinet",
+        "no_devices",
+        "no_connections",
+        "renewal",
+        "expired",
+        "expiring",
+    }
+
+    if readiness_filter not in valid_readiness:
+        readiness_filter = ""
+
+    valid_sorts = {
+        "name",
+        "expires",
+        "devices",
+        "connections",
+        "updated",
+    }
+
+    if sort_filter not in valid_sorts:
+        sort_filter = "name"
+
+    now = timezone.now()
+
+    expires_soon_at = (
+        now
+        + timedelta(days=7)
+    )
+
+    open_statuses = (
         ClientRenewalRequest.Status.NEW,
         ClientRenewalRequest.Status.IN_PROGRESS,
-    ]
+    )
 
     accounts = (
         CustomerAccount.objects
         .annotate(
             device_count=Count(
                 "devices",
+                filter=~Q(
+                    devices__status=(
+                        ClientDevice.Status.DELETED
+                    )
+                ),
                 distinct=True,
             ),
+
             vpn_config_count=Count(
                 "devices__vpn_clients",
+                filter=(
+                    ~Q(
+                        devices__status=(
+                            ClientDevice.Status.DELETED
+                        )
+                    )
+                    & ~Q(
+                        devices__vpn_clients__status=(
+                            VPNClient.Status.DELETED
+                        )
+                    )
+                ),
                 distinct=True,
             ),
+
+            xhttp_config_count=Count(
+                "devices__xhttp_devices",
+                filter=(
+                    ~Q(
+                        devices__status=(
+                            ClientDevice.Status.DELETED
+                        )
+                    )
+                    & ~Q(
+                        devices__xhttp_devices__status=(
+                            XHTTPDevice.Status.DELETED
+                        )
+                    )
+                ),
+                distinct=True,
+            ),
+
             open_renewal_count=Count(
                 "renewal_requests",
                 filter=Q(
                     renewal_requests__status__in=(
                         open_statuses
-                    ),
+                    )
                 ),
                 distinct=True,
             ),
         )
-        .order_by(
-            "display_name",
-            "id",
+        .annotate(
+            connection_count=(
+                F("vpn_config_count")
+                + F("xhttp_config_count")
+            ),
+        )
+        .annotate(
+            expiry_state=Case(
+                When(
+                    expires_at__isnull=True,
+                    then=Value("none"),
+                ),
+                When(
+                    expires_at__lte=now,
+                    then=Value("expired"),
+                ),
+                When(
+                    expires_at__lte=expires_soon_at,
+                    then=Value("soon"),
+                ),
+                default=Value("normal"),
+                output_field=CharField(),
+            ),
+
+            readiness_code=Case(
+                When(
+                    status=CustomerAccount.Status.DELETED,
+                    then=Value("deleted"),
+                ),
+                When(
+                    status=CustomerAccount.Status.DISABLED,
+                    then=Value("disabled"),
+                ),
+                When(
+                    expires_at__lte=now,
+                    then=Value("expired"),
+                ),
+                When(
+                    open_renewal_count__gt=0,
+                    then=Value("renewal"),
+                ),
+                When(
+                    expires_at__gt=now,
+                    expires_at__lte=expires_soon_at,
+                    then=Value("expiring"),
+                ),
+                When(
+                    user_id__isnull=True,
+                    then=Value("no_cabinet"),
+                ),
+                When(
+                    device_count=0,
+                    then=Value("no_devices"),
+                ),
+                When(
+                    connection_count=0,
+                    then=Value("no_connections"),
+                ),
+                default=Value("ready"),
+                output_field=CharField(),
+            ),
         )
     )
 
+    metrics = {
+        "total": accounts.count(),
+
+        "active": accounts.filter(
+            status=CustomerAccount.Status.ACTIVE
+        ).count(),
+
+        "disabled": accounts.filter(
+            status=CustomerAccount.Status.DISABLED
+        ).count(),
+
+        "deleted": accounts.filter(
+            status=CustomerAccount.Status.DELETED
+        ).count(),
+
+        "attention": (
+            accounts
+            .filter(
+                status=CustomerAccount.Status.ACTIVE
+            )
+            .exclude(
+                readiness_code="ready"
+            )
+            .count()
+        ),
+
+        "cabinet_missing": (
+            accounts
+            .filter(
+                status=CustomerAccount.Status.ACTIVE,
+                user_id__isnull=True,
+            )
+            .count()
+        ),
+
+        "cabinet_enabled": (
+            accounts
+            .filter(
+                status=CustomerAccount.Status.ACTIVE,
+                user_id__isnull=False,
+            )
+            .count()
+        ),
+
+        "no_devices": (
+            accounts
+            .filter(
+                status=CustomerAccount.Status.ACTIVE,
+                device_count=0,
+            )
+            .count()
+        ),
+
+        "no_connections": (
+            accounts
+            .filter(
+                status=CustomerAccount.Status.ACTIVE,
+                connection_count=0,
+            )
+            .count()
+        ),
+
+        "expires_soon": (
+            accounts
+            .filter(
+                status=CustomerAccount.Status.ACTIVE,
+                expires_at__gt=now,
+                expires_at__lte=expires_soon_at,
+            )
+            .count()
+        ),
+
+        "expired": (
+            accounts
+            .filter(
+                status=CustomerAccount.Status.ACTIVE,
+                expires_at__lte=now,
+            )
+            .count()
+        ),
+
+        "open_renewals": (
+            accounts
+            .filter(
+                open_renewal_count__gt=0
+            )
+            .count()
+        ),
+    }
+
+    if search_query:
+        accounts = (
+            accounts
+            .filter(
+                Q(
+                    display_name__icontains=(
+                        search_query
+                    )
+                )
+                | Q(
+                    email__icontains=(
+                        search_query
+                    )
+                )
+                | Q(
+                    devices__name__icontains=(
+                        search_query
+                    )
+                )
+            )
+            .distinct()
+        )
+
+    if status_filter:
+        accounts = accounts.filter(
+            status=status_filter
+        )
+
     if renewal_filter == "open":
         accounts = accounts.filter(
-            open_renewal_count__gt=0,
+            open_renewal_count__gt=0
         )
+
+    if readiness_filter == "attention":
+        accounts = (
+            accounts
+            .filter(
+                status=CustomerAccount.Status.ACTIVE
+            )
+            .exclude(
+                readiness_code="ready"
+            )
+        )
+
+    elif readiness_filter == "ready":
+        accounts = accounts.filter(
+            readiness_code="ready"
+        )
+
+    elif readiness_filter == "no_cabinet":
+        accounts = accounts.filter(
+            status=CustomerAccount.Status.ACTIVE,
+            user_id__isnull=True,
+        )
+
+    elif readiness_filter == "no_devices":
+        accounts = accounts.filter(
+            status=CustomerAccount.Status.ACTIVE,
+            device_count=0,
+        )
+
+    elif readiness_filter == "no_connections":
+        accounts = accounts.filter(
+            status=CustomerAccount.Status.ACTIVE,
+            connection_count=0,
+        )
+
+    elif readiness_filter == "renewal":
+        accounts = accounts.filter(
+            open_renewal_count__gt=0
+        )
+
+    elif readiness_filter == "expired":
+        accounts = accounts.filter(
+            status=CustomerAccount.Status.ACTIVE,
+            expires_at__lte=now,
+        )
+
+    elif readiness_filter == "expiring":
+        accounts = accounts.filter(
+            status=CustomerAccount.Status.ACTIVE,
+            expires_at__gt=now,
+            expires_at__lte=expires_soon_at,
+        )
+
+    sort_map = {
+        "name": (
+            "display_name",
+            "id",
+        ),
+
+        "expires": (
+            "expires_at",
+            "display_name",
+            "id",
+        ),
+
+        "devices": (
+            "-device_count",
+            "display_name",
+            "id",
+        ),
+
+        "connections": (
+            "-connection_count",
+            "display_name",
+            "id",
+        ),
+
+        "updated": (
+            "-updated_at",
+            "display_name",
+            "id",
+        ),
+    }
+
+    accounts = accounts.order_by(
+        *sort_map[sort_filter]
+    )
 
     return render(
         request,
         "customers/customers_list.html",
         {
             "accounts": accounts,
+            "metrics": metrics,
             "renewal_filter": renewal_filter,
+            "search_query": search_query,
+            "status_filter": status_filter,
+            "readiness_filter": readiness_filter,
+            "sort_filter": sort_filter,
         },
     )
 
