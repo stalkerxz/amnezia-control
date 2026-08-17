@@ -172,6 +172,7 @@ class CustomerReadinessWorkflowTest(
             "Настройка не завершена",
             "Создать кабинет",
             "Добавить устройство",
+            "Срок: без ограничения",
         ):
             self.assertContains(
                 response,
@@ -203,6 +204,20 @@ class CustomerReadinessWorkflowTest(
         self.assertContains(
             response,
             "Управление кабинетом",
+        )
+
+        portal_login_url = reverse(
+            "customer-portal-login"
+        )
+
+        self.assertContains(
+            response,
+            portal_login_url,
+        )
+
+        self.assertContains(
+            response,
+            "Страница входа клиента",
         )
 
         create_access_url = reverse(

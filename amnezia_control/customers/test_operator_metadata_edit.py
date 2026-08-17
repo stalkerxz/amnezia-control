@@ -389,7 +389,7 @@ class OperatorMetadataEditTest(
 
         self.assertContains(
             response,
-            "Редактировать клиента",
+            "Редактировать аккаунт",
         )
 
         self.assertContains(

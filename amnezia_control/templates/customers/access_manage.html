@@ -90,6 +90,73 @@
 
 </section>
 
+<section class="section-block">
+
+  <div class="section-body">
+
+    <div class="section-header-compact">
+
+      <div>
+
+        <p class="page-kicker mb-1">
+          Ссылка клиенту
+        </p>
+
+        <h2 class="h5 mb-1">
+          Ссылка на личный кабинет
+        </h2>
+
+        <div class="text-secondary small">
+          Эта страница входа общая для клиентов.
+          Для входа клиент использует выданный логин и пароль.
+        </div>
+
+      </div>
+
+    </div>
+
+
+    <div class="border rounded-3 p-3">
+
+      <div class="small text-secondary mb-1">
+        Адрес страницы входа
+      </div>
+
+      <div class="fw-semibold text-break">
+        {{ request.scheme }}://{{ request.get_host }}{% url 'customer-portal-login' %}
+      </div>
+
+
+      <div class="d-flex gap-2 flex-wrap mt-3">
+
+        <a
+          href="{% url 'customer-portal-login' %}"
+          target="_blank"
+          rel="noopener"
+          class="btn btn-primary"
+        >
+          Открыть страницу входа
+        </a>
+
+      </div>
+
+
+      <div class="small text-secondary mt-3">
+        Логин клиента:
+        <strong>
+          {{ customer_user.username }}
+        </strong>.
+        Пароль после создания не отображается.
+        При необходимости установите новый пароль ниже.
+      </div>
+
+    </div>
+
+  </div>
+
+</section>
+
+
 
 <section class="section-block">
 

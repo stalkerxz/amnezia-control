@@ -438,14 +438,24 @@ class CustomerOperatorWorkspaceTest(
             target_account.display_name,
         )
 
-        self.assertNotContains(
+        self.assertContains(
             response,
-            "Расширенное управление",
+            "Дополнительные действия",
+        )
+
+        self.assertContains(
+            response,
+            "Редактировать аккаунт",
         )
 
         self.assertContains(
             response,
             "Объединение аккаунтов",
+        )
+
+        self.assertNotContains(
+            response,
+            "Редактировать клиента",
         )
 
     def test_selective_create_link_preselects_mode(

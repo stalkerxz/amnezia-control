@@ -73,6 +73,16 @@
           Управление кабинетом
         </a>
 
+        <a
+          class="btn btn-outline-secondary"
+          href="{% url 'customer-portal-login' %}"
+          target="_blank"
+          rel="noopener"
+          title="Общая страница входа в личный кабинет клиента"
+        >
+          Страница входа
+        </a>
+
       {% else %}
 
         <a
@@ -145,6 +155,22 @@
           {% if account.user %}
 
             {{ account.user.username }}
+
+            <div class="small mt-2">
+
+              <a
+                href="{% url 'customer-portal-login' %}"
+                target="_blank"
+                rel="noopener"
+              >
+                Страница входа клиента
+              </a>
+
+              <div class="text-secondary mt-1">
+                {{ request.scheme }}://{{ request.get_host }}{% url 'customer-portal-login' %}
+              </div>
+
+            </div>
 
             <div class="small">
 
@@ -635,6 +661,39 @@
 
 {% if account.status != 'deleted' %}
 
+{% if not account.expires_at and not open_renewal_request and not latest_renewal_request %}
+
+<section class="section-block section-quiet">
+
+  <div class="section-body">
+
+    <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap">
+
+      <div>
+
+        <p class="page-kicker mb-1">
+          Подписка
+        </p>
+
+        <div class="fw-semibold">
+          Срок: без ограничения
+        </div>
+
+      </div>
+
+
+      <div class="text-secondary small">
+        Активной заявки на продление нет
+      </div>
+
+    </div>
+
+  </div>
+
+</section>
+
+{% else %}
+
 <section class="section-block">
 
   <div class="section-body">
@@ -892,6 +951,8 @@
 
 {% endif %}
 
+{% endif %}
+
 
 
 <div id="customer-connections">
@@ -904,9 +965,39 @@
 
 {% if account.status != 'deleted' %}
 
-<section class="section-block">
+<section class="section-block section-quiet">
 
   <div class="section-body">
+
+    <details>
+
+      <summary class="d-flex justify-content-between align-items-center gap-3 flex-wrap">
+
+        <span class="fw-semibold">
+          Дополнительные действия
+        </span>
+
+        <span class="text-secondary small">
+          Редактирование и объединение аккаунта
+        </span>
+
+      </summary>
+
+
+      <div class="mt-4">
+
+        <div class="mb-4">
+
+          <a
+            href="{% url 'customers-edit' account.pk %}"
+            class="btn btn-outline-secondary"
+          >
+            Редактировать аккаунт
+          </a>
+
+        </div>
+
+
 
     <div class="section-header-compact">
       <div>
@@ -1007,6 +1098,12 @@
       </div>
 
     {% endif %}
+
+
+
+      </div>
+
+    </details>
 
   </div>
 

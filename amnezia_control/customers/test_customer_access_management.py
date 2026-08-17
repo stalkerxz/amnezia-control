@@ -155,6 +155,25 @@ class CustomerAccessManagementTest(TestCase):
             "Управление доступом",
         )
 
+        self.assertContains(
+            response,
+            "Ссылка на личный кабинет",
+        )
+
+        portal_login_url = reverse(
+            "customer-portal-login"
+        )
+
+        self.assertContains(
+            response,
+            f'href="{portal_login_url}"',
+        )
+
+        self.assertContains(
+            response,
+            self.customer_user.username,
+        )
+
         for technical_marker in (
             "AWG2",
             "VLESS/XHTTP",
