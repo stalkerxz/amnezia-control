@@ -170,7 +170,12 @@ class CustomerAccountsListWorkspaceTest(
 
         self.assertContains(
             response,
-            "Личный кабинет",
+            "Кабинет создан",
+        )
+
+        self.assertContains(
+            response,
+            "Без кабинета",
         )
 
         self.assertContains(
@@ -315,4 +320,26 @@ class CustomerAccountsListWorkspaceTest(
         self.assertEqual(
             accounts,
             [self.delta],
+        )
+
+    def test_no_cabinet_does_not_override_operational_readiness(
+        self,
+    ):
+        response = self.client.get(
+            reverse("customers-list")
+        )
+
+        account = (
+            response.context["accounts"]
+            .get(pk=self.bravo.pk)
+        )
+
+        self.assertEqual(
+            account.readiness_code,
+            "no_connections",
+        )
+
+        self.assertNotEqual(
+            account.readiness_code,
+            "no_cabinet",
         )

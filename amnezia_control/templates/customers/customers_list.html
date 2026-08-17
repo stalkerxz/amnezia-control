@@ -8,19 +8,19 @@
   .accounts-kpi-grid {
     display: grid;
     grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: .75rem;
+    gap: .65rem;
   }
 
   .accounts-kpi {
     display: block;
-    min-height: 104px;
-    padding: 1rem 1.05rem;
+    min-height: 88px;
+    padding: .8rem .9rem;
     border: 1px solid var(--bs-border-color);
-    border-radius: .9rem;
+    border-radius: .85rem;
     background:
       linear-gradient(
         180deg,
-        rgba(255,255,255,.025),
+        rgba(255,255,255,.024),
         rgba(255,255,255,0)
       );
     color: inherit;
@@ -39,48 +39,55 @@
 
   .accounts-kpi .kpi-label {
     color: var(--bs-secondary-color);
-    font-size: .72rem;
+    font-size: .68rem;
     font-weight: 700;
-    letter-spacing: .1em;
+    letter-spacing: .095em;
+    line-height: 1.2;
     text-transform: uppercase;
   }
 
   .accounts-kpi .kpi-value {
-    margin-top: .35rem;
-    font-size: 1.65rem;
+    margin-top: .28rem;
+    font-size: 1.55rem;
     font-weight: 700;
     line-height: 1;
   }
 
   .accounts-kpi .kpi-note {
-    margin-top: .5rem;
+    margin-top: .38rem;
     color: var(--bs-secondary-color);
-    font-size: .78rem;
+    font-size: .73rem;
     line-height: 1.25;
   }
 
   .accounts-toolbar {
-    padding: 1rem;
+    padding: .8rem;
     border: 1px solid var(--bs-border-color);
-    border-radius: .9rem;
-    background: rgba(255,255,255,.018);
+    border-radius: .85rem;
+    background: rgba(255,255,255,.015);
+  }
+
+  .accounts-toolbar .form-label {
+    margin-bottom: .25rem;
+    font-size: .72rem;
   }
 
   .accounts-filter-chips {
     display: flex;
-    gap: .45rem;
+    gap: .38rem;
     flex-wrap: wrap;
   }
 
   .accounts-filter-chip {
     display: inline-flex;
-    gap: .4rem;
+    gap: .38rem;
     align-items: center;
-    padding: .4rem .65rem;
+    padding: .34rem .6rem;
     border: 1px solid var(--bs-border-color);
     border-radius: 999px;
     color: var(--bs-secondary-color);
-    font-size: .78rem;
+    font-size: .75rem;
+    line-height: 1;
     text-decoration: none;
   }
 
@@ -92,37 +99,69 @@
   }
 
   .accounts-filter-chip .chip-count {
-    font-variant-numeric: tabular-nums;
     color: var(--bs-body-color);
+    font-variant-numeric: tabular-nums;
   }
 
   .accounts-table-wrap {
-    max-height: calc(100vh - 360px);
-    min-height: 260px;
-    overflow: auto;
+    overflow: visible;
     border: 1px solid var(--bs-border-color);
     border-radius: .85rem;
   }
 
   .accounts-table {
-    min-width: 1180px;
+    width: 100%;
+    table-layout: fixed;
+    font-size: .84rem;
+  }
+
+  .accounts-table .col-account {
+    width: 23%;
+  }
+
+  .accounts-table .col-state {
+    width: 17%;
+  }
+
+  .accounts-table .col-devices {
+    width: 8%;
+  }
+
+  .accounts-table .col-connections {
+    width: 14%;
+  }
+
+  .accounts-table .col-access {
+    width: 17%;
+  }
+
+  .accounts-table .col-renewal {
+    width: 8%;
+  }
+
+  .accounts-table .col-actions {
+    width: 13%;
   }
 
   .accounts-table thead th {
     position: sticky;
     top: 0;
-    z-index: 3;
-    padding-top: .8rem;
-    padding-bottom: .8rem;
+    z-index: 4;
+    padding: .68rem .65rem;
     background: var(--bs-body-bg);
     box-shadow:
       inset 0 -1px 0 var(--bs-border-color);
+    color: var(--bs-secondary-color);
+    font-size: .66rem;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
     white-space: nowrap;
   }
 
   .accounts-table tbody td {
-    padding-top: .85rem;
-    padding-bottom: .85rem;
+    padding: .72rem .65rem;
+    vertical-align: middle;
   }
 
   .accounts-table tbody tr {
@@ -134,47 +173,110 @@
       rgba(var(--bs-primary-rgb), .035);
   }
 
-  .account-name {
-    max-width: 260px;
+  .accounts-table .col-actions {
+    position: sticky;
+    right: 0;
+    z-index: 2;
+    background: var(--bs-body-bg);
+    box-shadow:
+      -8px 0 14px -14px rgba(0,0,0,.7);
+  }
+
+  .accounts-table thead .col-actions {
+    z-index: 6;
   }
 
   .account-name-main {
     overflow: hidden;
+    font-weight: 650;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
   .account-name-meta {
     overflow: hidden;
+    margin-top: .12rem;
+    color: var(--bs-secondary-color);
+    font-size: .73rem;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  .metric-stack {
+  .account-cabinet-meta {
+    display: flex;
+    gap: .34rem;
+    align-items: center;
+    margin-top: .27rem;
+    color: var(--bs-secondary-color);
+    font-size: .69rem;
+    line-height: 1;
+  }
+
+  .account-cabinet-dot {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    flex: 0 0 6px;
+    border-radius: 50%;
+    background: var(--bs-secondary-color);
+    opacity: .7;
+  }
+
+  .account-cabinet-dot.active {
+    background: var(--bs-success);
+    opacity: 1;
+  }
+
+  .account-state-stack {
+    display: flex;
+    gap: .3rem;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .account-state-note {
+    font-size: .71rem;
     line-height: 1.2;
   }
 
-  .metric-stack .metric-main {
+  .account-state-note.ready {
+    color: var(--bs-success);
+  }
+
+  .account-state-note.warning {
+    color: var(--bs-warning);
+  }
+
+  .account-state-note.danger {
+    color: var(--bs-danger);
+  }
+
+  .metric-stack {
+    line-height: 1.15;
+  }
+
+  .metric-main {
     font-weight: 650;
     font-variant-numeric: tabular-nums;
   }
 
-  .metric-stack .metric-meta {
-    margin-top: .22rem;
+  .metric-meta {
+    margin-top: .2rem;
     color: var(--bs-secondary-color);
-    font-size: .74rem;
+    font-size: .69rem;
+    line-height: 1.25;
   }
 
-  .readiness-badge {
+  .access-date {
     white-space: nowrap;
   }
 
   .account-row-deleted {
-    opacity: .58;
+    opacity: .55;
   }
 
   .account-row-disabled {
-    opacity: .82;
+    opacity: .8;
   }
 
   .account-actions {
@@ -185,19 +287,24 @@
     min-width: 220px;
   }
 
-  @media (max-width: 1399.98px) {
+  @media (max-width: 1099.98px) {
     .accounts-kpi-grid {
       grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .accounts-table-wrap {
+      overflow-x: auto;
+      overflow-y: visible;
+    }
+
+    .accounts-table {
+      min-width: 920px;
     }
   }
 
   @media (max-width: 767.98px) {
     .accounts-kpi-grid {
       grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
-    .accounts-table-wrap {
-      max-height: none;
     }
   }
 
@@ -280,7 +387,7 @@
         </div>
 
         <div class="kpi-note">
-          Полный реестр клиентов
+          Полный реестр
         </div>
       </a>
 
@@ -298,7 +405,7 @@
         </div>
 
         <div class="kpi-note">
-          Доступные для работы
+          Доступны для работы
         </div>
       </a>
 
@@ -316,8 +423,7 @@
         </div>
 
         <div class="kpi-note">
-          Есть незавершённая настройка
-          или проблема со сроком
+          Срок, устройство или подключение
         </div>
       </a>
 
@@ -335,7 +441,7 @@
         </div>
 
         <div class="kpi-note">
-          Среди активных клиентов
+          Отдельный статус доступа
         </div>
       </a>
 
@@ -353,7 +459,7 @@
         </div>
 
         <div class="kpi-note">
-          Нужна проверка продления
+          Проверить продление
         </div>
       </a>
 
@@ -392,16 +498,14 @@
 
           {% else %}
 
-            Найдите клиента и сразу оцените
-            готовность кабинета, устройств,
-            подключений и срока доступа.
+            Поиск и основные состояния клиентов
+            без перехода в карточку.
 
           {% endif %}
 
         </div>
 
       </div>
-
 
       <div class="text-secondary small">
         Найдено: {{ accounts|length }}
@@ -429,7 +533,7 @@
         <div class="col-12 col-xl-4">
 
           <label
-            class="form-label small text-secondary"
+            class="form-label text-secondary"
             for="accountsSearch"
           >
             Поиск
@@ -451,7 +555,7 @@
         <div class="col-6 col-md-4 col-xl-2">
 
           <label
-            class="form-label small text-secondary"
+            class="form-label text-secondary"
             for="accountsStatus"
           >
             Статус
@@ -496,7 +600,7 @@
         <div class="col-6 col-md-4 col-xl-3">
 
           <label
-            class="form-label small text-secondary"
+            class="form-label text-secondary"
             for="accountsReadiness"
           >
             Состояние
@@ -523,7 +627,7 @@
               value="ready"
               {% if readiness_filter == 'ready' %}selected{% endif %}
             >
-              Полностью готовы
+              Подключения готовы
             </option>
 
             <option
@@ -576,7 +680,7 @@
         <div class="col-6 col-md-4 col-xl-2">
 
           <label
-            class="form-label small text-secondary"
+            class="form-label text-secondary"
             for="accountsSort"
           >
             Сортировка
@@ -829,39 +933,31 @@
 
             <tr>
 
-              <th>
+              <th class="col-account">
                 Аккаунт
               </th>
 
-              <th>
-                Статус
+              <th class="col-state">
+                Состояние
               </th>
 
-              <th>
-                Готовность
+              <th class="col-devices">
+                Устр.
               </th>
 
-              <th>
-                Устройства
-              </th>
-
-              <th>
+              <th class="col-connections">
                 Подключения
               </th>
 
-              <th>
-                Личный кабинет
+              <th class="col-access">
+                Доступ
               </th>
 
-              <th>
-                Срок доступа
-              </th>
-
-              <th>
+              <th class="col-renewal">
                 Продление
               </th>
 
-              <th class="text-end">
+              <th class="col-actions text-end">
                 Действия
               </th>
 
@@ -884,43 +980,148 @@
                 "
               >
 
-                <td>
+                <td class="col-account">
 
-                  <div class="account-name">
+                  <div class="account-name-main">
+                    {{ account.display_name }}
+                  </div>
 
-                    <div
-                      class="
-                        fw-semibold
-                        account-name-main
-                      "
-                    >
-                      {{ account.display_name }}
+                  {% if account.email %}
+
+                    <div class="account-name-meta">
+                      {{ account.email }}
                     </div>
 
+                  {% else %}
 
-                    {% if account.email %}
+                    <div class="account-name-meta">
+                      Без email
+                    </div>
 
-                      <div
+                  {% endif %}
+
+
+                  {% if account.user_id %}
+
+                    <div class="account-cabinet-meta">
+                      <span
                         class="
-                          small
-                          text-secondary
-                          account-name-meta
+                          account-cabinet-dot
+                          active
                         "
-                      >
-                        {{ account.email }}
-                      </div>
+                      ></span>
+                      Кабинет создан
+                    </div>
+
+                  {% elif account.status == 'active' %}
+
+                    <div class="account-cabinet-meta">
+                      <span
+                        class="account-cabinet-dot"
+                      ></span>
+                      Без кабинета
+                    </div>
+
+                  {% endif %}
+
+                </td>
+
+
+                <td class="col-state">
+
+                  <div class="account-state-stack">
+
+                    {% if account.status == 'active' %}
+
+                      <span class="badge text-bg-success">
+                        Активен
+                      </span>
+
+                      {% if account.readiness_code == 'ready' %}
+
+                        <span
+                          class="
+                            account-state-note
+                            ready
+                          "
+                        >
+                          Готов к работе
+                        </span>
+
+                      {% elif account.readiness_code == 'expired' %}
+
+                        <span
+                          class="
+                            account-state-note
+                            danger
+                          "
+                        >
+                          Срок истёк
+                        </span>
+
+                      {% elif account.readiness_code == 'expiring' %}
+
+                        <span
+                          class="
+                            account-state-note
+                            warning
+                          "
+                        >
+                          Истекает скоро
+                        </span>
+
+                      {% elif account.readiness_code == 'renewal' %}
+
+                        <span
+                          class="
+                            account-state-note
+                            warning
+                          "
+                        >
+                          Требует продления
+                        </span>
+
+                      {% elif account.readiness_code == 'no_devices' %}
+
+                        <span
+                          class="
+                            account-state-note
+                            warning
+                          "
+                        >
+                          Нет устройств
+                        </span>
+
+                      {% elif account.readiness_code == 'no_connections' %}
+
+                        <span
+                          class="
+                            account-state-note
+                            warning
+                          "
+                        >
+                          Нет подключений
+                        </span>
+
+                      {% endif %}
+
+                    {% elif account.status == 'disabled' %}
+
+                      <span class="badge text-bg-warning">
+                        Отключён
+                      </span>
+
+                    {% elif account.status == 'deleted' %}
+
+                      <span class="badge text-bg-secondary">
+                        Удалён
+                      </span>
 
                     {% else %}
 
-                      <div
-                        class="
-                          small
-                          text-secondary
-                          account-name-meta
-                        "
-                      >
-                        Без email
-                      </div>
+                      <span class="badge text-bg-secondary">
+                        {{ account.status }}
+                      </span>
 
                     {% endif %}
 
@@ -929,153 +1130,7 @@
                 </td>
 
 
-                <td>
-
-                  {% if account.status == 'active' %}
-
-                    <span class="badge text-bg-success">
-                      Активен
-                    </span>
-
-                  {% elif account.status == 'disabled' %}
-
-                    <span class="badge text-bg-warning">
-                      Отключён
-                    </span>
-
-                  {% elif account.status == 'deleted' %}
-
-                    <span class="badge text-bg-secondary">
-                      Удалён
-                    </span>
-
-                  {% else %}
-
-                    <span class="badge text-bg-secondary">
-                      {{ account.status }}
-                    </span>
-
-                  {% endif %}
-
-                </td>
-
-
-                <td>
-
-                  {% if account.readiness_code == 'ready' %}
-
-                    <span
-                      class="
-                        badge
-                        text-bg-success
-                        readiness-badge
-                      "
-                    >
-                      Готов
-                    </span>
-
-                  {% elif account.readiness_code == 'expired' %}
-
-                    <span
-                      class="
-                        badge
-                        text-bg-danger
-                        readiness-badge
-                      "
-                    >
-                      Срок истёк
-                    </span>
-
-                  {% elif account.readiness_code == 'expiring' %}
-
-                    <span
-                      class="
-                        badge
-                        text-bg-warning
-                        readiness-badge
-                      "
-                    >
-                      Истекает скоро
-                    </span>
-
-                  {% elif account.readiness_code == 'renewal' %}
-
-                    <span
-                      class="
-                        badge
-                        text-bg-warning
-                        readiness-badge
-                      "
-                    >
-                      Требует продления
-                    </span>
-
-                  {% elif account.readiness_code == 'no_cabinet' %}
-
-                    <span
-                      class="
-                        badge
-                        text-bg-warning
-                        readiness-badge
-                      "
-                    >
-                      Нет кабинета
-                    </span>
-
-                  {% elif account.readiness_code == 'no_devices' %}
-
-                    <span
-                      class="
-                        badge
-                        text-bg-warning
-                        readiness-badge
-                      "
-                    >
-                      Нет устройств
-                    </span>
-
-                  {% elif account.readiness_code == 'no_connections' %}
-
-                    <span
-                      class="
-                        badge
-                        text-bg-warning
-                        readiness-badge
-                      "
-                    >
-                      Нет подключений
-                    </span>
-
-                  {% elif account.readiness_code == 'disabled' %}
-
-                    <span
-                      class="
-                        badge
-                        text-bg-secondary
-                        readiness-badge
-                      "
-                    >
-                      Отключён
-                    </span>
-
-                  {% elif account.readiness_code == 'deleted' %}
-
-                    <span
-                      class="
-                        badge
-                        text-bg-secondary
-                        readiness-badge
-                      "
-                    >
-                      Удалён
-                    </span>
-
-                  {% endif %}
-
-                </td>
-
-
-                <td>
+                <td class="col-devices">
 
                   <div class="metric-stack">
 
@@ -1092,7 +1147,7 @@
                 </td>
 
 
-                <td>
+                <td class="col-connections">
 
                   <div class="metric-stack">
 
@@ -1110,32 +1165,7 @@
                 </td>
 
 
-                <td>
-
-                  {% if account.user_id %}
-
-                    <span class="badge text-bg-success">
-                      Создан
-                    </span>
-
-                  {% elif account.status == 'active' %}
-
-                    <span class="badge text-bg-warning">
-                      Не создан
-                    </span>
-
-                  {% else %}
-
-                    <span class="text-secondary">
-                      —
-                    </span>
-
-                  {% endif %}
-
-                </td>
-
-
-                <td>
+                <td class="col-access">
 
                   {% if account.expires_at %}
 
@@ -1144,6 +1174,7 @@
                       <div
                         class="
                           metric-main
+                          access-date
 
                           {% if account.expiry_state == 'expired' %}
                             text-danger
@@ -1152,29 +1183,30 @@
                           {% endif %}
                         "
                       >
-                        {{ account.expires_at|date:"d.m.Y H:i" }}
+                        {{ account.expires_at|date:"d.m.Y" }}
                       </div>
 
+                      <div
+                        class="
+                          metric-meta
 
-                      {% if account.expiry_state == 'expired' %}
+                          {% if account.expiry_state == 'expired' %}
+                            text-danger
+                          {% elif account.expiry_state == 'soon' %}
+                            text-warning
+                          {% endif %}
+                        "
+                      >
 
-                        <div class="metric-meta text-danger">
+                        {% if account.expiry_state == 'expired' %}
                           Срок истёк
-                        </div>
+                        {% elif account.expiry_state == 'soon' %}
+                          Истекает скоро
+                        {% else %}
+                          до {{ account.expires_at|date:"H:i" }}
+                        {% endif %}
 
-                      {% elif account.expiry_state == 'soon' %}
-
-                        <div class="metric-meta text-warning">
-                          Истекает в ближайшие 7 дней
-                        </div>
-
-                      {% else %}
-
-                        <div class="metric-meta">
-                          Срок доступа
-                        </div>
-
-                      {% endif %}
+                      </div>
 
                     </div>
 
@@ -1189,7 +1221,7 @@
                 </td>
 
 
-                <td>
+                <td class="col-renewal">
 
                   {% if account.open_renewal_count %}
 
@@ -1208,7 +1240,13 @@
                 </td>
 
 
-                <td class="text-end account-actions">
+                <td
+                  class="
+                    col-actions
+                    text-end
+                    account-actions
+                  "
+                >
 
                   <div
                     class="
@@ -1275,7 +1313,6 @@
                             </a>
 
                           </li>
-
 
                           <li>
 

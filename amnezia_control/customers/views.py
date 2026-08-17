@@ -1155,10 +1155,6 @@ def customers_list_view(request):
                     then=Value("expiring"),
                 ),
                 When(
-                    user_id__isnull=True,
-                    then=Value("no_cabinet"),
-                ),
-                When(
                     device_count=0,
                     then=Value("no_devices"),
                 ),
