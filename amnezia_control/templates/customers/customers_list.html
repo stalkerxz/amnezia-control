@@ -156,7 +156,7 @@
   }
 
   .accounts-table tbody td {
-    padding: .72rem .65rem;
+    padding: .56rem .65rem;
     vertical-align: middle;
   }
 
@@ -246,7 +246,8 @@
 
   .account-name-main {
     overflow: hidden;
-    font-weight: 650;
+    font-size: .86rem;
+    font-weight: 700;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -258,6 +259,10 @@
     font-size: .73rem;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .account-email-missing {
+    opacity: .6;
   }
 
   .account-cabinet-meta {
@@ -1045,7 +1050,12 @@
 
                   {% else %}
 
-                    <div class="account-name-meta">
+                    <div
+                      class="
+                        account-name-meta
+                        account-email-missing
+                      "
+                    >
                       Без email
                     </div>
 
@@ -1062,15 +1072,6 @@
                         "
                       ></span>
                       Кабинет создан
-                    </div>
-
-                  {% elif account.status == 'active' %}
-
-                    <div class="account-cabinet-meta">
-                      <span
-                        class="account-cabinet-dot"
-                      ></span>
-                      Без кабинета
                     </div>
 
                   {% endif %}
@@ -1201,8 +1202,22 @@
                     </div>
 
                     <div class="metric-meta">
-                      VPN {{ account.vpn_config_count }}
-                      · Альт. {{ account.xhttp_config_count }}
+
+                      {% if account.connection_count == 0 %}
+
+                        нет подключений
+
+                      {% elif account.connection_count == 1 %}
+
+                        подключение
+
+                      {% else %}
+
+                        VPN {{ account.vpn_config_count }}
+                        · Альт. {{ account.xhttp_config_count }}
+
+                      {% endif %}
+
                     </div>
 
                   </div>
@@ -1231,27 +1246,27 @@
                         {{ account.expires_at|date:"d.m.Y" }}
                       </div>
 
-                      <div
-                        class="
-                          metric-meta
+                      {% if account.expiry_state != 'expired' %}
 
-                          {% if account.expiry_state == 'expired' %}
-                            text-danger
-                          {% elif account.expiry_state == 'soon' %}
-                            text-warning
+                        <div
+                          class="
+                            metric-meta
+
+                            {% if account.expiry_state == 'soon' %}
+                              text-warning
+                            {% endif %}
+                          "
+                        >
+
+                          {% if account.expiry_state == 'soon' %}
+                            Истекает скоро
+                          {% else %}
+                            до {{ account.expires_at|date:"H:i" }}
                           {% endif %}
-                        "
-                      >
 
-                        {% if account.expiry_state == 'expired' %}
-                          Срок истёк
-                        {% elif account.expiry_state == 'soon' %}
-                          Истекает скоро
-                        {% else %}
-                          до {{ account.expires_at|date:"H:i" }}
-                        {% endif %}
+                        </div>
 
-                      </div>
+                      {% endif %}
 
                     </div>
 

@@ -513,3 +513,111 @@ class CustomerAccountsListWorkspaceTest(
                 + '"'
             ),
         )
+
+    def test_expired_filter_includes_disabled_accounts(
+        self,
+    ):
+        expired_at = (
+            timezone.now()
+            - timedelta(days=1)
+        )
+
+        active_expired = (
+            CustomerAccount.objects.create(
+                display_name="Active Expired",
+                status=(
+                    CustomerAccount.Status.ACTIVE
+                ),
+                expires_at=expired_at,
+            )
+        )
+
+        disabled_expired = (
+            CustomerAccount.objects.create(
+                display_name="Disabled Expired",
+                status=(
+                    CustomerAccount.Status.DISABLED
+                ),
+                expires_at=expired_at,
+            )
+        )
+
+        overview = self.client.get(
+            reverse("customers-list")
+        )
+
+        self.assertEqual(
+            overview.status_code,
+            200,
+        )
+
+        self.assertEqual(
+            overview.context[
+                "metrics"
+            ]["expired"],
+            2,
+        )
+
+        filtered = self.client.get(
+            reverse("customers-list"),
+            {
+                "readiness": "expired",
+            },
+        )
+
+        ids = set(
+            filtered.context[
+                "accounts"
+            ].values_list(
+                "pk",
+                flat=True,
+            )
+        )
+
+        self.assertEqual(
+            ids,
+            {
+                active_expired.pk,
+                disabled_expired.pk,
+            },
+        )
+
+
+    def test_registry_row_copy_is_compact(
+        self,
+    ):
+        response = self.client.get(
+            reverse("customers-list")
+        )
+
+        self.assertEqual(
+            response.status_code,
+            200,
+        )
+
+        html = (
+            response.content
+            .decode("utf-8")
+        )
+
+        self.assertEqual(
+            html.count(
+                "Без кабинета"
+            ),
+            2,
+        )
+
+        self.assertContains(
+            response,
+            "нет подключений",
+        )
+
+        self.assertNotContains(
+            response,
+            "VPN 0",
+        )
+
+        self.assertContains(
+            response,
+            "account-email-missing",
+        )

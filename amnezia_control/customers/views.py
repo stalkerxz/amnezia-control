@@ -1253,7 +1253,6 @@ def customers_list_view(request):
         "expired": (
             accounts
             .filter(
-                status=CustomerAccount.Status.ACTIVE,
                 expires_at__lte=now,
             )
             .count()
@@ -1342,7 +1341,6 @@ def customers_list_view(request):
 
     elif readiness_filter == "expired":
         accounts = accounts.filter(
-            status=CustomerAccount.Status.ACTIVE,
             expires_at__lte=now,
         )
 
