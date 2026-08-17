@@ -342,6 +342,19 @@
     white-space: nowrap;
   }
 
+  /*
+   * Every sticky action cell creates its own stacking context.
+   * While a dropdown is open, raise only its owning cell so that
+   * action cells from following rows cannot paint over the menu.
+   */
+  .account-actions.dropdown-open {
+    z-index: 8;
+  }
+
+  .account-actions.dropdown-open .dropdown-menu {
+    z-index: 9;
+  }
+
   .account-actions .dropdown-menu {
     min-width: 220px;
   }
@@ -1519,6 +1532,41 @@
   document.addEventListener(
     "DOMContentLoaded",
     function () {
+
+      document
+        .querySelectorAll(
+          ".account-actions [data-bs-toggle=\"dropdown\"]"
+        )
+        .forEach(function (toggle) {
+
+          const actionCell = toggle.closest(
+            ".account-actions"
+          );
+
+          if (!actionCell) {
+            return;
+          }
+
+          toggle.addEventListener(
+            "show.bs.dropdown",
+            function () {
+              actionCell.classList.add(
+                "dropdown-open"
+              );
+            }
+          );
+
+          toggle.addEventListener(
+            "hidden.bs.dropdown",
+            function () {
+              actionCell.classList.remove(
+                "dropdown-open"
+              );
+            }
+          );
+        });
+
+
       document
         .querySelectorAll(
           ".account-row-link[data-href]"

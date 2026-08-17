@@ -621,3 +621,40 @@ class CustomerAccountsListWorkspaceTest(
             response,
             "account-email-missing",
         )
+
+    def test_actions_dropdown_raises_active_sticky_cell(
+        self,
+    ):
+        response = self.client.get(
+            reverse("customers-list")
+        )
+
+        self.assertEqual(
+            response.status_code,
+            200,
+        )
+
+        self.assertContains(
+            response,
+            "account-actions.dropdown-open",
+        )
+
+        self.assertContains(
+            response,
+            "show.bs.dropdown",
+        )
+
+        self.assertContains(
+            response,
+            "hidden.bs.dropdown",
+        )
+
+        self.assertContains(
+            response,
+            'classList.add(',
+        )
+
+        self.assertContains(
+            response,
+            '"dropdown-open"',
+        )
