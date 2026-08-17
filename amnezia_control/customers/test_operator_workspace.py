@@ -505,3 +505,52 @@ class CustomerOperatorWorkspaceTest(
             form.initial["routing_mode"],
             "full",
         )
+
+    def test_workspace_hides_internal_device_metadata(
+        self,
+    ):
+        self.client.force_login(
+            self.operator
+        )
+
+        self.device.platform = (
+            ClientDevice.Platform.UNKNOWN
+        )
+
+        self.device.notes = (
+            "legacy-vpn-client:999"
+        )
+
+        self.device.save(
+            update_fields=[
+                "platform",
+                "notes",
+            ]
+        )
+
+        response = self.client.get(
+            reverse(
+                "customers-detail",
+                args=[self.account.pk],
+            )
+        )
+
+        self.assertEqual(
+            response.status_code,
+            200,
+        )
+
+        self.assertNotContains(
+            response,
+            "legacy-vpn-client:999",
+        )
+
+        self.assertNotContains(
+            response,
+            "Не указано",
+        )
+
+        self.assertContains(
+            response,
+            "Подключений: 3",
+        )

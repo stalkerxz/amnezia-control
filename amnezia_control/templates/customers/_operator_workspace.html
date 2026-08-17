@@ -162,11 +162,17 @@
         </div>
 
         <div class="small text-secondary mt-1">
-          {{ row.device.get_platform_display }}
-          · Подключений: {{ row.connection_total }}
+
+          {% if row.device.platform != 'unknown' %}
+            {{ row.device.get_platform_display }}
+            ·
+          {% endif %}
+
+          Подключений: {{ row.connection_total }}
+
         </div>
 
-        {% if row.device.notes %}
+        {% if row.device.notes and 'legacy-vpn-client:' not in row.device.notes %}
           <div class="small mt-2">
             {{ row.device.notes }}
           </div>

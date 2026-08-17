@@ -292,10 +292,17 @@ class CustomerReadinessWorkflowTest(
 
         self.assertContains(
             response,
-            (
-                "Аккаунт активен, "
-                "есть активное устройство"
-            ),
+            "Рабочее состояние.",
+        )
+
+        self.assertNotContains(
+            response,
+            "Шаг 1",
+        )
+
+        self.assertNotContains(
+            response,
+            "Шаг 4",
         )
 
     def test_disabled_account_requires_attention(
@@ -362,6 +369,11 @@ class CustomerReadinessWorkflowTest(
 
         self.assertContains(
             response,
+            "Личный кабинет не создан.",
+        )
+
+        self.assertNotContains(
+            response,
             "Отдельная настройка",
         )
 
@@ -373,4 +385,19 @@ class CustomerReadinessWorkflowTest(
         self.assertNotContains(
             response,
             "Настройка не завершена",
+        )
+
+        self.assertContains(
+            response,
+            "Рабочее состояние.",
+        )
+
+        self.assertNotContains(
+            response,
+            "Шаг 1",
+        )
+
+        self.assertNotContains(
+            response,
+            "Шаг 4",
         )

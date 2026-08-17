@@ -240,6 +240,31 @@
     </div>
 
 
+    {% if workspace.account_ready and workspace.active_device_total > 0 and workspace.active_connection_total > 0 %}
+
+      <div class="alert alert-success mb-0 py-2">
+
+        <strong>
+          Рабочее состояние.
+        </strong>
+
+        Активных устройств:
+        {{ workspace.active_device_total }}
+        · Активных подключений:
+        {{ workspace.active_connection_total }}.
+
+        {% if account.user and account.user.is_active %}
+          Личный кабинет доступен.
+        {% elif account.user %}
+          Вход в личный кабинет отключён.
+        {% else %}
+          Личный кабинет не создан.
+        {% endif %}
+
+      </div>
+
+    {% else %}
+
     <div class="row g-3">
 
 
@@ -588,21 +613,6 @@
 
 
     </div>
-
-
-    {% if workspace.account_ready and workspace.active_device_total > 0 and workspace.active_connection_total > 0 %}
-
-      <div class="alert alert-success mt-3 mb-0">
-
-        <strong>
-          VPN работает.
-        </strong>
-
-        Аккаунт активен, есть активное устройство
-        и хотя бы одно активное подключение.
-        Личный кабинет настраивается отдельно.
-
-      </div>
 
     {% endif %}
 
