@@ -187,12 +187,12 @@
         </p>
 
         <h2 class="h5 mb-1">
-          Готовность клиента
+          Состояние клиента
         </h2>
 
         <div class="text-secondary small">
-          Быстрая проверка полного пути:
-          аккаунт → кабинет → устройство → подключение.
+          Работоспособность VPN и отдельная
+          настройка личного кабинета.
         </div>
 
       </div>
@@ -200,10 +200,10 @@
 
       <div>
 
-        {% if workspace.account_ready and account.user and account.user.is_active and workspace.active_device_total > 0 and workspace.active_connection_total > 0 %}
+        {% if workspace.account_ready and workspace.active_device_total > 0 and workspace.active_connection_total > 0 %}
 
           <span class="badge text-bg-success">
-            Клиент готов к использованию
+            VPN работает
           </span>
 
         {% elif account.status == 'deleted' %}
@@ -216,6 +216,21 @@
 
           <span class="badge text-bg-warning">
             Настройка не завершена
+          </span>
+
+        {% endif %}
+
+
+        {% if account.status != 'deleted' and not account.user %}
+
+          <span class="badge text-bg-secondary ms-1">
+            Кабинет не создан
+          </span>
+
+        {% elif account.user and not account.user.is_active %}
+
+          <span class="badge text-bg-warning ms-1">
+            Вход в кабинет отключён
           </span>
 
         {% endif %}
@@ -326,8 +341,8 @@
 
             {% else %}
 
-              <span class="badge text-bg-primary">
-                → Следующее действие
+              <span class="badge text-bg-secondary">
+                Отдельная настройка
               </span>
 
             {% endif %}
@@ -575,17 +590,17 @@
     </div>
 
 
-    {% if workspace.account_ready and account.user and account.user.is_active and workspace.active_device_total > 0 and workspace.active_connection_total > 0 %}
+    {% if workspace.account_ready and workspace.active_device_total > 0 and workspace.active_connection_total > 0 %}
 
       <div class="alert alert-success mt-3 mb-0">
 
         <strong>
-          Клиент готов к использованию.
+          VPN работает.
         </strong>
 
-        Аккаунт активен, личный кабинет доступен,
-        есть активное устройство и хотя бы одно
-        активное подключение.
+        Аккаунт активен, есть активное устройство
+        и хотя бы одно активное подключение.
+        Личный кабинет настраивается отдельно.
 
       </div>
 

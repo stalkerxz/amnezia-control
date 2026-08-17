@@ -176,6 +176,18 @@
 
       <div class="d-flex gap-2 flex-wrap">
 
+        <button
+          class="btn btn-sm btn-outline-primary"
+          type="button"
+          data-bs-toggle="collapse"
+          data-bs-target="#device-workspace-{{ row.device.pk }}"
+          aria-expanded="false"
+          aria-controls="device-workspace-{{ row.device.pk }}"
+        >
+          Управление
+        </button>
+
+
         {% if account.status != 'deleted' and row.device.status != 'deleted' %}
 
           <a
@@ -245,6 +257,11 @@
 
     </div>
 
+
+    <div
+      class="collapse"
+      id="device-workspace-{{ row.device.pk }}"
+    >
 
     {% if account.status != 'deleted' and candidate_accounts %}
 
@@ -718,6 +735,9 @@
       </div>
 
     {% endif %}
+
+
+    </div>
 
   </div>
 </section>

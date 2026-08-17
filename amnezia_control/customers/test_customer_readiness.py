@@ -160,7 +160,7 @@ class CustomerReadinessWorkflowTest(
         )
 
         for marker in (
-            "Готовность клиента",
+            "Состояние клиента",
             "Шаг 1",
             "Шаг 2",
             "Шаг 3",
@@ -180,7 +180,7 @@ class CustomerReadinessWorkflowTest(
 
         self.assertNotContains(
             response,
-            "Клиент готов к использованию.",
+            "VPN работает",
         )
 
     def test_customer_login_marks_cabinet_ready(
@@ -277,7 +277,7 @@ class CustomerReadinessWorkflowTest(
 
         self.assertContains(
             response,
-            "Клиент готов к использованию",
+            "VPN работает",
         )
 
         self.assertContains(
@@ -294,7 +294,7 @@ class CustomerReadinessWorkflowTest(
             response,
             (
                 "Аккаунт активен, "
-                "личный кабинет доступен"
+                "есть активное устройство"
             ),
         )
 
@@ -331,5 +331,46 @@ class CustomerReadinessWorkflowTest(
 
         self.assertNotContains(
             response,
-            "Клиент готов к использованию.",
+            "VPN работает",
+        )
+
+    def test_operational_vpn_is_ready_without_cabinet(
+        self,
+    ):
+        device = self._add_device()
+
+        self._add_connection(
+            device
+        )
+
+        response = self._detail()
+
+        self.assertEqual(
+            response.status_code,
+            200,
+        )
+
+        self.assertContains(
+            response,
+            "VPN работает",
+        )
+
+        self.assertContains(
+            response,
+            "Кабинет не создан",
+        )
+
+        self.assertContains(
+            response,
+            "Отдельная настройка",
+        )
+
+        self.assertContains(
+            response,
+            "Создать кабинет",
+        )
+
+        self.assertNotContains(
+            response,
+            "Настройка не завершена",
         )

@@ -389,6 +389,27 @@ class CustomerOperatorWorkspaceTest(
             "+ Подключение",
         )
 
+        self.assertContains(
+            response,
+            "Управление",
+        )
+
+        self.assertContains(
+            response,
+            (
+                'data-bs-target="'
+                f'#device-workspace-{self.device.pk}"'
+            ),
+        )
+
+        self.assertContains(
+            response,
+            (
+                'id="'
+                f'device-workspace-{self.device.pk}"'
+            ),
+        )
+
         self.assertNotContains(
             response,
             "?routing_mode=full",
