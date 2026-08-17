@@ -194,7 +194,7 @@ class CustomerAccountsListWorkspaceTest(
 
         self.assertEqual(
             metrics["total"],
-            6,
+            5,
         )
 
         self.assertEqual(
@@ -342,4 +342,174 @@ class CustomerAccountsListWorkspaceTest(
         self.assertNotEqual(
             account.readiness_code,
             "no_cabinet",
+        )
+
+    def test_deleted_accounts_are_hidden_from_registry(
+        self,
+    ):
+        response = self.client.get(
+            reverse("customers-list")
+        )
+
+        self.assertEqual(
+            response.status_code,
+            200,
+        )
+
+        accounts = list(
+            response.context["accounts"]
+        )
+
+        self.assertNotIn(
+            self.deleted,
+            accounts,
+        )
+
+        self.assertEqual(
+            response.context["result_count"],
+            5,
+        )
+
+        self.assertNotContains(
+            response,
+            "Deleted Customer",
+        )
+
+        self.assertNotContains(
+            response,
+            'value="deleted"',
+        )
+
+        self.assertNotContains(
+            response,
+            "status=deleted",
+        )
+
+
+    def test_registry_is_paginated_by_twenty_five(
+        self,
+    ):
+        for index in range(26):
+            CustomerAccount.objects.create(
+                display_name=(
+                    f"Pagination Customer "
+                    f"{index:02d}"
+                ),
+                status=(
+                    CustomerAccount.Status.ACTIVE
+                ),
+            )
+
+        first = self.client.get(
+            reverse("customers-list")
+        )
+
+        self.assertEqual(
+            first.status_code,
+            200,
+        )
+
+        self.assertEqual(
+            first.context["result_count"],
+            31,
+        )
+
+        self.assertEqual(
+            first.context["paginator"].per_page,
+            25,
+        )
+
+        self.assertEqual(
+            first.context["paginator"].num_pages,
+            2,
+        )
+
+        self.assertEqual(
+            first.context["page_obj"].number,
+            1,
+        )
+
+        self.assertEqual(
+            len(
+                first.context[
+                    "page_obj"
+                ].object_list
+            ),
+            25,
+        )
+
+        second = self.client.get(
+            reverse("customers-list"),
+            {
+                "page": 2,
+            },
+        )
+
+        self.assertEqual(
+            second.context["page_obj"].number,
+            2,
+        )
+
+        self.assertEqual(
+            len(
+                second.context[
+                    "page_obj"
+                ].object_list
+            ),
+            6,
+        )
+
+        self.assertContains(
+            first,
+            "Показано",
+        )
+
+        self.assertContains(
+            first,
+            "из 31",
+        )
+
+
+    def test_pagination_preserves_filters_and_rows_are_clickable(
+        self,
+    ):
+        response = self.client.get(
+            reverse("customers-list"),
+            {
+                "q": "Customer",
+                "status": "active",
+                "sort": "name",
+                "page": 1,
+            },
+        )
+
+        query = response.context[
+            "query_without_page"
+        ]
+
+        self.assertIn(
+            "q=Customer",
+            query,
+        )
+
+        self.assertIn(
+            "status=active",
+            query,
+        )
+
+        self.assertNotIn(
+            "page=",
+            query,
+        )
+
+        self.assertContains(
+            response,
+            (
+                'data-href="'
+                + reverse(
+                    "customers-detail",
+                    args=[self.alpha.pk],
+                )
+                + '"'
+            ),
         )

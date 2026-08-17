@@ -116,7 +116,7 @@
   }
 
   .accounts-table .col-account {
-    width: 23%;
+    width: 25%;
   }
 
   .accounts-table .col-state {
@@ -128,19 +128,15 @@
   }
 
   .accounts-table .col-connections {
-    width: 14%;
+    width: 15%;
   }
 
   .accounts-table .col-access {
-    width: 17%;
-  }
-
-  .accounts-table .col-renewal {
-    width: 8%;
+    width: 20%;
   }
 
   .accounts-table .col-actions {
-    width: 13%;
+    width: 15%;
   }
 
   .accounts-table thead th {
@@ -171,6 +167,68 @@
   .accounts-table tbody tr:hover {
     background:
       rgba(var(--bs-primary-rgb), .035);
+  }
+
+  .account-row-link {
+    cursor: pointer;
+  }
+
+  .account-row-link:focus {
+    outline: 2px solid
+      rgba(var(--bs-primary-rgb), .55);
+    outline-offset: -2px;
+  }
+
+  .account-name-link {
+    display: block;
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .account-name-link:hover {
+    color: var(--bs-primary);
+  }
+
+  .accounts-pagination {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: .75rem;
+    flex-wrap: wrap;
+    padding-top: .85rem;
+  }
+
+  .accounts-pagination-summary {
+    color: var(--bs-secondary-color);
+    font-size: .75rem;
+  }
+
+  .accounts-pagination-pages {
+    display: flex;
+    gap: .3rem;
+    align-items: center;
+  }
+
+  .accounts-page-link {
+    display: inline-flex;
+    min-width: 30px;
+    height: 30px;
+    padding: 0 .5rem;
+    justify-content: center;
+    align-items: center;
+    border: 1px solid var(--bs-border-color);
+    border-radius: .45rem;
+    color: var(--bs-secondary-color);
+    font-size: .75rem;
+    text-decoration: none;
+  }
+
+  .accounts-page-link:hover,
+  .accounts-page-link.active {
+    border-color: var(--bs-primary);
+    background:
+      rgba(var(--bs-primary-rgb), .09);
+    color: var(--bs-body-color);
   }
 
   .accounts-table .col-actions {
@@ -271,10 +329,6 @@
     white-space: nowrap;
   }
 
-  .account-row-deleted {
-    opacity: .55;
-  }
-
   .account-row-disabled {
     opacity: .8;
   }
@@ -298,7 +352,7 @@
     }
 
     .accounts-table {
-      min-width: 920px;
+      min-width: 820px;
     }
   }
 
@@ -387,7 +441,7 @@
         </div>
 
         <div class="kpi-note">
-          Полный реестр
+          Текущие аккаунты
         </div>
       </a>
 
@@ -508,7 +562,7 @@
       </div>
 
       <div class="text-secondary small">
-        Найдено: {{ accounts|length }}
+        Найдено: {{ result_count }}
       </div>
 
     </div>
@@ -541,7 +595,7 @@
 
           <input
             id="accountsSearch"
-            class="form-control"
+            class="form-control form-control-sm"
             type="search"
             name="q"
             value="{{ search_query }}"
@@ -563,7 +617,7 @@
 
           <select
             id="accountsStatus"
-            class="form-select"
+            class="form-select form-select-sm"
             name="status"
           >
 
@@ -585,13 +639,6 @@
               Отключённые
             </option>
 
-            <option
-              value="deleted"
-              {% if status_filter == 'deleted' %}selected{% endif %}
-            >
-              Удалённые
-            </option>
-
           </select>
 
         </div>
@@ -608,7 +655,7 @@
 
           <select
             id="accountsReadiness"
-            class="form-select"
+            class="form-select form-select-sm"
             name="readiness"
           >
 
@@ -688,7 +735,7 @@
 
           <select
             id="accountsSort"
-            class="form-select"
+            class="form-select form-select-sm"
             name="sort"
           >
 
@@ -742,7 +789,7 @@
         >
 
           <button
-            class="btn btn-primary w-100"
+            class="btn btn-primary btn-sm w-100"
             type="submit"
           >
             Найти
@@ -799,6 +846,19 @@
             Требуют внимания
             <span class="chip-count">
               {{ metrics.attention }}
+            </span>
+          </a>
+
+          <a
+            class="
+              accounts-filter-chip
+              {% if readiness_filter == 'expired' %}active{% endif %}
+            "
+            href="{% url 'customers-list' %}?readiness=expired"
+          >
+            Истёкшие
+            <span class="chip-count">
+              {{ metrics.expired }}
             </span>
           </a>
 
@@ -871,19 +931,6 @@
             </span>
           </a>
 
-          <a
-            class="
-              accounts-filter-chip
-              {% if status_filter == 'deleted' %}active{% endif %}
-            "
-            href="{% url 'customers-list' %}?status=deleted"
-          >
-            Удалённые
-            <span class="chip-count">
-              {{ metrics.deleted }}
-            </span>
-          </a>
-
         </div>
 
 
@@ -916,7 +963,7 @@
     </form>
 
 
-    {% if accounts %}
+    {% if result_count %}
 
       <div class="accounts-table-wrap">
 
@@ -953,10 +1000,6 @@
                 Доступ
               </th>
 
-              <th class="col-renewal">
-                Продление
-              </th>
-
               <th class="col-actions text-end">
                 Действия
               </th>
@@ -968,23 +1011,31 @@
 
           <tbody>
 
-            {% for account in accounts %}
+            {% for account in page_obj %}
 
               <tr
                 class="
-                  {% if account.status == 'deleted' %}
-                    account-row-deleted
-                  {% elif account.status == 'disabled' %}
+                  account-row-link
+                  {% if account.status == 'disabled' %}
                     account-row-disabled
                   {% endif %}
                 "
+                data-href="{% url 'customers-detail' account.pk %}"
+                role="link"
+                tabindex="0"
               >
 
                 <td class="col-account">
 
-                  <div class="account-name-main">
+                  <a
+                    class="
+                      account-name-main
+                      account-name-link
+                    "
+                    href="{% url 'customers-detail' account.pk %}"
+                  >
                     {{ account.display_name }}
-                  </div>
+                  </a>
 
                   {% if account.email %}
 
@@ -1111,12 +1162,6 @@
                         Отключён
                       </span>
 
-                    {% elif account.status == 'deleted' %}
-
-                      <span class="badge text-bg-secondary">
-                        Удалён
-                      </span>
-
                     {% else %}
 
                       <span class="badge text-bg-secondary">
@@ -1218,22 +1263,14 @@
 
                   {% endif %}
 
-                </td>
-
-
-                <td class="col-renewal">
 
                   {% if account.open_renewal_count %}
 
-                    <span class="badge text-bg-warning">
-                      Открыта
-                    </span>
-
-                  {% else %}
-
-                    <span class="text-secondary">
-                      —
-                    </span>
+                    <div class="mt-2">
+                      <span class="badge text-bg-warning">
+                        Продление открыто
+                      </span>
+                    </div>
 
                   {% endif %}
 
@@ -1358,6 +1395,76 @@
 
       </div>
 
+
+      <div class="accounts-pagination">
+
+        <div class="accounts-pagination-summary">
+
+          Показано
+          {{ page_obj.start_index }}–{{ page_obj.end_index }}
+          из {{ result_count }}
+
+        </div>
+
+
+        {% if paginator.num_pages > 1 %}
+
+          <nav
+            class="accounts-pagination-pages"
+            aria-label="Страницы аккаунтов"
+          >
+
+            {% if page_obj.has_previous %}
+
+              <a
+                class="accounts-page-link"
+                href="?{% if query_without_page %}{{ query_without_page }}&{% endif %}page={{ page_obj.previous_page_number }}"
+                aria-label="Предыдущая страница"
+              >
+                Назад
+              </a>
+
+            {% endif %}
+
+
+            {% for number in page_numbers %}
+
+              <a
+                class="
+                  accounts-page-link
+                  {% if number == page_obj.number %}
+                    active
+                  {% endif %}
+                "
+                href="?{% if query_without_page %}{{ query_without_page }}&{% endif %}page={{ number }}"
+                {% if number == page_obj.number %}
+                  aria-current="page"
+                {% endif %}
+              >
+                {{ number }}
+              </a>
+
+            {% endfor %}
+
+
+            {% if page_obj.has_next %}
+
+              <a
+                class="accounts-page-link"
+                href="?{% if query_without_page %}{{ query_without_page }}&{% endif %}page={{ page_obj.next_page_number }}"
+                aria-label="Следующая страница"
+              >
+                Далее
+              </a>
+
+            {% endif %}
+
+          </nav>
+
+        {% endif %}
+
+      </div>
+
     {% else %}
 
       <div
@@ -1391,5 +1498,55 @@
   </div>
 
 </section>
+
+
+<script>
+  document.addEventListener(
+    "DOMContentLoaded",
+    function () {
+      document
+        .querySelectorAll(
+          ".account-row-link[data-href]"
+        )
+        .forEach(function (row) {
+
+          function openRow() {
+            window.location.href =
+              row.dataset.href;
+          }
+
+          row.addEventListener(
+            "click",
+            function (event) {
+
+              if (
+                event.target.closest(
+                  "a, button, input, select, textarea, .dropdown-menu"
+                )
+              ) {
+                return;
+              }
+
+              openRow();
+            }
+          );
+
+          row.addEventListener(
+            "keydown",
+            function (event) {
+
+              if (
+                event.target === row
+                && event.key === "Enter"
+              ) {
+                event.preventDefault();
+                openRow();
+              }
+            }
+          );
+        });
+    }
+  );
+</script>
 
 {% endblock %}

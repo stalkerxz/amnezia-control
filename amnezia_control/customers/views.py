@@ -3,6 +3,7 @@ from functools import wraps
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator
 from django.db.models import (
     Case,
     CharField,
@@ -1007,7 +1008,6 @@ def customers_list_view(request):
         "",
         CustomerAccount.Status.ACTIVE,
         CustomerAccount.Status.DISABLED,
-        CustomerAccount.Status.DELETED,
     }
 
     if status_filter not in valid_statuses:
@@ -1168,6 +1168,18 @@ def customers_list_view(request):
         )
     )
 
+    deleted_count = (
+        accounts
+        .filter(
+            status=CustomerAccount.Status.DELETED
+        )
+        .count()
+    )
+
+    accounts = accounts.exclude(
+        status=CustomerAccount.Status.DELETED
+    )
+
     metrics = {
         "total": accounts.count(),
 
@@ -1179,9 +1191,7 @@ def customers_list_view(request):
             status=CustomerAccount.Status.DISABLED
         ).count(),
 
-        "deleted": accounts.filter(
-            status=CustomerAccount.Status.DELETED
-        ).count(),
+        "deleted": deleted_count,
 
         "attention": (
             accounts
@@ -1378,11 +1388,52 @@ def customers_list_view(request):
         *sort_map[sort_filter]
     )
 
+    paginator = Paginator(
+        accounts,
+        25,
+    )
+
+    page_obj = paginator.get_page(
+        request.GET.get("page")
+    )
+
+    page_start = max(
+        1,
+        page_obj.number - 2,
+    )
+
+    page_end = min(
+        paginator.num_pages,
+        page_obj.number + 2,
+    )
+
+    page_numbers = list(
+        range(
+            page_start,
+            page_end + 1,
+        )
+    )
+
+    query_params = request.GET.copy()
+    query_params.pop(
+        "page",
+        None,
+    )
+
+    query_without_page = (
+        query_params.urlencode()
+    )
+
     return render(
         request,
         "customers/customers_list.html",
         {
             "accounts": accounts,
+            "page_obj": page_obj,
+            "paginator": paginator,
+            "page_numbers": page_numbers,
+            "result_count": paginator.count,
+            "query_without_page": query_without_page,
             "metrics": metrics,
             "renewal_filter": renewal_filter,
             "search_query": search_query,
