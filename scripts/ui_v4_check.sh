@@ -38,6 +38,8 @@ TEMPLATES = [
     "customers/connection_product_select.html",
     "customers/vpn_connection_form.html",
     "customers/xhttp_connection_form.html",
+    "customers/access_form.html",
+    "customers/access_manage.html",
     "customer_portal/base.html",
     "customer_portal/home.html",
     "customer_portal/_connections_workspace.html",
@@ -58,6 +60,7 @@ STATIC_ASSETS = [
     "css/app-v4-system-detail.css",
     "css/app-v4-renewals.css",
     "css/app-v4-forms.css",
+    "css/app-v4-access.css",
     "css/app-v4-polish.css",
 ]
 
@@ -74,6 +77,9 @@ for asset in STATIC_ASSETS:
 URLS = [
     ("customers-list", (), {}),
     ("customers-onboarding", (), {}),
+    ("customers-access-create", (1,), {}),
+    ("customers-access-manage", (1,), {}),
+    ("customers-device-access-update", (1,), {}),
     ("customer-portal-home", (), {}),
     ("renewal-requests-list", (), {}),
     ("servers-list", (), {}),
