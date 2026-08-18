@@ -1,1135 +1,291 @@
 {% extends 'partials/base.html' %}
+{% load static %}
 
-{% block title %}{{ account.display_name }} · amnezia-control{% endblock %}
+{% block title %}{{ account.display_name }} · VPN Control{% endblock %}
 
 {% block content %}
+<link href="{% static 'css/app-v4-layout.css' %}" rel="stylesheet">
+<link href="{% static 'css/app-v4-detail.css' %}" rel="stylesheet">
 
-<div class="page-header d-flex justify-content-between align-items-start gap-2 flex-wrap">
-  <div>
-    <p class="page-kicker">Операторская · Аккаунт клиента</p>
-    <h1 class="h3 mb-1">{{ account.display_name }}</h1>
+<div class="v4-customer-detail">
+  <a class="v4-back-link" href="{% url 'customers-list' %}">← Все клиенты</a>
 
-    <p class="page-subtle mb-0">
-      {% if account.email %}
-        {{ account.email }}
-      {% else %}
-        Email не указан
+  <header class="v4-detail-header">
+    <div class="v4-detail-identity">
+      <span class="v4-detail-avatar">{{ account.display_name|slice:':1' }}</span>
+      <div>
+        <div class="v4-detail-title-line">
+          <h1>{{ account.display_name }}</h1>
+          {% if account.status == 'active' and workspace.account_expired %}
+            <span class="v4-status-pill is-danger">Срок истёк</span>
+          {% elif account.status == 'active' %}
+            <span class="v4-status-pill is-success">Активен</span>
+          {% elif account.status == 'disabled' %}
+            <span class="v4-status-pill is-warning">Отключён</span>
+          {% else %}
+            <span class="v4-status-pill is-neutral">{{ account.get_status_display }}</span>
+          {% endif %}
+
+          {% if workspace.account_ready and workspace.active_device_total > 0 and workspace.active_connection_total > 0 %}
+            <span class="v4-detail-vpn-state"><i></i> VPN работает</span>
+          {% endif %}
+        </div>
+        <p>{% if account.email %}{{ account.email }}{% else %}Email не указан{% endif %}</p>
+      </div>
+    </div>
+
+    <div class="v4-detail-actions">
+      {% if account.status != 'deleted' %}
+        <a class="btn btn-primary" href="{% url 'customers-device-create' account.pk %}">
+          <span class="v4-btn-icon" aria-hidden="true">+</span>
+          Устройство
+        </a>
+
+        <div class="dropdown">
+          <button class="v4-detail-more" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Действия с аккаунтом">•••</button>
+          <ul class="dropdown-menu dropdown-menu-end v4-detail-menu">
+            <li><a class="dropdown-item" href="{% url 'customers-edit' account.pk %}">Редактировать аккаунт</a></li>
+            {% if account.user %}
+              <li><a class="dropdown-item" href="{% url 'customers-access-manage' account.pk %}">Управление кабинетом</a></li>
+              <li><a class="dropdown-item" href="{% url 'customer-portal-login' %}" target="_blank" rel="noopener">Страница входа клиента</a></li>
+            {% else %}
+              <li><a class="dropdown-item" href="{% url 'customers-access-create' account.pk %}">Создать личный кабинет</a></li>
+            {% endif %}
+            <li><hr class="dropdown-divider"></li>
+            <li>
+              <form method="post" action="{% url 'customers-status' account.pk %}" {% if account.status == 'active' %}onsubmit="return confirm('Отключить аккаунт и все его подключения?');"{% else %}onsubmit="return confirm('Включить аккаунт и восстановить его подключения?');"{% endif %}>
+                {% csrf_token %}
+                {% if account.status == 'active' %}
+                  <input type="hidden" name="status" value="disabled">
+                  <button type="submit" class="dropdown-item text-danger">Отключить аккаунт</button>
+                {% else %}
+                  <input type="hidden" name="status" value="active">
+                  <button type="submit" class="dropdown-item">Включить аккаунт</button>
+                {% endif %}
+              </form>
+            </li>
+          </ul>
+        </div>
       {% endif %}
-    </p>
-  </div>
+    </div>
+  </header>
 
-  <div class="action-cluster">
+  <section class="v4-detail-metrics" aria-label="Сводка клиента">
+    <div class="v4-detail-metric">
+      <span class="v4-detail-metric-icon is-blue" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="5" width="18" height="12" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+      </span>
+      <span class="v4-detail-metric-copy"><small>Устройства</small><strong>{{ workspace.device_total }}</strong><em>{{ workspace.active_device_total }} активных</em></span>
+    </div>
+
+    <div class="v4-detail-metric">
+      <span class="v4-detail-metric-icon is-violet" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M10 13a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1.2 1.2"/><path d="M14 11a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1.2-1.2"/></svg>
+      </span>
+      <span class="v4-detail-metric-copy"><small>Подключения</small><strong>{{ workspace.connection_total }}</strong><em>{{ workspace.active_connection_total }} активных</em></span>
+    </div>
+
+    <div class="v4-detail-metric">
+      <span class="v4-detail-metric-icon is-orange" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M7 3v4M17 3v4M3 10h18"/></svg>
+      </span>
+      <span class="v4-detail-metric-copy"><small>Действует до</small><strong class="is-date">{% if account.expires_at %}{{ account.expires_at|date:'d.m.Y' }}{% else %}Без срока{% endif %}</strong><em>{% if workspace.account_expired %}срок истёк{% else %}доступ аккаунта{% endif %}</em></span>
+    </div>
+
+    <div class="v4-detail-metric">
+      <span class="v4-detail-metric-icon is-green" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M6 10V8a6 6 0 0 1 12 0v2"/><rect x="4" y="10" width="16" height="11" rx="3"/><path d="M12 14v3"/></svg>
+      </span>
+      <span class="v4-detail-metric-copy"><small>Личный кабинет</small><strong class="is-state">{% if account.user %}{% if account.user.is_active %}Доступен{% else %}Отключён{% endif %}{% else %}Не создан{% endif %}</strong><em>{% if account.user %}{{ account.user.username }}{% else %}отдельная настройка{% endif %}</em></span>
+    </div>
+  </section>
+
+  <nav class="v4-detail-tabs" aria-label="Разделы клиента">
+    <a href="#customer-overview">Обзор</a>
+    <a href="#customer-connections">Устройства и VPN</a>
+    <a href="#customer-access">Доступ и продление</a>
+    <a href="#customer-management">Управление</a>
+  </nav>
+
+  <section class="v4-detail-panel" id="customer-overview">
+    <div class="v4-detail-section-head">
+      <div>
+        <span class="v4-panel-eyebrow">Состояние клиента</span>
+        <h2>Обзор</h2>
+      </div>
+      {% if workspace.account_ready and workspace.active_device_total > 0 and workspace.active_connection_total > 0 %}
+        <span class="v4-status-pill is-success">VPN работает</span>
+      {% elif workspace.account_expired %}
+        <span class="v4-status-pill is-danger">Срок истёк</span>
+      {% elif account.status == 'deleted' %}
+        <span class="v4-status-pill is-neutral">Недоступен</span>
+      {% else %}
+        <span class="v4-status-pill is-warning">Настройка не завершена</span>
+      {% endif %}
+    </div>
+
+    {% if account.status == 'deleted' %}
+      <div class="v4-detail-alert is-warning">
+        <strong>Аккаунт является удалённой или объединённой записью.</strong>
+        <span>Операции управления для него отключены.</span>
+      </div>
+
+    {% elif workspace.account_ready and workspace.active_device_total > 0 and workspace.active_connection_total > 0 %}
+      <div class="v4-ready-state">
+        <span class="v4-ready-icon">✓</span>
+        <div>
+          <strong>Клиент полностью настроен</strong>
+          <span>{{ workspace.active_device_total }} активных устройств · {{ workspace.active_connection_total }} активных подключений{% if account.user and account.user.is_active %} · личный кабинет доступен{% endif %}.</span>
+        </div>
+      </div>
+
+    {% else %}
+      <div class="v4-setup-progress">
+        <div class="v4-setup-step {% if workspace.account_ready %}is-done{% else %}is-attention{% endif %}">
+          <span>{% if workspace.account_ready %}✓{% else %}1{% endif %}</span>
+          <div><strong>Аккаунт</strong><small>{% if account.status == 'disabled' %}Аккаунт отключён{% elif workspace.account_expired %}Срок действия истёк{% elif workspace.account_ready %}Аккаунт готов{% else %}Требует проверки{% endif %}</small></div>
+        </div>
+
+        <div class="v4-setup-step {% if workspace.active_device_total > 0 %}is-done{% elif workspace.device_total == 0 %}is-next{% else %}is-attention{% endif %}">
+          <span>{% if workspace.active_device_total > 0 %}✓{% else %}2{% endif %}</span>
+          <div><strong>Устройство</strong><small>{% if workspace.active_device_total > 0 %}{{ workspace.active_device_total }} активных{% elif workspace.device_total == 0 %}Нужно добавить устройство{% else %}Нет активных устройств{% endif %}</small></div>
+          {% if account.status != 'deleted' and workspace.active_device_total == 0 %}<a href="{% url 'customers-device-create' account.pk %}">Добавить</a>{% endif %}
+        </div>
+
+        <div class="v4-setup-step {% if workspace.active_connection_total > 0 %}is-done{% elif workspace.active_device_total > 0 and workspace.account_ready %}is-next{% else %}is-waiting{% endif %}">
+          <span>{% if workspace.active_connection_total > 0 %}✓{% else %}3{% endif %}</span>
+          <div><strong>VPN</strong><small>{% if workspace.active_connection_total > 0 %}{{ workspace.active_connection_total }} активных подключений{% elif workspace.active_device_total > 0 and workspace.account_ready %}Нужно создать подключение{% else %}Ожидает предыдущих шагов{% endif %}</small></div>
+          {% if workspace.device_total > 0 %}<a href="#customer-connections">Открыть</a>{% endif %}
+        </div>
+
+        <div class="v4-setup-step {% if account.user and account.user.is_active %}is-done{% elif account.user %}is-attention{% else %}is-optional{% endif %}">
+          <span>{% if account.user and account.user.is_active %}✓{% else %}4{% endif %}</span>
+          <div><strong>Личный кабинет</strong><small>{% if account.user and account.user.is_active %}Вход разрешён{% elif account.user %}Вход отключён{% else %}Необязательная настройка{% endif %}</small></div>
+          {% if account.status != 'deleted' %}{% if account.user %}<a href="{% url 'customers-access-manage' account.pk %}">Настроить</a>{% else %}<a href="{% url 'customers-access-create' account.pk %}">Создать</a>{% endif %}{% endif %}
+        </div>
+      </div>
+    {% endif %}
+  </section>
+
+  <section id="customer-connections" class="v4-detail-anchor-section">
+    <div class="v4-detail-section-title">
+      <div><span class="v4-panel-eyebrow">Устройства и VPN</span><h2>Подключения</h2></div>
+      {% if account.status != 'deleted' %}<a class="btn btn-outline-primary btn-sm" href="{% url 'customers-device-create' account.pk %}">+ Устройство</a>{% endif %}
+    </div>
+    <div class="operator-workspace-v4">
+      {% include 'customers/_operator_workspace.html' %}
+    </div>
+  </section>
+
+  <section class="v4-detail-panel" id="customer-access">
+    <div class="v4-detail-section-head">
+      <div>
+        <span class="v4-panel-eyebrow">Доступ</span>
+        <h2>Срок и продление</h2>
+        <p>Продление меняет срок аккаунта и всех его подключений. Сохранённые конфигурации не перевыпускаются.</p>
+      </div>
+      <div class="v4-current-expiry">
+        <span>Текущий срок</span>
+        <strong>{% if account.expires_at %}{{ account.expires_at|date:'d.m.Y H:i' }}{% else %}Без срока{% endif %}</strong>
+      </div>
+    </div>
 
     {% if account.status != 'deleted' %}
+      {% if open_renewal_request %}
+        <div class="v4-renewal-request-card">
+          <div>
+            <span class="v4-status-pill is-warning">{{ open_renewal_request.get_status_display }}</span>
+            <strong>Заявка #{{ open_renewal_request.pk }}</strong>
+            <small>{{ open_renewal_request.created_at|date:'d.m.Y H:i' }}</small>
+            {% if open_renewal_request.attachment %}<a href="{% url 'renewal-request-attachment-download' open_renewal_request.pk %}" target="_blank" rel="noopener">{{ open_renewal_request.attachment_display_name }}</a>{% endif %}
+          </div>
 
-      <form
-        method="post"
-        action="{% url 'customers-status' account.pk %}"
-        class="d-inline"
-        {% if account.status == 'active' %}
-          onsubmit="return confirm('Отключить аккаунт и все его подключения?');"
-        {% else %}
-          onsubmit="return confirm('Включить аккаунт и восстановить его подключения?');"
-        {% endif %}
-      >
-        {% csrf_token %}
-
-        {% if account.status == 'active' %}
-          <input
-            type="hidden"
-            name="status"
-            value="disabled"
-          >
-
-          <button
-            type="submit"
-            class="btn btn-outline-danger"
-          >
-            Отключить аккаунт
-          </button>
-
-        {% else %}
-          <input
-            type="hidden"
-            name="status"
-            value="active"
-          >
-
-          <button
-            type="submit"
-            class="btn btn-outline-success"
-          >
-            Включить аккаунт
-          </button>
-        {% endif %}
-      </form>
-
-      {% if account.user %}
-
-        <a
-          class="btn btn-outline-primary"
-          href="{% url 'customers-access-manage' account.pk %}"
-        >
-          Управление кабинетом
-        </a>
-
-        <a
-          class="btn btn-outline-secondary"
-          href="{% url 'customer-portal-login' %}"
-          target="_blank"
-          rel="noopener"
-          title="Общая страница входа в личный кабинет клиента"
-        >
-          Страница входа
-        </a>
-
-      {% else %}
-
-        <a
-          class="btn btn-outline-primary"
-          href="{% url 'customers-access-create' account.pk %}"
-        >
-          Создать кабинет
-        </a>
-
-      {% endif %}
-
-      <a
-        class="btn btn-outline-secondary"
-        href="{% url 'customers-edit' account.pk %}"
-      >
-        Редактировать аккаунт
-      </a>
-
-      <a
-        class="btn btn-primary"
-        href="{% url 'customers-device-create' account.pk %}"
-      >
-        Добавить устройство
-      </a>
-
-    {% endif %}
-
-    <a
-      class="btn btn-outline-secondary"
-      href="{% url 'customers-list' %}"
-    >
-      Все аккаунты
-    </a>
-
-  </div>
-</div>
-
-
-<section class="section-block section-quiet">
-  <div class="section-body">
-    <div class="summary-strip">
-
-      <div class="summary-item span-3">
-        <div class="label">Статус</div>
-        <div class="value">
-          {% if account.status == 'active' and workspace.account_expired %}
-            <span class="text-danger">
-              Срок истёк
-            </span>
-          {% elif account.status == 'active' %}
-            Активен
-          {% elif account.status == 'disabled' %}
-            Отключён
-          {% elif account.status == 'deleted' %}
-            Удалён
-          {% else %}
-            {{ account.status }}
+          {% if open_renewal_request.status == 'new' %}
+            <form method="post" action="{% url 'customers-renewal-action' account.pk %}">
+              {% csrf_token %}<input type="hidden" name="renewal_request_id" value="{{ open_renewal_request.pk }}"><input type="hidden" name="action" value="in_progress">
+              <button type="submit" class="btn btn-outline-primary btn-sm">Взять в работу</button>
+            </form>
           {% endif %}
         </div>
-      </div>
 
-      <div class="summary-item span-3">
-        <div class="label">Устройств</div>
-        <div class="value">{{ account.devices.all|length }}</div>
-      </div>
-
-      <div class="summary-item span-3">
-        <div class="label">Срок аккаунта</div>
-        <div class="value">
-          {% if account.expires_at %}
-            {{ account.expires_at|date:"d.m.Y" }}
-          {% else %}
-            Без срока
-          {% endif %}
-        </div>
-      </div>
-
-      <div class="summary-item span-3">
-        <div class="label">Кабинет</div>
-        <div class="value">
-          {% if account.user %}
-
-            {{ account.user.username }}
-
-            <div class="small mt-2">
-
-              <a
-                href="{% url 'customer-portal-login' %}"
-                target="_blank"
-                rel="noopener"
-              >
-                Страница входа клиента
-              </a>
-
-              <div class="text-secondary mt-1">
-                {{ request.scheme }}://{{ request.get_host }}{% url 'customer-portal-login' %}
-              </div>
-
-            </div>
-
-            <div class="small">
-
-              {% if account.user.is_active %}
-                <span class="text-success">
-                  Доступ включён
-                </span>
-              {% else %}
-                <span class="text-warning">
-                  Вход отключён
-                </span>
-              {% endif %}
-
-            </div>
-
-          {% else %}
-            Не создан
-          {% endif %}
-        </div>
-      </div>
-
-    </div>
-  </div>
-</section>
-
-
-<section
-  class="section-block"
-  id="customer-readiness"
->
-
-  <div class="section-body">
-
-    <div class="section-header-compact">
-
-      <div>
-
-        <p class="page-kicker mb-1">
-          Настройка клиента
-        </p>
-
-        <h2 class="h5 mb-1">
-          Состояние клиента
-        </h2>
-
-        <div class="text-secondary small">
-          Работоспособность VPN и отдельная
-          настройка личного кабинета.
-        </div>
-
-      </div>
-
-
-      <div>
-
-        {% if workspace.account_ready and workspace.active_device_total > 0 and workspace.active_connection_total > 0 %}
-
-          <span class="badge text-bg-success">
-            VPN работает
-          </span>
-
-        {% elif workspace.account_expired %}
-
-          <span class="badge text-bg-danger">
-            Срок истёк
-          </span>
-
-        {% elif account.status == 'deleted' %}
-
-          <span class="badge text-bg-secondary">
-            Недоступен
-          </span>
-
-        {% else %}
-
-          <span class="badge text-bg-warning">
-            Настройка не завершена
-          </span>
-
-        {% endif %}
-
-
-        {% if account.status != 'deleted' and not account.user %}
-
-          <span class="badge text-bg-secondary ms-1">
-            Кабинет не создан
-          </span>
-
-        {% elif account.user and not account.user.is_active %}
-
-          <span class="badge text-bg-warning ms-1">
-            Вход в кабинет отключён
-          </span>
-
-        {% endif %}
-
-      </div>
-
-    </div>
-
-
-    {% if workspace.account_ready and workspace.active_device_total > 0 and workspace.active_connection_total > 0 %}
-
-      <div class="alert alert-success mb-0 py-2">
-
-        <strong>
-          Рабочее состояние.
-        </strong>
-
-        Активных устройств:
-        {{ workspace.active_device_total }}
-        · Активных подключений:
-        {{ workspace.active_connection_total }}.
-
-        {% if account.user and account.user.is_active %}
-          Личный кабинет доступен.
-        {% elif account.user %}
-          Вход в личный кабинет отключён.
-        {% else %}
-          Личный кабинет не создан.
-        {% endif %}
-
-      </div>
-
-    {% else %}
-
-    <div class="row g-3">
-
-
-      <div class="col-12 col-md-6 col-xl-3">
-
-        <div class="border rounded-3 p-3 h-100">
-
-          <div class="d-flex justify-content-between gap-2 align-items-start">
-
-            <div>
-
-              <div class="small text-secondary">
-                Шаг 1
-              </div>
-
-              <div class="fw-semibold">
-                Клиент
-              </div>
-
-            </div>
-
-
-            {% if workspace.account_ready %}
-
-              <span class="badge text-bg-success">
-                ✓ Готово
-              </span>
-
-            {% else %}
-
-              <span class="badge text-bg-warning">
-                ! Требует внимания
-              </span>
-
-            {% endif %}
-
-          </div>
-
-
-          <div class="small text-secondary mt-3">
-
-            {% if account.status == 'deleted' %}
-
-              Аккаунт удалён или объединён.
-
-            {% elif account.status == 'disabled' %}
-
-              Аккаунт отключён.
-              Включите его кнопкой управления выше.
-
-            {% elif workspace.account_expired %}
-
-              Срок действия аккаунта истёк.
-
-            {% else %}
-
-              Аккаунт активен и может
-              использовать подключения.
-
-            {% endif %}
-
-          </div>
-
-        </div>
-
-      </div>
-
-
-      <div class="col-12 col-md-6 col-xl-3">
-
-        <div class="border rounded-3 p-3 h-100">
-
-          <div class="d-flex justify-content-between gap-2 align-items-start">
-
-            <div>
-
-              <div class="small text-secondary">
-                Шаг 2
-              </div>
-
-              <div class="fw-semibold">
-                Личный кабинет
-              </div>
-
-            </div>
-
-
-            {% if account.user and account.user.is_active %}
-
-              <span class="badge text-bg-success">
-                ✓ Готово
-              </span>
-
-            {% elif account.user %}
-
-              <span class="badge text-bg-warning">
-                ! Требует внимания
-              </span>
-
-            {% else %}
-
-              <span class="badge text-bg-secondary">
-                Отдельная настройка
-              </span>
-
-            {% endif %}
-
-          </div>
-
-
-          <div class="small text-secondary mt-3">
-
-            {% if account.user and account.user.is_active %}
-
-              Кабинет создан, вход разрешён.
-
-            {% elif account.user %}
-
-              Кабинет создан, но вход отключён.
-
-            {% else %}
-
-              Кабинет клиента ещё не создан.
-
-            {% endif %}
-
-          </div>
-
-
-          {% if account.status != 'deleted' %}
-
-            {% if account.user %}
-
-              <a
-                href="{% url 'customers-access-manage' account.pk %}"
-                class="btn btn-sm btn-outline-primary mt-3"
-              >
-                Управление кабинетом
-              </a>
-
-            {% else %}
-
-              <a
-                href="{% url 'customers-access-create' account.pk %}"
-                class="btn btn-sm btn-primary mt-3"
-              >
-                Создать кабинет
-              </a>
-
-            {% endif %}
-
-          {% endif %}
-
-        </div>
-
-      </div>
-
-
-      <div class="col-12 col-md-6 col-xl-3">
-
-        <div class="border rounded-3 p-3 h-100">
-
-          <div class="d-flex justify-content-between gap-2 align-items-start">
-
-            <div>
-
-              <div class="small text-secondary">
-                Шаг 3
-              </div>
-
-              <div class="fw-semibold">
-                Устройство
-              </div>
-
-            </div>
-
-
-            {% if workspace.active_device_total > 0 %}
-
-              <span class="badge text-bg-success">
-                ✓ Готово
-              </span>
-
-            {% elif workspace.device_total == 0 %}
-
-              <span class="badge text-bg-primary">
-                → Следующее действие
-              </span>
-
-            {% else %}
-
-              <span class="badge text-bg-warning">
-                ! Требует внимания
-              </span>
-
-            {% endif %}
-
-          </div>
-
-
-          <div class="small text-secondary mt-3">
-
-            {% if workspace.active_device_total > 0 %}
-
-              Активных устройств:
-              {{ workspace.active_device_total }}.
-
-            {% elif workspace.device_total == 0 %}
-
-              Устройства ещё не добавлены.
-
-            {% else %}
-
-              Устройства есть, но активных нет.
-
-            {% endif %}
-
-          </div>
-
-
-          {% if account.status != 'deleted' %}
-
-            {% if workspace.active_device_total == 0 %}
-
-              <a
-                href="{% url 'customers-device-create' account.pk %}"
-                class="btn btn-sm btn-primary mt-3"
-              >
-                Добавить устройство
-              </a>
-
-            {% else %}
-
-              <a
-                href="#customer-connections"
-                class="btn btn-sm btn-outline-primary mt-3"
-              >
-                К устройствам
-              </a>
-
-            {% endif %}
-
-          {% endif %}
-
-        </div>
-
-      </div>
-
-
-      <div class="col-12 col-md-6 col-xl-3">
-
-        <div class="border rounded-3 p-3 h-100">
-
-          <div class="d-flex justify-content-between gap-2 align-items-start">
-
-            <div>
-
-              <div class="small text-secondary">
-                Шаг 4
-              </div>
-
-              <div class="fw-semibold">
-                Подключения
-              </div>
-
-            </div>
-
-
-            {% if workspace.active_connection_total > 0 %}
-
-              <span class="badge text-bg-success">
-                ✓ Готово
-              </span>
-
-            {% elif workspace.active_device_total > 0 and workspace.account_ready %}
-
-              <span class="badge text-bg-primary">
-                → Следующее действие
-              </span>
-
-            {% elif workspace.connection_total > 0 %}
-
-              <span class="badge text-bg-warning">
-                ! Требует внимания
-              </span>
-
-            {% else %}
-
-              <span class="badge text-bg-secondary">
-                Ожидает
-              </span>
-
-            {% endif %}
-
-          </div>
-
-
-          <div class="small text-secondary mt-3">
-
-            {% if workspace.active_connection_total > 0 %}
-
-              Активных подключений:
-              {{ workspace.active_connection_total }}.
-
-            {% elif workspace.active_device_total > 0 and workspace.account_ready %}
-
-              Добавьте нужное подключение
-              в карточке устройства ниже.
-
-            {% elif workspace.connection_total > 0 %}
-
-              Подключения созданы,
-              но активных сейчас нет.
-
-            {% elif workspace.device_total == 0 %}
-
-              Сначала добавьте устройство.
-
-            {% elif not workspace.account_ready %}
-
-              Сначала восстановите доступ аккаунта.
-
-            {% else %}
-
-              Подключения пока не созданы.
-
-            {% endif %}
-
-          </div>
-
-
-          {% if account.status != 'deleted' and workspace.device_total > 0 %}
-
-            <a
-              href="#customer-connections"
-              class="btn btn-sm btn-outline-primary mt-3"
-            >
-              Перейти к подключениям
-            </a>
-
-          {% endif %}
-
-        </div>
-
-      </div>
-
-
-    </div>
-
-    {% endif %}
-
-  </div>
-
-</section>
-
-
-{% if account.status == 'deleted' %}
-<section class="section-block">
-  <div class="section-body">
-    <div class="alert alert-warning mb-0">
-      Этот аккаунт является удалённой или объединённой записью.
-      Операции управления для него отключены.
-    </div>
-  </div>
-</section>
-{% endif %}
-
-
-{% if account.status != 'deleted' %}
-
-{% if not account.expires_at and not open_renewal_request and not latest_renewal_request %}
-
-<section class="section-block section-quiet">
-
-  <div class="section-body">
-
-    <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap">
-
-      <div>
-
-        <p class="page-kicker mb-1">
-          Подписка
-        </p>
-
-        <div class="fw-semibold">
-          Срок: без ограничения
-        </div>
-
-      </div>
-
-
-      <div class="text-secondary small">
-        Активной заявки на продление нет
-      </div>
-
-    </div>
-
-  </div>
-
-</section>
-
-{% else %}
-
-<section class="section-block">
-
-  <div class="section-body">
-
-    <div class="section-header-compact">
-
-      <div>
-
-        <p class="page-kicker mb-1">
-          Подписка
-        </p>
-
-        <h2 class="h5 mb-1">
-          Продление аккаунта
-        </h2>
-
-        <div class="text-secondary small">
-          Продление меняет срок действия клиента
-          и всех его подключений.
-          Сохранённые конфигурации при этом
-          не перевыпускаются.
-        </div>
-
-      </div>
-
-    </div>
-
-
-    <div class="mb-3">
-
-      <span class="text-secondary">
-        Текущий срок:
-      </span>
-
-      <strong>
-        {% if account.expires_at %}
-          {{ account.expires_at|date:"d.m.Y H:i" }}
-        {% else %}
-          Без срока
-        {% endif %}
-      </strong>
-
-    </div>
-
-
-    {% if open_renewal_request %}
-
-      <div class="alert alert-info">
-
-        <div class="fw-semibold">
-          {{ open_renewal_request.get_status_display }}
-        </div>
-
-        <div class="small mt-1">
-          Заявка #{{ open_renewal_request.pk }}
-          ·
-          {{ open_renewal_request.created_at|date:"d.m.Y H:i" }}
-        </div>
-
-        {% if open_renewal_request.attachment %}
-          <div class="small mt-2">
-            <a
-              href="{% url 'renewal-request-attachment-download' open_renewal_request.pk %}"
-              target="_blank"
-              rel="noopener"
-            >
-              {{ open_renewal_request.attachment_display_name }}
-            </a>
-          </div>
-        {% endif %}
-
-      </div>
-
-
-      {% if open_renewal_request.status == 'new' %}
-
-        <form
-          method="post"
-          action="{% url 'customers-renewal-action' account.pk %}"
-          class="mb-3"
-        >
-
+        <form method="post" action="{% url 'customers-renewal-action' account.pk %}" class="v4-renewal-extend-form">
           {% csrf_token %}
-
-          <input
-            type="hidden"
-            name="renewal_request_id"
-            value="{{ open_renewal_request.pk }}"
-          >
-
-          <input
-            type="hidden"
-            name="action"
-            value="in_progress"
-          >
-
-          <button
-            type="submit"
-            class="btn btn-outline-primary"
-          >
-            Взять в работу
-          </button>
-
+          <input type="hidden" name="renewal_request_id" value="{{ open_renewal_request.pk }}">
+          <input type="hidden" name="action" value="extend">
+          <label><span>Продлить на дней</span><input type="number" min="1" max="365" name="extension_days" value="30" required class="form-control"></label>
+          <label class="is-wide"><span>Комментарий</span><input type="text" name="operator_note" class="form-control" maxlength="1000" placeholder="Необязательно"></label>
+          <button type="submit" class="btn btn-primary">Продлить и закрыть</button>
         </form>
 
+        <details class="v4-danger-details">
+          <summary>Отклонить заявку</summary>
+          <form method="post" action="{% url 'customers-renewal-action' account.pk %}" onsubmit="return confirm('Отклонить заявку на продление?');">
+            {% csrf_token %}<input type="hidden" name="renewal_request_id" value="{{ open_renewal_request.pk }}"><input type="hidden" name="action" value="dismiss">
+            <input type="text" name="operator_note" class="form-control" maxlength="1000" placeholder="Причина / комментарий">
+            <button type="submit" class="btn btn-outline-danger btn-sm">Отклонить заявку</button>
+          </form>
+        </details>
+
+      {% elif latest_renewal_request %}
+        <div class="v4-detail-alert is-neutral">
+          <strong>Последняя заявка: {{ latest_renewal_request.get_status_display }}</strong>
+          <span>{{ latest_renewal_request.updated_at|date:'d.m.Y H:i' }}{% if latest_renewal_request.operator_note %} · {{ latest_renewal_request.operator_note }}{% endif %}</span>
+        </div>
+      {% else %}
+        <div class="v4-detail-alert is-neutral">
+          <strong>Активной заявки на продление нет</strong>
+          <span>{% if account.expires_at %}Текущий срок указан выше.{% else %}Аккаунт работает без ограничения по сроку.{% endif %}</span>
+        </div>
       {% endif %}
-
-
-      <form
-        method="post"
-        action="{% url 'customers-renewal-action' account.pk %}"
-        class="row g-3 align-items-end mb-3"
-      >
-
-        {% csrf_token %}
-
-        <input
-          type="hidden"
-          name="renewal_request_id"
-          value="{{ open_renewal_request.pk }}"
-        >
-
-        <input
-          type="hidden"
-          name="action"
-          value="extend"
-        >
-
-
-        <div class="col-12 col-lg-3">
-
-          <label
-            class="form-label"
-            for="extension-days"
-          >
-            Продлить на дней
-          </label>
-
-          <input
-            id="extension-days"
-            type="number"
-            min="1"
-            max="365"
-            name="extension_days"
-            value="30"
-            required
-            class="form-control"
-          >
-
-        </div>
-
-
-        <div class="col-12 col-lg-6">
-
-          <label
-            class="form-label"
-            for="renewal-note"
-          >
-            Комментарий
-          </label>
-
-          <input
-            id="renewal-note"
-            type="text"
-            name="operator_note"
-            class="form-control"
-            maxlength="1000"
-          >
-
-        </div>
-
-
-        <div class="col-12 col-lg-3">
-
-          <button
-            type="submit"
-            class="btn btn-success w-100"
-          >
-            Продлить и закрыть
-          </button>
-
-        </div>
-
-      </form>
-
-
-      <form
-        method="post"
-        action="{% url 'customers-renewal-action' account.pk %}"
-        onsubmit="return confirm('Отклонить заявку на продление?');"
-      >
-
-        {% csrf_token %}
-
-        <input
-          type="hidden"
-          name="renewal_request_id"
-          value="{{ open_renewal_request.pk }}"
-        >
-
-        <input
-          type="hidden"
-          name="action"
-          value="dismiss"
-        >
-
-        <input
-          type="text"
-          name="operator_note"
-          class="form-control mb-2"
-          maxlength="1000"
-          placeholder="Причина / комментарий"
-        >
-
-        <button
-          type="submit"
-          class="btn btn-outline-danger"
-        >
-          Отклонить заявку
-        </button>
-
-      </form>
-
-    {% elif latest_renewal_request %}
-
-      <div class="alert alert-secondary mb-0">
-
-        Последняя заявка:
-        <strong>
-          {{ latest_renewal_request.get_status_display }}
-        </strong>
-
-        ·
-        {{ latest_renewal_request.updated_at|date:"d.m.Y H:i" }}
-
-        {% if latest_renewal_request.operator_note %}
-          <div class="small mt-2">
-            {{ latest_renewal_request.operator_note }}
-          </div>
-        {% endif %}
-
-      </div>
-
     {% else %}
-
-      <div class="text-secondary">
-        Заявок на продление пока нет.
-      </div>
-
+      <div class="v4-detail-alert is-warning"><strong>Управление доступом недоступно</strong><span>Аккаунт удалён или объединён.</span></div>
     {% endif %}
 
-  </div>
-
-</section>
-
-{% endif %}
-
-{% endif %}
-
-
-
-<div id="customer-connections">
-  {% include 'customers/_operator_workspace.html' %}
-</div>
-
-
-
-
-
-{% if account.status != 'deleted' %}
-
-<section class="section-block section-quiet">
-
-  <div class="section-body">
-
-    <details>
-
-      <summary class="d-flex justify-content-between align-items-center gap-3 flex-wrap">
-
-        <span class="fw-semibold">
-          Дополнительные действия
-        </span>
-
-        <span class="text-secondary small">
-          Объединение аккаунтов
-        </span>
-
-      </summary>
-
-
-      <div class="mt-4">
-
-
-
-
-    <div class="section-header-compact">
+    <div class="v4-cabinet-summary">
       <div>
-        <p class="page-kicker mb-1">
-          Управление аккаунтом
-        </p>
+        <span>Личный кабинет</span>
+        <strong>{% if account.user %}{{ account.user.username }}{% else %}Не создан{% endif %}</strong>
+        {% if account.user %}<small>{% if account.user.is_active %}Вход разрешён{% else %}Вход отключён{% endif %}</small>{% endif %}
+      </div>
+      {% if account.status != 'deleted' %}
+        {% if account.user %}<a class="btn btn-outline-secondary btn-sm" href="{% url 'customers-access-manage' account.pk %}">Управление кабинетом</a>{% else %}<a class="btn btn-outline-primary btn-sm" href="{% url 'customers-access-create' account.pk %}">Создать кабинет</a>{% endif %}
+      {% endif %}
+    </div>
+  </section>
 
-        <h2 class="h5 mb-1">
-          Объединение аккаунтов
-        </h2>
-
-        <div class="text-secondary small">
-          Все устройства исходного аккаунта будут перенесены
-          в выбранный аккаунт. VPN-ключи, IP-адреса и
-          конфигурации не перевыпускаются.
-        </div>
+  <section class="v4-detail-panel v4-management-panel" id="customer-management">
+    <div class="v4-detail-section-head">
+      <div>
+        <span class="v4-panel-eyebrow">Редкие операции</span>
+        <h2>Управление аккаунтом</h2>
+        <p>Операции ниже не перевыпускают VPN-ключи, IP-адреса и сохранённые конфигурации.</p>
       </div>
     </div>
 
-
-    {% if account.user %}
-
-      <div class="alert alert-warning mb-0">
-        Этот аккаунт привязан к пользовательскому логину.
-        Автоматическое объединение запрещено.
-      </div>
-
-    {% elif candidate_accounts %}
-
-      <form
-        method="post"
-        action="{% url 'customers-merge' account.pk %}"
-        class="row g-3 align-items-end"
-        onsubmit="return confirm('Объединить аккаунт «{{ account.display_name|escapejs }}» с выбранным аккаунтом? Все устройства будут перенесены. VPN-конфигурации останутся без изменений.');"
-      >
-
-        {% csrf_token %}
-
-        <div class="col-12 col-lg-8">
-
-          <label
-            class="form-label"
-            for="merge-target"
-          >
-            Целевой аккаунт
-          </label>
-
-          <select
-            id="merge-target"
-            name="target_account_id"
-            class="form-select"
-            required
-          >
-
-            <option value="">
-              Выберите аккаунт…
-            </option>
-
-            {% for target in candidate_accounts %}
-
-              <option value="{{ target.pk }}">
-                {{ target.display_name }}
-                {% if target.email %}
-                  · {{ target.email }}
-                {% endif %}
-              </option>
-
-            {% endfor %}
-
-          </select>
-
+    {% if account.status != 'deleted' %}
+      <details class="v4-management-details">
+        <summary>
+          <span><strong>Объединение аккаунтов</strong><small>Перенести все устройства в другой аккаунт</small></span>
+          <span>Раскрыть</span>
+        </summary>
+        <div class="v4-management-body">
+          {% if account.user %}
+            <div class="v4-detail-alert is-warning"><strong>Объединение запрещено</strong><span>Этот аккаунт привязан к пользовательскому логину.</span></div>
+          {% elif candidate_accounts %}
+            <form method="post" action="{% url 'customers-merge' account.pk %}" class="v4-merge-form" onsubmit="return confirm('Объединить аккаунт «{{ account.display_name|escapejs }}» с выбранным аккаунтом? Все устройства будут перенесены. VPN-конфигурации останутся без изменений.');">
+              {% csrf_token %}
+              <label><span>Целевой аккаунт</span><select name="target_account_id" class="form-select" required><option value="">Выберите аккаунт…</option>{% for target in candidate_accounts %}<option value="{{ target.pk }}">{{ target.display_name }}{% if target.email %} · {{ target.email }}{% endif %}</option>{% endfor %}</select></label>
+              <button type="submit" class="btn btn-outline-danger">Объединить аккаунты</button>
+            </form>
+            <p class="v4-management-note">Исходный аккаунт останется как tombstone со статусом «Удалён».</p>
+          {% else %}
+            <div class="v4-detail-alert is-neutral"><strong>Нет доступного аккаунта для объединения</strong></div>
+          {% endif %}
         </div>
-
-
-        <div class="col-12 col-lg-4">
-
-          <button
-            type="submit"
-            class="btn btn-danger w-100"
-          >
-            Объединить аккаунты
-          </button>
-
-        </div>
-
-      </form>
-
-      <div class="small text-secondary mt-3">
-        Исходный аккаунт не удаляется физически:
-        после объединения он сохраняется как tombstone
-        со статусом «Удалён».
-      </div>
-
+      </details>
     {% else %}
-
-      <div class="text-secondary">
-        Нет другого доступного аккаунта для объединения.
-      </div>
-
+      <div class="v4-detail-alert is-neutral"><strong>Дополнительные операции недоступны</strong></div>
     {% endif %}
-
-
-
-      </div>
-
-    </details>
-
-  </div>
-
-</section>
-
-{% endif %}
-
-
-<section class="section-block section-quiet">
-  <div class="section-body">
-
-    <div class="small text-secondary">
-      Управление аккаунтами выполняется отдельно от технических
-      VPN-конфигураций. Перенос устройства или объединение
-      аккаунтов не изменяет уже выданные VPN-ключи,
-      адреса и сохранённые конфигурации.
-    </div>
-
-  </div>
-</section>
-
+  </section>
+</div>
 {% endblock %}
