@@ -17,6 +17,7 @@
   <link href="{% static 'css/app-v4-customers.css' %}" rel="stylesheet">
   <link href="{% static 'css/app-v4-detail.css' %}" rel="stylesheet">
   <link href="{% static 'css/app-v4-system.css' %}" rel="stylesheet">
+  <link href="{% static 'css/app-v4-polish.css' %}" rel="stylesheet">
   <style>
     form[action="/clients/import/"],
     form[action$="/import-peers/"] { display: none !important; }
@@ -28,7 +29,7 @@
 {% if user.is_authenticated %}
 <div class="app-layout d-flex">
   <aside class="sidebar" id="appSidebar" aria-label="Основная навигация">
-    <a class="brand" href="/" aria-label="VPN Control — главная">
+    <a class="brand" href="/" aria-label="VPN Control — обзор">
       <span class="brand-mark" aria-hidden="true">A</span>
       <span class="brand-label">VPN Control</span>
     </a>
@@ -37,7 +38,7 @@
     <nav class="nav flex-column" aria-label="Обзор">
       <a class="nav-link {% if request.path == '/' %}active{% endif %}" href="/" {% if request.path == '/' %}aria-current="page"{% endif %}>
         <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 10.8 12 3l9 7.8v9.7a.5.5 0 0 1-.5.5h-5.8v-6.5H9.3V21H3.5a.5.5 0 0 1-.5-.5z"/></svg></span>
-        <span class="nav-label">Главная</span>
+        <span class="nav-label">Обзор</span>
       </a>
     </nav>
 
@@ -77,22 +78,23 @@
       </a>
     </nav>
 
-    <hr class="my-3 sidebar-divider">
-    <div class="sidebar-section sidebar-section-muted">Техническое</div>
-    <nav class="nav flex-column sidebar-nav-aux" aria-label="Технические разделы">
-      <a class="nav-link {% if request.path|slice:':9' == '/clients/' and request.path|slice:':26' != '/clients/renewal-requests/' %}active{% endif %}" href="/clients/">
-        <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/></svg></span>
-        <span class="nav-label">Legacy · Клиенты</span>
-      </a>
-      <a class="nav-link {% if request.path|slice:':7' == '/xhttp/' %}active{% endif %}" href="/xhttp/">
-        <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M5 12a7 7 0 0 1 14 0v5a3 3 0 0 1-3 3h-1"/><path d="M5 12v5a3 3 0 0 0 3 3h1"/><path d="M9 16h6"/></svg></span>
-        <span class="nav-label">Legacy · XHTTP</span>
-      </a>
-      <a class="nav-link" href="/admin/">
-        <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 21V10l8-7 8 7v11"/><path d="M9 21v-6h6v6"/></svg></span>
-        <span class="nav-label">Django Admin</span>
-      </a>
-    </nav>
+    <details class="sidebar-system" {% if request.path|slice:':9' == '/clients/' and request.path|slice:':26' != '/clients/renewal-requests/' or request.path|slice:':7' == '/xhttp/' or request.path|slice:':7' == '/admin/' %}open{% endif %}>
+      <summary>
+        <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M4 12a8 8 0 0 1 16 0M12 4v2M12 18v2M4 12h2M18 12h2"/></svg></span>
+        <span class="nav-label">Системные инструменты</span>
+      </summary>
+      <nav class="nav flex-column sidebar-system-menu" aria-label="Технические разделы">
+        <a class="nav-link {% if request.path|slice:':9' == '/clients/' and request.path|slice:':26' != '/clients/renewal-requests/' %}active{% endif %}" href="/clients/">
+          <span class="nav-label">Legacy · Клиенты</span>
+        </a>
+        <a class="nav-link {% if request.path|slice:':7' == '/xhttp/' %}active{% endif %}" href="/xhttp/">
+          <span class="nav-label">Legacy · XHTTP</span>
+        </a>
+        <a class="nav-link" href="/admin/">
+          <span class="nav-label">Django Admin</span>
+        </a>
+      </nav>
+    </details>
 
     <div class="sidebar-account" aria-label="Текущий оператор">
       <span class="sidebar-account-avatar" aria-hidden="true">{{ user.username|slice:':1' }}</span>
