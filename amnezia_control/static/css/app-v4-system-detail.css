@@ -1,5 +1,15 @@
 /* VPN Control UI v4 — server and operation detail surfaces. */
 
+.v4-system-page > .v4-back-link {
+  display: inline-flex;
+  margin-bottom: 12px;
+  color: #64758b !important;
+  font-size: .63rem;
+  font-weight: 620;
+  text-decoration: none;
+}
+.v4-system-page > .v4-back-link:hover { color: #8ebcff !important; }
+
 .v4-protocol-row,
 .v4-event-row { position: relative; }
 .v4-protocol-row::before,
