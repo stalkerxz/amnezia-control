@@ -12,7 +12,7 @@
     <div>
       <p class="page-kicker">VPN Control · Инфраструктура</p>
       <h1>Серверы</h1>
-      <p class="v4-hero-copy">Runtime, доступность протоколов и мониторинг серверов в одном рабочем экране.</p>
+      <p class="v4-hero-copy">Состояние узлов, доступность runtime и протоколов. Детальная диагностика открывается только по запросу.</p>
     </div>
   </header>
 
@@ -28,43 +28,48 @@
         <div>
           <span class="v4-panel-eyebrow">Runtime</span>
           <h2>Инфраструктура</h2>
-          <p>Показано серверов: {{ servers|length }}</p>
+          <p>{{ servers|length }} серверов по текущему фильтру</p>
         </div>
       </div>
 
       <div class="v4-system-table-wrap">
-        <table class="table v4-system-table align-middle">
+        <table class="table v4-system-table v4-servers-table align-middle">
           <thead>
             <tr>
               <th>Сервер</th>
-              <th>SSH</th>
+              <th>Доступ</th>
               <th>Состояние</th>
-              <th>Последняя sync</th>
-              <th class="text-end">Мониторинг</th>
+              <th>Последняя синхронизация</th>
+              <th class="text-end"><span class="visually-hidden">Мониторинг</span></th>
             </tr>
           </thead>
           <tbody>
             {% for s in servers %}
-              <tr>
+              <tr class="v4-server-row {% if s.obj.health_status == 'healthy' %}is-success{% elif s.obj.health_status == 'degraded' %}is-warning{% elif s.obj.health_status == 'unhealthy' %}is-danger{% endif %}">
                 <td>
                   <a class="v4-system-primary" href="/servers/{{ s.obj.id }}/">{{ s.obj.name }}</a>
-                  {% if s.health_reasons %}<div class="v4-system-meta">{{ s.health_reasons.0 }}</div>{% endif %}
+                  {% if s.health_reasons %}<div class="v4-system-meta">{{ s.health_reasons.0 }}</div>{% else %}<div class="v4-system-meta">runtime-узел VPN Control</div>{% endif %}
                 </td>
-                <td><code class="v4-system-mono">{{ s.obj.ssh_username }}@{{ s.obj.host }}:{{ s.obj.port }}</code></td>
+                <td>
+                  <code class="v4-system-mono">{{ s.obj.ssh_username }}@{{ s.obj.host }}</code>
+                  <div class="v4-system-meta">SSH · порт {{ s.obj.port }}</div>
+                </td>
                 <td>
                   <span class="v4-server-status {% if s.obj.health_status == 'healthy' %}is-success{% elif s.obj.health_status == 'degraded' %}is-warning{% elif s.obj.health_status == 'unhealthy' %}is-danger{% else %}is-neutral{% endif %}">{{ s.health_label }}</span>
                 </td>
-                <td class="text-nowrap">{{ s.obj.last_runtime_sync_at|date:'d.m.Y H:i'|default:'—' }}</td>
+                <td class="text-nowrap">
+                  {% if s.obj.last_runtime_sync_at %}<span class="v4-date-primary">{{ s.obj.last_runtime_sync_at|date:'d.m.Y' }}</span><div class="v4-system-meta">{{ s.obj.last_runtime_sync_at|date:'H:i' }}</div>{% else %}<span class="v4-system-meta">Нет данных</span>{% endif %}
+                </td>
                 <td class="text-end">
-                  <a class="btn btn-sm btn-outline-primary" href="/servers/?{% if health_filter %}health={{ health_filter }}&{% endif %}monitor={{ s.obj.id }}">Обновить</a>
+                  <a class="btn btn-sm btn-outline-primary v4-monitor-button" href="/servers/?{% if health_filter %}health={{ health_filter }}&{% endif %}monitor={{ s.obj.id }}">Проверить</a>
                 </td>
               </tr>
 
               {% if s.metrics %}
-                <tr>
+                <tr class="v4-detail-row">
                   <td colspan="5" class="p-0">
                     {% if s.metrics.errors %}
-                      <div class="alert alert-warning m-3 mb-0 py-2">{{ s.metrics.errors|join:'; ' }}</div>
+                      <div class="v4-runtime-warning">{{ s.metrics.errors|join:'; ' }}</div>
                     {% endif %}
                     <div class="v4-server-metrics">
                       <div class="v4-server-metric"><span>Host / uptime</span><strong>{{ s.metrics.hostname|default:'—' }}</strong><div class="v4-system-meta">{{ s.metrics.uptime|default:'—' }}</div></div>
@@ -75,12 +80,12 @@
                       <div class="v4-server-protocols">
                         <strong>Docker:</strong>
                         {% if s.metrics.docker.available %}
-                          {% for c in s.metrics.docker.containers %}{{ c.name }}={{ c.status }}{% if not forloop.last %} · {% endif %}{% empty %}нет активных контейнеров{% endfor %}
+                          {% for c in s.metrics.docker.containers %}<span class="v4-runtime-token">{{ c.name }} · {{ c.status }}</span>{% empty %}нет активных контейнеров{% endfor %}
                         {% else %}недоступно{% endif %}
                         <br>
                         <strong>Протоколы:</strong>
                         {% for p in s.metrics.protocols %}
-                          {{ p.protocol_type|upper }}{% if p.available %} FILE {{ p.peer_counts.file_peers }} / LIVE {{ p.peer_counts.live_peers }}{% else %} недоступен{% endif %}{% if not forloop.last %} · {% endif %}
+                          <span class="v4-runtime-token {% if not p.available %}is-danger{% endif %}">{{ p.protocol_type|upper }}{% if p.available %} · FILE {{ p.peer_counts.file_peers }} / LIVE {{ p.peer_counts.live_peers }}{% else %} · недоступен{% endif %}</span>
                         {% empty %}нет включённых протоколов{% endfor %}
                       </div>
                     </div>
