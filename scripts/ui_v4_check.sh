@@ -16,8 +16,11 @@ echo "[ui-v4] Migration drift check"
 
 echo "[ui-v4] Template and static asset load check"
 "${COMPOSE[@]}" exec -T web python manage.py shell <<'PY'
+from types import SimpleNamespace
+
 from django.contrib.staticfiles import finders
 from django.template.loader import get_template
+from django.test import RequestFactory
 from django.urls import reverse
 
 TEMPLATES = [
@@ -71,6 +74,33 @@ URLS = [
 for name, args, kwargs in URLS:
     value = reverse(name, args=args, kwargs=kwargs)
     print(f"url OK: {name} -> {value}")
+
+# Modern operator routes must not load the transitional v2/v3 bundles.
+base = get_template("partials/base.html")
+rf = RequestFactory()
+auth_user = SimpleNamespace(is_authenticated=True, username="ui-v4-check")
+anon_user = SimpleNamespace(is_authenticated=False, username="")
+legacy_assets = ("app-v2.css", "app-v3.css", "app-v3-pages.css")
+
+for path in ("/", "/customers/", "/servers/", "/jobs/", "/audit/", "/settings/"):
+    html = base.render({"request": rf.get(path), "user": auth_user})
+    leaked = [asset for asset in legacy_assets if asset in html]
+    if leaked:
+        raise RuntimeError(f"legacy CSS leaked into modern route {path}: {', '.join(leaked)}")
+    print(f"modern CSS isolation OK: {path}")
+
+for path in ("/clients/", "/clients/renewal-requests/", "/xhttp/"):
+    html = base.render({"request": rf.get(path), "user": auth_user})
+    missing = [asset for asset in legacy_assets if asset not in html]
+    if missing:
+        raise RuntimeError(f"legacy fallback missing on {path}: {', '.join(missing)}")
+    print(f"legacy CSS fallback OK: {path}")
+
+login_html = base.render({"request": rf.get("/login/"), "user": anon_user})
+missing = [asset for asset in legacy_assets if asset not in login_html]
+if missing:
+    raise RuntimeError(f"auth fallback missing: {', '.join(missing)}")
+print("auth CSS fallback OK: /login/")
 
 print("UI v4 structural checks passed")
 PY
