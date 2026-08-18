@@ -1,67 +1,60 @@
 {% extends 'partials/base.html' %}
+{% load static %}
+
+{% block title %}Операция #{{ job.id }} · VPN Control{% endblock %}
+
 {% block content %}
-<div class="page-header">
-  <p class="page-kicker">Операторская · Задания</p>
-  <h1 class="h3 mb-1">Задание #{{ job.id }}</h1>
+<link href="{% static 'css/app-v4-layout.css' %}" rel="stylesheet">
+<link href="{% static 'css/app-v4-system.css' %}" rel="stylesheet">
+
+<div class="v4-system-page">
+  <a class="v4-back-link" href="{% url 'jobs-list' %}">← Все операции</a>
+
+  <header class="v4-page-hero v4-system-hero">
+    <div>
+      <p class="page-kicker">VPN Control · Операция</p>
+      <h1>Операция #{{ job.id }}</h1>
+      <p class="v4-hero-copy"><code>{{ job.action }}</code></p>
+    </div>
+  </header>
+
+  {% if job_signal == 'failed' %}<div class="alert alert-danger">Операция завершилась с ошибкой. Проверьте stderr, exit code и payload.</div>{% elif job_signal == 'degraded_success' %}<div class="alert alert-warning">Операция завершена, но использован деградированный путь выполнения.</div>{% elif job_signal == 'warning' %}<div class="alert alert-warning">Операция выполнена с предупреждением.</div>{% endif %}
+
+  <section class="v4-system-summary-grid">
+    <div class="v4-system-summary"><span>Сигнал</span><strong><span class="v4-status-pill {% if job_signal == 'failed' %}is-danger{% elif job_signal == 'warning' or job_signal == 'degraded_success' %}is-warning{% elif job_signal == 'success' %}is-success{% else %}is-neutral{% endif %}">{% if job_signal == 'failed' %}Ошибка{% elif job_signal == 'warning' %}Предупреждение{% elif job_signal == 'degraded_success' %}Деградация{% elif job_signal == 'success' %}Успех{% else %}В процессе{% endif %}</span></strong><small>Операционный результат</small></div>
+    <div class="v4-system-summary"><span>Сервер</span><strong>{% if job.server %}{{ job.server.name }}{% else %}—{% endif %}</strong><small>Контур выполнения</small></div>
+    <div class="v4-system-summary"><span>Инициатор</span><strong>{% if job.actor %}{{ job.actor.username }}{% else %}система{% endif %}</strong><small>{% if job.actor_id == request.user.id %}Текущий оператор{% else %}Источник задания{% endif %}</small></div>
+    <div class="v4-system-summary"><span>Тех. статус</span><strong>{{ job.get_status_display }}</strong><small>{{ job.created_at|date:'d.m.Y H:i:s' }}</small></div>
+  </section>
+
+  <section class="v4-system-panel">
+    <div class="v4-system-panel-head"><div><span class="v4-panel-eyebrow">Input</span><h2>Payload</h2><p>Параметры, с которыми была запущена операция.</p></div></div>
+    <div class="v4-system-panel-body"><pre class="v4-log mb-0">{{ payload_pretty }}</pre></div>
+  </section>
+
+  <section class="v4-system-panel">
+    <div class="v4-system-panel-head"><div><span class="v4-panel-eyebrow">Execution</span><h2>События выполнения</h2><p>Запуск: {{ job.started_at|default:'—' }} · завершение: {{ job.finished_at|default:'—' }}</p></div></div>
+    {% if events %}
+      <div class="v4-system-table-wrap">
+        <table class="table v4-system-table align-middle">
+          <thead><tr><th>Время</th><th>Уровень</th><th>Сообщение</th><th>Exit</th><th>stdout</th><th>stderr</th></tr></thead>
+          <tbody>
+            {% for e in events %}
+              <tr>
+                <td class="text-nowrap">{{ e.created_at|date:'d.m.Y H:i:s' }}</td>
+                <td><span class="v4-status-pill {% if e.level == 'error' %}is-danger{% elif e.level == 'warning' %}is-warning{% else %}is-neutral{% endif %}">{{ e.level }}</span></td>
+                <td>{{ e.message }}</td>
+                <td>{{ e.exit_code|default:'—' }}</td>
+                <td>{% if e.stdout %}<pre class="v4-log mb-0">{{ e.stdout }}</pre>{% else %}<span class="text-secondary">—</span>{% endif %}</td>
+                <td>{% if e.stderr %}<pre class="v4-log is-danger mb-0">{{ e.stderr }}</pre>{% else %}<span class="text-secondary">—</span>{% endif %}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="v4-empty-state compact"><strong>Событий пока нет</strong></div>
+    {% endif %}
+  </section>
 </div>
-
-{% if job_signal == 'failed' %}
-<div class="alert alert-danger" role="alert">Задание завершилось с ошибкой. Это реальный сбой выполнения: проверьте stderr, exit code и payload ниже.</div>
-{% elif job_signal == 'degraded_success' %}
-<div class="alert alert-warning" role="alert">Задание выполнено успешно, но использован деградированный fallback-путь.</div>
-{% elif job_signal == 'warning' %}
-<div class="alert alert-warning" role="alert">Задание выполнено успешно, но с предупреждением. Проверьте события ниже.</div>
-{% endif %}
-
-<div class="row g-3 mb-3">
-  <div class="col-lg-8">
-    <div class="card"><div class="card-body">
-      <p class="mb-1">Действие: <code>{{ job.action }}</code></p>
-      <p class="mb-1">Сервер: <strong>{{ job.server.name }}</strong></p>
-      <p class="mb-0">Инициатор:
-        {% if job.actor %}
-          <strong>{{ job.actor.username }}</strong>
-          {% if job.actor_id == request.user.id %}<span class="badge status-badge status-success">Мой</span>{% else %}<span class="badge status-badge status-neutral">Другой оператор</span>{% endif %}
-        {% else %}
-          <span class="text-secondary">система</span>
-        {% endif %}
-      </p>
-    </div></div>
-  </div>
-  <div class="col-lg-4">
-    <div class="card"><div class="card-body">
-      <p class="mb-1">Операционный сигнал:
-        <span class="badge status-badge {% if job_signal == 'failed' %}status-danger{% elif job_signal == 'warning' or job_signal == 'degraded_success' %}status-warning{% elif job_signal == 'success' %}status-success{% else %}status-neutral{% endif %}">
-          {% if job_signal == 'failed' %}Ошибка{% elif job_signal == 'warning' %}Успех с предупреждением{% elif job_signal == 'degraded_success' %}Успех с деградацией{% elif job_signal == 'success' %}Успех{% else %}В процессе{% endif %}
-        </span>
-      </p>
-      <p class="mb-1">Технический статус: <span class="badge status-badge {% if job.status == 'success' %}status-success{% elif job.status == 'failed' %}status-danger{% elif job.status == 'running' %}status-warning{% else %}status-neutral{% endif %}">{{ job.status }}</span></p>
-      <p class="mb-1">Создано: {{ job.created_at }}</p>
-      <p class="mb-1">Запуск: {{ job.started_at|default:'—' }}</p>
-      <p class="mb-0">Завершено: {{ job.finished_at|default:'—' }}</p>
-    </div></div>
-  </div>
-</div>
-
-<div class="card mb-3"><div class="card-body">
-  <h2 class="h6">Payload</h2>
-  <pre class="log mb-0">{{ payload_pretty }}</pre>
-</div></div>
-
-{% if events %}
-<table class="table table-sm align-middle"><tr><th>Время</th><th>Уровень</th><th>Сообщение</th><th>Exit code</th><th>stdout</th><th>stderr</th></tr>
-{% for e in events %}
-<tr class="{% if e.level == 'error' %}table-danger{% elif e.level == 'warning' %}table-warning{% elif e.exit_code %}table-danger{% endif %}">
-  <td>{{ e.created_at }}</td>
-  <td><span class="badge status-badge {% if e.level == 'error' %}status-danger{% elif e.level == 'warning' %}status-warning{% else %}status-neutral{% endif %}">{{ e.level }}</span></td>
-  <td>{{ e.message }}</td>
-  <td>{{ e.exit_code|default:'—' }}</td>
-  <td>{% if e.stdout %}<pre class="log mb-0">{{ e.stdout }}</pre>{% else %}—{% endif %}</td>
-  <td>{% if e.stderr %}<pre class="log text-danger mb-0">{{ e.stderr }}</pre>{% else %}—{% endif %}</td>
-</tr>
-{% endfor %}
-</table>
-{% else %}
-<div class="empty-state">Событий по заданию пока нет.</div>
-{% endif %}
 {% endblock %}
