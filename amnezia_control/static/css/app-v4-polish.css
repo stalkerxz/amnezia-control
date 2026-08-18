@@ -1,0 +1,95 @@
+/* VPN Control UI v4 — live render polish.
+   Small global corrections found during production preview review. */
+
+/* Keep the accessibility skip link fully outside the viewport until focused.
+   Older layers used translateY(), which left a blue rounded strip visible. */
+.skip-link {
+  position: fixed !important;
+  top: -96px !important;
+  left: 14px !important;
+  z-index: 2000 !important;
+  transform: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+.skip-link:focus,
+.skip-link:focus-visible {
+  top: 12px !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+/* Navigation wording and technical tools. */
+.sidebar-system {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(113, 144, 188, .10);
+}
+.sidebar-system > summary {
+  display: flex;
+  min-height: 36px;
+  gap: 9px;
+  align-items: center;
+  padding: 7px 10px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  color: #607087;
+  cursor: pointer;
+  font-size: .7rem;
+  font-weight: 620;
+  list-style: none;
+  transition: color .15s ease, background .15s ease, border-color .15s ease;
+}
+.sidebar-system > summary::-webkit-details-marker { display: none; }
+.sidebar-system > summary::after {
+  margin-left: auto;
+  color: #46556b;
+  content: "⌄";
+  transition: transform .16s ease;
+}
+.sidebar-system[open] > summary::after { transform: rotate(180deg); }
+.sidebar-system > summary:hover {
+  border-color: rgba(112,151,211,.08);
+  background: rgba(62,90,135,.07);
+  color: #9ba9bb;
+}
+.sidebar-system-menu {
+  display: grid;
+  gap: 2px;
+  margin: 5px 0 0 8px;
+}
+.sidebar-system-menu .nav-link {
+  min-height: 33px !important;
+  opacity: .72;
+  font-size: .69rem !important;
+}
+.sidebar-system-menu .nav-link:hover,
+.sidebar-system-menu .nav-link.active { opacity: 1; }
+
+/* Live screenshots showed the interface slightly too compressed on desktop. */
+@media (min-width: 1200px) {
+  .sidebar .nav-link { font-size: .82rem !important; }
+  .topbar-title { font-size: .92rem !important; }
+  .v4-hero-copy { font-size: .86rem; }
+  .v4-kpi-label { font-size: .73rem; }
+  .v4-kpi-meta { font-size: .7rem; }
+  .v4-panel-head h2 { font-size: .92rem; }
+  .v4-attention-copy strong { font-size: .78rem; }
+  .v4-attention-copy span { font-size: .66rem; }
+}
+
+/* Hide zero-value dashboard noise while retaining a clean all-clear state. */
+.v4-attention-row[data-count="0"] { display: none; }
+.v4-attention-clean { display: flex; }
+.v4-attention-list:has(.v4-attention-row:not([data-count="0"])) .v4-attention-clean { display: none; }
+
+/* Make the primary customer route visually distinct from technical legacy pages. */
+body:has(a[href="/customers/"][aria-current="page"]) .sidebar-system { opacity: .82; }
+
+/* Slightly calmer large empty areas on infrastructure pages. */
+.v4-system-page { min-height: calc(100vh - 110px); }
+.v4-system-panel { max-width: 100%; }
+
+@media (max-width: 767.98px) {
+  .sidebar-system-menu { margin-left: 0; }
+}
