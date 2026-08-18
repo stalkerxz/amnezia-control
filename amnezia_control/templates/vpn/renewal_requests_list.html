@@ -1,8 +1,13 @@
 {% extends 'partials/base.html' %}
+{% load static %}
 
 {% block title %}Продления · VPN Control{% endblock %}
 
 {% block content %}
+<link href="{% static 'css/app-v4-layout.css' %}" rel="stylesheet">
+<link href="{% static 'css/app-v4-system.css' %}" rel="stylesheet">
+<link href="{% static 'css/app-v4-renewals.css' %}" rel="stylesheet">
+
 <div class="v4-system-page v4-renewals-page">
   <header class="v4-page-hero v4-system-hero">
     <div>
