@@ -1,17 +1,14 @@
 {% extends 'customer_portal/base.html' %}
-{% load static %}
 
 {% block title %}{{ account.display_name }} · VPN{% endblock %}
 
 {% block content %}
-<link href="{% static 'css/app-v4-layout.css' %}" rel="stylesheet">
-
 <div class="customer-portal-v4">
   <header class="portal-v4-header">
     <div>
       <span class="portal-v4-kicker">Личный кабинет VPN</span>
-      <h1>Добро пожаловать, {{ account.display_name }}</h1>
-      <p>Ваши устройства, подключения и доступ собраны в одном месте.</p>
+      <h1>{{ account.display_name }}</h1>
+      <p>Здесь находятся ваши устройства, подключения и срок доступа.</p>
     </div>
 
     <div class="portal-v4-account-chip">
@@ -27,16 +24,16 @@
     <div class="portal-v4-alert is-warning">
       <span class="portal-v4-alert-icon">!</span>
       <div>
-        <strong>Аккаунт временно отключён</strong>
-        <span>Подключения отображаются, но управление доступом ограничено.</span>
+        <strong>Доступ временно отключён</strong>
+        <span>Существующие подключения сохранены, но скачивание конфигураций сейчас недоступно.</span>
       </div>
     </div>
   {% elif expired %}
     <div class="portal-v4-alert is-warning">
       <span class="portal-v4-alert-icon">!</span>
       <div>
-        <strong>Срок действия аккаунта истёк</strong>
-        <span>{% if account.expires_at %}Доступ завершился {{ account.expires_at|date:'d.m.Y H:i' }}.{% else %}Обратитесь к оператору для продления.{% endif %}</span>
+        <strong>Срок доступа закончился</strong>
+        <span>{% if account.expires_at %}Доступ завершился {{ account.expires_at|date:'d.m.Y H:i' }}.{% else %}Отправьте запрос на продление.{% endif %}</span>
       </div>
     </div>
   {% endif %}
@@ -47,11 +44,11 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3 20 6v5c0 5-3.4 8.6-8 10-4.6-1.4-8-5-8-10V6l8-3Z"/><path d="m8.5 12 2.2 2.2 4.8-5"/></svg>
       </div>
       <div>
-        <span class="portal-v4-status-label">Статус доступа</span>
-        <h2>{% if blocked %}VPN ограничен{% else %}VPN активен{% endif %}</h2>
+        <span class="portal-v4-status-label">Состояние</span>
+        <h2>{% if blocked %}VPN недоступен{% else %}VPN работает{% endif %}</h2>
         <p>
           {% if blocked %}
-            Скачивание и управление конфигурациями временно недоступны.
+            Для восстановления доступа требуется продление или включение аккаунта оператором.
           {% elif account.expires_at %}
             Доступ действует до {{ account.expires_at|date:'d.m.Y' }}.
           {% else %}
@@ -75,7 +72,7 @@
       <div>
         <span>Доступ до</span>
         <strong class="is-date">{% if account.expires_at %}{{ account.expires_at|date:'d.m.Y' }}{% else %}Без срока{% endif %}</strong>
-        <small>{{ account.get_status_display }}</small>
+        <small>{% if blocked %}нужна проверка{% else %}аккаунт активен{% endif %}</small>
       </div>
     </div>
   </section>
@@ -84,18 +81,16 @@
     <section class="portal-v4-connections-panel">
       <div class="portal-v4-section-head">
         <div>
-          <span>VPN</span>
+          <span>Подключения</span>
           <h2>Мои устройства</h2>
-          <p>Выберите устройство и скачайте нужный тип подключения.</p>
+          <p>Скачайте конфигурацию для нужного устройства. Повторное скачивание не создаёт новое подключение.</p>
         </div>
-        <span class="v4-status-pill {% if blocked %}is-warning{% else %}is-success{% endif %}">
-          {% if blocked %}Скачивание ограничено{% else %}Подключения доступны{% endif %}
+        <span class="portal-v4-availability {% if blocked %}is-warning{% endif %}">
+          {% if blocked %}Скачивание ограничено{% else %}Доступно{% endif %}
         </span>
       </div>
 
-      <div class="portal-connections-v4">
-        {% include 'customer_portal/_connections_workspace.html' %}
-      </div>
+      {% include 'customer_portal/_connections_workspace.html' %}
     </section>
 
     <aside class="portal-v4-side-column">
@@ -108,15 +103,14 @@
 
         {% if account.expires_at %}
           <div class="portal-v4-expiry-date">{{ account.expires_at|date:'d.m.Y' }}</div>
-          <p>Текущий срок действия всего аккаунта и всех устройств.</p>
+          <p>До этой даты действуют аккаунт и доступные подключения.</p>
         {% else %}
           <div class="portal-v4-expiry-date">Без срока</div>
-          <p>Для аккаунта не установлена дата окончания доступа.</p>
+          <p>Дата окончания доступа не установлена.</p>
         {% endif %}
 
         {% if open_renewal_request %}
           <div class="portal-v4-request-state">
-            <span class="v4-signal-dot is-warning"></span>
             <div>
               <strong>{{ open_renewal_request.get_status_display }}</strong>
               <small>Заявка от {{ open_renewal_request.created_at|date:'d.m.Y H:i' }}</small>
@@ -125,7 +119,7 @@
 
           {% if open_renewal_request.operator_note %}
             <div class="portal-v4-operator-note">
-              <span>Комментарий оператора</span>
+              <span>Комментарий</span>
               {{ open_renewal_request.operator_note }}
             </div>
           {% endif %}
@@ -145,17 +139,17 @@
         {% else %}
           <div class="portal-v4-request-state is-muted">
             <div>
-              <strong>Продление недоступно</strong>
-              <small>Для отключённого аккаунта новая заявка не создаётся.</small>
+              <strong>Новая заявка недоступна</strong>
+              <small>Свяжитесь с оператором для восстановления аккаунта.</small>
             </div>
           </div>
         {% endif %}
       </section>
 
       <section class="portal-v4-help-card">
-        <span class="portal-v4-card-kicker">Подсказка</span>
-        <h3>Конфигурации не дублируются</h3>
-        <p>Повторное скачивание использует уже выпущенную конфигурацию и не создаёт новое VPN-подключение.</p>
+        <span class="portal-v4-card-kicker">Важно</span>
+        <h3>Повторное скачивание безопасно</h3>
+        <p>Вы получите уже выпущенную конфигурацию. Ключи и параметры подключения не изменятся.</p>
       </section>
     </aside>
   </div>
