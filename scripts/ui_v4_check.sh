@@ -30,6 +30,14 @@ TEMPLATES = [
     "customers/customers_list.html",
     "customers/customer_detail.html",
     "customers/_operator_workspace.html",
+    "customers/customer_onboarding_form.html",
+    "customers/customer_form.html",
+    "customers/customer_edit_form.html",
+    "customers/device_form.html",
+    "customers/device_edit_form.html",
+    "customers/connection_product_select.html",
+    "customers/vpn_connection_form.html",
+    "customers/xhttp_connection_form.html",
     "customer_portal/base.html",
     "customer_portal/home.html",
     "customer_portal/_connections_workspace.html",
@@ -49,6 +57,7 @@ STATIC_ASSETS = [
     "css/app-v4-system.css",
     "css/app-v4-system-detail.css",
     "css/app-v4-renewals.css",
+    "css/app-v4-forms.css",
     "css/app-v4-polish.css",
 ]
 
