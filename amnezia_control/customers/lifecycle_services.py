@@ -36,6 +36,16 @@ class CustomerConnectionLifecycleService:
             and account.expires_at <= now
         )
 
+    @staticmethod
+    def _device_expired(
+        device: ClientDevice,
+        now,
+    ) -> bool:
+        return bool(
+            device.expires_at
+            and device.expires_at <= now
+        )
+
     @classmethod
     def owner_available(
         cls,
@@ -51,6 +61,12 @@ class CustomerConnectionLifecycleService:
         if (
             device.status
             != ClientDevice.Status.ACTIVE
+        ):
+            return False
+
+        if cls._device_expired(
+            device,
+            current_time,
         ):
             return False
 
@@ -106,6 +122,10 @@ class CustomerConnectionLifecycleService:
         if (
             cls._account_expired(
                 account,
+                current_time,
+            )
+            or cls._device_expired(
+                device,
                 current_time,
             )
             or limit_state

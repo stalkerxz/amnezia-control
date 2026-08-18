@@ -4,6 +4,7 @@ from django.contrib.auth.password_validation import (
     validate_password,
 )
 from django.core.exceptions import ValidationError
+from django.utils import timezone
 
 from .models import ClientDevice, CustomerAccount
 
@@ -237,6 +238,257 @@ class ClientDeviceEditForm(forms.ModelForm):
             self.cleaned_data.get("notes")
             or ""
         ).strip()
+
+class DeviceAccessUpdateForm(forms.Form):
+    APPLY_KEEP = "keep"
+    APPLY_SET = "set"
+    APPLY_CLEAR = "clear"
+
+    TRAFFIC_PRESET_TO_BYTES = {
+        "1gb": 1 * 1024**3,
+        "5gb": 5 * 1024**3,
+        "10gb": 10 * 1024**3,
+        "25gb": 25 * 1024**3,
+        "50gb": 50 * 1024**3,
+        "100gb": 100 * 1024**3,
+    }
+
+    expires_at = forms.DateTimeField(
+        required=False,
+        label="Срок устройства",
+        input_formats=[
+            "%Y-%m-%dT%H:%M",
+        ],
+        widget=forms.DateTimeInput(
+            attrs={
+                "class": "form-control form-control-sm",
+                "type": "datetime-local",
+            },
+            format="%Y-%m-%dT%H:%M",
+        ),
+    )
+
+    apply_traffic = forms.ChoiceField(
+        required=False,
+        label="VPN-лимит устройства",
+        choices=(
+            (
+                APPLY_KEEP,
+                "Не изменять текущие VPN-лимиты",
+            ),
+            (
+                APPLY_SET,
+                "Установить одинаковый лимит",
+            ),
+            (
+                APPLY_CLEAR,
+                "Снять лимит",
+            ),
+        ),
+        initial=APPLY_KEEP,
+        widget=forms.Select(
+            attrs={
+                "class": "form-select form-select-sm",
+            }
+        ),
+    )
+
+    traffic_limit_preset = forms.ChoiceField(
+        required=False,
+        label="Размер лимита",
+        choices=(
+            ("1gb", "1 ГБ"),
+            ("5gb", "5 ГБ"),
+            ("10gb", "10 ГБ"),
+            ("25gb", "25 ГБ"),
+            ("50gb", "50 ГБ"),
+            ("100gb", "100 ГБ"),
+            ("custom", "Свой объём"),
+        ),
+        initial="50gb",
+        widget=forms.Select(
+            attrs={
+                "class": "form-select form-select-sm",
+            }
+        ),
+    )
+
+    traffic_custom_value = forms.IntegerField(
+        required=False,
+        min_value=1,
+        label="Свой объём",
+        widget=forms.NumberInput(
+            attrs={
+                "class": "form-control form-control-sm",
+                "min": 1,
+            }
+        ),
+    )
+
+    traffic_custom_unit = forms.ChoiceField(
+        required=False,
+        label="Единица",
+        choices=(
+            ("mb", "МБ"),
+            ("gb", "ГБ"),
+        ),
+        initial="gb",
+        widget=forms.Select(
+            attrs={
+                "class": "form-select form-select-sm",
+            }
+        ),
+    )
+
+    def __init__(
+        self,
+        *args,
+        device=None,
+        **kwargs,
+    ):
+        self.device = device
+
+        super().__init__(
+            *args,
+            **kwargs,
+        )
+
+        if (
+            device is not None
+            and not self.is_bound
+        ):
+            if device.expires_at:
+                local_dt = timezone.localtime(
+                    device.expires_at
+                )
+
+                self.initial[
+                    "expires_at"
+                ] = local_dt.strftime(
+                    "%Y-%m-%dT%H:%M"
+                )
+
+            current_limit = (
+                device.vpn_traffic_limit_bytes
+            )
+
+            if current_limit is not None:
+                preset = next(
+                    (
+                        key
+                        for key, value
+                        in self.TRAFFIC_PRESET_TO_BYTES.items()
+                        if value == current_limit
+                    ),
+                    "custom",
+                )
+
+                self.initial[
+                    "traffic_limit_preset"
+                ] = preset
+
+                if preset == "custom":
+                    if (
+                        current_limit
+                        % (1024**3)
+                        == 0
+                    ):
+                        self.initial[
+                            "traffic_custom_unit"
+                        ] = "gb"
+
+                        self.initial[
+                            "traffic_custom_value"
+                        ] = (
+                            current_limit
+                            // (1024**3)
+                        )
+
+                    else:
+                        self.initial[
+                            "traffic_custom_unit"
+                        ] = "mb"
+
+                        self.initial[
+                            "traffic_custom_value"
+                        ] = max(
+                            1,
+                            current_limit
+                            // (1024**2),
+                        )
+
+    def clean(self):
+        cleaned_data = super().clean()
+
+        apply_traffic = (
+            cleaned_data.get(
+                "apply_traffic"
+            )
+            or self.APPLY_KEEP
+        )
+
+        cleaned_data[
+            "resolved_traffic_limit_bytes"
+        ] = None
+
+        if apply_traffic != self.APPLY_SET:
+            return cleaned_data
+
+        preset = cleaned_data.get(
+            "traffic_limit_preset"
+        )
+
+        if preset == "custom":
+            value = cleaned_data.get(
+                "traffic_custom_value"
+            )
+
+            unit = (
+                cleaned_data.get(
+                    "traffic_custom_unit"
+                )
+                or "gb"
+            )
+
+            if not value:
+                self.add_error(
+                    "traffic_custom_value",
+                    "Укажите объём лимита.",
+                )
+
+                return cleaned_data
+
+            factor = (
+                1024**2
+                if unit == "mb"
+                else 1024**3
+            )
+
+            cleaned_data[
+                "resolved_traffic_limit_bytes"
+            ] = value * factor
+
+            return cleaned_data
+
+        value = (
+            self.TRAFFIC_PRESET_TO_BYTES
+            .get(preset)
+        )
+
+        if value is None:
+            self.add_error(
+                "traffic_limit_preset",
+                "Выберите размер лимита.",
+            )
+
+            return cleaned_data
+
+        cleaned_data[
+            "resolved_traffic_limit_bytes"
+        ] = value
+
+        return cleaned_data
+
 
 class CustomerOnboardingForm(forms.Form):
     display_name = forms.CharField(

@@ -88,6 +88,34 @@ class ClientDevice(models.Model):
 
     notes = models.TextField(blank=True)
 
+    # Optional device-level access boundary.
+    # None means that only the account expiry applies.
+    expires_at = models.DateTimeField(
+        null=True,
+        blank=True,
+    )
+
+    # VPN traffic policy for this device.
+    # Applied to current and newly created VPNClient connections.
+    # XHTTP traffic is not metered by this field.
+    vpn_traffic_limit_bytes = models.BigIntegerField(
+        null=True,
+        blank=True,
+    )
+
+    @property
+    def effective_expires_at(self):
+        values = [
+            value
+            for value in (
+                self.account.expires_at,
+                self.expires_at,
+            )
+            if value is not None
+        ]
+
+        return min(values) if values else None
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

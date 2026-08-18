@@ -37,6 +37,7 @@ from vpn.xhttp_services import XHTTPDeviceService
 from .forms import (
     ClientDeviceCreateForm,
     ClientDeviceEditForm,
+    DeviceAccessUpdateForm,
     CustomerAccountCreateForm,
     CustomerAccountEditForm,
     CustomerOnboardingForm,
@@ -45,6 +46,7 @@ from .models import ClientDevice, CustomerAccount
 from .edit_services import (
     CustomerMetadataEditError,
     update_customer_account_metadata,
+    update_customer_device_access,
     update_customer_device_metadata,
 )
 from .status_services import (
@@ -438,6 +440,15 @@ def customer_device_xhttp_create_view(
             "Срок действия аккаунта истёк."
         )
 
+    if (
+        device.expires_at
+        and device.expires_at
+        <= timezone.now()
+    ):
+        return HttpResponseForbidden(
+            "Срок действия устройства истёк."
+        )
+
     default_server = (
         Server.objects
         .filter(is_enabled=True)
@@ -737,6 +748,15 @@ def customer_device_connection_create_view(
             "Срок действия аккаунта истёк."
         )
 
+    if (
+        device.expires_at
+        and device.expires_at
+        <= timezone.now()
+    ):
+        return HttpResponseForbidden(
+            "Срок действия устройства истёк."
+        )
+
     existing_awg2 = (
         device.vpn_clients
         .filter(
@@ -819,6 +839,15 @@ def customer_device_vpn_create_view(request, device_id):
     ):
         return HttpResponseForbidden(
             "Срок действия аккаунта истёк."
+        )
+
+    if (
+        device.expires_at
+        and device.expires_at
+        <= timezone.now()
+    ):
+        return HttpResponseForbidden(
+            "Срок действия устройства истёк."
         )
 
     server = (
@@ -921,8 +950,12 @@ def customer_device_vpn_create_view(request, device_id):
                         name=technical_name,
                         protocol_type=VPNClient.ProtocolType.AWG2,
                         routing_mode=routing_mode,
-                        expires_at=account.expires_at,
-                        traffic_limit_bytes=None,
+                        expires_at=(
+                            device.effective_expires_at
+                        ),
+                        traffic_limit_bytes=(
+                            device.vpn_traffic_limit_bytes
+                        ),
                         contact_email=account.email,
                         actor=request.user,
                         device=device,
@@ -1530,6 +1563,16 @@ def customer_detail_view(request, pk):
 
     workspace = build_customer_workspace(account)
 
+    for row in workspace["devices"]:
+        row["access_form"] = (
+            DeviceAccessUpdateForm(
+                device=row["device"],
+                prefix=(
+                    f"device-{row['device'].pk}"
+                ),
+            )
+        )
+
     return render(
         request,
         "customers/customer_detail.html",
@@ -1620,6 +1663,99 @@ def merge_customer_view(request, pk):
     return redirect(
         "customers-detail",
         pk=target_account_id,
+    )
+
+
+@login_required
+@operator_required
+@require_POST
+def customer_device_access_update_view(
+    request,
+    device_id,
+):
+    device = get_object_or_404(
+        ClientDevice.objects.select_related(
+            "account"
+        ),
+        pk=device_id,
+    )
+
+    if (
+        device.status
+        == ClientDevice.Status.DELETED
+        or device.account.status
+        == CustomerAccount.Status.DELETED
+    ):
+        return HttpResponseForbidden(
+            "Удалённое устройство нельзя изменять."
+        )
+
+    form = DeviceAccessUpdateForm(
+        request.POST,
+        device=device,
+        prefix=f"device-{device.pk}",
+    )
+
+    if not form.is_valid():
+        first_error = next(
+            iter(form.errors.values()),
+            [
+                "Проверьте параметры устройства."
+            ],
+        )[0]
+
+        messages.error(
+            request,
+            str(first_error),
+        )
+
+        return redirect(
+            "customers-detail",
+            pk=device.account_id,
+        )
+
+    try:
+        device = (
+            update_customer_device_access(
+                device_id=device.pk,
+                expires_at=(
+                    form.cleaned_data[
+                        "expires_at"
+                    ]
+                ),
+                apply_traffic=(
+                    form.cleaned_data[
+                        "apply_traffic"
+                    ]
+                ),
+                traffic_limit_bytes=(
+                    form.cleaned_data.get(
+                        "resolved_traffic_limit_bytes"
+                    )
+                ),
+                actor=request.user,
+            )
+        )
+
+    except CustomerMetadataEditError as exc:
+        messages.error(
+            request,
+            str(exc),
+        )
+
+    else:
+        messages.success(
+            request,
+            (
+                "Срок и VPN-лимиты устройства "
+                "обновлены без перевыпуска "
+                "конфигураций."
+            ),
+        )
+
+    return redirect(
+        "customers-detail",
+        pk=device.account_id,
     )
 
 

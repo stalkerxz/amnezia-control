@@ -101,6 +101,12 @@ class XHTTPDeviceService:
         if device.status != ClientDevice.Status.ACTIVE:
             return False
 
+        if (
+            device.expires_at is not None
+            and device.expires_at <= timezone.now()
+        ):
+            return False
+
         if account.status != CustomerAccount.Status.ACTIVE:
             return False
 
@@ -117,6 +123,14 @@ class XHTTPDeviceService:
         if device.status != ClientDevice.Status.ACTIVE:
             raise RuntimeError(
                 "XHTTP доступен только для активного устройства."
+            )
+
+        if (
+            device.expires_at is not None
+            and device.expires_at <= timezone.now()
+        ):
+            raise RuntimeError(
+                "XHTTP недоступен: срок устройства истёк."
             )
 
         account = device.account

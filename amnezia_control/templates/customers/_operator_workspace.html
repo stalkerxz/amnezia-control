@@ -136,7 +136,11 @@
             {{ row.device.name }}
           </h2>
 
-          {% if row.device.status == 'active' %}
+          {% if row.device_expired %}
+            <span class="badge text-bg-danger">
+              Срок истёк
+            </span>
+          {% elif row.device.status == 'active' %}
             <span class="badge text-bg-success">
               Активно
             </span>
@@ -260,6 +264,158 @@
       id="device-workspace-{{ row.device.pk }}"
     >
 
+    {% if account.status != 'deleted' and row.device.status != 'deleted' %}
+
+      <div class="border rounded-3 p-3 mb-4">
+
+        <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
+
+          <div>
+            <div class="fw-semibold">
+              Срок и VPN-лимиты
+            </div>
+
+            <div class="small text-secondary mt-1">
+              Срок относится ко всему устройству.
+              VPN-лимит применяется отдельно к каждому
+              FULL/SELECTIVE-подключению устройства.
+              Трафик альтернативного подключения пока
+              не учитывается.
+            </div>
+          </div>
+
+
+          <div class="small text-end">
+
+            <div>
+              Эффективный срок:
+              <strong>
+                {% if row.effective_expires_at %}
+                  {{ row.effective_expires_at|date:"d.m.Y H:i" }}
+                {% else %}
+                  Без срока
+                {% endif %}
+              </strong>
+            </div>
+
+            <div class="text-secondary mt-1">
+              Политика VPN-лимита:
+              {{ row.device_vpn_limit_display }}
+              на подключение
+            </div>
+
+          </div>
+
+        </div>
+
+
+        <form
+          method="post"
+          action="{% url 'customers-device-access-update' row.device.pk %}"
+          class="row g-3 align-items-end"
+        >
+
+          {% csrf_token %}
+
+
+          <div class="col-12 col-xl-3">
+
+            <label
+              for="{{ row.access_form.expires_at.id_for_label }}"
+              class="form-label"
+            >
+              Срок устройства
+            </label>
+
+            {{ row.access_form.expires_at }}
+
+            <div class="form-text">
+              Пусто — использовать срок аккаунта.
+            </div>
+
+          </div>
+
+
+          <div class="col-12 col-xl-3">
+
+            <label
+              for="{{ row.access_form.apply_traffic.id_for_label }}"
+              class="form-label"
+            >
+              VPN-лимит
+            </label>
+
+            {{ row.access_form.apply_traffic }}
+
+          </div>
+
+
+          <div class="col-12 col-md-6 col-xl-2">
+
+            <label
+              for="{{ row.access_form.traffic_limit_preset.id_for_label }}"
+              class="form-label"
+            >
+              Размер
+            </label>
+
+            {{ row.access_form.traffic_limit_preset }}
+
+          </div>
+
+
+          <div class="col-6 col-md-3 col-xl-1">
+
+            <label
+              for="{{ row.access_form.traffic_custom_value.id_for_label }}"
+              class="form-label"
+            >
+              Объём
+            </label>
+
+            {{ row.access_form.traffic_custom_value }}
+
+          </div>
+
+
+          <div class="col-6 col-md-3 col-xl-1">
+
+            <label
+              for="{{ row.access_form.traffic_custom_unit.id_for_label }}"
+              class="form-label"
+            >
+              Ед.
+            </label>
+
+            {{ row.access_form.traffic_custom_unit }}
+
+          </div>
+
+
+          <div class="col-12 col-xl-2">
+
+            <button
+              type="submit"
+              class="btn btn-sm btn-primary w-100"
+            >
+              Сохранить
+            </button>
+
+          </div>
+
+        </form>
+
+
+        <div class="small text-secondary mt-3">
+          Изменение не перевыпускает VPN-ключи,
+          IP-адреса или сохранённые конфигурации.
+        </div>
+
+      </div>
+
+    {% endif %}
+
+
     {% if account.status != 'deleted' and candidate_accounts %}
 
       <div class="border rounded-3 p-3 mb-4">
@@ -377,6 +533,13 @@
                   <div class="fw-semibold">
                     Основное подключение
                   </div>
+
+                  <div class="small text-secondary mt-1">
+                    Трафик:
+                    {{ client.traffic_used_display }}
+                    из
+                    {{ client.traffic_limit_display }}
+                  </div>
                 </div>
 
                 {% if client.status == 'active' %}
@@ -462,6 +625,13 @@
                 <div>
                   <div class="fw-semibold">
                     Подключение сервисов
+                  </div>
+
+                  <div class="small text-secondary mt-1">
+                    Трафик:
+                    {{ client.traffic_used_display }}
+                    из
+                    {{ client.traffic_limit_display }}
                   </div>
                 </div>
 

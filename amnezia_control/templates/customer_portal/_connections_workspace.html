@@ -151,7 +151,13 @@
           </h2>
 
 
-          {% if row.device.status == 'active' %}
+          {% if row.device_expired %}
+
+            <span class="badge text-bg-danger">
+              Срок истёк
+            </span>
+
+          {% elif row.device.status == 'active' %}
 
             <span class="badge text-bg-success">
               Активно
@@ -182,6 +188,11 @@
 
           {{ row.connection_total }}
           подключений
+
+          {% if row.effective_expires_at %}
+            · доступ до
+            {{ row.effective_expires_at|date:"d.m.Y" }}
+          {% endif %}
 
         </div>
 
@@ -219,6 +230,13 @@
 
                 <div class="fw-semibold">
                   Основное подключение
+                </div>
+
+                <div class="small text-secondary mt-1">
+                  Трафик:
+                  {{ client.traffic_used_display }}
+                  из
+                  {{ client.traffic_limit_display }}
                 </div>
 
 
@@ -287,6 +305,10 @@
 
                     Скачивание временно недоступно
                     для аккаунта.
+
+                  {% elif row.device_expired %}
+
+                    Срок действия устройства истёк.
 
                   {% elif row.device.status != 'active' %}
 
@@ -351,6 +373,13 @@
                   Подключение сервисов
                 </div>
 
+                <div class="small text-secondary mt-1">
+                  Трафик:
+                  {{ client.traffic_used_display }}
+                  из
+                  {{ client.traffic_limit_display }}
+                </div>
+
 
                 {% if client.status == 'active' %}
 
@@ -417,6 +446,10 @@
 
                     Скачивание временно недоступно
                     для аккаунта.
+
+                  {% elif row.device_expired %}
+
+                    Срок действия устройства истёк.
 
                   {% elif row.device.status != 'active' %}
 
@@ -526,6 +559,10 @@
 
                     Скачивание временно недоступно
                     для аккаунта.
+
+                  {% elif row.device_expired %}
+
+                    Срок действия устройства истёк.
 
                   {% elif row.device.status != 'active' %}
 

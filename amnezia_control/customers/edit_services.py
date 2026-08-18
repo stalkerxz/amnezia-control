@@ -70,6 +70,10 @@ def update_customer_account_metadata(
         vpn_clients = (
             VPNClient.objects
             .select_for_update()
+            .select_related(
+                "device",
+                "device__account",
+            )
             .filter(
                 device__account=account,
             )
@@ -80,7 +84,10 @@ def update_customer_account_metadata(
         )
 
         for client in vpn_clients:
-            client.expires_at = expires_at
+            client.expires_at = (
+                client.device
+                .effective_expires_at
+            )
             client.limit_state = (
                 VPNClientService
                 .get_limit_state(client)
@@ -226,6 +233,202 @@ def update_customer_device_metadata(
             ),
             "notes_changed": old_notes != notes,
             "runtime_mutated": False,
+        },
+    )
+
+    return device
+
+@transaction.atomic
+def update_customer_device_access(
+    *,
+    device_id,
+    expires_at,
+    apply_traffic,
+    traffic_limit_bytes,
+    actor,
+):
+    device = (
+        ClientDevice.objects
+        .select_for_update()
+        .select_related("account")
+        .get(pk=device_id)
+    )
+
+    if (
+        device.status
+        == ClientDevice.Status.DELETED
+        or device.account.status
+        == CustomerAccount.Status.DELETED
+    ):
+        raise CustomerMetadataEditError(
+            "Удалённое устройство нельзя изменять."
+        )
+
+    if apply_traffic not in {
+        "keep",
+        "set",
+        "clear",
+    }:
+        raise CustomerMetadataEditError(
+            "Некорректный режим изменения VPN-лимита."
+        )
+
+    if (
+        apply_traffic == "set"
+        and traffic_limit_bytes is None
+    ):
+        raise CustomerMetadataEditError(
+            "Укажите размер VPN-лимита."
+        )
+
+    old_expires_at = device.expires_at
+    old_device_limit = (
+        device.vpn_traffic_limit_bytes
+    )
+
+    device.expires_at = expires_at
+
+    if apply_traffic == "set":
+        device.vpn_traffic_limit_bytes = (
+            traffic_limit_bytes
+        )
+
+    elif apply_traffic == "clear":
+        device.vpn_traffic_limit_bytes = None
+
+    device_fields = [
+        "expires_at",
+        "updated_at",
+    ]
+
+    if apply_traffic != "keep":
+        device_fields.append(
+            "vpn_traffic_limit_bytes"
+        )
+
+    device.save(
+        update_fields=device_fields
+    )
+
+    vpn_clients = list(
+        VPNClient.objects
+        .select_for_update()
+        .filter(device=device)
+        .exclude(
+            status=VPNClient.Status.DELETED,
+        )
+        .order_by("pk")
+    )
+
+    expiry_updated = 0
+    traffic_updated = 0
+    limit_state_updated = 0
+
+    effective_expires_at = (
+        device.effective_expires_at
+    )
+
+    target_traffic_limit = (
+        device.vpn_traffic_limit_bytes
+    )
+
+    for client in vpn_clients:
+        update_fields = []
+
+        if (
+            client.expires_at
+            != effective_expires_at
+        ):
+            client.expires_at = (
+                effective_expires_at
+            )
+
+            update_fields.append(
+                "expires_at"
+            )
+
+            expiry_updated += 1
+
+        if (
+            apply_traffic != "keep"
+            and client.traffic_limit_bytes
+            != target_traffic_limit
+        ):
+            client.traffic_limit_bytes = (
+                target_traffic_limit
+            )
+
+            update_fields.append(
+                "traffic_limit_bytes"
+            )
+
+            traffic_updated += 1
+
+        new_limit_state = (
+            VPNClientService
+            .get_limit_state(client)
+        )
+
+        if (
+            client.limit_state
+            != new_limit_state
+        ):
+            client.limit_state = (
+                new_limit_state
+            )
+
+            update_fields.append(
+                "limit_state"
+            )
+
+            limit_state_updated += 1
+
+        if update_fields:
+            client.save(
+                update_fields=update_fields
+            )
+
+    AuditService.log(
+        actor,
+        "customer.device.access.update",
+        "ClientDevice",
+        device.pk,
+        {
+            "account_id": device.account_id,
+            "expires_at_changed": (
+                old_expires_at
+                != expires_at
+            ),
+            "old_expires_at": (
+                old_expires_at.isoformat()
+                if old_expires_at
+                else None
+            ),
+            "new_expires_at": (
+                expires_at.isoformat()
+                if expires_at
+                else None
+            ),
+            "traffic_policy_changed": (
+                apply_traffic != "keep"
+            ),
+            "old_vpn_traffic_limit_bytes": (
+                old_device_limit
+            ),
+            "new_vpn_traffic_limit_bytes": (
+                device.vpn_traffic_limit_bytes
+            ),
+            "vpn_expiry_updated": (
+                expiry_updated
+            ),
+            "vpn_traffic_updated": (
+                traffic_updated
+            ),
+            "vpn_limit_state_updated": (
+                limit_state_updated
+            ),
+            "runtime_mutated": False,
+            "config_reissued": False,
         },
     )
 

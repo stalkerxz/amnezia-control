@@ -13,6 +13,7 @@ from .views import (
     customer_device_connection_create_view,
     customer_device_create_view,
     customer_device_edit_view,
+    customer_device_access_update_view,
     customer_device_status_view,
     customer_device_vpn_create_view,
     customer_device_xhttp_create_view,
@@ -71,6 +72,11 @@ urlpatterns = [
         "devices/<int:device_id>/edit/",
         customer_device_edit_view,
         name="customers-device-edit",
+    ),
+    path(
+        "devices/<int:device_id>/access/",
+        customer_device_access_update_view,
+        name="customers-device-access-update",
     ),
     path(
         "devices/<int:device_id>/status/",

@@ -218,6 +218,12 @@ def customer_portal_home_view(request):
     )
 
     for device in account.devices.all():
+        device_expired = bool(
+            device.expires_at
+            and device.expires_at
+            <= timezone.now()
+        )
+
         for client in device.vpn_clients.all():
             has_revision = bool(
                 list(client.revisions.all())
@@ -227,6 +233,7 @@ def customer_portal_home_view(request):
                 not blocked
                 and device.status
                 == ClientDevice.Status.ACTIVE
+                and not device_expired
                 and client.status
                 == VPNClient.Status.ACTIVE
                 and has_revision
@@ -250,6 +257,7 @@ def customer_portal_home_view(request):
                 not blocked
                 and device.status
                 == ClientDevice.Status.ACTIVE
+                and not device_expired
                 and xhttp.status
                 == XHTTPDevice.Status.ACTIVE
                 and bool(
@@ -318,6 +326,15 @@ def _assert_vpn_secret_available(client):
     ):
         raise PermissionDenied(
             "Устройство недоступно."
+        )
+
+    if (
+        client.device.expires_at is not None
+        and client.device.expires_at
+        <= timezone.now()
+    ):
+        raise PermissionDenied(
+            "Срок действия устройства истёк."
         )
 
     if (
