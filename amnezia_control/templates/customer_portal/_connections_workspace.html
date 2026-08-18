@@ -1,668 +1,151 @@
-<section class="card mb-4">
-
-  <div class="card-body">
-
-    <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-4">
-
-      <div>
-
-        <div class="text-secondary small">
-          VPN
-        </div>
-
-        <h2 class="h4 mb-1">
-          Мои устройства
-        </h2>
-
-        <div class="text-secondary">
-          Все ваши подключения собраны
-          отдельно для каждого устройства.
-        </div>
-
-      </div>
-
-
-      <div>
-
-        {% if blocked %}
-          <span class="badge text-bg-warning">
-            Скачивание ограничено
-          </span>
-        {% else %}
-          <span class="badge text-bg-success">
-            Подключения доступны
-          </span>
-        {% endif %}
-
-      </div>
-
-    </div>
-
-
-    <div class="row g-3">
-
-      <div class="col-6 col-lg-3">
-
-        <div class="border rounded-3 p-3 h-100">
-
-          <div class="small text-secondary">
-            Устройства
-          </div>
-
-          <div class="fs-4 fw-semibold">
-            {{ workspace.device_total }}
-          </div>
-
-          <div class="small text-secondary">
-            Активных:
-            {{ workspace.active_device_total }}
-          </div>
-
-        </div>
-
-      </div>
-
-
-      <div class="col-6 col-lg-3">
-
-        <div class="border rounded-3 p-3 h-100">
-
-          <div class="small text-secondary">
-            Подключения
-          </div>
-
-          <div class="fs-4 fw-semibold">
-            {{ workspace.connection_total }}
-          </div>
-
-          <div class="small text-secondary">
-            Активных:
-            {{ workspace.active_connection_total }}
-          </div>
-
-        </div>
-
-      </div>
-
-
-      <div class="col-6 col-lg-3">
-
-        <div class="border rounded-3 p-3 h-100">
-
-          <div class="small text-secondary">
-            Основные VPN-подключения
-          </div>
-
-          <div class="fs-4 fw-semibold">
-            {{ workspace.full_total|add:workspace.selective_total }}
-          </div>
-
-          <div class="small text-secondary">
-            Весь интернет: {{ workspace.full_total }}
-            · Выбранные сервисы: {{ workspace.selective_total }}
-          </div>
-
-        </div>
-
-      </div>
-
-
-      <div class="col-6 col-lg-3">
-
-        <div class="border rounded-3 p-3 h-100">
-
-          <div class="small text-secondary">
-            Альтернативные подключения
-          </div>
-
-          <div class="fs-4 fw-semibold">
-            {{ workspace.xhttp_total }}
-          </div>
-
-          <div class="small text-secondary">
-            Дополнительный способ подключения
-          </div>
-
-        </div>
-
-      </div>
-
-    </div>
-
-  </div>
-
-</section>
-
-
+<div class="portal-device-list">
 {% for row in workspace.devices %}
-
-<section class="card mb-3">
-
-  <div class="card-body">
-
-    <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-4">
-
-      <div>
-
-        <div class="d-flex align-items-center gap-2 flex-wrap">
-
-          <h2 class="h5 mb-0">
-            {{ row.device.name }}
-          </h2>
-
-
+  <article class="portal-device-card">
+    <header class="portal-device-head">
+      <div class="portal-device-title">
+        <div class="portal-device-title-line">
+          <h3>{{ row.device.name }}</h3>
           {% if row.device_expired %}
-
-            <span class="badge text-bg-danger">
-              Срок истёк
-            </span>
-
+            <span class="portal-device-state is-danger">Срок истёк</span>
           {% elif row.device.status == 'active' %}
-
-            <span class="badge text-bg-success">
-              Активно
-            </span>
-
-          {% elif row.device.status == 'disabled' %}
-
-            <span class="badge text-bg-warning">
-              Отключено
-            </span>
-
+            <span class="portal-device-state">Активно</span>
           {% else %}
-
-            <span class="badge text-bg-secondary">
-              {{ row.device.get_status_display }}
-            </span>
-
+            <span class="portal-device-state is-warning">{{ row.device.get_status_display }}</span>
           {% endif %}
-
         </div>
-
-
-        <div class="small text-secondary mt-1">
-
-          {{ row.device.get_platform_display }}
-
-          ·
-
-          {{ row.connection_total }}
-          подключений
-
-          {% if row.effective_expires_at %}
-            · доступ до
-            {{ row.effective_expires_at|date:"d.m.Y" }}
-          {% endif %}
-
+        <div class="portal-device-meta">
+          <span>{{ row.device.get_platform_display }}</span>
+          <span>{{ row.connection_total }} подключений</span>
+          {% if row.effective_expires_at %}<span>до {{ row.effective_expires_at|date:'d.m.Y' }}</span>{% endif %}
         </div>
-
       </div>
+    </header>
 
-    </div>
-
-
-    <div class="row g-3">
-
-      <!-- ВЕСЬ ИНТЕРНЕТ -->
-      <div class="col-12 col-xl-4">
-
-        <div class="border rounded-3 p-3 h-100">
-
-          <div class="mb-3">
-
-            <div class="fw-semibold">
-              Весь интернет через VPN
-            </div>
-
-            <div class="small text-secondary">
-              Весь интернет-трафик устройства
-              проходит через VPN
-            </div>
-
-          </div>
-
-
-          {% for client in row.full %}
-
-            <div class="border-top pt-3 mt-3">
-
-              <div class="d-flex justify-content-between gap-2 align-items-start">
-
-                <div class="fw-semibold">
-                  Основное подключение
-                </div>
-
-                <div class="small text-secondary mt-1">
-                  Трафик:
-                  {{ client.traffic_used_display }}
-                  из
-                  {{ client.traffic_limit_display }}
-                </div>
-
-
-                {% if client.status == 'active' %}
-
-                  <span class="badge text-bg-success">
-                    Активно
-                  </span>
-
-                {% elif client.status == 'disabled' %}
-
-                  <span class="badge text-bg-warning">
-                    Отключено
-                  </span>
-
-                {% else %}
-
-                  <span class="badge text-bg-secondary">
-                    {{ client.get_status_display }}
-                  </span>
-
-                {% endif %}
-
+    {% if row.full or row.selective or row.xhttp or row.legacy %}
+      <div class="portal-device-connections">
+        {% for client in row.full %}
+          <section class="portal-connection-card">
+            <div class="portal-connection-top">
+              <div class="portal-connection-copy">
+                <span>Основное</span>
+                <strong>Весь интернет</strong>
+                <small>Трафик: {{ client.traffic_used_display }} из {{ client.traffic_limit_display }}</small>
               </div>
-
-
-              {% if client.cabinet_download_allowed %}
-
-                <div class="d-grid gap-2 mt-3">
-
-                  <a
-                    href="{% url 'customer-portal-vpn-download' client.pk %}"
-                    class="btn btn-primary"
-                  >
-                    Скачать конфигурацию
-                  </a>
-
-
-                  {% if client.cabinet_qr_allowed %}
-
-                    <a
-                      href="{% url 'customer-portal-vpn-qr' client.pk %}"
-                      class="btn btn-outline-primary"
-                      target="_blank"
-                      rel="noopener"
-                    >
-                      Показать QR-код
-                    </a>
-
-                  {% else %}
-
-                    <div class="small text-secondary mt-2">
-                      QR недоступен для этого профиля —
-                      используйте .conf
-                    </div>
-
-                  {% endif %}
-
-                </div>
-
-              {% else %}
-
-                <div class="small text-secondary mt-3">
-
-                  {% if blocked %}
-
-                    Скачивание временно недоступно
-                    для аккаунта.
-
-                  {% elif row.device_expired %}
-
-                    Срок действия устройства истёк.
-
-                  {% elif row.device.status != 'active' %}
-
-                    Устройство отключено.
-
-                  {% elif client.status != 'active' %}
-
-                    Подключение отключено.
-
-                  {% else %}
-
-                    Конфигурация пока недоступна.
-
-                  {% endif %}
-
-                </div>
-
-              {% endif %}
-
-            </div>
-
-          {% empty %}
-
-            <div class="small text-secondary">
-              Подключение для всего интернета
-              пока не создано.
-            </div>
-
-          {% endfor %}
-
-        </div>
-
-      </div>
-
-
-      <!-- ВЫБРАННЫЕ СЕРВИСЫ -->
-      <div class="col-12 col-xl-4">
-
-        <div class="border rounded-3 p-3 h-100">
-
-          <div class="mb-3">
-
-            <div class="fw-semibold">
-              Только выбранные сервисы
-            </div>
-
-            <div class="small text-secondary">
-              Через VPN идут только настроенные
-              сервисы и маршруты
-            </div>
-
-          </div>
-
-
-          {% for client in row.selective %}
-
-            <div class="border-top pt-3 mt-3">
-
-              <div class="d-flex justify-content-between gap-2 align-items-start">
-
-                <div class="fw-semibold">
-                  Подключение сервисов
-                </div>
-
-                <div class="small text-secondary mt-1">
-                  Трафик:
-                  {{ client.traffic_used_display }}
-                  из
-                  {{ client.traffic_limit_display }}
-                </div>
-
-
-                {% if client.status == 'active' %}
-
-                  <span class="badge text-bg-success">
-                    Активно
-                  </span>
-
-                {% elif client.status == 'disabled' %}
-
-                  <span class="badge text-bg-warning">
-                    Отключено
-                  </span>
-
-                {% else %}
-
-                  <span class="badge text-bg-secondary">
-                    {{ client.get_status_display }}
-                  </span>
-
-                {% endif %}
-
-              </div>
-
-
-              {% if client.cabinet_download_allowed %}
-
-                <div class="d-grid gap-2 mt-3">
-
-                  <a
-                    href="{% url 'customer-portal-vpn-download' client.pk %}"
-                    class="btn btn-primary"
-                  >
-                    Скачать конфигурацию
-                  </a>
-
-
-                  {% if client.cabinet_qr_allowed %}
-
-                    <a
-                      href="{% url 'customer-portal-vpn-qr' client.pk %}"
-                      class="btn btn-outline-primary"
-                      target="_blank"
-                      rel="noopener"
-                    >
-                      Показать QR-код
-                    </a>
-
-                  {% else %}
-
-                    <div class="small text-secondary mt-2">
-                      QR недоступен для этого профиля —
-                      используйте .conf
-                    </div>
-
-                  {% endif %}
-
-                </div>
-
-              {% else %}
-
-                <div class="small text-secondary mt-3">
-
-                  {% if blocked %}
-
-                    Скачивание временно недоступно
-                    для аккаунта.
-
-                  {% elif row.device_expired %}
-
-                    Срок действия устройства истёк.
-
-                  {% elif row.device.status != 'active' %}
-
-                    Устройство отключено.
-
-                  {% elif client.status != 'active' %}
-
-                    Подключение отключено.
-
-                  {% else %}
-
-                    Конфигурация пока недоступна.
-
-                  {% endif %}
-
-                </div>
-
-              {% endif %}
-
-            </div>
-
-          {% empty %}
-
-            <div class="small text-secondary">
-              Подключение для выбранных сервисов
-              пока не создано.
-            </div>
-
-          {% endfor %}
-
-        </div>
-
-      </div>
-
-
-      <!-- АЛЬТЕРНАТИВНОЕ ПОДКЛЮЧЕНИЕ -->
-      <div class="col-12 col-xl-4">
-
-        <div class="border rounded-3 p-3 h-100">
-
-          <div class="mb-3">
-
-            <div class="fw-semibold">
-              Альтернативное подключение
-            </div>
-
-            <div class="small text-secondary">
-              Дополнительный способ подключения
-              для этого устройства
-            </div>
-
-          </div>
-
-
-          {% for xhttp in row.xhttp %}
-
-            <div class="border-top pt-3 mt-3">
-
-              <div class="d-flex justify-content-between gap-2 align-items-start">
-
-                <div class="fw-semibold">
-                  Конфигурация подключения
-                </div>
-
-
-                {% if xhttp.status == 'active' %}
-
-                  <span class="badge text-bg-success">
-                    Активно
-                  </span>
-
-                {% elif xhttp.status == 'disabled' %}
-
-                  <span class="badge text-bg-warning">
-                    Отключено
-                  </span>
-
-                {% else %}
-
-                  <span class="badge text-bg-secondary">
-                    {{ xhttp.get_status_display }}
-                  </span>
-
-                {% endif %}
-
-              </div>
-
-
-              {% if xhttp.cabinet_download_allowed %}
-
-                <div class="d-grid gap-2 mt-3">
-
-                  <a
-                    href="{% url 'customer-portal-xhttp-download' xhttp.pk %}"
-                    class="btn btn-primary"
-                  >
-                    Скачать конфигурацию
-                  </a>
-
-                </div>
-
-              {% else %}
-
-                <div class="small text-secondary mt-3">
-
-                  {% if blocked %}
-
-                    Скачивание временно недоступно
-                    для аккаунта.
-
-                  {% elif row.device_expired %}
-
-                    Срок действия устройства истёк.
-
-                  {% elif row.device.status != 'active' %}
-
-                    Устройство отключено.
-
-                  {% elif xhttp.status != 'active' %}
-
-                    Подключение отключено.
-
-                  {% else %}
-
-                    Конфигурация пока недоступна.
-
-                  {% endif %}
-
-                </div>
-
-              {% endif %}
-
-            </div>
-
-          {% empty %}
-
-            <div class="small text-secondary">
-              Альтернативное подключение
-              пока не создано.
-            </div>
-
-          {% endfor %}
-
-        </div>
-
-      </div>
-
-    </div>
-
-
-    {% if row.legacy %}
-
-      <div class="border rounded-3 p-3 mt-3">
-
-        <div class="fw-semibold mb-2">
-          Другие подключения
-        </div>
-
-        {% for client in row.legacy %}
-
-          <div class="d-flex justify-content-between gap-3 align-items-center flex-wrap">
-
-            <div>
-              Дополнительное VPN-подключение
+              <span class="portal-connection-state {% if client.status != 'active' %}is-warning{% endif %}">
+                {% if client.status == 'active' %}Активно{% else %}{{ client.get_status_display }}{% endif %}
+              </span>
             </div>
 
             {% if client.cabinet_download_allowed %}
-
-              <a
-                href="{% url 'customer-portal-vpn-download' client.pk %}"
-                class="btn btn-sm btn-outline-primary"
-              >
-                Скачать конфигурацию
-              </a>
-
+              <div class="portal-connection-actions">
+                <a href="{% url 'customer-portal-vpn-download' client.pk %}" class="btn btn-primary btn-sm">Скачать</a>
+                {% if client.cabinet_qr_allowed %}
+                  <a href="{% url 'customer-portal-vpn-qr' client.pk %}" class="btn btn-outline-primary btn-sm" target="_blank" rel="noopener">QR-код</a>
+                {% endif %}
+              </div>
             {% else %}
-
-              <span class="small text-secondary">
-                Недоступно
-              </span>
-
+              <div class="portal-connection-unavailable">
+                {% if blocked %}Скачивание временно недоступно.
+                {% elif row.device_expired %}Срок устройства истёк.
+                {% elif row.device.status != 'active' %}Устройство отключено.
+                {% elif client.status != 'active' %}Подключение отключено.
+                {% else %}Конфигурация временно недоступна.{% endif %}
+              </div>
             {% endif %}
-
-          </div>
-
+          </section>
         {% endfor %}
 
+        {% for client in row.selective %}
+          <section class="portal-connection-card">
+            <div class="portal-connection-top">
+              <div class="portal-connection-copy">
+                <span>Выборочное</span>
+                <strong>Выбранные сервисы</strong>
+                <small>Трафик: {{ client.traffic_used_display }} из {{ client.traffic_limit_display }}</small>
+              </div>
+              <span class="portal-connection-state {% if client.status != 'active' %}is-warning{% endif %}">
+                {% if client.status == 'active' %}Активно{% else %}{{ client.get_status_display }}{% endif %}
+              </span>
+            </div>
+
+            {% if client.cabinet_download_allowed %}
+              <div class="portal-connection-actions">
+                <a href="{% url 'customer-portal-vpn-download' client.pk %}" class="btn btn-primary btn-sm">Скачать</a>
+                {% if client.cabinet_qr_allowed %}
+                  <a href="{% url 'customer-portal-vpn-qr' client.pk %}" class="btn btn-outline-primary btn-sm" target="_blank" rel="noopener">QR-код</a>
+                {% endif %}
+              </div>
+            {% else %}
+              <div class="portal-connection-unavailable">
+                {% if blocked %}Скачивание временно недоступно.
+                {% elif row.device_expired %}Срок устройства истёк.
+                {% elif row.device.status != 'active' %}Устройство отключено.
+                {% elif client.status != 'active' %}Подключение отключено.
+                {% else %}Конфигурация временно недоступна.{% endif %}
+              </div>
+            {% endif %}
+          </section>
+        {% endfor %}
+
+        {% for xhttp in row.xhttp %}
+          <section class="portal-connection-card is-alt">
+            <div class="portal-connection-top">
+              <div class="portal-connection-copy">
+                <span>Дополнительное</span>
+                <strong>Альтернативное подключение</strong>
+                <small>Отдельный способ подключения для этого устройства.</small>
+              </div>
+              <span class="portal-connection-state {% if xhttp.status != 'active' %}is-warning{% endif %}">
+                {% if xhttp.status == 'active' %}Активно{% else %}{{ xhttp.get_status_display }}{% endif %}
+              </span>
+            </div>
+
+            {% if xhttp.cabinet_download_allowed %}
+              <div class="portal-connection-actions">
+                <a href="{% url 'customer-portal-xhttp-download' xhttp.pk %}" class="btn btn-primary btn-sm">Скачать</a>
+              </div>
+            {% else %}
+              <div class="portal-connection-unavailable">
+                {% if blocked %}Скачивание временно недоступно.
+                {% elif row.device_expired %}Срок устройства истёк.
+                {% elif row.device.status != 'active' %}Устройство отключено.
+                {% elif xhttp.status != 'active' %}Подключение отключено.
+                {% else %}Конфигурация временно недоступна.{% endif %}
+              </div>
+            {% endif %}
+          </section>
+        {% endfor %}
+
+        {% for client in row.legacy %}
+          <section class="portal-connection-card is-legacy">
+            <div class="portal-connection-top">
+              <div class="portal-connection-copy">
+                <span>Дополнительное</span>
+                <strong>VPN-подключение</strong>
+                <small>Существующая конфигурация устройства.</small>
+              </div>
+            </div>
+            {% if client.cabinet_download_allowed %}
+              <div class="portal-connection-actions">
+                <a href="{% url 'customer-portal-vpn-download' client.pk %}" class="btn btn-outline-primary btn-sm">Скачать</a>
+              </div>
+            {% else %}
+              <div class="portal-connection-unavailable">Конфигурация сейчас недоступна.</div>
+            {% endif %}
+          </section>
+        {% endfor %}
       </div>
-
+    {% else %}
+      <div class="portal-device-empty">
+        <strong>Подключений пока нет</strong>
+        <span>Когда оператор добавит VPN, конфигурация появится здесь автоматически.</span>
+      </div>
     {% endif %}
-
-  </div>
-
-</section>
-
-
+  </article>
 {% empty %}
-
-<section class="card mb-3">
-
-  <div class="card-body text-center py-4">
-
-    <div class="fw-semibold">
-      Устройства ещё не добавлены
-    </div>
-
-    <div class="small text-secondary mt-1">
-      После добавления устройства оператором
-      здесь появятся доступные подключения.
-    </div>
-
+  <div class="portal-device-empty">
+    <strong>Устройства ещё не добавлены</strong>
+    <span>После добавления устройства оператором доступные подключения появятся здесь.</span>
   </div>
-
-</section>
-
 {% endfor %}
+</div>
