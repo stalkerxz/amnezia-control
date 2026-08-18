@@ -1,8 +1,46 @@
 import uuid
 
 from django.db import models
+from django.db.models.deletion import ProtectedError
 from django.conf import settings
 from servers.models import ProtocolProfile, Server
+
+
+def protect_non_deleted_connection(
+    collector,
+    field,
+    sub_objs,
+    using,
+):
+    """
+    Protect a ClientDevice while it still owns a live
+    or disabled connection.
+
+    Connections already in DELETED state have previously
+    completed their managed runtime removal. They may be
+    physically cascaded when the parent device/account is
+    finally deleted.
+    """
+    protected = sub_objs.exclude(
+        status="deleted"
+    )
+
+    if protected.exists():
+        raise ProtectedError(
+            (
+                "Нельзя удалить устройство клиента, "
+                "пока у него есть не удалённые "
+                "VPN/XHTTP-подключения."
+            ),
+            protected,
+        )
+
+    models.CASCADE(
+        collector,
+        field,
+        sub_objs,
+        using,
+    )
 
 
 class VPNClient(models.Model):
@@ -39,7 +77,7 @@ class VPNClient(models.Model):
     # Nullable so the schema change is non-destructive for existing clients.
     device = models.ForeignKey(
         "customers.ClientDevice",
-        on_delete=models.PROTECT,
+        on_delete=protect_non_deleted_connection,
         null=True,
         blank=True,
         related_name="vpn_clients",
@@ -114,7 +152,7 @@ class XHTTPDevice(models.Model):
     # Logical owner of the VLESS/XHTTP connection.
     device = models.ForeignKey(
         "customers.ClientDevice",
-        on_delete=models.PROTECT,
+        on_delete=protect_non_deleted_connection,
         related_name="xhttp_devices",
     )
 
