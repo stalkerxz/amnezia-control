@@ -16,8 +16,10 @@ echo "[ui-v4] Migration drift check"
 
 echo "[ui-v4] Template and static asset load check"
 "${COMPOSE[@]}" exec -T web python manage.py shell <<'PY'
+from pathlib import Path
 from types import SimpleNamespace
 
+from django.conf import settings
 from django.contrib.staticfiles import finders
 from django.template.loader import get_template
 from django.test import RequestFactory
@@ -68,10 +70,12 @@ for template_name in TEMPLATES:
     get_template(template_name)
     print(f"template OK: {template_name}")
 
+static_paths = {}
 for asset in STATIC_ASSETS:
     found = finders.find(asset)
     if not found:
         raise RuntimeError(f"static asset not found: {asset}")
+    static_paths[asset] = Path(found)
     print(f"static OK: {asset}")
 
 URLS = [
@@ -102,12 +106,22 @@ for name, args, kwargs in URLS:
     value = reverse(name, args=args, kwargs=kwargs)
     print(f"url OK: {name} -> {value}")
 
-# Modern operator routes must not load the transitional v2/v3 bundles.
+# The shell owns only core v4 styles. Composition belongs to individual pages.
 base = get_template("partials/base.html")
 rf = RequestFactory()
 auth_user = SimpleNamespace(is_authenticated=True, username="ui-v4-check")
 anon_user = SimpleNamespace(is_authenticated=False, username="")
 legacy_assets = ("app-v2.css", "app-v3.css", "app-v3-pages.css")
+composition_assets = (
+    "app-v4-layout.css",
+    "app-v4-customers.css",
+    "app-v4-detail.css",
+    "app-v4-system.css",
+    "app-v4-system-detail.css",
+    "app-v4-renewals.css",
+    "app-v4-forms.css",
+    "app-v4-access.css",
+)
 
 for path in (
     "/",
@@ -119,12 +133,24 @@ for path in (
     "/settings/",
 ):
     html = base.render({"request": rf.get(path), "user": auth_user})
-    leaked = [asset for asset in legacy_assets if asset in html]
-    if leaked:
-        raise RuntimeError(f"legacy CSS leaked into modern route {path}: {', '.join(leaked)}")
-    if "app-v4-renewals.css" not in html:
-        raise RuntimeError(f"v4 renewal stylesheet missing from base on {path}")
-    print(f"modern CSS isolation OK: {path}")
+    leaked_legacy = [asset for asset in legacy_assets if asset in html]
+    if leaked_legacy:
+        raise RuntimeError(
+            f"legacy CSS leaked into modern route {path}: "
+            + ", ".join(leaked_legacy)
+        )
+    leaked_composition = [asset for asset in composition_assets if asset in html]
+    if leaked_composition:
+        raise RuntimeError(
+            f"page composition CSS leaked into base shell on {path}: "
+            + ", ".join(leaked_composition)
+        )
+    for required_core in ("app-v4.css", "app-v4-polish.css"):
+        if required_core not in html:
+            raise RuntimeError(
+                f"core v4 stylesheet missing from shell on {path}: {required_core}"
+            )
+    print(f"modern shell CSS isolation OK: {path}")
 
 for path in ("/clients/", "/xhttp/"):
     html = base.render({"request": rf.get(path), "user": auth_user})
@@ -138,6 +164,74 @@ missing = [asset for asset in legacy_assets if asset not in login_html]
 if missing:
     raise RuntimeError(f"auth fallback missing: {', '.join(missing)}")
 print("auth CSS fallback OK: /login/")
+
+# Every modern operator screen must own exactly one copy of its composition layers.
+template_root = Path(settings.BASE_DIR) / "templates"
+TEMPLATE_STYLE_REQUIREMENTS = {
+    "core/dashboard.html": ("app-v4-layout.css",),
+    "core/settings.html": ("app-v4-layout.css", "app-v4-system.css"),
+    "customers/customers_list.html": ("app-v4-layout.css", "app-v4-customers.css"),
+    "customers/customer_detail.html": ("app-v4-layout.css", "app-v4-detail.css"),
+    "customers/customer_onboarding_form.html": ("app-v4-forms.css",),
+    "customers/customer_form.html": ("app-v4-forms.css",),
+    "customers/customer_edit_form.html": ("app-v4-forms.css",),
+    "customers/device_form.html": ("app-v4-forms.css",),
+    "customers/device_edit_form.html": ("app-v4-forms.css",),
+    "customers/connection_product_select.html": ("app-v4-forms.css",),
+    "customers/vpn_connection_form.html": ("app-v4-forms.css",),
+    "customers/xhttp_connection_form.html": ("app-v4-forms.css",),
+    "customers/access_form.html": ("app-v4-forms.css", "app-v4-access.css"),
+    "customers/access_manage.html": ("app-v4-forms.css", "app-v4-access.css"),
+    "vpn/renewal_requests_list.html": (
+        "app-v4-layout.css",
+        "app-v4-system.css",
+        "app-v4-renewals.css",
+    ),
+    "servers/list.html": ("app-v4-layout.css", "app-v4-system.css"),
+    "servers/detail.html": (
+        "app-v4-layout.css",
+        "app-v4-system.css",
+        "app-v4-system-detail.css",
+    ),
+    "jobs/list.html": ("app-v4-layout.css", "app-v4-system.css"),
+    "jobs/detail.html": (
+        "app-v4-layout.css",
+        "app-v4-system.css",
+        "app-v4-system-detail.css",
+    ),
+    "audit/list.html": ("app-v4-layout.css", "app-v4-system.css"),
+}
+
+for template_name, required_assets in TEMPLATE_STYLE_REQUIREMENTS.items():
+    source = (template_root / template_name).read_text(encoding="utf-8")
+    for asset in required_assets:
+        count = source.count(asset)
+        if count != 1:
+            raise RuntimeError(
+                f"stylesheet ownership error in {template_name}: "
+                f"{asset} occurs {count} times, expected exactly 1"
+            )
+    print(f"page CSS ownership OK: {template_name}")
+
+# Self-contained page layers must retain the shared primitives they use.
+CSS_MARKERS = {
+    "css/app-v4-forms.css": (
+        ".v4-form-page .v4-back-link",
+        ".v4-form-page .v4-status-pill",
+    ),
+    "css/app-v4-system-detail.css": (
+        ".v4-system-page > .v4-back-link",
+    ),
+}
+for asset, markers in CSS_MARKERS.items():
+    css = static_paths[asset].read_text(encoding="utf-8")
+    missing_markers = [marker for marker in markers if marker not in css]
+    if missing_markers:
+        raise RuntimeError(
+            f"self-contained CSS primitives missing from {asset}: "
+            + ", ".join(missing_markers)
+        )
+    print(f"self-contained CSS OK: {asset}")
 
 print("UI v4 structural checks passed")
 PY
