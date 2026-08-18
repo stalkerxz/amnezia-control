@@ -204,6 +204,56 @@
   background: rgba(6,13,23,.54) !important;
 }
 
+/* Final customer-detail density pass from production render. */
+.v4-detail-section-title > a[href*="/devices/"] { display: none !important; }
+#customer-overview.v4-detail-panel {
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+#customer-overview .v4-detail-section-head {
+  margin-bottom: 9px;
+}
+#customer-overview .v4-ready-state {
+  min-height: 54px;
+  padding: 9px 11px;
+}
+#customer-overview .v4-ready-icon {
+  width: 29px;
+  height: 29px;
+  flex-basis: 29px;
+  border-radius: 9px;
+}
+
+/* Empty product slots should remain understandable but visually secondary. */
+.operator-workspace-v4 .collapse > .row.g-3 > [class*="col-"] > .border.rounded-3:not(:has(.border-top)),
+.operator-workspace-v4 .collapsing > .row.g-3 > [class*="col-"] > .border.rounded-3:not(:has(.border-top)) {
+  opacity: .56;
+  background: rgba(7,14,24,.45) !important;
+}
+.operator-workspace-v4 .collapse > .row.g-3 > [class*="col-"] > .border.rounded-3:has(.border-top),
+.operator-workspace-v4 .collapsing > .row.g-3 > [class*="col-"] > .border.rounded-3:has(.border-top) {
+  border-color: rgba(103,145,215,.18) !important;
+  background: linear-gradient(155deg, rgba(15,27,45,.86), rgba(8,16,29,.72)) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.018), 0 8px 24px rgba(0,0,0,.06) !important;
+}
+.operator-workspace-v4 .collapse > .row.g-3 > [class*="col-"] > .border.rounded-3:has(.border-top) .fw-semibold,
+.operator-workspace-v4 .collapsing > .row.g-3 > [class*="col-"] > .border.rounded-3:has(.border-top) .fw-semibold {
+  color: #e1e8f2;
+}
+
+/* The account-level create button is the canonical device action; avoid duplicate CTAs. */
+.v4-detail-header .btn-primary { box-shadow: 0 8px 24px rgba(74,119,255,.10); }
+
+/* Secondary device actions should not compete with connection/download actions. */
+.operator-workspace-v4 > section.section-block > .section-body > .d-flex:first-child .btn-outline-secondary,
+.operator-workspace-v4 > section.section-block > .section-body > .d-flex:first-child .btn-outline-danger {
+  opacity: .64;
+}
+.operator-workspace-v4 > section.section-block:hover > .section-body > .d-flex:first-child .btn-outline-secondary,
+.operator-workspace-v4 > section.section-block:hover > .section-body > .d-flex:first-child .btn-outline-danger {
+  opacity: .92;
+}
+
 /* Make the primary customer route visually distinct from technical legacy pages. */
 body:has(a[href="/customers/"][aria-current="page"]) .sidebar-system { opacity: .82; }
 
@@ -263,6 +313,10 @@ body:has(.clients-table-wrap) .filters-row {
     white-space: normal;
   }
   .operator-workspace-v4 > section.section-block > .section-body > .d-flex:first-child > .d-flex.gap-2.flex-wrap {
+    opacity: 1;
+  }
+  .operator-workspace-v4 > section.section-block > .section-body > .d-flex:first-child .btn-outline-secondary,
+  .operator-workspace-v4 > section.section-block > .section-body > .d-flex:first-child .btn-outline-danger {
     opacity: 1;
   }
 }
