@@ -1,104 +1,83 @@
 {% extends 'partials/base.html' %}
+{% load static %}
+
+{% block title %}Аудит · VPN Control{% endblock %}
+
 {% block content %}
-<div class="page-header d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
-  <div>
-    <p class="page-kicker">Операторская · Audit</p>
-    <h1 class="h3 mb-1">Журнал аудита</h1>
-    <p class="text-secondary mb-0">Просмотр действий, сущностей и деталей изменений с быстрым разбором payload.</p>
-  </div>
-</div>
-<form class="card card-body filter-panel mb-3">
-  <div class="row g-2 align-items-end">
-    <div class="col-xl-3 col-lg-4">
-      <label class="form-label" for="id_q">Фильтр по действию</label>
-      <input id="id_q" class="form-control" name="q" value="{{ q }}" placeholder="Например, vpn.client.reissue">
+<link href="{% static 'css/app-v4-layout.css' %}" rel="stylesheet">
+<link href="{% static 'css/app-v4-system.css' %}" rel="stylesheet">
+
+<div class="v4-system-page">
+  <header class="v4-page-hero v4-system-hero">
+    <div>
+      <p class="page-kicker">VPN Control · Система</p>
+      <h1>Аудит</h1>
+      <p class="v4-hero-copy">История действий операторов и системы с быстрым просмотром изменённых сущностей и payload.</p>
     </div>
-    <div class="col-xl-3 col-lg-4">
-      <label class="form-label" for="id_entity_type">Тип сущности</label>
-      <select class="form-select" id="id_entity_type" name="entity_type">
-        <option value="">Все</option>
-        {% for value in entity_type_choices %}
-          <option value="{{ value }}" {% if value == entity_type_filter %}selected{% endif %}>{{ value }}</option>
-        {% endfor %}
-      </select>
+  </header>
+
+  <form method="get" class="v4-system-toolbar">
+    <div class="v4-system-filter-grid" style="grid-template-columns: minmax(220px,1.4fr) minmax(160px,1fr) minmax(150px,.8fr) minmax(130px,.7fr) auto auto;">
+      <label><span>Действие</span><input id="id_q" class="form-control" name="q" value="{{ q }}" placeholder="vpn.client.reissue"></label>
+      <label><span>Тип сущности</span><select class="form-select" name="entity_type"><option value="">Все</option>{% for value in entity_type_choices %}<option value="{{ value }}" {% if value == entity_type_filter %}selected{% endif %}>{{ value }}</option>{% endfor %}</select></label>
+      <label><span>Дата с</span><input class="form-control" type="date" name="created_from" value="{{ created_from }}"></label>
+      <label><span>Оператор</span><select class="form-select" name="operator_scope"><option value="all" {% if operator_scope != 'mine' %}selected{% endif %}>Все</option><option value="mine" {% if operator_scope == 'mine' %}selected{% endif %}>Только мои</option></select></label>
+      <button class="btn btn-primary" type="submit">Применить</button>
+      <a href="{% url 'audit-list' %}" class="btn btn-outline-secondary">Сбросить</a>
     </div>
-    <div class="col-xl-3 col-lg-4">
-      <label class="form-label" for="id_created_from">Дата с</label>
-      <input class="form-control" type="date" id="id_created_from" name="created_from" value="{{ created_from }}">
-    </div>
-    <div class="col-xl-2 col-lg-4">
-      <label class="form-label" for="id_operator_scope">Операторы</label>
-      <select class="form-select" id="id_operator_scope" name="operator_scope">
-        <option value="all" {% if operator_scope != 'mine' %}selected{% endif %}>Все</option>
-        <option value="mine" {% if operator_scope == 'mine' %}selected{% endif %}>Мои</option>
-      </select>
-    </div>
-    <div class="col-xl-1 col-lg-6">
-      <button class="btn btn-primary w-100" type="submit">Применить</button>
-    </div>
-    <div class="col-xl-2 col-lg-6">
-      <a href="{% url 'audit-list' %}" class="btn btn-outline-secondary w-100">Сброс</a>
-    </div>
-  </div>
-</form>
-{% if log_rows %}
-<div class="table-responsive card p-2">
-<table class="table table-sm align-middle mb-0">
-  <thead><tr><th>Дата</th><th>Пользователь</th><th>Действие</th><th>Сущность</th><th class="text-end">Детали</th></tr></thead>
-  <tbody>
-  {% for row in log_rows %}
-  {% with l=row.log %}
-  <tr>
-    <td>{{ l.created_at|date:'d.m.Y H:i:s' }}</td>
-    <td>
-      {% if l.actor %}
-        {{ l.actor.username }}
-        {% if l.actor_id == request.user.id %}<span class="badge status-badge status-success">Моё</span>{% else %}<span class="badge status-badge status-neutral">Другой оператор</span>{% endif %}
-      {% else %}
-        <span class="text-secondary">система</span>
-      {% endif %}
-    </td>
-    <td>
-      <code>{{ l.action }}</code>
-      <div class="small text-secondary">{{ l.entity_type }}</div>
-    </td>
-    <td><span class="badge status-badge status-neutral">{{ l.entity_type }}</span> <span class="text-secondary">#{{ l.entity_id }}</span></td>
-    <td class="text-end">
-      <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#audit-details-{{ l.id }}" type="button">Показать</button>
-    </td>
-  </tr>
-  <tr class="collapse-row">
-    <td colspan="5" class="p-0 border-0">
-      <div class="collapse" id="audit-details-{{ l.id }}">
-        <div class="p-3 border-top">
-          <h2 class="h6 mb-2">Детали события</h2>
-          <pre class="log mb-0">{{ row.details_pretty }}</pre>
+  </form>
+
+  {% if log_rows %}
+    <section class="v4-system-panel">
+      <div class="v4-system-panel-head">
+        <div>
+          <span class="v4-panel-eyebrow">Security & changes</span>
+          <h2>Журнал событий</h2>
+          {% if page_obj %}<p>Всего по текущему фильтру: {{ page_obj.paginator.count }}</p>{% endif %}
         </div>
       </div>
-    </td>
-  </tr>
-  {% endwith %}
-  {% endfor %}
-  </tbody>
-</table>
+
+      <div class="v4-system-table-wrap">
+        <table class="table v4-system-table align-middle">
+          <thead><tr><th>Дата</th><th>Инициатор</th><th>Действие</th><th>Сущность</th><th class="text-end">Детали</th></tr></thead>
+          <tbody>
+            {% for row in log_rows %}
+              {% with l=row.log %}
+                <tr>
+                  <td class="text-nowrap">{{ l.created_at|date:'d.m.Y H:i:s' }}</td>
+                  <td>{% if l.actor %}<span class="v4-system-primary">{{ l.actor.username }}</span>{% if l.actor_id == request.user.id %}<div class="v4-system-meta">текущий оператор</div>{% else %}<div class="v4-system-meta">другой оператор</div>{% endif %}{% else %}<span class="text-secondary">система</span>{% endif %}</td>
+                  <td><code class="v4-system-mono">{{ l.action }}</code><div class="v4-system-meta">{{ l.entity_type }}</div></td>
+                  <td><span class="v4-status-pill is-neutral">{{ l.entity_type }}</span> <span class="v4-system-meta d-inline">#{{ l.entity_id }}</span></td>
+                  <td class="text-end"><button class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#audit-details-{{ l.id }}" type="button">Просмотр</button></td>
+                </tr>
+                <tr>
+                  <td colspan="5" class="p-0 border-0">
+                    <div class="collapse" id="audit-details-{{ l.id }}">
+                      <div class="v4-collapse-body">
+                        <div class="v4-system-meta mb-2">Детали события</div>
+                        <pre class="v4-log mb-0">{{ row.details_pretty }}</pre>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              {% endwith %}
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    {% if page_obj and page_obj.paginator.num_pages > 1 %}
+      <nav class="v4-system-pagination" aria-label="Навигация по журналу аудита">
+        <ul class="pagination pagination-sm mb-0">
+          <li class="page-item {% if not page_obj.has_previous %}disabled{% endif %}"><a class="page-link" href="?q={{ q|urlencode }}&entity_type={{ entity_type_filter|urlencode }}&created_from={{ created_from|urlencode }}&operator_scope={{ operator_scope|urlencode }}&page={% if page_obj.has_previous %}{{ page_obj.previous_page_number }}{% else %}1{% endif %}">Назад</a></li>
+          <li class="page-item disabled"><span class="page-link">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span></li>
+          <li class="page-item {% if not page_obj.has_next %}disabled{% endif %}"><a class="page-link" href="?q={{ q|urlencode }}&entity_type={{ entity_type_filter|urlencode }}&created_from={{ created_from|urlencode }}&operator_scope={{ operator_scope|urlencode }}&page={% if page_obj.has_next %}{{ page_obj.next_page_number }}{% else %}{{ page_obj.paginator.num_pages }}{% endif %}">Далее</a></li>
+        </ul>
+      </nav>
+    {% endif %}
+  {% else %}
+    <section class="v4-system-panel"><div class="v4-empty-state"><strong>Записей аудита пока нет</strong><span>История изменений появится после действий операторов и системы.</span></div></section>
+  {% endif %}
 </div>
-{% if page_obj and page_obj.paginator.num_pages > 1 %}
-<nav class="mt-3" aria-label="Навигация по журналу аудита">
-  <ul class="pagination pagination-sm mb-0">
-    <li class="page-item {% if not page_obj.has_previous %}disabled{% endif %}">
-      <a class="page-link" href="?q={{ q|urlencode }}&entity_type={{ entity_type_filter|urlencode }}&created_from={{ created_from|urlencode }}&operator_scope={{ operator_scope|urlencode }}&page={% if page_obj.has_previous %}{{ page_obj.previous_page_number }}{% else %}1{% endif %}">Назад</a>
-    </li>
-    <li class="page-item disabled"><span class="page-link">Стр. {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span></li>
-    <li class="page-item {% if not page_obj.has_next %}disabled{% endif %}">
-      <a class="page-link" href="?q={{ q|urlencode }}&entity_type={{ entity_type_filter|urlencode }}&created_from={{ created_from|urlencode }}&operator_scope={{ operator_scope|urlencode }}&page={% if page_obj.has_next %}{{ page_obj.next_page_number }}{% else %}{{ page_obj.paginator.num_pages }}{% endif %}">Вперёд</a>
-    </li>
-  </ul>
-</nav>
-{% endif %}
-{% else %}
-<div class="empty-state">
-  <h2 class="h6 mb-2">Записей аудита пока нет</h2>
-  <p class="mb-0">После действий операторов и фоновых задач здесь появится история изменений.</p>
-</div>
-{% endif %}
 {% endblock %}
