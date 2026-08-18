@@ -43,6 +43,7 @@ TEMPLATES = [
     "customers/access_form.html",
     "customers/access_manage.html",
     "customer_portal/base.html",
+    "customer_portal/login.html",
     "customer_portal/home.html",
     "customer_portal/_connections_workspace.html",
     "vpn/renewal_requests_list.html",
@@ -63,6 +64,7 @@ STATIC_ASSETS = [
     "css/app-v4-renewals.css",
     "css/app-v4-forms.css",
     "css/app-v4-access.css",
+    "css/app-v4-portal.css",
     "css/app-v4-polish.css",
 ]
 
@@ -93,7 +95,13 @@ URLS = [
     ("clients-detail", (1,), {}),
     ("clients-download-native", (1,), {}),
     ("xhttp-device-download", (1,), {}),
+    ("customer-portal-login", (), {}),
+    ("customer-portal-logout", (), {}),
     ("customer-portal-home", (), {}),
+    ("customer-portal-renewal-request", (), {}),
+    ("customer-portal-vpn-download", (1,), {}),
+    ("customer-portal-vpn-qr", (1,), {}),
+    ("customer-portal-xhttp-download", (1,), {}),
     ("renewal-requests-list", (), {}),
     ("servers-list", (), {}),
     ("servers-detail", (1,), {}),
@@ -106,7 +114,7 @@ for name, args, kwargs in URLS:
     value = reverse(name, args=args, kwargs=kwargs)
     print(f"url OK: {name} -> {value}")
 
-# The shell owns only core v4 styles. Composition belongs to individual pages.
+# The operator shell owns only core v4 styles. Composition belongs to individual pages.
 base = get_template("partials/base.html")
 rf = RequestFactory()
 auth_user = SimpleNamespace(is_authenticated=True, username="ui-v4-check")
@@ -121,6 +129,7 @@ composition_assets = (
     "app-v4-renewals.css",
     "app-v4-forms.css",
     "app-v4-access.css",
+    "app-v4-portal.css",
 )
 
 for path in (
@@ -213,6 +222,24 @@ for template_name, required_assets in TEMPLATE_STYLE_REQUIREMENTS.items():
             )
     print(f"page CSS ownership OK: {template_name}")
 
+# The customer portal is a separate consumer shell and must not inherit legacy/operator composition.
+portal_base_source = (template_root / "customer_portal/base.html").read_text(encoding="utf-8")
+for forbidden in (*legacy_assets, *composition_assets[:-1], "app-v4-polish.css"):
+    if forbidden in portal_base_source:
+        raise RuntimeError(f"operator/legacy stylesheet leaked into customer portal: {forbidden}")
+for required in ("app.css", "app-v4.css", "app-v4-portal.css"):
+    if portal_base_source.count(required) != 1:
+        raise RuntimeError(
+            f"customer portal stylesheet ownership error: {required} "
+            f"occurs {portal_base_source.count(required)} times"
+        )
+print("customer portal CSS isolation OK")
+
+portal_home_source = (template_root / "customer_portal/home.html").read_text(encoding="utf-8")
+if "app-v4-layout.css" in portal_home_source or "app-v2.css" in portal_home_source:
+    raise RuntimeError("customer portal home still depends on operator/legacy CSS")
+print("customer portal home composition OK")
+
 # Self-contained page layers must retain the shared primitives they use.
 CSS_MARKERS = {
     "css/app-v4-forms.css": (
@@ -221,6 +248,12 @@ CSS_MARKERS = {
     ),
     "css/app-v4-system-detail.css": (
         ".v4-system-page > .v4-back-link",
+    ),
+    "css/app-v4-portal.css": (
+        ".portal-shell-header",
+        ".portal-v4-status-card",
+        ".portal-device-card",
+        ".portal-login-card",
     ),
 }
 for asset, markers in CSS_MARKERS.items():
