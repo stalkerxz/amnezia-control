@@ -33,6 +33,7 @@ TEMPLATES = [
     "customer_portal/base.html",
     "customer_portal/home.html",
     "customer_portal/_connections_workspace.html",
+    "vpn/renewal_requests_list.html",
     "servers/list.html",
     "servers/detail.html",
     "jobs/list.html",
@@ -47,6 +48,7 @@ STATIC_ASSETS = [
     "css/app-v4-detail.css",
     "css/app-v4-system.css",
     "css/app-v4-system-detail.css",
+    "css/app-v4-renewals.css",
     "css/app-v4-polish.css",
 ]
 
@@ -64,6 +66,7 @@ URLS = [
     ("customers-list", (), {}),
     ("customers-onboarding", (), {}),
     ("customer-portal-home", (), {}),
+    ("renewal-requests-list", (), {}),
     ("servers-list", (), {}),
     ("servers-detail", (1,), {}),
     ("servers-sync-runtime", (1,), {}),
@@ -82,14 +85,24 @@ auth_user = SimpleNamespace(is_authenticated=True, username="ui-v4-check")
 anon_user = SimpleNamespace(is_authenticated=False, username="")
 legacy_assets = ("app-v2.css", "app-v3.css", "app-v3-pages.css")
 
-for path in ("/", "/customers/", "/servers/", "/jobs/", "/audit/", "/settings/"):
+for path in (
+    "/",
+    "/customers/",
+    "/clients/renewal-requests/",
+    "/servers/",
+    "/jobs/",
+    "/audit/",
+    "/settings/",
+):
     html = base.render({"request": rf.get(path), "user": auth_user})
     leaked = [asset for asset in legacy_assets if asset in html]
     if leaked:
         raise RuntimeError(f"legacy CSS leaked into modern route {path}: {', '.join(leaked)}")
+    if "app-v4-renewals.css" not in html:
+        raise RuntimeError(f"v4 renewal stylesheet missing from base on {path}")
     print(f"modern CSS isolation OK: {path}")
 
-for path in ("/clients/", "/clients/renewal-requests/", "/xhttp/"):
+for path in ("/clients/", "/xhttp/"):
     html = base.render({"request": rf.get(path), "user": auth_user})
     missing = [asset for asset in legacy_assets if asset not in html]
     if missing:
