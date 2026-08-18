@@ -1,154 +1,206 @@
 {% extends 'partials/base.html' %}
+
+{% block title %}Продления · VPN Control{% endblock %}
+
 {% block content %}
-<div class="page-header d-flex justify-content-between align-items-start gap-2 flex-wrap">
-  <div>
-    <p class="page-kicker">Операторская · Продления</p>
-    <h1 class="h3 mb-1">Очередь продлений</h1>
-    <p class="page-subtle">Страница обработчика заявок: компактная сводка очереди, плотный список и встроенный блок обработки.</p>
-  </div>
-</div>
-
-<section class="section-block section-flat section-quiet">
-  <div class="section-body py-2">
-    <div class="summary-strip summary-strip-compact">
-      <div class="summary-item span-3"><div class="label">Всего в фильтре</div><div class="value">{{ request_rows|length }}</div></div>
-      <div class="summary-item span-3"><div class="label">Новые</div><div class="meta">приоритет на обработку</div></div>
-      <div class="summary-item span-3"><div class="label">В работе</div><div class="meta">назначенные оператору</div></div>
-      <div class="summary-item span-3"><div class="label">Закрытые</div><div class="meta">выполнено / отклонено</div></div>
+<div class="v4-system-page v4-renewals-page">
+  <header class="v4-page-hero v4-system-hero">
+    <div>
+      <p class="page-kicker">VPN Control · Клиенты</p>
+      <div class="v4-title-line">
+        <h1>Продления</h1>
+        <span class="v4-total-badge">{{ request_rows|length }}</span>
+      </div>
+      <p class="v4-hero-copy">Очередь запросов на продление доступа. Обработка заявки не перевыпускает существующие VPN-конфигурации.</p>
     </div>
-  </div>
-</section>
+    <div class="v4-hero-actions">
+      <a class="btn btn-outline-secondary" href="{% url 'customers-list' %}">Все клиенты</a>
+    </div>
+  </header>
 
-<form method="get" class="section-block section-flat filter-toolbar">
-  <div class="section-body py-2">
-    <div class="section-header-compact"><h2 class="h6">Фильтр очереди</h2></div>
-    <div class="filters-row">
-      <div class="field">
-        <label class="form-label" for="id_status">Статус</label>
-        <select class="form-select" id="id_status" name="status">
-          {% for value, label in status_choices %}
-            <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div class="field">
-        <label class="form-label" for="id_server">Сервер</label>
-        <select class="form-select" id="id_server" name="server">
-          <option value="">Все серверы</option>
-          {% for server_id, server_name in server_choices %}
-            <option value="{{ server_id }}" {% if server_filter == server_id|stringformat:'s' %}selected{% endif %}>{{ server_name }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div class="field">
-        <label class="form-label" for="id_operator">Оператор</label>
-        <select class="form-select" id="id_operator" name="operator">
-          <option value="">Все операторы</option>
-          {% for operator_id, operator_name in operator_choices %}
-            <option value="{{ operator_id }}" {% if operator_filter == operator_id|stringformat:'s' %}selected{% endif %}>{{ operator_name }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div class="field-actions">
-        <div class="form-check mb-1 mt-4">
+  <div class="v4-system-chips" aria-label="Статус заявок">
+    <a class="v4-system-chip {% if not status_filter %}active{% endif %}" href="{% url 'renewal-requests-list' %}">Все</a>
+    <a class="v4-system-chip is-warning {% if status_filter == 'new' %}active{% endif %}" href="{% url 'renewal-requests-list' %}?status=new">Новые</a>
+    <a class="v4-system-chip {% if status_filter == 'in_progress' %}active{% endif %}" href="{% url 'renewal-requests-list' %}?status=in_progress">В работе</a>
+    <a class="v4-system-chip {% if status_filter == 'done' %}active{% endif %}" href="{% url 'renewal-requests-list' %}?status=done">Выполненные</a>
+    <a class="v4-system-chip {% if status_filter == 'dismissed' %}active{% endif %}" href="{% url 'renewal-requests-list' %}?status=dismissed">Отклонённые</a>
+  </div>
+
+  <div class="v4-renewal-toolbar">
+    <details class="v4-renewal-filter-details" {% if server_filter or operator_filter or only_my_actions %}open{% endif %}>
+      <summary>Расширенные фильтры</summary>
+      <form method="get" class="v4-renewal-filter-panel">
+        <label>
+          <span>Статус</span>
+          <select class="form-select form-select-sm" name="status">
+            {% for value, label in status_choices %}
+              <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </label>
+
+        <label>
+          <span>Сервер</span>
+          <select class="form-select form-select-sm" name="server">
+            <option value="">Все серверы</option>
+            {% for server_id, server_name in server_choices %}
+              <option value="{{ server_id }}" {% if server_filter == server_id|stringformat:'s' %}selected{% endif %}>{{ server_name }}</option>
+            {% endfor %}
+          </select>
+        </label>
+
+        <label>
+          <span>Оператор</span>
+          <select class="form-select form-select-sm" name="operator">
+            <option value="">Все операторы</option>
+            {% for operator_id, operator_name in operator_choices %}
+              <option value="{{ operator_id }}" {% if operator_filter == operator_id|stringformat:'s' %}selected{% endif %}>{{ operator_name }}</option>
+            {% endfor %}
+          </select>
+        </label>
+
+        <div class="form-check">
           <input class="form-check-input" type="checkbox" value="1" id="id_only_my_actions" name="only_my_actions" {% if only_my_actions %}checked{% endif %}>
           <label class="form-check-label" for="id_only_my_actions">Только мои действия</label>
         </div>
-      </div>
-      <div class="field-actions">
-        <label class="form-label">&nbsp;</label>
-        <button class="btn btn-primary w-100">Применить</button>
-      </div>
-    </div>
-  </div>
-</form>
 
-{% if request_rows %}
-<div class="table-responsive section-block section-flat table-shell renewal-table-shell">
-  <table class="table table-hover align-middle mb-0 renewal-table">
-    <thead>
-      <tr>
-        <th>ID</th>
-        <th>Клиент</th>
-        <th>Сервер</th>
-        <th>Статус</th>
-        <th>Создана</th>
-        <th>Обработана</th>
-        <th>Оператор</th>
-        <th>Файл</th>
-        <th class="text-end">Действия</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for item in request_rows %}
-      <tr class="renewal-main-row {% if item.status == 'new' or item.status == 'in_progress' %}renewal-main-row-open{% endif %}">
-        <td>#{{ item.id }}</td>
-        <td><a href="/clients/{{ item.client_id }}/" class="text-decoration-none fw-semibold">{{ item.client.name }}</a></td>
-        <td>{{ item.client.server.name }}</td>
-        <td><span class="badge status-badge {% if item.status == 'new' %}status-warning{% elif item.status == 'in_progress' %}status-info{% elif item.status == 'done' %}status-success{% else %}status-neutral{% endif %}">{{ item.get_status_display }}</span></td>
-        <td>{{ item.created_at|date:'d.m.Y H:i' }}</td>
-        <td>{% if item.processed_at %}{{ item.processed_at|date:'d.m.Y H:i' }}{% else %}—{% endif %}</td>
-        <td>{% if item.processed_by %}{{ item.processed_by.username }}{% else %}—{% endif %}</td>
-        <td>
-          {% if item.attachment %}
-          <span class="badge status-badge status-info mb-1">Есть файл</span><br>
-          <div class="small text-secondary mb-1" title="{{ item.attachment_display_name }}">{{ item.attachment_display_name|truncatechars:28 }}</div>
-          <a class="btn btn-sm btn-outline-secondary" href="{% url 'renewal-request-attachment-download' item.id %}" target="_blank">Открыть файл</a>
-          {% else %}
-          <span class="text-secondary">—</span>
-          {% endif %}
-        </td>
-        <td class="text-end"><div class="table-actions"><a class="btn btn-sm btn-outline-primary" href="/clients/{{ item.client_id }}/">К клиенту</a><button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#renewal-actions-{{ item.id }}" aria-expanded="false" aria-controls="renewal-actions-{{ item.id }}">Обработать</button></div></td>
-      </tr>
-      <tr class="collapse-row">
-        <td colspan="9" class="py-0 border-0">
-          <div class="collapse p-2" id="renewal-actions-{{ item.id }}">
-            <form method="post" action="/clients/{{ item.client_id }}/action/renewal_set_status/" class="renewal-action-card">
-              {% csrf_token %}
-              <input type="hidden" name="renewal_request_id" value="{{ item.id }}">
-              <input type="hidden" name="next" value="{{ request.get_full_path }}">
-              <div class="row g-2 align-items-end">
-                <div class="col-lg-6">
-                  <label class="form-label" for="operator_note_{{ item.id }}">Комментарий оператора</label>
-                  <textarea id="operator_note_{{ item.id }}" name="operator_note" class="form-control form-control-sm" rows="2" placeholder="Короткий комментарий по результату">{{ item.operator_note }}</textarea>
-                </div>
-                <div class="col-lg-2">
-                  <label class="form-label" for="extension_days_{{ item.id }}">Продлить на (дней)</label>
-                  <input id="extension_days_{{ item.id }}" type="number" min="1" max="365" class="form-control form-control-sm" name="extension_days" placeholder="30" {% if item.status != 'new' and item.status != 'in_progress' %}disabled{% endif %}>
-                </div>
-                <div class="col-lg-4">
-                  <label class="form-label">Действия</label>
-                  <div class="renewal-action-buttons">
-                    <button class="btn btn-sm btn-outline-secondary" name="target_status" value="{{ item.status }}">Сохранить</button>
-                    {% if item.status == 'new' %}
-                      <button class="btn btn-sm btn-outline-primary" name="target_status" value="in_progress">В работу</button>
-                      <button class="btn btn-sm btn-outline-success" name="target_status" value="done">Выполнено</button>
-                      <button class="btn btn-sm btn-outline-secondary" name="target_status" value="dismissed">Отклонить</button>
-                      <button class="btn btn-sm btn-success" name="target_status" value="extend_and_close">Продлить и закрыть</button>
-                    {% elif item.status == 'in_progress' %}
-                      <button class="btn btn-sm btn-outline-success" name="target_status" value="done">Выполнено</button>
-                      <button class="btn btn-sm btn-outline-secondary" name="target_status" value="dismissed">Отклонить</button>
-                      <button class="btn btn-sm btn-success" name="target_status" value="extend_and_close">Продлить и закрыть</button>
+        <div class="d-flex gap-2">
+          <button class="btn btn-primary btn-sm" type="submit">Применить</button>
+          <a class="btn btn-outline-secondary btn-sm" href="{% url 'renewal-requests-list' %}">Сбросить</a>
+        </div>
+      </form>
+    </details>
+  </div>
+
+  {% if request_rows %}
+    <section class="v4-system-panel">
+      <div class="v4-system-panel-head">
+        <div>
+          <span class="v4-panel-eyebrow">Очередь оператора</span>
+          <h2>Заявки на продление</h2>
+          <p>Показано по текущему фильтру: {{ request_rows|length }}</p>
+        </div>
+      </div>
+
+      <div class="v4-system-table-wrap">
+        <table class="table v4-system-table v4-renewal-table align-middle">
+          <thead>
+            <tr>
+              <th>Клиент</th>
+              <th>Статус</th>
+              <th>Заявка</th>
+              <th>Сервер</th>
+              <th>Оператор</th>
+              <th>Файл</th>
+              <th class="text-end">Действия</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in request_rows %}
+              <tr class="v4-renewal-row {% if item.status == 'new' or item.status == 'in_progress' %}is-open{% endif %}">
+                <td>
+                  <div class="v4-renewal-client">
+                    {% if item.client.device_id %}
+                      <a href="{% url 'customers-detail' item.client.device.account_id %}">{{ item.client.device.account.display_name }}</a>
+                      <span>{{ item.client.device.name }} · VPN #{{ item.client_id }}</span>
+                    {% else %}
+                      <a href="/clients/{{ item.client_id }}/">{{ item.client.name }}</a>
+                      <span>Legacy VPN #{{ item.client_id }}</span>
                     {% endif %}
                   </div>
-                </div>
-              </div>
-            </form>
-          </div>
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+                </td>
+
+                <td>
+                  <span class="v4-status-pill {% if item.status == 'new' %}is-warning{% elif item.status == 'done' %}is-success{% elif item.status == 'dismissed' %}is-neutral{% else %}is-neutral{% endif %}">{{ item.get_status_display }}</span>
+                </td>
+
+                <td>
+                  <div class="v4-renewal-request-meta">
+                    <strong>#{{ item.id }}</strong>
+                    <span>{{ item.created_at|date:'d.m.Y H:i' }}</span>
+                    {% if item.processed_at %}<span>Обработана {{ item.processed_at|date:'d.m.Y H:i' }}</span>{% endif %}
+                  </div>
+                </td>
+
+                <td>{{ item.client.server.name }}</td>
+
+                <td>
+                  {% if item.processed_by %}
+                    <span class="v4-system-primary">{{ item.processed_by.username }}</span>
+                  {% else %}
+                    <span class="text-secondary">Не назначен</span>
+                  {% endif %}
+                </td>
+
+                <td>
+                  {% if item.attachment %}
+                    <a class="v4-renewal-file" href="{% url 'renewal-request-attachment-download' item.id %}" target="_blank" rel="noopener" title="{{ item.attachment_display_name }}">Файл · {{ item.attachment_display_name|truncatechars:22 }}</a>
+                  {% else %}
+                    <span class="text-secondary">—</span>
+                  {% endif %}
+                </td>
+
+                <td class="text-end v4-renewal-actions-cell">
+                  <div class="d-inline-flex gap-2">
+                    {% if item.client.device_id %}
+                      <a class="btn btn-sm btn-outline-primary" href="{% url 'customers-detail' item.client.device.account_id %}">К аккаунту</a>
+                    {% else %}
+                      <a class="btn btn-sm btn-outline-secondary" href="/clients/{{ item.client_id }}/">Legacy</a>
+                    {% endif %}
+                    <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#renewal-actions-{{ item.id }}" aria-expanded="false" aria-controls="renewal-actions-{{ item.id }}">Обработать</button>
+                  </div>
+                </td>
+              </tr>
+
+              <tr>
+                <td colspan="7" class="p-0 border-0">
+                  <div class="collapse" id="renewal-actions-{{ item.id }}">
+                    <div class="v4-renewal-action-wrap">
+                      <form method="post" action="/clients/{{ item.client_id }}/action/renewal_set_status/" class="v4-renewal-action-card">
+                        {% csrf_token %}
+                        <input type="hidden" name="renewal_request_id" value="{{ item.id }}">
+                        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+
+                        <label>
+                          <span>Комментарий оператора</span>
+                          <textarea name="operator_note" class="form-control form-control-sm" rows="2" placeholder="Короткий комментарий по результату">{{ item.operator_note }}</textarea>
+                        </label>
+
+                        <label>
+                          <span>Продлить на дней</span>
+                          <input type="number" min="1" max="365" class="form-control form-control-sm" name="extension_days" placeholder="30" {% if item.status != 'new' and item.status != 'in_progress' %}disabled{% endif %}>
+                        </label>
+
+                        <div class="v4-renewal-action-buttons">
+                          <button class="btn btn-sm btn-outline-secondary" name="target_status" value="{{ item.status }}">Сохранить</button>
+                          {% if item.status == 'new' %}
+                            <button class="btn btn-sm btn-outline-primary" name="target_status" value="in_progress">В работу</button>
+                            <button class="btn btn-sm btn-outline-success" name="target_status" value="done">Выполнено</button>
+                            <button class="btn btn-sm btn-outline-secondary" name="target_status" value="dismissed">Отклонить</button>
+                            <button class="btn btn-sm btn-primary" name="target_status" value="extend_and_close">Продлить и закрыть</button>
+                          {% elif item.status == 'in_progress' %}
+                            <button class="btn btn-sm btn-outline-success" name="target_status" value="done">Выполнено</button>
+                            <button class="btn btn-sm btn-outline-secondary" name="target_status" value="dismissed">Отклонить</button>
+                            <button class="btn btn-sm btn-primary" name="target_status" value="extend_and_close">Продлить и закрыть</button>
+                          {% endif %}
+                        </div>
+                      </form>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  {% else %}
+    <section class="v4-system-panel">
+      <div class="v4-empty-state v4-renewal-empty">
+        <strong>Очередь пуста</strong>
+        <span>По выбранному фильтру заявок на продление нет.</span>
+      </div>
+    </section>
+  {% endif %}
 </div>
-{% else %}
-<section class="section-block section-flat">
-  <div class="section-body py-3">
-    <div class="empty-state compact-empty">
-      <h2 class="h6 mb-1">Очередь пуста</h2>
-      <p class="mb-0">По выбранному фильтру заявок нет. Попробуйте статус «Все» или снимите фильтр по оператору/серверу.</p>
-    </div>
-  </div>
-</section>
-{% endif %}
 {% endblock %}
