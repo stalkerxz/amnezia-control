@@ -1221,9 +1221,17 @@ def customers_list_view(request):
     metrics = {
         "total": accounts.count(),
 
-        "active": accounts.filter(
-            status=CustomerAccount.Status.ACTIVE
-        ).count(),
+        "active": (
+            accounts
+            .filter(
+                status=CustomerAccount.Status.ACTIVE
+            )
+            .filter(
+                Q(expires_at__isnull=True)
+                | Q(expires_at__gt=now)
+            )
+            .count()
+        ),
 
         "disabled": accounts.filter(
             status=CustomerAccount.Status.DISABLED
@@ -1328,7 +1336,22 @@ def customers_list_view(request):
             .distinct()
         )
 
-    if status_filter:
+    if (
+        status_filter
+        == CustomerAccount.Status.ACTIVE
+    ):
+        accounts = (
+            accounts
+            .filter(
+                status=CustomerAccount.Status.ACTIVE
+            )
+            .filter(
+                Q(expires_at__isnull=True)
+                | Q(expires_at__gt=now)
+            )
+        )
+
+    elif status_filter:
         accounts = accounts.filter(
             status=status_filter
         )

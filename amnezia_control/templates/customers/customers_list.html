@@ -1034,7 +1034,7 @@
               <tr
                 class="
                   account-row-link
-                  {% if account.status == 'disabled' %}
+                  {% if account.status == 'disabled' or account.readiness_code == 'expired' %}
                     account-row-disabled
                   {% endif %}
                 "
@@ -1096,7 +1096,22 @@
 
                   <div class="account-state-stack">
 
-                    {% if account.status == 'active' %}
+                    {% if account.status == 'active' and account.readiness_code == 'expired' %}
+
+                      <span class="badge text-bg-danger">
+                        Срок истёк
+                      </span>
+
+                      <span
+                        class="
+                          account-state-note
+                          danger
+                        "
+                      >
+                        Доступ отключён
+                      </span>
+
+                    {% elif account.status == 'active' %}
 
                       <span class="badge text-bg-success">
                         Активен

@@ -128,7 +128,11 @@
       <div class="summary-item span-3">
         <div class="label">Статус</div>
         <div class="value">
-          {% if account.status == 'active' %}
+          {% if account.status == 'active' and workspace.account_expired %}
+            <span class="text-danger">
+              Срок истёк
+            </span>
+          {% elif account.status == 'active' %}
             Активен
           {% elif account.status == 'disabled' %}
             Отключён
@@ -237,6 +241,12 @@
 
           <span class="badge text-bg-success">
             VPN работает
+          </span>
+
+        {% elif workspace.account_expired %}
+
+          <span class="badge text-bg-danger">
+            Срок истёк
           </span>
 
         {% elif account.status == 'deleted' %}
