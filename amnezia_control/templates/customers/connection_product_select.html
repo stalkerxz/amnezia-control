@@ -1,284 +1,75 @@
 {% extends 'partials/base.html' %}
+{% load static %}
 
-{% block title %}
-Новое подключение · {{ device.name }}
-{% endblock %}
+{% block title %}Новое подключение · {{ device.name }}{% endblock %}
 
 {% block content %}
+<link href="{% static 'css/app-v4-forms.css' %}" rel="stylesheet">
 
-<div class="page-header d-flex justify-content-between align-items-start gap-2 flex-wrap">
+<div class="v4-form-page">
+  <header class="v4-form-hero">
+    <div class="v4-form-hero-copy">
+      <a class="v4-back-link" href="{% url 'customers-detail' account.pk %}">← {{ account.display_name }}</a>
+      <p class="page-kicker">VPN Control · Подключение</p>
+      <h1>Добавить подключение</h1>
+      <p>Выберите, как должен работать VPN на устройстве {{ device.name }}. Технические параметры будут подставлены автоматически.</p>
+    </div>
+  </header>
 
-  <div>
-
-    <p class="page-kicker">
-      Операторская · Подключения
-    </p>
-
-    <h1 class="h3 mb-1">
-      Добавить подключение
-    </h1>
-
-    <p class="page-subtle mb-0">
-      {{ account.display_name }}
-      ·
-      {{ device.name }}
-    </p>
-
+  <div class="v4-inline-summary">
+    <div class="v4-inline-summary-item"><span>Клиент</span><strong>{{ account.display_name }}</strong></div>
+    <div class="v4-inline-summary-item"><span>Устройство</span><strong>{{ device.name }}</strong></div>
+    <div class="v4-inline-summary-item"><span>Платформа</span><strong>{{ device.get_platform_display }}</strong></div>
+    <div class="v4-inline-summary-item"><span>Создано</span><strong>{% if has_full %}FULL {% endif %}{% if has_selective %}SELECT {% endif %}{% if xhttp_total %}ALT {{ xhttp_total }}{% endif %}{% if not has_full and not has_selective and not xhttp_total %}Нет подключений{% endif %}</strong></div>
   </div>
 
+  <section class="v4-form-card">
+    <div class="v4-form-card-head">
+      <div><h2>Что должно работать через VPN?</h2><p>Один тип не отключает другой. На устройстве могут одновременно существовать FULL, SELECT и альтернативные подключения.</p></div>
+    </div>
 
-  <div class="action-cluster">
+    <div class="v4-product-grid">
+      <article class="v4-product-card">
+        <div class="v4-product-icon">F</div>
+        <div class="v4-product-eyebrow">Основной режим</div>
+        <h2>Весь интернет через VPN</h2>
+        <p>Весь интернет-трафик устройства направляется через VPN. Подходит как основное подключение.</p>
+        <div class="v4-product-action">
+          {% if has_full %}
+            <span class="v4-status-pill is-success">Уже создано</span>
+          {% else %}
+            <a class="btn btn-primary" href="{% url 'customers-device-vpn-create' device.pk %}?routing_mode=full">Продолжить</a>
+          {% endif %}
+        </div>
+      </article>
 
-    <a
-      href="{% url 'customers-detail' account.pk %}"
-      class="btn btn-outline-secondary"
-    >
-      К аккаунту
-    </a>
+      <article class="v4-product-card is-selective">
+        <div class="v4-product-icon">S</div>
+        <div class="v4-product-eyebrow">Выборочный режим</div>
+        <h2>Только выбранные сервисы</h2>
+        <p>Через VPN идут только настроенные сервисы и маршруты. Остальной интернет остаётся прямым.</p>
+        <div class="v4-product-action">
+          {% if has_selective %}
+            <span class="v4-status-pill is-success">Уже создано</span>
+          {% else %}
+            <a class="btn btn-outline-primary" href="{% url 'customers-device-vpn-create' device.pk %}?routing_mode=selective">Продолжить</a>
+          {% endif %}
+        </div>
+      </article>
 
-  </div>
+      <article class="v4-product-card is-alt">
+        <div class="v4-product-icon">A</div>
+        <div class="v4-product-eyebrow">Дополнительный способ</div>
+        <h2>Альтернативное подключение</h2>
+        <p>Отдельное альтернативное подключение. Существующие FULL и SELECT останутся без изменений.</p>
+        {% if xhttp_total %}<div class="v4-product-meta">Уже создано: {{ xhttp_total }}</div>{% endif %}
+        <div class="v4-product-action">
+          <a class="btn btn-outline-primary" href="{% url 'customers-device-xhttp-create' device.pk %}">Продолжить</a>
+        </div>
+      </article>
+    </div>
+  </section>
 
+  <div class="v4-context-note mt-3">На этом экране ничего не создаётся. Реальное подключение появится только после подтверждения на следующем шаге.</div>
 </div>
-
-
-<section class="section-block section-quiet">
-
-  <div class="section-body">
-
-    <div class="summary-strip">
-
-      <div class="summary-item span-4">
-        <div class="label">
-          Клиент
-        </div>
-
-        <div class="value">
-          {{ account.display_name }}
-        </div>
-      </div>
-
-
-      <div class="summary-item span-4">
-        <div class="label">
-          Устройство
-        </div>
-
-        <div class="value">
-          {{ device.name }}
-        </div>
-      </div>
-
-
-      <div class="summary-item span-4">
-        <div class="label">
-          Платформа
-        </div>
-
-        <div class="value">
-          {{ device.get_platform_display }}
-        </div>
-      </div>
-
-    </div>
-
-  </div>
-
-</section>
-
-
-<section class="section-block">
-
-  <div class="section-body">
-
-    <div class="section-header-compact">
-
-      <div>
-
-        <p class="page-kicker mb-1">
-          Тип подключения
-        </p>
-
-        <h2 class="h5 mb-1">
-          Что должно работать через VPN?
-        </h2>
-
-        <div class="small text-secondary">
-          Выберите готовый режим.
-          Технические параметры будут подставлены автоматически.
-        </div>
-
-      </div>
-
-    </div>
-
-
-    <div class="row g-3">
-
-
-      <div class="col-12 col-xl-4">
-
-        <div class="border rounded-3 p-4 h-100 d-flex flex-column">
-
-          <div>
-
-            <div class="small text-secondary mb-1">
-              VPN
-            </div>
-
-            <h3 class="h5">
-              Весь интернет через VPN
-            </h3>
-
-            <p class="text-secondary small">
-              Основное подключение.
-              Весь интернет-трафик устройства
-              направляется через VPN.
-            </p>
-
-          </div>
-
-
-          <div class="mt-auto pt-3">
-
-            {% if has_full %}
-
-              <span class="badge text-bg-success">
-                Уже создано
-              </span>
-
-            {% else %}
-
-              <a
-                class="btn btn-primary w-100"
-                href="{% url 'customers-device-vpn-create' device.pk %}?routing_mode=full"
-              >
-                Выбрать
-              </a>
-
-            {% endif %}
-
-          </div>
-
-        </div>
-
-      </div>
-
-
-      <div class="col-12 col-xl-4">
-
-        <div class="border rounded-3 p-4 h-100 d-flex flex-column">
-
-          <div>
-
-            <div class="small text-secondary mb-1">
-              VPN
-            </div>
-
-            <h3 class="h5">
-              Только выбранные сервисы
-            </h3>
-
-            <p class="text-secondary small">
-              Через VPN идут только настроенные
-              маршруты и сервисы.
-              Остальной интернет работает напрямую.
-            </p>
-
-          </div>
-
-
-          <div class="mt-auto pt-3">
-
-            {% if has_selective %}
-
-              <span class="badge text-bg-success">
-                Уже создано
-              </span>
-
-            {% else %}
-
-              <a
-                class="btn btn-outline-primary w-100"
-                href="{% url 'customers-device-vpn-create' device.pk %}?routing_mode=selective"
-              >
-                Выбрать
-              </a>
-
-            {% endif %}
-
-          </div>
-
-        </div>
-
-      </div>
-
-
-      <div class="col-12 col-xl-4">
-
-        <div class="border rounded-3 p-4 h-100 d-flex flex-column">
-
-          <div>
-
-            <div class="small text-secondary mb-1">
-              Дополнительный способ
-            </div>
-
-            <h3 class="h5">
-              Альтернативное подключение
-            </h3>
-
-            <p class="text-secondary small">
-              Создаёт отдельное альтернативное подключение.
-              Уже созданные подключения этого устройства
-              останутся без изменений.
-            </p>
-
-            {% if xhttp_total %}
-              <div class="small text-secondary">
-                Уже создано:
-                {{ xhttp_total }}
-              </div>
-            {% endif %}
-
-          </div>
-
-
-          <div class="mt-auto pt-3">
-
-            <a
-              class="btn btn-outline-primary w-100"
-              href="{% url 'customers-device-xhttp-create' device.pk %}"
-            >
-              Выбрать
-            </a>
-
-          </div>
-
-        </div>
-
-      </div>
-
-
-    </div>
-
-  </div>
-
-</section>
-
-
-<section class="section-block section-quiet">
-
-  <div class="section-body">
-
-    <div class="small text-secondary">
-      Выбор типа подключения сам по себе
-      ничего не изменяет.
-      Подключение создаётся только после подтверждения
-      на следующем экране.
-    </div>
-
-  </div>
-
-</section>
-
 {% endblock %}
