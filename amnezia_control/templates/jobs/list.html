@@ -12,11 +12,11 @@
     <div>
       <p class="page-kicker">VPN Control · Runtime</p>
       <h1>Операции</h1>
-      <p class="v4-hero-copy">Фоновые действия, изменения runtime и реальные ошибки без смешивания технического статуса с операционным сигналом.</p>
+      <p class="v4-hero-copy">Фоновые действия и изменения runtime. Ошибки и деградации выделены как операционный сигнал, технический статус остаётся доступен вторым уровнем.</p>
     </div>
   </header>
 
-  <div class="v4-system-chips">
+  <div class="v4-system-chips" aria-label="Быстрые фильтры операций">
     <a class="v4-system-chip {% if not signal_filter and operator_scope != 'mine' %}active{% endif %}" href="{% url 'jobs-list' %}">Все</a>
     <a class="v4-system-chip is-danger {% if signal_filter == 'failed' %}active{% endif %}" href="{% url 'jobs-list' %}?signal=failed">Ошибки</a>
     <a class="v4-system-chip is-warning {% if signal_filter == 'warning' %}active{% endif %}" href="{% url 'jobs-list' %}?signal=warning">Предупреждения</a>
@@ -24,17 +24,20 @@
     <a class="v4-system-chip {% if operator_scope == 'mine' %}active{% endif %}" href="{% url 'jobs-list' %}?operator_scope=mine">Мои</a>
   </div>
 
-  <form method="get" class="v4-system-toolbar">
-    <div class="v4-system-filter-grid">
-      <label><span>Операционный сигнал</span><select class="form-select" name="signal"><option value="" {% if not signal_filter %}selected{% endif %}>Все</option><option value="failed" {% if signal_filter == 'failed' %}selected{% endif %}>Ошибки</option><option value="warning" {% if signal_filter == 'warning' %}selected{% endif %}>Предупреждения</option><option value="degraded_success" {% if signal_filter == 'degraded_success' %}selected{% endif %}>Деградация</option></select></label>
-      <label><span>Действие</span><input class="form-control" name="action" value="{{ action_filter }}" placeholder="server.sync_runtime"></label>
-      <label><span>Тех. статус</span><select class="form-select" name="status"><option value="">Все</option>{% for value, label in status_choices %}<option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
-      <label><span>Создано с даты</span><input class="form-control" type="date" name="created_from" value="{{ created_from }}"></label>
-      <label><span>Оператор</span><select class="form-select" name="operator_scope"><option value="all" {% if operator_scope != 'mine' %}selected{% endif %}>Все</option><option value="mine" {% if operator_scope == 'mine' %}selected{% endif %}>Только мои</option></select></label>
-      <button class="btn btn-primary" type="submit">Применить</button>
-      <a class="btn btn-outline-secondary" href="{% url 'jobs-list' %}">Сбросить</a>
-    </div>
-  </form>
+  <details class="v4-system-filter-details" {% if action_filter or status_filter or created_from or operator_scope == 'mine' %}open{% endif %}>
+    <summary>Расширенные фильтры</summary>
+    <form method="get" class="v4-system-toolbar">
+      <div class="v4-system-filter-grid">
+        <label><span>Операционный сигнал</span><select class="form-select" name="signal"><option value="" {% if not signal_filter %}selected{% endif %}>Все</option><option value="failed" {% if signal_filter == 'failed' %}selected{% endif %}>Ошибки</option><option value="warning" {% if signal_filter == 'warning' %}selected{% endif %}>Предупреждения</option><option value="degraded_success" {% if signal_filter == 'degraded_success' %}selected{% endif %}>Деградация</option></select></label>
+        <label><span>Действие</span><input class="form-control" name="action" value="{{ action_filter }}" placeholder="server.sync_runtime"></label>
+        <label><span>Тех. статус</span><select class="form-select" name="status"><option value="">Все</option>{% for value, label in status_choices %}<option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+        <label><span>Создано с даты</span><input class="form-control" type="date" name="created_from" value="{{ created_from }}"></label>
+        <label><span>Оператор</span><select class="form-select" name="operator_scope"><option value="all" {% if operator_scope != 'mine' %}selected{% endif %}>Все</option><option value="mine" {% if operator_scope == 'mine' %}selected{% endif %}>Только мои</option></select></label>
+        <button class="btn btn-primary" type="submit">Применить</button>
+        <a class="btn btn-outline-secondary" href="{% url 'jobs-list' %}">Сбросить</a>
+      </div>
+    </form>
+  </details>
 
   {% if job_rows %}
     <section class="v4-system-panel">
@@ -42,25 +45,28 @@
         <div>
           <span class="v4-panel-eyebrow">Operations log</span>
           <h2>Журнал операций</h2>
-          {% if page_obj %}<p>Всего по текущему фильтру: {{ page_obj.paginator.count }}</p>{% endif %}
+          {% if page_obj %}<p>{{ page_obj.paginator.count }} операций по текущему фильтру</p>{% endif %}
         </div>
       </div>
 
       <div class="v4-system-table-wrap">
-        <table class="table v4-system-table align-middle">
-          <thead><tr><th>Операция</th><th>Сервер</th><th>Инициатор</th><th>Сигнал</th><th>Создано</th><th class="text-end">Детали</th></tr></thead>
+        <table class="table v4-system-table v4-operations-table align-middle">
+          <thead><tr><th>Операция</th><th>Сервер</th><th>Инициатор</th><th>Сигнал</th><th>Создано</th><th class="text-end"><span class="visually-hidden">Детали</span></th></tr></thead>
           <tbody>
             {% for row in job_rows %}
               {% with j=row.job %}
-                <tr>
-                  <td><a class="v4-system-primary" href="/jobs/{{ j.id }}/">#{{ j.id }} · {{ j.action }}</a><div class="v4-system-meta">Технический статус: {{ j.get_status_display }}</div></td>
-                  <td>{% if j.server %}{{ j.server.name }}{% else %}<span class="text-secondary">—</span>{% endif %}</td>
-                  <td>{% if j.actor %}{{ j.actor.username }}{% if j.actor_id == request.user.id %}<div class="v4-system-meta">текущий оператор</div>{% endif %}{% else %}<span class="text-secondary">система</span>{% endif %}</td>
+                <tr class="v4-operation-row {% if row.job_signal == 'failed' %}is-danger{% elif row.job_signal == 'warning' or row.job_signal == 'degraded_success' %}is-warning{% elif row.job_signal == 'success' %}is-success{% endif %}">
+                  <td>
+                    <a class="v4-system-primary" href="/jobs/{{ j.id }}/">{% if row.action_label %}{{ row.action_label }}{% else %}{{ j.action }}{% endif %}</a>
+                    <div class="v4-system-meta"><code>#{{ j.id }} · {{ j.action }}</code> · {{ j.get_status_display }}</div>
+                  </td>
+                  <td>{% if j.server %}<span class="v4-server-inline">{{ j.server.name }}</span>{% else %}<span class="text-secondary">—</span>{% endif %}</td>
+                  <td>{% if j.actor %}{{ j.actor.username }}{% if j.actor_id == request.user.id %}<div class="v4-system-meta">вы</div>{% endif %}{% else %}<span class="text-secondary">система</span>{% endif %}</td>
                   <td><span class="v4-status-pill {% if row.job_signal == 'failed' %}is-danger{% elif row.job_signal == 'warning' or row.job_signal == 'degraded_success' %}is-warning{% elif row.job_signal == 'success' %}is-success{% else %}is-neutral{% endif %}">{% if row.job_signal == 'failed' %}Ошибка{% elif row.job_signal == 'warning' %}Предупреждение{% elif row.job_signal == 'degraded_success' %}Деградация{% elif row.job_signal == 'success' %}Успех{% elif j.status == 'running' %}Выполняется{% else %}Ожидает{% endif %}</span></td>
-                  <td class="text-nowrap">{{ j.created_at|date:'d.m.Y H:i:s' }}</td>
-                  <td class="text-end"><button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#job-details-{{ j.id }}" aria-expanded="false">Просмотр</button></td>
+                  <td class="text-nowrap"><span class="v4-date-primary">{{ j.created_at|date:'d.m.Y' }}</span><div class="v4-system-meta">{{ j.created_at|date:'H:i:s' }}</div></td>
+                  <td class="text-end"><button class="v4-icon-action" type="button" data-bs-toggle="collapse" data-bs-target="#job-details-{{ j.id }}" aria-expanded="false" aria-label="Показать технические детали">•••</button></td>
                 </tr>
-                <tr>
+                <tr class="v4-detail-row">
                   <td colspan="6" class="p-0 border-0">
                     <div class="collapse" id="job-details-{{ j.id }}">
                       <div class="v4-collapse-body">
