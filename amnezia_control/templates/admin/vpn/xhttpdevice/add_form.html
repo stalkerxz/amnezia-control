@@ -1,0 +1,94 @@
+{% extends "admin/base_site.html" %}
+{% load i18n admin_urls static %}
+
+{% block extrahead %}
+  {{ block.super }}
+  {{ media }}
+{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">
+    Главная
+  </a>
+  &rsaquo;
+  <a href="{% url 'admin:app_list' app_label='vpn' %}">
+    VPN
+  </a>
+  &rsaquo;
+  <a href="{% url 'admin:vpn_xhttpdevice_changelist' %}">
+    XHTTP devices
+  </a>
+  &rsaquo;
+  Добавить
+</div>
+{% endblock %}
+
+{% block content %}
+
+<div id="content-main">
+
+  <p>
+    Создание выполняется через
+    <strong>XHTTPDeviceService</strong>:
+    runtime Xray и база данных изменяются
+    одной управляемой операцией.
+  </p>
+
+  <form method="post" novalidate>
+    {% csrf_token %}
+
+    {% if form.non_field_errors %}
+      <div class="errornote">
+        {{ form.non_field_errors }}
+      </div>
+    {% endif %}
+
+    <fieldset class="module aligned">
+
+      {% for field in form %}
+
+        <div class="form-row field-{{ field.name }}">
+
+          {{ field.errors }}
+
+          <div>
+
+            <label
+              {% if field.field.required %}
+                class="required"
+              {% endif %}
+              for="{{ field.id_for_label }}"
+            >
+              {{ field.label }}:
+            </label>
+
+            {{ field }}
+
+            {% if field.help_text %}
+              <div class="help">
+                {{ field.help_text }}
+              </div>
+            {% endif %}
+
+          </div>
+
+        </div>
+
+      {% endfor %}
+
+    </fieldset>
+
+    <div class="submit-row">
+      <input
+        type="submit"
+        value="Создать XHTTP"
+        class="default"
+      >
+    </div>
+
+  </form>
+
+</div>
+
+{% endblock %}

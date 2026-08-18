@@ -1,0 +1,938 @@
+<section class="section-block">
+  <div class="section-body">
+
+    <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-4">
+
+      <div>
+        <p class="page-kicker mb-1">
+          Устройства и подключения
+        </p>
+
+        <h2 class="h4 mb-1">
+          Рабочая область клиента
+        </h2>
+
+        <div class="text-secondary">
+          Все подключения сгруппированы по устройствам:
+          «Весь интернет через VPN»,
+          «Только выбранные сервисы»
+          и «Альтернативное подключение».
+        </div>
+      </div>
+
+      <div class="d-flex gap-2 align-items-center flex-wrap">
+
+        {% if workspace.account_expired %}
+          <span class="badge text-bg-danger">
+            Срок аккаунта истёк
+          </span>
+        {% elif account.status == 'active' %}
+          <span class="badge text-bg-success">
+            Аккаунт активен
+          </span>
+        {% elif account.status == 'disabled' %}
+          <span class="badge text-bg-warning">
+            Аккаунт отключён
+          </span>
+        {% else %}
+          <span class="badge text-bg-secondary">
+            {{ account.get_status_display }}
+          </span>
+        {% endif %}
+      </div>
+
+    </div>
+
+
+    <div class="row g-3">
+
+      <div class="col-6 col-lg-3">
+        <div class="border rounded-3 p-3 h-100">
+          <div class="small text-secondary">
+            Устройства
+          </div>
+
+          <div class="fs-4 fw-semibold">
+            {{ workspace.device_total }}
+          </div>
+
+          <div class="small text-secondary">
+            Активных:
+            {{ workspace.active_device_total }}
+          </div>
+        </div>
+      </div>
+
+
+      <div class="col-6 col-lg-3">
+        <div class="border rounded-3 p-3 h-100">
+          <div class="small text-secondary">
+            Подключения
+          </div>
+
+          <div class="fs-4 fw-semibold">
+            {{ workspace.connection_total }}
+          </div>
+
+          <div class="small text-secondary">
+            Активных:
+            {{ workspace.active_connection_total }}
+          </div>
+        </div>
+      </div>
+
+
+      <div class="col-6 col-lg-3">
+        <div class="border rounded-3 p-3 h-100">
+          <div class="small text-secondary">
+            Основные VPN-подключения
+          </div>
+
+          <div class="fs-4 fw-semibold">
+            {{ workspace.full_total|add:workspace.selective_total }}
+          </div>
+
+          <div class="small text-secondary">
+            Весь интернет: {{ workspace.full_total }}
+            · Выбранные сервисы: {{ workspace.selective_total }}
+          </div>
+        </div>
+      </div>
+
+
+      <div class="col-6 col-lg-3">
+        <div class="border rounded-3 p-3 h-100">
+          <div class="small text-secondary">
+            Альтернативные подключения
+          </div>
+
+          <div class="fs-4 fw-semibold">
+            {{ workspace.xhttp_total }}
+          </div>
+
+          <div class="small text-secondary">
+            Дополнительный способ подключения
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+</section>
+
+
+{% for row in workspace.devices %}
+
+<section class="section-block">
+  <div class="section-body">
+
+    <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-4">
+
+      <div>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+
+          <h2 class="h5 mb-0">
+            {{ row.device.name }}
+          </h2>
+
+          {% if row.device_expired %}
+            <span class="badge text-bg-danger">
+              Срок истёк
+            </span>
+          {% elif row.device.status == 'active' %}
+            <span class="badge text-bg-success">
+              Активно
+            </span>
+          {% elif row.device.status == 'disabled' %}
+            <span class="badge text-bg-warning">
+              Отключено
+            </span>
+          {% else %}
+            <span class="badge text-bg-secondary">
+              {{ row.device.get_status_display }}
+            </span>
+          {% endif %}
+
+        </div>
+
+        <div class="small text-secondary mt-1">
+
+          {% if row.device.platform != 'unknown' %}
+            {{ row.device.get_platform_display }}
+            ·
+          {% endif %}
+
+          Подключений: {{ row.connection_total }}
+
+        </div>
+
+        {% if row.device.notes and 'legacy-vpn-client:' not in row.device.notes %}
+          <div class="small mt-2">
+            {{ row.device.notes }}
+          </div>
+        {% endif %}
+      </div>
+
+
+      <div class="d-flex gap-2 flex-wrap">
+
+        <button
+          class="btn btn-sm btn-outline-primary"
+          type="button"
+          data-bs-toggle="collapse"
+          data-bs-target="#device-workspace-{{ row.device.pk }}"
+          aria-expanded="false"
+          aria-controls="device-workspace-{{ row.device.pk }}"
+        >
+          Управление
+        </button>
+
+
+        {% if account.status != 'deleted' and row.device.status != 'deleted' %}
+
+          <a
+            href="{% url 'customers-device-edit' row.device.pk %}"
+            class="btn btn-sm btn-outline-secondary"
+          >
+            Изменить
+          </a>
+
+          <form
+            method="post"
+            action="{% url 'customers-device-status' row.device.pk %}"
+            class="d-inline"
+            {% if row.device.status == 'active' %}
+              onsubmit="return confirm('Отключить устройство и его подключения?');"
+            {% else %}
+              onsubmit="return confirm('Включить устройство и восстановить его подключения?');"
+            {% endif %}
+          >
+            {% csrf_token %}
+
+            {% if row.device.status == 'active' %}
+              <input
+                type="hidden"
+                name="status"
+                value="disabled"
+              >
+
+              <button
+                type="submit"
+                class="btn btn-sm btn-outline-danger"
+              >
+                Отключить
+              </button>
+            {% else %}
+              <input
+                type="hidden"
+                name="status"
+                value="active"
+              >
+
+              <button
+                type="submit"
+                class="btn btn-sm btn-outline-success"
+              >
+                Включить
+              </button>
+            {% endif %}
+
+          </form>
+
+        {% endif %}
+
+
+        {% if row.can_add_connections %}
+
+          <a
+            class="btn btn-sm btn-primary"
+            href="{% url 'customers-device-connection-create' row.device.pk %}"
+          >
+            + Подключение
+          </a>
+
+        {% endif %}
+
+      </div>
+
+    </div>
+
+
+    <div
+      class="collapse"
+      id="device-workspace-{{ row.device.pk }}"
+    >
+
+    {% if account.status != 'deleted' and row.device.status != 'deleted' %}
+
+      <div class="border rounded-3 p-3 mb-4">
+
+        <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
+
+          <div>
+            <div class="fw-semibold">
+              Срок и VPN-лимиты
+            </div>
+
+            <div class="small text-secondary mt-1">
+              Срок относится ко всему устройству.
+              VPN-лимит применяется отдельно к каждому
+              FULL/SELECTIVE-подключению устройства.
+              Трафик альтернативного подключения пока
+              не учитывается.
+            </div>
+          </div>
+
+
+          <div class="small text-end">
+
+            <div>
+              Эффективный срок:
+              <strong>
+                {% if row.effective_expires_at %}
+                  {{ row.effective_expires_at|date:"d.m.Y H:i" }}
+                {% else %}
+                  Без срока
+                {% endif %}
+              </strong>
+            </div>
+
+            <div class="text-secondary mt-1">
+              Политика VPN-лимита:
+              {{ row.device_vpn_limit_display }}
+              на подключение
+            </div>
+
+          </div>
+
+        </div>
+
+
+        <form
+          method="post"
+          action="{% url 'customers-device-access-update' row.device.pk %}"
+          class="row g-3 align-items-end"
+        >
+
+          {% csrf_token %}
+
+
+          <div class="col-12 col-xl-3">
+
+            <label
+              for="{{ row.access_form.expires_at.id_for_label }}"
+              class="form-label"
+            >
+              Срок устройства
+            </label>
+
+            {{ row.access_form.expires_at }}
+
+            <div class="form-text">
+              Пусто — использовать срок аккаунта.
+            </div>
+
+          </div>
+
+
+          <div class="col-12 col-xl-3">
+
+            <label
+              for="{{ row.access_form.apply_traffic.id_for_label }}"
+              class="form-label"
+            >
+              VPN-лимит
+            </label>
+
+            {{ row.access_form.apply_traffic }}
+
+          </div>
+
+
+          <div class="col-12 col-md-6 col-xl-2">
+
+            <label
+              for="{{ row.access_form.traffic_limit_preset.id_for_label }}"
+              class="form-label"
+            >
+              Размер
+            </label>
+
+            {{ row.access_form.traffic_limit_preset }}
+
+          </div>
+
+
+          <div class="col-6 col-md-3 col-xl-1">
+
+            <label
+              for="{{ row.access_form.traffic_custom_value.id_for_label }}"
+              class="form-label"
+            >
+              Объём
+            </label>
+
+            {{ row.access_form.traffic_custom_value }}
+
+          </div>
+
+
+          <div class="col-6 col-md-3 col-xl-1">
+
+            <label
+              for="{{ row.access_form.traffic_custom_unit.id_for_label }}"
+              class="form-label"
+            >
+              Ед.
+            </label>
+
+            {{ row.access_form.traffic_custom_unit }}
+
+          </div>
+
+
+          <div class="col-12 col-xl-2">
+
+            <button
+              type="submit"
+              class="btn btn-sm btn-primary w-100"
+            >
+              Сохранить
+            </button>
+
+          </div>
+
+        </form>
+
+
+        <div class="small text-secondary mt-3">
+          Изменение не перевыпускает VPN-ключи,
+          IP-адреса или сохранённые конфигурации.
+        </div>
+
+      </div>
+
+    {% endif %}
+
+
+    {% if account.status != 'deleted' and candidate_accounts %}
+
+      <div class="border rounded-3 p-3 mb-4">
+
+        <div class="row g-3 align-items-end">
+
+          <div class="col-12 col-xl-5">
+
+            <div class="fw-semibold">
+              Перенести устройство
+            </div>
+
+            <div class="small text-secondary mt-1">
+              Перенос между аккаунтами не перевыпускает
+              VPN-ключи, IP-адреса и конфигурации.
+            </div>
+
+          </div>
+
+
+          <div class="col-12 col-xl-7">
+
+            <form
+              method="post"
+              action="{% url 'customers-device-move' row.device.pk %}"
+              class="d-flex gap-2 align-items-center flex-wrap"
+            >
+
+              {% csrf_token %}
+
+              <label
+                class="visually-hidden"
+                for="workspace-move-target-{{ row.device.pk }}"
+              >
+                Целевой аккаунт
+              </label>
+
+              <select
+                id="workspace-move-target-{{ row.device.pk }}"
+                name="target_account_id"
+                class="form-select form-select-sm flex-grow-1"
+                required
+              >
+
+                <option value="">
+                  Перенести в аккаунт…
+                </option>
+
+                {% for target in candidate_accounts %}
+
+                  <option value="{{ target.pk }}">
+                    {{ target.display_name }}
+
+                    {% if target.email %}
+                      · {{ target.email }}
+                    {% endif %}
+                  </option>
+
+                {% endfor %}
+
+              </select>
+
+              <button
+                type="submit"
+                class="btn btn-sm btn-outline-warning"
+                onclick="return confirm('Перенести устройство «{{ row.device.name|escapejs }}» в выбранный аккаунт? Ключи, IP и конфигурации останутся без изменений.');"
+              >
+                Перенести
+              </button>
+
+            </form>
+
+          </div>
+
+        </div>
+
+      </div>
+
+    {% endif %}
+
+
+    <div class="row g-3">
+
+      <!-- FULL -->
+      <div class="col-12 col-xl-4">
+
+        <div class="border rounded-3 p-3 h-100">
+
+          <div class="d-flex justify-content-between align-items-center gap-2 mb-3">
+
+            <div>
+              <div class="fw-semibold">
+                Весь интернет через VPN
+              </div>
+
+              <div class="small text-secondary">
+                Весь интернет-трафик устройства проходит через VPN
+              </div>
+            </div>
+
+            <span class="badge text-bg-light">
+              {{ row.full|length }}
+            </span>
+
+          </div>
+
+
+          {% for client in row.full %}
+
+            <div class="border-top pt-3 mt-3">
+
+              <div class="d-flex justify-content-between gap-2">
+
+                <div>
+                  <div class="fw-semibold">
+                    Основное подключение
+                  </div>
+
+                  <div class="small text-secondary mt-1">
+                    Трафик:
+                    {{ client.traffic_used_display }}
+                    из
+                    {{ client.traffic_limit_display }}
+                  </div>
+                </div>
+
+                {% if client.status == 'active' %}
+                  <span class="badge text-bg-success">
+                    Активно
+                  </span>
+                {% elif client.status == 'disabled' %}
+                  <span class="badge text-bg-warning">
+                    Отключено
+                  </span>
+                {% else %}
+                  <span class="badge text-bg-secondary">
+                    {{ client.get_status_display }}
+                  </span>
+                {% endif %}
+
+              </div>
+
+
+              <div class="d-flex gap-2 flex-wrap mt-3">
+
+                <a
+                  class="btn btn-sm btn-outline-primary"
+                  href="{% url 'clients-download-native' client.pk %}"
+                >
+                  Скачать конфигурацию
+                </a>
+
+                <a
+                  class="btn btn-sm btn-outline-secondary"
+                  href="{% url 'clients-detail' client.pk %}"
+                >
+                  Открыть
+                </a>
+
+              </div>
+
+            </div>
+
+          {% empty %}
+
+            <div class="text-secondary small">
+              Подключение для всего интернета не создано.
+            </div>
+
+          {% endfor %}
+
+        </div>
+
+      </div>
+
+
+      <!-- SELECTIVE -->
+      <div class="col-12 col-xl-4">
+
+        <div class="border rounded-3 p-3 h-100">
+
+          <div class="d-flex justify-content-between align-items-center gap-2 mb-3">
+
+            <div>
+              <div class="fw-semibold">
+                Только выбранные сервисы
+              </div>
+
+              <div class="small text-secondary">
+                Через VPN идут только настроенные сервисы и маршруты
+              </div>
+            </div>
+
+            <span class="badge text-bg-light">
+              {{ row.selective|length }}
+            </span>
+
+          </div>
+
+
+          {% for client in row.selective %}
+
+            <div class="border-top pt-3 mt-3">
+
+              <div class="d-flex justify-content-between gap-2">
+
+                <div>
+                  <div class="fw-semibold">
+                    Подключение сервисов
+                  </div>
+
+                  <div class="small text-secondary mt-1">
+                    Трафик:
+                    {{ client.traffic_used_display }}
+                    из
+                    {{ client.traffic_limit_display }}
+                  </div>
+                </div>
+
+                {% if client.status == 'active' %}
+                  <span class="badge text-bg-success">
+                    Активно
+                  </span>
+                {% elif client.status == 'disabled' %}
+                  <span class="badge text-bg-warning">
+                    Отключено
+                  </span>
+                {% else %}
+                  <span class="badge text-bg-secondary">
+                    {{ client.get_status_display }}
+                  </span>
+                {% endif %}
+
+              </div>
+
+
+              <div class="d-flex gap-2 flex-wrap mt-3">
+
+                <a
+                  class="btn btn-sm btn-outline-primary"
+                  href="{% url 'clients-download-native' client.pk %}"
+                >
+                  Скачать конфигурацию
+                </a>
+
+                <a
+                  class="btn btn-sm btn-outline-secondary"
+                  href="{% url 'clients-detail' client.pk %}"
+                >
+                  Открыть
+                </a>
+
+              </div>
+
+            </div>
+
+          {% empty %}
+
+            <div class="text-secondary small">
+              Подключение для выбранных сервисов не создано.
+            </div>
+
+          {% endfor %}
+
+        </div>
+
+      </div>
+
+
+      <!-- XHTTP -->
+      <div class="col-12 col-xl-4">
+
+        <div class="border rounded-3 p-3 h-100">
+
+          <div class="d-flex justify-content-between align-items-center gap-2 mb-3">
+
+            <div>
+              <div class="fw-semibold">
+                Альтернативное подключение
+              </div>
+
+              <div class="small text-secondary">
+                Дополнительный способ подключения
+              </div>
+            </div>
+
+            <span class="badge text-bg-light">
+              {{ row.xhttp|length }}
+            </span>
+
+          </div>
+
+
+          {% for xhttp in row.xhttp %}
+
+            <div class="border-top pt-3 mt-3">
+
+              <div class="d-flex justify-content-between gap-2">
+
+                <div>
+                  <div class="fw-semibold">
+                    {{ xhttp.name }}
+                  </div>
+
+                  <div class="small text-secondary">
+                    Подключение #{{ xhttp.pk }}
+                  </div>
+                </div>
+
+                {% if xhttp.status == 'active' %}
+                  <span class="badge text-bg-success">
+                    Активно
+                  </span>
+                {% elif xhttp.status == 'disabled' %}
+                  <span class="badge text-bg-warning">
+                    Отключено
+                  </span>
+                {% else %}
+                  <span class="badge text-bg-secondary">
+                    {{ xhttp.get_status_display }}
+                  </span>
+                {% endif %}
+
+              </div>
+
+
+              {% if xhttp.disable_reason != 'none' %}
+                <div class="small text-secondary mt-1">
+                  {{ xhttp.get_disable_reason_display }}
+                </div>
+              {% endif %}
+
+
+              {% if xhttp.last_error %}
+                <div class="small text-danger mt-1">
+                  Последняя ошибка:
+                  {{ xhttp.last_error }}
+                </div>
+              {% endif %}
+
+
+              <div class="d-flex gap-2 flex-wrap mt-3">
+
+                <a
+                  class="btn btn-sm btn-outline-primary"
+                  href="{% url 'xhttp-device-download' xhttp.pk %}"
+                >
+                  Скачать конфигурацию
+                </a>
+
+                {% if xhttp.status == 'active' %}
+
+                  <form
+                    method="post"
+                    action="{% url 'customers-xhttp-action' xhttp.pk 'check' %}"
+                    class="d-inline"
+                  >
+                    {% csrf_token %}
+
+                    <button
+                      type="submit"
+                      class="btn btn-sm btn-outline-secondary"
+                    >
+                      Проверить
+                    </button>
+                  </form>
+
+
+                  <form
+                    method="post"
+                    action="{% url 'customers-xhttp-action' xhttp.pk 'disable' %}"
+                    class="d-inline"
+                    onsubmit="return confirm('Отключить альтернативное подключение?');"
+                  >
+                    {% csrf_token %}
+
+                    <button
+                      type="submit"
+                      class="btn btn-sm btn-outline-warning"
+                    >
+                      Отключить
+                    </button>
+                  </form>
+
+                {% elif xhttp.status == 'disabled' and row.can_add_connections %}
+
+                  <form
+                    method="post"
+                    action="{% url 'customers-xhttp-action' xhttp.pk 'enable' %}"
+                    class="d-inline"
+                  >
+                    {% csrf_token %}
+
+                    <button
+                      type="submit"
+                      class="btn btn-sm btn-outline-success"
+                    >
+                      Включить
+                    </button>
+                  </form>
+
+                {% endif %}
+
+
+                {% if row.can_add_connections %}
+
+                  <form
+                    method="post"
+                    action="{% url 'customers-xhttp-action' xhttp.pk 'rotate' %}"
+                    class="d-inline"
+                    onsubmit="return confirm('Перевыпустить параметры альтернативного подключения? Ранее скачанная конфигурация перестанет работать.');"
+                  >
+                    {% csrf_token %}
+
+                    <button
+                      type="submit"
+                      class="btn btn-sm btn-outline-secondary"
+                    >
+                      Перевыпустить
+                    </button>
+                  </form>
+
+                {% endif %}
+
+
+                <form
+                  method="post"
+                  action="{% url 'customers-xhttp-action' xhttp.pk 'delete' %}"
+                  class="d-inline"
+                  onsubmit="return confirm('Удалить альтернативное подключение?');"
+                >
+                  {% csrf_token %}
+
+                  <button
+                    type="submit"
+                    class="btn btn-sm btn-outline-danger"
+                  >
+                    Удалить
+                  </button>
+                </form>
+
+              </div>
+
+            </div>
+
+          {% empty %}
+
+            <div class="text-secondary small">
+              Альтернативное подключение не создано.
+            </div>
+
+          {% endfor %}
+
+        </div>
+
+      </div>
+
+    </div>
+
+
+    {% if row.legacy %}
+
+      <div class="alert alert-secondary mt-3 mb-0">
+
+        <div class="fw-semibold mb-2">
+          Legacy VPN
+        </div>
+
+        {% for client in row.legacy %}
+          <div>
+            {{ client.get_protocol_type_display }}
+            · VPN #{{ client.pk }}
+            · {{ client.get_status_display }}
+
+            <a
+              class="ms-2"
+              href="{% url 'clients-detail' client.pk %}"
+            >
+              Открыть
+            </a>
+          </div>
+        {% endfor %}
+
+      </div>
+
+    {% endif %}
+
+
+    </div>
+
+  </div>
+</section>
+
+{% empty %}
+
+<section class="section-block">
+  <div class="section-body text-center py-4">
+
+    <div class="fw-semibold">
+      У аккаунта пока нет устройств
+    </div>
+
+    <div class="text-secondary small mt-1">
+      Сначала добавьте устройство,
+      затем выпустите для него подключения.
+    </div>
+
+    {% if account.status == 'active' %}
+      <a
+        class="btn btn-primary mt-3"
+        href="{% url 'customers-device-create' account.pk %}"
+      >
+        Добавить устройство
+      </a>
+    {% endif %}
+
+  </div>
+</section>
+
+{% endfor %}

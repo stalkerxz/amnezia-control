@@ -16,6 +16,7 @@ def _csv_env(name, default=""):
 def _bool_env(name, default="1"):
     return os.getenv(name, default).lower() in {"1", "true", "yes", "on"}
 
+
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -26,6 +27,7 @@ INSTALLED_APPS = [
     "django.contrib.humanize",
     "core",
     "accounts",
+    "customers",
     "servers",
     "vpn",
     "audit",
@@ -43,6 +45,7 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
+    "vpn.middleware.ClientCreationPreflightMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
@@ -135,6 +138,33 @@ CELERY_BEAT_SCHEDULE = {
 
 CONFIG_ENCRYPTION_KEY = os.getenv("CONFIG_ENCRYPTION_KEY", "")
 
+# Резервный VLESS/XHTTP через Yandex Cloud CDN.
+XHTTP_CDN_DOMAIN = os.getenv(
+    "XHTTP_CDN_DOMAIN",
+    "cdn.vpn.protopopov.pro",
+).strip()
+XHTTP_PATH = os.getenv(
+    "XHTTP_PATH",
+    "/api/ad4f850643d5e660f09d31f9",
+).strip()
+XHTTP_SC_MAX_EACH_POST_BYTES = int(
+    os.getenv("XHTTP_SC_MAX_EACH_POST_BYTES", "2048")
+)
+XHTTP_SC_MIN_POSTS_INTERVAL_MS = int(
+    os.getenv("XHTTP_SC_MIN_POSTS_INTERVAL_MS", "30")
+)
+XHTTP_UPLINK_CHUNK_SIZE = int(
+    os.getenv("XHTTP_UPLINK_CHUNK_SIZE", "1800")
+)
+XHTTP_SERVER_MAX_HEADER_BYTES = int(
+    os.getenv("XHTTP_SERVER_MAX_HEADER_BYTES", "65536")
+)
+
+# Runtime peer import is destructive in the current production topology and is
+# disabled by default. It may only be enabled explicitly for controlled
+# maintenance after a verified backup.
+ENABLE_RUNTIME_PEER_IMPORT = _bool_env("ENABLE_RUNTIME_PEER_IMPORT", "0")
+CLIENT_PREFLIGHT_WORKER_TIMEOUT = float(os.getenv("CLIENT_PREFLIGHT_WORKER_TIMEOUT", "0.8"))
 
 EMAIL_BACKEND = os.getenv("EMAIL_BACKEND", "django.core.mail.backends.smtp.EmailBackend")
 EMAIL_HOST = os.getenv("EMAIL_HOST", "localhost")
@@ -169,6 +199,5 @@ SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 SESSION_COOKIE_HTTPONLY = True
 CSRF_COOKIE_HTTPONLY = True
 X_FRAME_OPTIONS = "DENY"
-
 
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"

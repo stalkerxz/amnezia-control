@@ -1,0 +1,260 @@
+#!/usr/bin/env python3
+"""Safely add, remove, or verify one managed XHTTP client in Xray."""
+
+from __future__ import annotations
+
+import fcntl
+import json
+import os
+from pathlib import Path
+import re
+import shutil
+import stat
+import subprocess
+import sys
+import tempfile
+from datetime import datetime, timezone
+from uuid import UUID
+
+CONFIG_PATH = Path("/usr/local/etc/xray/config.json")
+XRAY_BIN = Path("/usr/local/bin/xray")
+XRAY_SERVICE = "xray"
+LOCK_PATH = Path("/run/lock/amnezia-control-xhttp.lock")
+BACKUP_DIR = Path("/var/backups/amnezia-control")
+INBOUND_TAG = "vless-xhttp-yandex"
+INBOUND_LISTEN = "127.0.0.1"
+INBOUND_PORT = 8080
+XHTTP_PATH = "/api/ad4f850643d5e660f09d31f9"
+EMAIL_RE = re.compile(r"xhttp-[0-9a-f]{32}")
+
+
+class ManagedError(RuntimeError):
+    pass
+
+
+def emit(payload: dict, *, stream=sys.stdout) -> None:
+    print(json.dumps(payload, ensure_ascii=False, sort_keys=True), file=stream)
+
+
+def run(command: list[str], *, check: bool = True) -> subprocess.CompletedProcess[str]:
+    result = subprocess.run(
+        command,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    if check and result.returncode != 0:
+        detail = (result.stderr or result.stdout or "command failed").strip().splitlines()[-1]
+        raise ManagedError(f"Команда завершилась с ошибкой: {detail[:240]}")
+    return result
+
+
+def validate_identity(uuid_text: str, email: str) -> tuple[str, str]:
+    try:
+        normalized_uuid = str(UUID(uuid_text))
+    except ValueError as exc:
+        raise ManagedError("Некорректный UUID.") from exc
+    if normalized_uuid != uuid_text.lower():
+        raise ManagedError("UUID должен быть в каноническом формате.")
+    if not EMAIL_RE.fullmatch(email):
+        raise ManagedError("Некорректная техническая метка клиента.")
+    return normalized_uuid, email
+
+
+def load_config(path: Path) -> dict:
+    try:
+        with path.open("r", encoding="utf-8") as handle:
+            value = json.load(handle)
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ManagedError("Не удалось прочитать корректную конфигурацию Xray.") from exc
+    if not isinstance(value, dict):
+        raise ManagedError("Корневая структура конфигурации Xray должна быть объектом.")
+    return value
+
+
+def find_inbound(config: dict) -> dict:
+    inbounds = config.get("inbounds")
+    if not isinstance(inbounds, list):
+        raise ManagedError("В конфигурации Xray отсутствует список inbounds.")
+
+    for inbound in inbounds:
+        if isinstance(inbound, dict) and inbound.get("tag") == INBOUND_TAG:
+            return inbound
+
+    for inbound in inbounds:
+        if not isinstance(inbound, dict):
+            continue
+        stream = inbound.get("streamSettings") or {}
+        xhttp = stream.get("xhttpSettings") or {}
+        if (
+            inbound.get("protocol") == "vless"
+            and inbound.get("listen") == INBOUND_LISTEN
+            and inbound.get("port") == INBOUND_PORT
+            and stream.get("network") == "xhttp"
+            and xhttp.get("path") == XHTTP_PATH
+        ):
+            return inbound
+
+    raise ManagedError("Управляемый VLESS/XHTTP inbound не найден.")
+
+
+def client_list(inbound: dict) -> list[dict]:
+    settings = inbound.setdefault("settings", {})
+    clients = settings.setdefault("clients", [])
+    if not isinstance(clients, list):
+        raise ManagedError("settings.clients должен быть списком.")
+    if any(not isinstance(client, dict) for client in clients):
+        raise ManagedError("В settings.clients найдена некорректная запись.")
+    return clients
+
+
+def mutate(config: dict, action: str, uuid_text: str, email: str) -> bool:
+    clients = client_list(find_inbound(config))
+    exact = [item for item in clients if item.get("id") == uuid_text and item.get("email") == email]
+    uuid_matches = [item for item in clients if item.get("id") == uuid_text]
+    email_matches = [item for item in clients if item.get("email") == email]
+
+    if action == "check":
+        if len(exact) != 1:
+            raise ManagedError("Клиент не найден в управляемом XHTTP inbound.")
+        return False
+
+    if action == "add":
+        if len(exact) == 1 and len(uuid_matches) == 1 and len(email_matches) == 1:
+            return False
+        if uuid_matches or email_matches:
+            raise ManagedError("UUID или техническая метка уже заняты другой записью.")
+        clients.append({"id": uuid_text, "email": email})
+        return True
+
+    if action == "remove":
+        if not uuid_matches and not email_matches:
+            return False
+        if len(exact) != 1 or len(uuid_matches) != 1 or len(email_matches) != 1:
+            raise ManagedError("UUID и техническая метка относятся к разным записям.")
+        clients.remove(exact[0])
+        return True
+
+    raise ManagedError("Неизвестное действие.")
+
+
+def test_config(path: Path) -> None:
+    if not XRAY_BIN.is_file():
+        raise ManagedError("Исполняемый файл Xray не найден.")
+    run([str(XRAY_BIN), "run", "-test", "-config", str(path)])
+
+
+def ensure_service_active() -> None:
+    result = run(["systemctl", "is-active", "--quiet", XRAY_SERVICE], check=False)
+    if result.returncode != 0:
+        raise ManagedError("Сервис Xray не активен.")
+
+
+def write_temp(config: dict, original_stat: os.stat_result) -> Path:
+    fd, raw_path = tempfile.mkstemp(
+        prefix=".config.amnezia-control-",
+        suffix=".json",
+        dir=str(CONFIG_PATH.parent),
+        text=True,
+    )
+    temp_path = Path(raw_path)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            json.dump(config, handle, ensure_ascii=False, indent=2)
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.chmod(temp_path, stat.S_IMODE(original_stat.st_mode))
+        os.chown(temp_path, original_stat.st_uid, original_stat.st_gid)
+        return temp_path
+    except Exception:
+        temp_path.unlink(missing_ok=True)
+        raise
+
+
+def backup_config() -> Path:
+    BACKUP_DIR.mkdir(parents=True, exist_ok=True, mode=0o700)
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ")
+    destination = BACKUP_DIR / f"xray-config-{stamp}.json"
+    shutil.copy2(CONFIG_PATH, destination)
+    os.chmod(destination, 0o600)
+    backups = sorted(BACKUP_DIR.glob("xray-config-*.json"), reverse=True)
+    for stale in backups[50:]:
+        stale.unlink(missing_ok=True)
+    return destination
+
+
+def replace_and_restart(config: dict) -> Path:
+    original_stat = CONFIG_PATH.stat()
+    backup = backup_config()
+    temp_path = write_temp(config, original_stat)
+    try:
+        test_config(temp_path)
+        os.replace(temp_path, CONFIG_PATH)
+        run(["systemctl", "restart", XRAY_SERVICE])
+        ensure_service_active()
+        test_config(CONFIG_PATH)
+        return backup
+    except Exception as exc:
+        temp_path.unlink(missing_ok=True)
+        rollback_temp = None
+        try:
+            rollback_config = load_config(backup)
+            rollback_temp = write_temp(rollback_config, original_stat)
+            test_config(rollback_temp)
+            os.replace(rollback_temp, CONFIG_PATH)
+            run(["systemctl", "restart", XRAY_SERVICE])
+            ensure_service_active()
+        except Exception as rollback_exc:
+            if rollback_temp:
+                rollback_temp.unlink(missing_ok=True)
+            raise ManagedError(
+                f"Применение и автоматический откат завершились ошибкой: {rollback_exc}"
+            ) from exc
+        raise ManagedError(f"Изменение отменено автоматическим откатом: {exc}") from exc
+
+
+def main() -> int:
+    if os.geteuid() != 0:
+        raise ManagedError("Скрипт должен выполняться от root.")
+    if len(sys.argv) != 4:
+        raise ManagedError("Использование: amnezia-control-xhttp add|remove|check UUID EMAIL")
+
+    action = sys.argv[1]
+    if action not in {"add", "remove", "check"}:
+        raise ManagedError("Разрешены только add, remove и check.")
+    uuid_text, email = validate_identity(sys.argv[2], sys.argv[3])
+
+    LOCK_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with LOCK_PATH.open("a+", encoding="utf-8") as lock_handle:
+        fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX)
+        config = load_config(CONFIG_PATH)
+        changed = mutate(config, action, uuid_text, email)
+        backup = None
+        if changed:
+            backup = replace_and_restart(config)
+        else:
+            test_config(CONFIG_PATH)
+            ensure_service_active()
+
+    emit(
+        {
+            "ok": True,
+            "action": action,
+            "changed": changed,
+            "backup": str(backup) if backup else None,
+        }
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        raise SystemExit(main())
+    except ManagedError as exc:
+        emit({"ok": False, "error": str(exc)}, stream=sys.stderr)
+        raise SystemExit(1)
+    except Exception:
+        emit({"ok": False, "error": "Непредвиденная ошибка helper-скрипта."}, stream=sys.stderr)
+        raise SystemExit(1)

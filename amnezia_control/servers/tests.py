@@ -81,7 +81,14 @@ class RuntimeDetectionTest(TestCase):
             Result("[Interface]\nAddress = 10.8.1.0/24\nListenPort = 49561\nJc = 10\n"),
         ]
 
-        ServerService.sync_runtime_state(server=self.server, actor=self.user)
+        with patch(
+            "servers.services.RuntimeCommandService.run_with_expected_failure",
+            side_effect=run_mock,
+        ):
+            ServerService.sync_runtime_state(
+                server=self.server,
+                actor=self.user,
+            )
         awg2 = self.server.protocols.get(protocol_type="awg2")
         self.assertEqual(awg2.runtime_metadata["awg2_metadata"]["Jc"], "10")
         self.assertTrue(awg2.runtime_metadata["endpoint_host_ready"])
@@ -109,7 +116,27 @@ class RuntimeDetectionTest(TestCase):
             return mapping[action]
 
         run_mock.side_effect = side_effect
-        ServerService.sync_runtime_state(server=self.server, actor=self.user)
+        def expected_side_effect(*args, **kwargs):
+            action = args[2]
+
+            if action == "runtime.peers.awg2.all":
+                return None
+
+            if action == "runtime.peers.awg2":
+                return side_effect(*args, **kwargs)
+
+            raise AssertionError(
+                f"Unexpected expected-failure action: {action}"
+            )
+
+        with patch(
+            "servers.services.RuntimeCommandService.run_with_expected_failure",
+            side_effect=expected_side_effect,
+        ):
+            ServerService.sync_runtime_state(
+                server=self.server,
+                actor=self.user,
+            )
         awg2 = self.server.protocols.get(protocol_type="awg2")
         self.assertEqual(awg2.runtime_metadata["peer_source"], "runtime wg dump")
         self.assertEqual(awg2.runtime_metadata["peer_count"], 1)
@@ -134,7 +161,14 @@ class RuntimeDetectionTest(TestCase):
             return mapping[action]
 
         run_mock.side_effect = side_effect
-        ServerService.sync_runtime_state(server=self.server, actor=self.user)
+        with patch(
+            "servers.services.RuntimeCommandService.run_with_expected_failure",
+            return_value=None,
+        ):
+            ServerService.sync_runtime_state(
+                server=self.server,
+                actor=self.user,
+            )
         awg2 = self.server.protocols.get(protocol_type="awg2")
         self.assertEqual(awg2.runtime_metadata["peer_source"], "config file fallback (degraded telemetry)")
         self.assertEqual(awg2.runtime_metadata["peer_count"], 1)

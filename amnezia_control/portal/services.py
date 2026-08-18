@@ -129,49 +129,299 @@ class PortalAccessService:
 
 
 class RenewalRequestService:
-    OPEN_STATUSES = (ClientRenewalRequest.Status.NEW, ClientRenewalRequest.Status.IN_PROGRESS)
+    OPEN_STATUSES = (
+        ClientRenewalRequest.Status.NEW,
+        ClientRenewalRequest.Status.IN_PROGRESS,
+    )
+
+    @staticmethod
+    def _legacy_account_id(client):
+        if client.device_id is None:
+            return None
+
+        return client.device.account_id
 
     @classmethod
     @transaction.atomic
-    def create_or_get_open_from_portal(cls, *, client, note: str = "", attachment=None):
-        request_obj = (
-            ClientRenewalRequest.objects.select_for_update()
-            .filter(client=client, status__in=cls.OPEN_STATUSES)
-            .order_by("-created_at")
-            .first()
+    def create_or_get_open_from_portal(
+        cls,
+        *,
+        client,
+        note: str = "",
+        attachment=None,
+    ):
+        account_id = cls._legacy_account_id(
+            client
         )
+
+        if account_id is not None:
+            request_obj = (
+                ClientRenewalRequest.objects
+                .select_for_update()
+                .filter(
+                    account_id=account_id,
+                    status__in=cls.OPEN_STATUSES,
+                )
+                .order_by("-created_at")
+                .first()
+            )
+        else:
+            request_obj = (
+                ClientRenewalRequest.objects
+                .select_for_update()
+                .filter(
+                    client=client,
+                    status__in=cls.OPEN_STATUSES,
+                )
+                .order_by("-created_at")
+                .first()
+            )
+
         if request_obj:
-            if note and not request_obj.note:
+            update_fields = []
+
+            if (
+                account_id is not None
+                and request_obj.account_id is None
+            ):
+                request_obj.account_id = account_id
+                update_fields.append("account")
+
+            if (
+                note
+                and not request_obj.note
+            ):
                 request_obj.note = note
-                request_obj.save(update_fields=["note", "updated_at"])
-            if attachment and not request_obj.attachment:
-                request_obj.attachment = attachment
-                request_obj.attachment_original_name = (attachment.name or "")[:255]
-                request_obj.save(update_fields=["attachment", "attachment_original_name", "updated_at"])
+                update_fields.append("note")
+
+            if (
+                attachment
+                and not request_obj.attachment
+            ):
+                request_obj.attachment = (
+                    attachment
+                )
+
+                request_obj.attachment_original_name = (
+                    attachment.name or ""
+                )[:255]
+
+                update_fields.extend(
+                    [
+                        "attachment",
+                        "attachment_original_name",
+                    ]
+                )
+
+            if update_fields:
+                update_fields.append(
+                    "updated_at"
+                )
+
+                request_obj.save(
+                    update_fields=update_fields
+                )
+
             return request_obj, False
 
-        request_obj = ClientRenewalRequest.objects.create(
-            client=client,
-            status=ClientRenewalRequest.Status.NEW,
-            note=note,
-            created_from_portal=True,
-            attachment=attachment,
-            attachment_original_name=((attachment.name or "")[:255] if attachment else ""),
+        request_obj = (
+            ClientRenewalRequest.objects.create(
+                client=client,
+                account_id=account_id,
+                status=(
+                    ClientRenewalRequest.Status.NEW
+                ),
+                note=note,
+                created_from_portal=True,
+                attachment=attachment,
+                attachment_original_name=(
+                    (
+                        attachment.name
+                        or ""
+                    )[:255]
+                    if attachment
+                    else ""
+                ),
+            )
         )
+
         return request_obj, True
 
     @classmethod
-    def get_open_for_client(cls, *, client):
-        return (
-            ClientRenewalRequest.objects.filter(client=client, status__in=cls.OPEN_STATUSES)
+    @transaction.atomic
+    def create_or_get_open_for_account(
+        cls,
+        *,
+        account,
+        note: str = "",
+        attachment=None,
+    ):
+        locked_account = (
+            account.__class__.objects
+            .select_for_update()
+            .get(pk=account.pk)
+        )
+
+        request_obj = (
+            ClientRenewalRequest.objects
+            .select_for_update()
+            .filter(
+                account=locked_account,
+                status__in=cls.OPEN_STATUSES,
+            )
             .order_by("-created_at")
             .first()
         )
 
+        if request_obj:
+            update_fields = []
+
+            if (
+                note
+                and not request_obj.note
+            ):
+                request_obj.note = note
+                update_fields.append("note")
+
+            if (
+                attachment
+                and not request_obj.attachment
+            ):
+                request_obj.attachment = (
+                    attachment
+                )
+
+                request_obj.attachment_original_name = (
+                    attachment.name or ""
+                )[:255]
+
+                update_fields.extend(
+                    [
+                        "attachment",
+                        "attachment_original_name",
+                    ]
+                )
+
+            if update_fields:
+                update_fields.append(
+                    "updated_at"
+                )
+
+                request_obj.save(
+                    update_fields=update_fields
+                )
+
+            return request_obj, False
+
+        request_obj = (
+            ClientRenewalRequest.objects.create(
+                account=locked_account,
+                client=None,
+                status=(
+                    ClientRenewalRequest.Status.NEW
+                ),
+                note=note,
+                created_from_portal=True,
+                attachment=attachment,
+                attachment_original_name=(
+                    (
+                        attachment.name
+                        or ""
+                    )[:255]
+                    if attachment
+                    else ""
+                ),
+            )
+        )
+
+        return request_obj, True
 
     @classmethod
-    def get_latest_for_client(cls, *, client):
-        return ClientRenewalRequest.objects.filter(client=client).order_by("-created_at").first()
+    def get_open_for_client(
+        cls,
+        *,
+        client,
+    ):
+        account_id = cls._legacy_account_id(
+            client
+        )
+
+        if account_id is not None:
+            return (
+                ClientRenewalRequest.objects
+                .filter(
+                    account_id=account_id,
+                    status__in=cls.OPEN_STATUSES,
+                )
+                .order_by("-created_at")
+                .first()
+            )
+
+        return (
+            ClientRenewalRequest.objects
+            .filter(
+                client=client,
+                status__in=cls.OPEN_STATUSES,
+            )
+            .order_by("-created_at")
+            .first()
+        )
+
+    @classmethod
+    def get_latest_for_client(
+        cls,
+        *,
+        client,
+    ):
+        account_id = cls._legacy_account_id(
+            client
+        )
+
+        if account_id is not None:
+            return (
+                ClientRenewalRequest.objects
+                .filter(
+                    account_id=account_id,
+                )
+                .order_by("-created_at")
+                .first()
+            )
+
+        return (
+            ClientRenewalRequest.objects
+            .filter(client=client)
+            .order_by("-created_at")
+            .first()
+        )
+
+    @classmethod
+    def get_open_for_account(
+        cls,
+        *,
+        account,
+    ):
+        return (
+            ClientRenewalRequest.objects
+            .filter(
+                account=account,
+                status__in=cls.OPEN_STATUSES,
+            )
+            .order_by("-created_at")
+            .first()
+        )
+
+    @classmethod
+    def get_latest_for_account(
+        cls,
+        *,
+        account,
+    ):
+        return (
+            ClientRenewalRequest.objects
+            .filter(account=account)
+            .order_by("-created_at")
+            .first()
+        )
 
 
 class PortalReissuePolicyService:

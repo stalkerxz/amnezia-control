@@ -1,0 +1,1630 @@
+{% extends 'partials/base.html' %}
+
+{% block title %}Аккаунты клиентов · amnezia-control{% endblock %}
+
+{% block content %}
+
+<style>
+  .accounts-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: .65rem;
+  }
+
+  .accounts-kpi {
+    display: block;
+    min-height: 88px;
+    padding: .8rem .9rem;
+    border: 1px solid var(--bs-border-color);
+    border-radius: .85rem;
+    background:
+      linear-gradient(
+        180deg,
+        rgba(255,255,255,.024),
+        rgba(255,255,255,0)
+      );
+    color: inherit;
+    text-decoration: none;
+    transition:
+      border-color .15s ease,
+      transform .15s ease,
+      background-color .15s ease;
+  }
+
+  .accounts-kpi:hover {
+    border-color: var(--bs-primary);
+    transform: translateY(-1px);
+    color: inherit;
+  }
+
+  .accounts-kpi .kpi-label {
+    color: var(--bs-secondary-color);
+    font-size: .68rem;
+    font-weight: 700;
+    letter-spacing: .095em;
+    line-height: 1.2;
+    text-transform: uppercase;
+  }
+
+  .accounts-kpi .kpi-value {
+    margin-top: .28rem;
+    font-size: 1.55rem;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  .accounts-kpi .kpi-note {
+    margin-top: .38rem;
+    color: var(--bs-secondary-color);
+    font-size: .73rem;
+    line-height: 1.25;
+  }
+
+  .accounts-toolbar {
+    padding: .8rem;
+    border: 1px solid var(--bs-border-color);
+    border-radius: .85rem;
+    background: rgba(255,255,255,.015);
+  }
+
+  .accounts-toolbar .form-label {
+    margin-bottom: .25rem;
+    font-size: .72rem;
+  }
+
+  .accounts-filter-chips {
+    display: flex;
+    gap: .38rem;
+    flex-wrap: wrap;
+  }
+
+  .accounts-filter-chip {
+    display: inline-flex;
+    gap: .38rem;
+    align-items: center;
+    padding: .34rem .6rem;
+    border: 1px solid var(--bs-border-color);
+    border-radius: 999px;
+    color: var(--bs-secondary-color);
+    font-size: .75rem;
+    line-height: 1;
+    text-decoration: none;
+  }
+
+  .accounts-filter-chip:hover,
+  .accounts-filter-chip.active {
+    border-color: var(--bs-primary);
+    color: var(--bs-body-color);
+    background: rgba(var(--bs-primary-rgb), .08);
+  }
+
+  .accounts-filter-chip .chip-count {
+    color: var(--bs-body-color);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .accounts-table-wrap {
+    overflow: visible;
+    border: 1px solid var(--bs-border-color);
+    border-radius: .85rem;
+  }
+
+  .accounts-table {
+    width: 100%;
+    table-layout: fixed;
+    font-size: .84rem;
+  }
+
+  .accounts-table .col-account {
+    width: 25%;
+  }
+
+  .accounts-table .col-state {
+    width: 17%;
+  }
+
+  .accounts-table .col-devices {
+    width: 8%;
+  }
+
+  .accounts-table .col-connections {
+    width: 15%;
+  }
+
+  .accounts-table .col-access {
+    width: 20%;
+  }
+
+  .accounts-table .col-actions {
+    width: 15%;
+  }
+
+  .accounts-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 4;
+    padding: .68rem .65rem;
+    background: var(--bs-body-bg);
+    box-shadow:
+      inset 0 -1px 0 var(--bs-border-color);
+    color: var(--bs-secondary-color);
+    font-size: .66rem;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .accounts-table tbody td {
+    padding: .56rem .65rem;
+    vertical-align: middle;
+  }
+
+  .accounts-table tbody tr {
+    transition: background-color .12s ease;
+  }
+
+  .accounts-table tbody tr:hover {
+    background:
+      rgba(var(--bs-primary-rgb), .035);
+  }
+
+  .account-row-link {
+    cursor: pointer;
+  }
+
+  .account-row-link:focus {
+    outline: 2px solid
+      rgba(var(--bs-primary-rgb), .55);
+    outline-offset: -2px;
+  }
+
+  .account-name-link {
+    display: block;
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .account-name-link:hover {
+    color: var(--bs-primary);
+  }
+
+  .accounts-pagination {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: .75rem;
+    flex-wrap: wrap;
+    padding-top: .85rem;
+  }
+
+  .accounts-pagination-summary {
+    color: var(--bs-secondary-color);
+    font-size: .75rem;
+  }
+
+  .accounts-pagination-pages {
+    display: flex;
+    gap: .3rem;
+    align-items: center;
+  }
+
+  .accounts-page-link {
+    display: inline-flex;
+    min-width: 30px;
+    height: 30px;
+    padding: 0 .5rem;
+    justify-content: center;
+    align-items: center;
+    border: 1px solid var(--bs-border-color);
+    border-radius: .45rem;
+    color: var(--bs-secondary-color);
+    font-size: .75rem;
+    text-decoration: none;
+  }
+
+  .accounts-page-link:hover,
+  .accounts-page-link.active {
+    border-color: var(--bs-primary);
+    background:
+      rgba(var(--bs-primary-rgb), .09);
+    color: var(--bs-body-color);
+  }
+
+  .accounts-table .col-actions {
+    position: sticky;
+    right: 0;
+    z-index: 2;
+    background: var(--bs-body-bg);
+    box-shadow:
+      -8px 0 14px -14px rgba(0,0,0,.7);
+  }
+
+  .accounts-table thead .col-actions {
+    z-index: 6;
+  }
+
+  .account-name-main {
+    overflow: hidden;
+    font-size: .86rem;
+    font-weight: 700;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .account-name-meta {
+    overflow: hidden;
+    margin-top: .12rem;
+    color: var(--bs-secondary-color);
+    font-size: .73rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .account-email-missing {
+    opacity: .6;
+  }
+
+  .account-cabinet-meta {
+    display: flex;
+    gap: .34rem;
+    align-items: center;
+    margin-top: .27rem;
+    color: var(--bs-secondary-color);
+    font-size: .69rem;
+    line-height: 1;
+  }
+
+  .account-cabinet-dot {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    flex: 0 0 6px;
+    border-radius: 50%;
+    background: var(--bs-secondary-color);
+    opacity: .7;
+  }
+
+  .account-cabinet-dot.active {
+    background: var(--bs-success);
+    opacity: 1;
+  }
+
+  .account-state-stack {
+    display: flex;
+    gap: .3rem;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .account-state-note {
+    font-size: .71rem;
+    line-height: 1.2;
+  }
+
+  .account-state-note.ready {
+    color: var(--bs-success);
+  }
+
+  .account-state-note.warning {
+    color: var(--bs-warning);
+  }
+
+  .account-state-note.danger {
+    color: var(--bs-danger);
+  }
+
+  .metric-stack {
+    line-height: 1.15;
+  }
+
+  .metric-main {
+    font-weight: 650;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .metric-meta {
+    margin-top: .2rem;
+    color: var(--bs-secondary-color);
+    font-size: .69rem;
+    line-height: 1.25;
+  }
+
+  .access-date {
+    white-space: nowrap;
+  }
+
+  .account-row-disabled {
+    opacity: .8;
+  }
+
+  .account-actions {
+    white-space: nowrap;
+  }
+
+  /*
+   * Every sticky action cell creates its own stacking context.
+   * While a dropdown is open, raise only its owning cell so that
+   * action cells from following rows cannot paint over the menu.
+   */
+  .account-actions.dropdown-open {
+    z-index: 8;
+  }
+
+  .account-actions.dropdown-open .dropdown-menu {
+    z-index: 9;
+  }
+
+  .account-actions .dropdown-menu {
+    min-width: 220px;
+  }
+
+  @media (max-width: 1099.98px) {
+    .accounts-kpi-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .accounts-table-wrap {
+      overflow-x: auto;
+      overflow-y: visible;
+    }
+
+    .accounts-table {
+      min-width: 820px;
+    }
+  }
+
+  @media (max-width: 767.98px) {
+    .accounts-kpi-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 479.98px) {
+    .accounts-kpi-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+
+
+<div
+  class="
+    page-header
+    d-flex
+    justify-content-between
+    align-items-start
+    gap-3
+    flex-wrap
+  "
+>
+
+  <div>
+
+    <p class="page-kicker">
+      Операторская · Аккаунты
+    </p>
+
+    <h1 class="h3 mb-1">
+      Аккаунты клиентов
+    </h1>
+
+    <p class="page-subtle mb-0">
+      Клиенты, устройства, личные кабинеты
+      и подключения в одном рабочем пространстве.
+    </p>
+
+  </div>
+
+
+  <div class="action-cluster">
+
+    <a
+      class="btn btn-primary"
+      href="{% url 'customers-onboarding' %}"
+      title="Создать клиента, первое устройство и при необходимости личный кабинет"
+    >
+      Новый клиент
+    </a>
+
+    <a
+      class="btn btn-outline-secondary"
+      href="{% url 'customers-create' %}"
+      title="Создать только карточку аккаунта без дальнейшей настройки"
+    >
+      Только аккаунт
+    </a>
+
+  </div>
+
+</div>
+
+
+<section class="section-block section-quiet">
+
+  <div class="section-body">
+
+    <div class="accounts-kpi-grid">
+
+      <a
+        class="accounts-kpi"
+        href="{% url 'customers-list' %}"
+      >
+        <div class="kpi-label">
+          Всего аккаунтов
+        </div>
+
+        <div class="kpi-value">
+          {{ metrics.total }}
+        </div>
+
+        <div class="kpi-note">
+          Текущие аккаунты
+        </div>
+      </a>
+
+
+      <a
+        class="accounts-kpi"
+        href="{% url 'customers-list' %}?status=active"
+      >
+        <div class="kpi-label">
+          Активные
+        </div>
+
+        <div class="kpi-value">
+          {{ metrics.active }}
+        </div>
+
+        <div class="kpi-note">
+          Доступны для работы
+        </div>
+      </a>
+
+
+      <a
+        class="accounts-kpi"
+        href="{% url 'customers-list' %}?readiness=attention"
+      >
+        <div class="kpi-label">
+          Требуют внимания
+        </div>
+
+        <div class="kpi-value">
+          {{ metrics.attention }}
+        </div>
+
+        <div class="kpi-note">
+          Срок, устройство или подключение
+        </div>
+      </a>
+
+
+      <a
+        class="accounts-kpi"
+        href="{% url 'customers-list' %}?readiness=no_cabinet"
+      >
+        <div class="kpi-label">
+          Без кабинета
+        </div>
+
+        <div class="kpi-value">
+          {{ metrics.cabinet_missing }}
+        </div>
+
+        <div class="kpi-note">
+          Отдельный статус доступа
+        </div>
+      </a>
+
+
+      <a
+        class="accounts-kpi"
+        href="{% url 'customers-list' %}?readiness=expiring"
+      >
+        <div class="kpi-label">
+          Истекают ≤ 7 дней
+        </div>
+
+        <div class="kpi-value">
+          {{ metrics.expires_soon }}
+        </div>
+
+        <div class="kpi-note">
+          Проверить продление
+        </div>
+      </a>
+
+    </div>
+
+  </div>
+
+</section>
+
+
+<section class="section-block">
+
+  <div class="section-body">
+
+    <div class="section-header-compact mb-3">
+
+      <div>
+
+        <h2 class="h6 mb-1">
+
+          {% if renewal_filter == 'open' %}
+            Открытые заявки на продление
+          {% else %}
+            Клиенты
+          {% endif %}
+
+        </h2>
+
+        <div class="text-secondary small">
+
+          {% if renewal_filter == 'open' %}
+
+            Показаны аккаунты с новой
+            или находящейся в работе заявкой
+            на продление.
+
+          {% else %}
+
+            Поиск и основные состояния клиентов
+            без перехода в карточку.
+
+          {% endif %}
+
+        </div>
+
+      </div>
+
+      <div class="text-secondary small">
+        Найдено: {{ result_count }}
+      </div>
+
+    </div>
+
+
+    <form
+      method="get"
+      class="accounts-toolbar mb-3"
+    >
+
+      {% if renewal_filter %}
+        <input
+          type="hidden"
+          name="renewal"
+          value="{{ renewal_filter }}"
+        >
+      {% endif %}
+
+
+      <div class="row g-2">
+
+        <div class="col-12 col-xl-4">
+
+          <label
+            class="form-label text-secondary"
+            for="accountsSearch"
+          >
+            Поиск
+          </label>
+
+          <input
+            id="accountsSearch"
+            class="form-control form-control-sm"
+            type="search"
+            name="q"
+            value="{{ search_query }}"
+            placeholder="Клиент, email или устройство"
+            autocomplete="off"
+          >
+
+        </div>
+
+
+        <div class="col-6 col-md-4 col-xl-2">
+
+          <label
+            class="form-label text-secondary"
+            for="accountsStatus"
+          >
+            Статус
+          </label>
+
+          <select
+            id="accountsStatus"
+            class="form-select form-select-sm"
+            name="status"
+          >
+
+            <option value="">
+              Все
+            </option>
+
+            <option
+              value="active"
+              {% if status_filter == 'active' %}selected{% endif %}
+            >
+              Активные
+            </option>
+
+            <option
+              value="disabled"
+              {% if status_filter == 'disabled' %}selected{% endif %}
+            >
+              Отключённые
+            </option>
+
+          </select>
+
+        </div>
+
+
+        <div class="col-6 col-md-4 col-xl-3">
+
+          <label
+            class="form-label text-secondary"
+            for="accountsReadiness"
+          >
+            Состояние
+          </label>
+
+          <select
+            id="accountsReadiness"
+            class="form-select form-select-sm"
+            name="readiness"
+          >
+
+            <option value="">
+              Любое
+            </option>
+
+            <option
+              value="attention"
+              {% if readiness_filter == 'attention' %}selected{% endif %}
+            >
+              Требуют внимания
+            </option>
+
+            <option
+              value="ready"
+              {% if readiness_filter == 'ready' %}selected{% endif %}
+            >
+              Подключения готовы
+            </option>
+
+            <option
+              value="no_cabinet"
+              {% if readiness_filter == 'no_cabinet' %}selected{% endif %}
+            >
+              Нет личного кабинета
+            </option>
+
+            <option
+              value="no_devices"
+              {% if readiness_filter == 'no_devices' %}selected{% endif %}
+            >
+              Нет устройств
+            </option>
+
+            <option
+              value="no_connections"
+              {% if readiness_filter == 'no_connections' %}selected{% endif %}
+            >
+              Нет подключений
+            </option>
+
+            <option
+              value="renewal"
+              {% if readiness_filter == 'renewal' %}selected{% endif %}
+            >
+              Есть продление
+            </option>
+
+            <option
+              value="expired"
+              {% if readiness_filter == 'expired' %}selected{% endif %}
+            >
+              Срок истёк
+            </option>
+
+            <option
+              value="expiring"
+              {% if readiness_filter == 'expiring' %}selected{% endif %}
+            >
+              Истекает в ближайшие 7 дней
+            </option>
+
+          </select>
+
+        </div>
+
+
+        <div class="col-6 col-md-4 col-xl-2">
+
+          <label
+            class="form-label text-secondary"
+            for="accountsSort"
+          >
+            Сортировка
+          </label>
+
+          <select
+            id="accountsSort"
+            class="form-select form-select-sm"
+            name="sort"
+          >
+
+            <option
+              value="name"
+              {% if sort_filter == 'name' %}selected{% endif %}
+            >
+              По имени
+            </option>
+
+            <option
+              value="expires"
+              {% if sort_filter == 'expires' %}selected{% endif %}
+            >
+              По сроку
+            </option>
+
+            <option
+              value="devices"
+              {% if sort_filter == 'devices' %}selected{% endif %}
+            >
+              По устройствам
+            </option>
+
+            <option
+              value="connections"
+              {% if sort_filter == 'connections' %}selected{% endif %}
+            >
+              По подключениям
+            </option>
+
+            <option
+              value="updated"
+              {% if sort_filter == 'updated' %}selected{% endif %}
+            >
+              Недавно изменённые
+            </option>
+
+          </select>
+
+        </div>
+
+
+        <div
+          class="
+            col-6
+            col-xl-1
+            d-flex
+            align-items-end
+          "
+        >
+
+          <button
+            class="btn btn-primary btn-sm w-100"
+            type="submit"
+          >
+            Найти
+          </button>
+
+        </div>
+
+      </div>
+
+
+      <div
+        class="
+          d-flex
+          justify-content-between
+          align-items-center
+          gap-2
+          flex-wrap
+          mt-3
+        "
+      >
+
+        <div class="accounts-filter-chips">
+
+          <a
+            class="accounts-filter-chip"
+            href="{% url 'customers-list' %}"
+          >
+            Все
+            <span class="chip-count">
+              {{ metrics.total }}
+            </span>
+          </a>
+
+          <a
+            class="
+              accounts-filter-chip
+              {% if status_filter == 'active' %}active{% endif %}
+            "
+            href="{% url 'customers-list' %}?status=active"
+          >
+            Активные
+            <span class="chip-count">
+              {{ metrics.active }}
+            </span>
+          </a>
+
+          <a
+            class="
+              accounts-filter-chip
+              {% if readiness_filter == 'attention' %}active{% endif %}
+            "
+            href="{% url 'customers-list' %}?readiness=attention"
+          >
+            Требуют внимания
+            <span class="chip-count">
+              {{ metrics.attention }}
+            </span>
+          </a>
+
+          <a
+            class="
+              accounts-filter-chip
+              {% if readiness_filter == 'expired' %}active{% endif %}
+            "
+            href="{% url 'customers-list' %}?readiness=expired"
+          >
+            Истёкшие
+            <span class="chip-count">
+              {{ metrics.expired }}
+            </span>
+          </a>
+
+          <a
+            class="
+              accounts-filter-chip
+              {% if readiness_filter == 'no_cabinet' %}active{% endif %}
+            "
+            href="{% url 'customers-list' %}?readiness=no_cabinet"
+          >
+            Без кабинета
+            <span class="chip-count">
+              {{ metrics.cabinet_missing }}
+            </span>
+          </a>
+
+          <a
+            class="
+              accounts-filter-chip
+              {% if readiness_filter == 'no_devices' %}active{% endif %}
+            "
+            href="{% url 'customers-list' %}?readiness=no_devices"
+          >
+            Без устройств
+            <span class="chip-count">
+              {{ metrics.no_devices }}
+            </span>
+          </a>
+
+          <a
+            class="
+              accounts-filter-chip
+              {% if readiness_filter == 'no_connections' %}active{% endif %}
+            "
+            href="{% url 'customers-list' %}?readiness=no_connections"
+          >
+            Без подключений
+            <span class="chip-count">
+              {{ metrics.no_connections }}
+            </span>
+          </a>
+
+          {% if metrics.open_renewals %}
+
+            <a
+              class="
+                accounts-filter-chip
+                {% if readiness_filter == 'renewal' %}active{% endif %}
+              "
+              href="{% url 'customers-list' %}?readiness=renewal"
+            >
+              Продление
+              <span class="chip-count">
+                {{ metrics.open_renewals }}
+              </span>
+            </a>
+
+          {% endif %}
+
+          <a
+            class="
+              accounts-filter-chip
+              {% if status_filter == 'disabled' %}active{% endif %}
+            "
+            href="{% url 'customers-list' %}?status=disabled"
+          >
+            Отключённые
+            <span class="chip-count">
+              {{ metrics.disabled }}
+            </span>
+          </a>
+
+        </div>
+
+
+        {% if search_query or status_filter or readiness_filter or sort_filter != 'name' %}
+
+          {% if renewal_filter == 'open' %}
+
+            <a
+              class="btn btn-sm btn-outline-secondary"
+              href="{% url 'customers-list' %}?renewal=open"
+            >
+              Сбросить
+            </a>
+
+          {% else %}
+
+            <a
+              class="btn btn-sm btn-outline-secondary"
+              href="{% url 'customers-list' %}"
+            >
+              Сбросить
+            </a>
+
+          {% endif %}
+
+        {% endif %}
+
+      </div>
+
+    </form>
+
+
+    {% if result_count %}
+
+      <div class="accounts-table-wrap">
+
+        <table
+          class="
+            table
+            align-middle
+            mb-0
+            accounts-table
+          "
+        >
+
+          <thead>
+
+            <tr>
+
+              <th class="col-account">
+                Аккаунт
+              </th>
+
+              <th class="col-state">
+                Состояние
+              </th>
+
+              <th class="col-devices">
+                Устр.
+              </th>
+
+              <th class="col-connections">
+                Подключения
+              </th>
+
+              <th class="col-access">
+                Доступ
+              </th>
+
+              <th class="col-actions text-end">
+                Действия
+              </th>
+
+            </tr>
+
+          </thead>
+
+
+          <tbody>
+
+            {% for account in page_obj %}
+
+              <tr
+                class="
+                  account-row-link
+                  {% if account.status == 'disabled' or account.readiness_code == 'expired' %}
+                    account-row-disabled
+                  {% endif %}
+                "
+                data-href="{% url 'customers-detail' account.pk %}"
+                role="link"
+                tabindex="0"
+              >
+
+                <td class="col-account">
+
+                  <a
+                    class="
+                      account-name-main
+                      account-name-link
+                    "
+                    href="{% url 'customers-detail' account.pk %}"
+                  >
+                    {{ account.display_name }}
+                  </a>
+
+                  {% if account.email %}
+
+                    <div class="account-name-meta">
+                      {{ account.email }}
+                    </div>
+
+                  {% else %}
+
+                    <div
+                      class="
+                        account-name-meta
+                        account-email-missing
+                      "
+                    >
+                      Без email
+                    </div>
+
+                  {% endif %}
+
+
+                  {% if account.user_id %}
+
+                    <div class="account-cabinet-meta">
+                      <span
+                        class="
+                          account-cabinet-dot
+                          active
+                        "
+                      ></span>
+                      Кабинет создан
+                    </div>
+
+                  {% endif %}
+
+                </td>
+
+
+                <td class="col-state">
+
+                  <div class="account-state-stack">
+
+                    {% if account.status == 'active' and account.readiness_code == 'expired' %}
+
+                      <span class="badge text-bg-danger">
+                        Срок истёк
+                      </span>
+
+                      <span
+                        class="
+                          account-state-note
+                          danger
+                        "
+                      >
+                        Доступ отключён
+                      </span>
+
+                    {% elif account.status == 'active' %}
+
+                      <span class="badge text-bg-success">
+                        Активен
+                      </span>
+
+                      {% if account.readiness_code == 'ready' %}
+
+                        <span
+                          class="
+                            account-state-note
+                            ready
+                          "
+                        >
+                          Готов к работе
+                        </span>
+
+                      {% elif account.readiness_code == 'expired' %}
+
+                        <span
+                          class="
+                            account-state-note
+                            danger
+                          "
+                        >
+                          Срок истёк
+                        </span>
+
+                      {% elif account.readiness_code == 'expiring' %}
+
+                        <span
+                          class="
+                            account-state-note
+                            warning
+                          "
+                        >
+                          Истекает скоро
+                        </span>
+
+                      {% elif account.readiness_code == 'renewal' %}
+
+                        <span
+                          class="
+                            account-state-note
+                            warning
+                          "
+                        >
+                          Требует продления
+                        </span>
+
+                      {% elif account.readiness_code == 'no_devices' %}
+
+                        <span
+                          class="
+                            account-state-note
+                            warning
+                          "
+                        >
+                          Нет устройств
+                        </span>
+
+                      {% elif account.readiness_code == 'no_connections' %}
+
+                        <span
+                          class="
+                            account-state-note
+                            warning
+                          "
+                        >
+                          Нет подключений
+                        </span>
+
+                      {% endif %}
+
+                    {% elif account.status == 'disabled' %}
+
+                      <span class="badge text-bg-warning">
+                        Отключён
+                      </span>
+
+                    {% else %}
+
+                      <span class="badge text-bg-secondary">
+                        {{ account.status }}
+                      </span>
+
+                    {% endif %}
+
+                  </div>
+
+                </td>
+
+
+                <td class="col-devices">
+
+                  <div class="metric-stack">
+
+                    <div class="metric-main">
+                      {{ account.device_count }}
+                    </div>
+
+                    <div class="metric-meta">
+                      устройств
+                    </div>
+
+                  </div>
+
+                </td>
+
+
+                <td class="col-connections">
+
+                  <div class="metric-stack">
+
+                    <div class="metric-main">
+                      {{ account.connection_count }}
+                    </div>
+
+                    <div class="metric-meta">
+
+                      {% if account.connection_count == 0 %}
+
+                        нет подключений
+
+                      {% elif account.connection_count == 1 %}
+
+                        подключение
+
+                      {% else %}
+
+                        VPN {{ account.vpn_config_count }}
+                        · Альт. {{ account.xhttp_config_count }}
+
+                      {% endif %}
+
+                    </div>
+
+                  </div>
+
+                </td>
+
+
+                <td class="col-access">
+
+                  {% if account.expires_at %}
+
+                    <div class="metric-stack">
+
+                      <div
+                        class="
+                          metric-main
+                          access-date
+
+                          {% if account.expiry_state == 'expired' %}
+                            text-danger
+                          {% elif account.expiry_state == 'soon' %}
+                            text-warning
+                          {% endif %}
+                        "
+                      >
+                        {{ account.expires_at|date:"d.m.Y" }}
+                      </div>
+
+                      {% if account.expiry_state != 'expired' %}
+
+                        <div
+                          class="
+                            metric-meta
+
+                            {% if account.expiry_state == 'soon' %}
+                              text-warning
+                            {% endif %}
+                          "
+                        >
+
+                          {% if account.expiry_state == 'soon' %}
+                            Истекает скоро
+                          {% else %}
+                            до {{ account.expires_at|date:"H:i" }}
+                          {% endif %}
+
+                        </div>
+
+                      {% endif %}
+
+                    </div>
+
+                  {% else %}
+
+                    <span class="text-secondary">
+                      Без срока
+                    </span>
+
+                  {% endif %}
+
+
+                  {% if account.open_renewal_count %}
+
+                    <div class="mt-2">
+                      <span class="badge text-bg-warning">
+                        Продление открыто
+                      </span>
+                    </div>
+
+                  {% endif %}
+
+                </td>
+
+
+                <td
+                  class="
+                    col-actions
+                    text-end
+                    account-actions
+                  "
+                >
+
+                  <div
+                    class="
+                      btn-group
+                      btn-group-sm
+                    "
+                  >
+
+                    <a
+                      class="btn btn-outline-primary"
+                      href="{% url 'customers-detail' account.pk %}"
+                    >
+                      Открыть
+                    </a>
+
+
+                    {% if account.status != 'deleted' %}
+
+                      <button
+                        class="
+                          btn
+                          btn-outline-primary
+                          dropdown-toggle
+                          dropdown-toggle-split
+                        "
+                        type="button"
+                        data-bs-toggle="dropdown"
+                        aria-expanded="false"
+                      >
+                        <span class="visually-hidden">
+                          Другие действия
+                        </span>
+                      </button>
+
+
+                      <ul
+                        class="
+                          dropdown-menu
+                          dropdown-menu-end
+                        "
+                      >
+
+                        <li>
+
+                          <a
+                            class="dropdown-item"
+                            href="{% url 'customers-edit' account.pk %}"
+                          >
+                            Редактировать аккаунт
+                          </a>
+
+                        </li>
+
+
+                        {% if account.status == 'active' %}
+
+                          <li>
+
+                            <a
+                              class="dropdown-item"
+                              href="{% url 'customers-device-create' account.pk %}"
+                            >
+                              Добавить устройство
+                            </a>
+
+                          </li>
+
+                          <li>
+
+                            {% if account.user_id %}
+
+                              <a
+                                class="dropdown-item"
+                                href="{% url 'customers-access-manage' account.pk %}"
+                              >
+                                Управлять кабинетом
+                              </a>
+
+                            {% else %}
+
+                              <a
+                                class="dropdown-item"
+                                href="{% url 'customers-access-create' account.pk %}"
+                              >
+                                Создать личный кабинет
+                              </a>
+
+                            {% endif %}
+
+                          </li>
+
+                        {% endif %}
+
+                      </ul>
+
+                    {% endif %}
+
+                  </div>
+
+                </td>
+
+              </tr>
+
+            {% endfor %}
+
+          </tbody>
+
+        </table>
+
+      </div>
+
+
+      <div class="accounts-pagination">
+
+        <div class="accounts-pagination-summary">
+
+          Показано
+          {{ page_obj.start_index }}–{{ page_obj.end_index }}
+          из {{ result_count }}
+
+        </div>
+
+
+        {% if paginator.num_pages > 1 %}
+
+          <nav
+            class="accounts-pagination-pages"
+            aria-label="Страницы аккаунтов"
+          >
+
+            {% if page_obj.has_previous %}
+
+              <a
+                class="accounts-page-link"
+                href="?{% if query_without_page %}{{ query_without_page }}&{% endif %}page={{ page_obj.previous_page_number }}"
+                aria-label="Предыдущая страница"
+              >
+                Назад
+              </a>
+
+            {% endif %}
+
+
+            {% for number in page_numbers %}
+
+              <a
+                class="
+                  accounts-page-link
+                  {% if number == page_obj.number %}
+                    active
+                  {% endif %}
+                "
+                href="?{% if query_without_page %}{{ query_without_page }}&{% endif %}page={{ number }}"
+                {% if number == page_obj.number %}
+                  aria-current="page"
+                {% endif %}
+              >
+                {{ number }}
+              </a>
+
+            {% endfor %}
+
+
+            {% if page_obj.has_next %}
+
+              <a
+                class="accounts-page-link"
+                href="?{% if query_without_page %}{{ query_without_page }}&{% endif %}page={{ page_obj.next_page_number }}"
+                aria-label="Следующая страница"
+              >
+                Далее
+              </a>
+
+            {% endif %}
+
+          </nav>
+
+        {% endif %}
+
+      </div>
+
+    {% else %}
+
+      <div
+        class="
+          py-5
+          text-center
+          text-secondary
+        "
+      >
+
+        {% if renewal_filter == 'open' %}
+
+          Открытых заявок на продление
+          по выбранным условиям нет.
+
+        {% elif search_query or status_filter or readiness_filter %}
+
+          По выбранным условиям
+          аккаунты не найдены.
+
+        {% else %}
+
+          Аккаунтов пока нет.
+
+        {% endif %}
+
+      </div>
+
+    {% endif %}
+
+  </div>
+
+</section>
+
+
+<script>
+  document.addEventListener(
+    "DOMContentLoaded",
+    function () {
+
+      document
+        .querySelectorAll(
+          ".account-actions [data-bs-toggle=\"dropdown\"]"
+        )
+        .forEach(function (toggle) {
+
+          const actionCell = toggle.closest(
+            ".account-actions"
+          );
+
+          if (!actionCell) {
+            return;
+          }
+
+          toggle.addEventListener(
+            "show.bs.dropdown",
+            function () {
+              actionCell.classList.add(
+                "dropdown-open"
+              );
+            }
+          );
+
+          toggle.addEventListener(
+            "hidden.bs.dropdown",
+            function () {
+              actionCell.classList.remove(
+                "dropdown-open"
+              );
+            }
+          );
+        });
+
+
+      document
+        .querySelectorAll(
+          ".account-row-link[data-href]"
+        )
+        .forEach(function (row) {
+
+          function openRow() {
+            window.location.href =
+              row.dataset.href;
+          }
+
+          row.addEventListener(
+            "click",
+            function (event) {
+
+              if (
+                event.target.closest(
+                  "a, button, input, select, textarea, .dropdown-menu"
+                )
+              ) {
+                return;
+              }
+
+              openRow();
+            }
+          );
+
+          row.addEventListener(
+            "keydown",
+            function (event) {
+
+              if (
+                event.target === row
+                && event.key === "Enter"
+              ) {
+                event.preventDefault();
+                openRow();
+              }
+            }
+          );
+        });
+    }
+  );
+</script>
+
+{% endblock %}

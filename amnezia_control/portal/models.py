@@ -8,7 +8,25 @@ from vpn.models import VPNClient
 
 
 class ClientPortalAccess(models.Model):
-    client = models.OneToOneField(VPNClient, on_delete=models.CASCADE, related_name="portal_access")
+    # Legacy technical owner.
+    # Kept during the migration away from VPNClient-level portal access.
+    client = models.OneToOneField(
+        VPNClient,
+        on_delete=models.CASCADE,
+        related_name="portal_access",
+    )
+
+    # Transitional account attribution.
+    # ForeignKey rather than OneToOne is intentional: after manual account
+    # merges several historical VPNClient portal links may map to one account.
+    account = models.ForeignKey(
+        "customers.CustomerAccount",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="legacy_portal_accesses",
+    )
+
     token_hash = models.CharField(max_length=64, unique=True)
     token_encrypted = models.TextField(blank=True, null=True)
     enabled = models.BooleanField(default=True)
@@ -29,8 +47,25 @@ class ClientPortalAccess(models.Model):
 
 def renewal_attachment_upload_to(instance, filename: str) -> str:
     extension = Path(filename).suffix.lower()
-    safe_extension = extension if extension in {".jpg", ".jpeg", ".pdf"} else ""
-    return f"portal/renewal_attachments/client_{instance.client_id}/{uuid4().hex}{safe_extension}"
+
+    safe_extension = (
+        extension
+        if extension in {".jpg", ".jpeg", ".pdf"}
+        else ""
+    )
+
+    if instance.account_id is not None:
+        owner = f"account_{instance.account_id}"
+    elif instance.client_id is not None:
+        owner = f"client_{instance.client_id}"
+    else:
+        owner = "unassigned"
+
+    return (
+        "portal/renewal_attachments/"
+        f"{owner}/"
+        f"{uuid4().hex}{safe_extension}"
+    )
 
 
 class ClientRenewalRequest(models.Model):
@@ -40,7 +75,26 @@ class ClientRenewalRequest(models.Model):
         DONE = "done", "Выполнена"
         DISMISSED = "dismissed", "Отклонена"
 
-    client = models.ForeignKey(VPNClient, on_delete=models.CASCADE, related_name="renewal_requests")
+    # Legacy technical owner.
+    # New account-level renewal requests do not require VPNClient.
+    client = models.ForeignKey(
+        VPNClient,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="renewal_requests",
+    )
+
+    # New subscription/account attribution.
+    # Nullable during Phase 6 so existing data is preserved.
+    account = models.ForeignKey(
+        "customers.CustomerAccount",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="renewal_requests",
+    )
+
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.NEW)
     note = models.TextField(blank=True)
     operator_note = models.TextField(blank=True)
@@ -65,13 +119,34 @@ class ClientRenewalRequest(models.Model):
         constraints = [
             models.UniqueConstraint(
                 fields=("client",),
-                condition=Q(status__in=["new", "in_progress"]),
+                condition=Q(
+                    status__in=[
+                        "new",
+                        "in_progress",
+                    ]
+                ),
                 name="uniq_open_renewal_request_per_client",
-            )
+            ),
+            models.UniqueConstraint(
+                fields=("account",),
+                condition=Q(
+                    account__isnull=False,
+                    status__in=[
+                        "new",
+                        "in_progress",
+                    ],
+                ),
+                name="uniq_open_renewal_request_per_account",
+            ),
         ]
 
     def __str__(self):
-        return f"renewal:{self.client_id}:{self.status}"
+        if self.account_id is not None:
+            owner = f"account:{self.account_id}"
+        else:
+            owner = f"client:{self.client_id}"
+
+        return f"renewal:{owner}:{self.status}"
 
     @property
     def is_open(self) -> bool:

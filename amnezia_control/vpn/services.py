@@ -8,7 +8,8 @@ from collections import defaultdict
 from dataclasses import dataclass
 
 import qrcode
-from cryptography.fernet import Fernet
+from qrcode.exceptions import DataOverflowError
+from cryptography.fernet import Fernet, InvalidToken
 from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
@@ -138,6 +139,13 @@ class BaseProtocolAdapter:
     protocol_type = ""
     command_bin = "wg"
 
+    AWG2_RUNTIME_SAVE_LOCK = (
+        "/run/lock/"
+        "amnezia-control-awg2-save.lock"
+    )
+
+    AWG2_RUNTIME_SAVE_LOCK_TIMEOUT_SECONDS = 10
+
     def __init__(self, server: Server):
         self.server = server
         self.protocol = ServerProtocol.objects.filter(server=self.server, protocol_type=self.protocol_type).first()
@@ -185,8 +193,12 @@ class BaseProtocolAdapter:
             )
 
         command = (
-            f"docker exec {self.container} "
-            f"awg-quick save {config_path}"
+            "flock "
+            "-x "
+            f"-w {self.AWG2_RUNTIME_SAVE_LOCK_TIMEOUT_SECONDS} "
+            f"{shlex.quote(self.AWG2_RUNTIME_SAVE_LOCK)} "
+            f"docker exec {shlex.quote(self.container)} "
+            f"awg-quick save {shlex.quote(config_path)}"
         )
         self._run(
             actor,
@@ -204,44 +216,124 @@ class BaseProtocolAdapter:
     def server_public_key(self, actor, iface: str) -> str:
         return self._run(actor, f"{self.protocol_type}.server_pub", self._wg_cmd(f"show {iface} public-key")).stdout.strip()
 
+    @staticmethod
+    def _runtime_allowed_ips_valid(value: str) -> bool:
+        tokens = [
+            token.strip()
+            for token in (value or "").split(",")
+            if token.strip()
+        ]
+
+        if not tokens:
+            return False
+
+        try:
+            for token in tokens:
+                ipaddress.ip_network(
+                    token,
+                    strict=False,
+                )
+        except ValueError:
+            return False
+
+        return True
+
     def _parse_runtime_dump_peers(self, out: str):
         peers = []
-        runtime_interface = (self.protocol.runtime_metadata.get("interface") or "awg0").strip()
+        runtime_interface = (
+            self.protocol.runtime_metadata.get(
+                "interface"
+            )
+            or "awg0"
+        ).strip()
+
         for line in out.splitlines():
-            cols = [c.strip() for c in line.split("\t")]
+            cols = [
+                column.strip()
+                for column in line.split("\t")
+            ]
 
             # `wg show dump`:
-            #   public_key, preshared_key, endpoint, allowed_ips, latest_handshake, transfer_rx, transfer_tx, persistent_keepalive
+            # public_key, preshared_key, endpoint,
+            # allowed_ips, latest_handshake,
+            # transfer_rx, transfer_tx,
+            # persistent_keepalive
             #
-            # `wg show all dump`:
-            #   interface, public_key, preshared_key, endpoint, allowed_ips, latest_handshake, transfer_rx, transfer_tx, persistent_keepalive
+            # `wg show all dump` peer:
+            # interface, public_key, preshared_key,
+            # endpoint, allowed_ips,
+            # latest_handshake, transfer_rx,
+            # transfer_tx, persistent_keepalive
             #
-            # AWG2 in this environment returns live telemetry via `wg show all dump`,
-            # so support both layouts here.
+            # AWG2 also emits an extended interface
+            # metadata row. It can have many columns,
+            # so column count alone cannot identify
+            # a peer. Valid AllowedIPs are required.
 
-            if len(cols) >= 9 and cols[0] == runtime_interface:
+            if (
+                len(cols) >= 9
+                and cols[0] == runtime_interface
+            ):
                 public_key = cols[1]
                 allowed_ips = cols[4]
-                transfer_rx = int(cols[6]) if cols[6].isdigit() else 0
-                transfer_tx = int(cols[7]) if cols[7].isdigit() else 0
+
+                if not self._runtime_allowed_ips_valid(
+                    allowed_ips
+                ):
+                    continue
+
+                transfer_rx = (
+                    int(cols[6])
+                    if cols[6].isdigit()
+                    else 0
+                )
+
+                transfer_tx = (
+                    int(cols[7])
+                    if cols[7].isdigit()
+                    else 0
+                )
+
             elif len(cols) >= 8:
                 public_key = cols[0]
                 allowed_ips = cols[3]
-                transfer_rx = int(cols[5]) if cols[5].isdigit() else 0
-                transfer_tx = int(cols[6]) if cols[6].isdigit() else 0
+
+                if not self._runtime_allowed_ips_valid(
+                    allowed_ips
+                ):
+                    continue
+
+                transfer_rx = (
+                    int(cols[5])
+                    if cols[5].isdigit()
+                    else 0
+                )
+
+                transfer_tx = (
+                    int(cols[6])
+                    if cols[6].isdigit()
+                    else 0
+                )
+
             else:
                 continue
 
-            if public_key:
-                peers.append(
-                    PeerState(
-                        public_key=public_key,
-                        allowed_ips=allowed_ips,
-                        transfer_rx=transfer_rx,
-                        transfer_tx=transfer_tx,
-                        telemetry_state=PeerState.TELEMETRY_AVAILABLE,
-                    )
+            if not public_key:
+                continue
+
+            peers.append(
+                PeerState(
+                    public_key=public_key,
+                    allowed_ips=allowed_ips,
+                    transfer_rx=transfer_rx,
+                    transfer_tx=transfer_tx,
+                    telemetry_state=(
+                        PeerState
+                        .TELEMETRY_AVAILABLE
+                    ),
                 )
+            )
+
         return peers
 
     def _awg2_runtime_peers(self, actor):
@@ -506,8 +598,32 @@ class VPNClientPolicyService:
         return VPNClientService.get_limit_state(client, now=now)
 
     @classmethod
-    def reissue_block_reason(cls, client: VPNClient):
-        return cls.REISSUE_BLOCK_REASONS.get(cls.limit_state(client), "")
+    def reissue_block_reason(
+        cls,
+        client: VPNClient,
+    ):
+        if (
+            client.status
+            == VPNClient.Status.DELETED
+        ):
+            return (
+                "Переиздание запрещено: "
+                "клиент удалён."
+            )
+
+        if (
+            client.status
+            != VPNClient.Status.ACTIVE
+        ):
+            return (
+                "Переиздание запрещено: "
+                "сначала включите клиента."
+            )
+
+        return cls.REISSUE_BLOCK_REASONS.get(
+            cls.limit_state(client),
+            "",
+        )
 
     @classmethod
     def can_reissue(cls, client: VPNClient):
@@ -582,6 +698,75 @@ class VPNClientService:
         )
 
     @staticmethod
+    def _profile_is_selective(profile: ProtocolProfile) -> bool:
+        return any(
+            line.strip().lower() == "# routing-mode: selective"
+            for line in (profile.config_template or "").splitlines()
+        )
+
+    @staticmethod
+    def resolve_profile_allowed_ips(profile: ProtocolProfile) -> str:
+        if not VPNClientService._profile_is_selective(profile):
+            return "0.0.0.0/0, ::/0"
+
+        networks = []
+
+        for line_number, raw_line in enumerate(
+            (profile.config_template or "").splitlines(),
+            start=1,
+        ):
+            value = raw_line.split("#", 1)[0].strip()
+
+            if not value:
+                continue
+
+            try:
+                network = ipaddress.ip_network(value, strict=False)
+            except ValueError as exc:
+                raise RuntimeError(
+                    f"Selective profile {profile.name!r}: "
+                    f"invalid CIDR at line {line_number}: {value}"
+                ) from exc
+
+            if network.version != 4:
+                raise RuntimeError(
+                    f"Selective profile {profile.name!r}: "
+                    f"IPv6 is not supported yet: {network}"
+                )
+
+            if any(
+                (
+                    network.is_private,
+                    network.is_loopback,
+                    network.is_multicast,
+                    network.is_reserved,
+                    network.is_unspecified,
+                    network.is_link_local,
+                )
+            ):
+                raise RuntimeError(
+                    f"Selective profile {profile.name!r}: "
+                    f"special network is not allowed: {network}"
+                )
+
+            networks.append(network)
+
+        if not networks:
+            raise RuntimeError(
+                f"Selective profile {profile.name!r} contains no IPv4 routes"
+            )
+
+        collapsed = list(ipaddress.collapse_addresses(networks))
+
+        if len(collapsed) > 2000:
+            raise RuntimeError(
+                f"Selective profile {profile.name!r} contains too many routes: "
+                f"{len(collapsed)}"
+            )
+
+        return ", ".join(str(network) for network in collapsed)
+
+    @staticmethod
     def build_awg2_client_config(
         *,
         private_key: str,
@@ -590,6 +775,7 @@ class VPNClientService:
         server_public_key: str,
         awg2_metadata: dict,
         preshared_key: str = "",
+        allowed_ips: str = "0.0.0.0/0, ::/0",
     ) -> str:
         required = ("Jc", "Jmin", "Jmax", "S1", "S2", "S3", "S4", "H1", "H2", "H3", "H4")
         optional = ("I1", "I2", "I3", "I4", "I5")
@@ -606,7 +792,7 @@ class VPNClientService:
         peer_lines.extend(
             [
                 f"Endpoint = {endpoint}",
-                "AllowedIPs = 0.0.0.0/0, ::/0",
+                f"AllowedIPs = {allowed_ips}",
                 "PersistentKeepalive = 25",
             ]
         )
@@ -709,7 +895,18 @@ class VPNClientService:
 
     @staticmethod
     @transaction.atomic
-    def create_client(*, server, name: str, protocol_type: str, actor, expires_at=None, traffic_limit_bytes=None, contact_email: str = ""):
+    def create_client(
+        *,
+        server,
+        name: str,
+        protocol_type: str,
+        actor,
+        routing_mode: str | None = None,
+        expires_at=None,
+        traffic_limit_bytes=None,
+        contact_email: str = "",
+        device=None,
+    ):
         protocol = ServerProtocol.objects.filter(
             server=server,
             protocol_type=protocol_type,
@@ -718,14 +915,67 @@ class VPNClientService:
         if not protocol:
             raise ValueError("Protocol is not enabled or container is not running")
 
-        profile = ProtocolProfile.objects.filter(
-            server_protocol__server=server,
-            server_protocol=protocol,
-            protocol_type=protocol_type,
-            status=ProtocolProfile.ProfileStatus.ACTIVE,
-        ).first()
+        profiles = list(
+            ProtocolProfile.objects.filter(
+                server_protocol__server=server,
+                server_protocol=protocol,
+                protocol_type=protocol_type,
+                status=ProtocolProfile.ProfileStatus.ACTIVE,
+            ).order_by("id")
+        )
+
+        routing_mode = routing_mode or "full"
+
+        if routing_mode == "selective":
+            if protocol_type != VPNClient.ProtocolType.AWG2:
+                raise ValueError(
+                    "Selective routing is available only for AWG2"
+                )
+
+            profile = next(
+                (
+                    item
+                    for item in profiles
+                    if VPNClientService._profile_is_selective(item)
+                ),
+                None,
+            )
+
+        elif routing_mode == "full":
+            profile = next(
+                (
+                    item
+                    for item in profiles
+                    if not VPNClientService._profile_is_selective(item)
+                ),
+                None,
+            )
+
+        else:
+            raise ValueError("Unknown routing mode")
+
         if not profile:
-            raise ValueError("No active profile for protocol")
+            raise ValueError(
+                f"No active {routing_mode} profile for protocol"
+            )
+
+        if device is not None:
+            from customers.models import (
+                ClientDevice,
+                CustomerAccount,
+            )
+
+            if device.status != ClientDevice.Status.ACTIVE:
+                raise ValueError(
+                    "Нельзя создавать VPN-подключение "
+                    "для неактивного устройства."
+                )
+
+            if device.account.status != CustomerAccount.Status.ACTIVE:
+                raise ValueError(
+                    "Нельзя создавать VPN-подключение "
+                    "для неактивного аккаунта."
+                )
 
         client = VPNClient.objects.create(
             server=server,
@@ -736,6 +986,7 @@ class VPNClientService:
             expires_at=expires_at,
             traffic_limit_bytes=traffic_limit_bytes,
             contact_email=(contact_email or "").strip(),
+            device=device,
         )
         VPNClientService.reissue_config(client=client, actor=actor)
         AuditService.log(actor, "client.create", "VPNClient", client.id, {"protocol_type": protocol_type})
@@ -761,6 +1012,9 @@ class VPNClientService:
                 preshared_key=generated.get("preshared_key", ""),
             )
         else:
+            allowed_ips = VPNClientService.resolve_profile_allowed_ips(
+                client.profile
+            )
             config = VPNClientService.build_awg2_client_config(
                 private_key=generated["private_key"],
                 address=generated["address"],
@@ -768,6 +1022,7 @@ class VPNClientService:
                 server_public_key=generated["server_public_key"],
                 awg2_metadata=adapter.protocol.runtime_metadata.get("awg2_metadata", {}),
                 preshared_key=generated.get("preshared_key", ""),
+                allowed_ips=allowed_ips,
             )
 
         rev = VPNClientService._store_revision(client, config)
@@ -891,6 +1146,46 @@ class VPNClientService:
         if target == "amneziavpn":
             return VPNClientService.latest_config(client)
         return VPNClientService.portal_export_config(client)
+
+    @staticmethod
+    def qr_payload_supported(payload: str) -> bool:
+        qr = qrcode.QRCode()
+
+        try:
+            qr.add_data(payload)
+            qr.make(fit=True)
+        except (DataOverflowError, ValueError):
+            return False
+
+        return True
+
+    @staticmethod
+    def portal_qr_available_for_target(
+        client: VPNClient,
+        target: str,
+    ) -> bool:
+        try:
+            payload = (
+                VPNClientService
+                .portal_export_config_for_target(
+                    client,
+                    target,
+                )
+            )
+        except (
+            RuntimeError,
+            InvalidToken,
+            ValueError,
+            UnicodeError,
+        ):
+            return False
+
+        return (
+            VPNClientService
+            .qr_payload_supported(
+                payload
+            )
+        )
 
     @staticmethod
     def portal_qr_png_base64_for_target(client: VPNClient, target: str) -> str:

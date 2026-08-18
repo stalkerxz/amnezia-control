@@ -168,7 +168,7 @@ def clients_list_view(request):
             pass
         elif status:
             clients = clients.filter(status=status)
-        else:
+        elif quick != VPNClientListFilterForm.QUICK_DELETED:
             clients = clients.exclude(status=VPNClient.Status.DELETED)
         if source == "imported":
             clients = clients.filter(imported_from_runtime=True)
@@ -301,6 +301,10 @@ def clients_create_view(request):
                     server=server,
                     name=form.cleaned_data["name"],
                     protocol_type=form.cleaned_data["protocol_type"],
+                    routing_mode=(
+                        form.cleaned_data.get("routing_mode")
+                        or VPNClientCreateForm.ROUTING_MODE_FULL
+                    ),
                     expires_at=form.cleaned_data["expires_at"],
                     traffic_limit_bytes=form.cleaned_data["traffic_limit_bytes"],
                     contact_email=form.cleaned_data["contact_email"],
@@ -322,12 +326,33 @@ def clients_detail_view(request, pk: int):
     limits_form = VPNClientLimitsUpdateForm(client=client)
     revision = client.revisions.first()
     revision_count = client.revisions.count()
-    qr_base64_amneziavpn = (
-        VPNClientService.portal_qr_png_base64_for_target(client, "amneziavpn") if revision else ""
-    )
-    qr_base64_amneziawg = (
-        VPNClientService.portal_qr_png_base64_for_target(client, "amneziawg") if revision else ""
-    )
+    qr_base64_amneziavpn = ""
+    qr_base64_amneziawg = ""
+    qr_unavailable_message = ""
+
+    def build_qr_for_target(target: str) -> str:
+        nonlocal qr_unavailable_message
+
+        if not revision:
+            return ""
+
+        try:
+            return VPNClientService.portal_qr_png_base64_for_target(
+                client,
+                target,
+            )
+        except ValueError as exc:
+            if "Invalid version" not in str(exc):
+                raise
+
+            qr_unavailable_message = (
+                "QR-код недоступен: конфигурация слишком большая. "
+                "Скачайте файл .conf и импортируйте его в приложение."
+            )
+            return ""
+
+    qr_base64_amneziavpn = build_qr_for_target("amneziavpn")
+    qr_base64_amneziawg = build_qr_for_target("amneziawg")
 
     protocol = client.server.protocols.filter(protocol_type=client.protocol_type).first()
     missing_endpoint = False
@@ -374,6 +399,8 @@ def clients_detail_view(request, pk: int):
         warning_items.append("Телеметрия трафика недоступна.")
     if not revision:
         warning_items.append("Для клиента отсутствует выпущенная ревизия конфига.")
+    if qr_unavailable_message:
+        warning_items.append(qr_unavailable_message)
 
     recent_audit_logs = AuditLog.objects.select_related("actor").filter(entity_type="VPNClient", entity_id=str(client.id)).order_by("-created_at")[:5]
     latest_operator_action = recent_audit_logs[0] if recent_audit_logs else None
@@ -681,7 +708,18 @@ def renewal_requests_list_view(request):
     server_filter = (request.GET.get("server") or "").strip()
     operator_filter = (request.GET.get("operator") or "").strip()
     only_my_actions = (request.GET.get("only_my_actions") or "").strip() == "1"
-    requests_qs = ClientRenewalRequest.objects.select_related("client", "client__server", "processed_by").order_by("-created_at")
+    # Legacy VPNClient renewal list.
+    # Account-only requests are managed from CustomerAccount detail.
+    requests_qs = (
+        ClientRenewalRequest.objects
+        .filter(client__isnull=False)
+        .select_related(
+            "client",
+            "client__server",
+            "processed_by",
+        )
+        .order_by("-created_at")
+    )
     if status_filter == "open":
         requests_qs = requests_qs.filter(status__in=[ClientRenewalRequest.Status.NEW, ClientRenewalRequest.Status.IN_PROGRESS])
     elif status_filter in {ClientRenewalRequest.Status.NEW, ClientRenewalRequest.Status.IN_PROGRESS, ClientRenewalRequest.Status.DONE, ClientRenewalRequest.Status.DISMISSED}:

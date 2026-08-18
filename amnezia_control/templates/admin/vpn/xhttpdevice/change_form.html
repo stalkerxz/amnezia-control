@@ -1,0 +1,96 @@
+{% extends "admin/change_form.html" %}
+{% load i18n admin_urls %}
+
+{% block object-tools-items %}
+
+  {{ block.super }}
+
+  {% if original %}
+
+    {% if original.status == 'active' %}
+
+      <li>
+        <form
+          method="post"
+          action="{% url 'admin:vpn_xhttpdevice_lifecycle' original.pk 'check' %}"
+          style="display:inline"
+        >
+          {% csrf_token %}
+          <button type="submit" class="button">
+            Проверить runtime
+          </button>
+        </form>
+      </li>
+
+      <li>
+        <form
+          method="post"
+          action="{% url 'admin:vpn_xhttpdevice_lifecycle' original.pk 'disable' %}"
+          style="display:inline"
+        >
+          {% csrf_token %}
+          <button
+            type="submit"
+            class="button"
+            onclick="return confirm('Отключить XHTTP-подключение?');"
+          >
+            Отключить
+          </button>
+        </form>
+      </li>
+
+    {% elif original.status == 'disabled' %}
+
+      <li>
+        <form
+          method="post"
+          action="{% url 'admin:vpn_xhttpdevice_lifecycle' original.pk 'enable' %}"
+          style="display:inline"
+        >
+          {% csrf_token %}
+          <button
+            type="submit"
+            class="button"
+            onclick="return confirm('Включить XHTTP-подключение?');"
+          >
+            Включить
+          </button>
+        </form>
+      </li>
+
+    {% endif %}
+
+
+    {% if original.status != 'deleted' %}
+
+      <li>
+        <form
+          method="post"
+          action="{% url 'admin:vpn_xhttpdevice_lifecycle' original.pk 'rotate' %}"
+          style="display:inline"
+        >
+          {% csrf_token %}
+          <button
+            type="submit"
+            class="button"
+            onclick="return confirm('Перевыпустить XHTTP? Старую конфигурацию клиента потребуется заменить.');"
+          >
+            Перевыпустить
+          </button>
+        </form>
+      </li>
+
+      <li>
+        <a
+          href="{% url 'admin:vpn_xhttpdevice_delete' original.pk %}"
+          class="deletelink"
+        >
+          Удалить
+        </a>
+      </li>
+
+    {% endif %}
+
+  {% endif %}
+
+{% endblock %}
