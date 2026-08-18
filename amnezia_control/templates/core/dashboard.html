@@ -1,223 +1,211 @@
 {% extends 'partials/base.html' %}
+{% load static %}
+
 {% block content %}
-<div class="page-header d-flex justify-content-between align-items-start gap-3 flex-wrap">
-  <div>
-    <p class="page-kicker">Операторская панель</p>
-    <h1 class="h3">Операционный центр</h1>
-    <p class="page-subtle">Ключевые показатели, проблемные зоны и последние операции — на одном рабочем экране.</p>
-  </div>
-  <div class="action-cluster">
-    <a class="btn btn-primary" href="/clients/new/">Создать клиента</a>
-    <a class="btn btn-outline-primary" href="/servers/">Открыть серверы</a>
-    <a class="btn btn-outline-secondary" href="/customers/?renewal=open">Очередь продлений</a>
-  </div>
-</div>
+<link href="{% static 'css/app-v4-layout.css' %}" rel="stylesheet">
 
-<section class="metric-grid" aria-label="Ключевые показатели">
-  <a class="metric-card is-success" href="/servers/">
-    <span class="metric-card-label">Активные серверы</span>
-    <span class="metric-card-value">{{ healthy_servers_count }}</span>
-    <span class="metric-card-meta">Всего: {{ servers_count }}</span>
-  </a>
-  <a class="metric-card" href="/clients/">
-    <span class="metric-card-label">Активные клиенты</span>
-    <span class="metric-card-value">{{ active_clients_count }}</span>
-    <span class="metric-card-meta">Всего: {{ clients_total_count }}</span>
-  </a>
-  <a class="metric-card {% if expired_clients_count %}is-warning{% endif %}" href="/clients/?quick=expired">
-    <span class="metric-card-label">Просроченные клиенты</span>
-    <span class="metric-card-value">{{ expired_clients_count }}</span>
-    <span class="metric-card-meta">Требуют проверки доступа</span>
-  </a>
-  <a class="metric-card {% if traffic_exceeded_clients_count %}is-danger{% endif %}" href="/clients/?quick=traffic_exceeded">
-    <span class="metric-card-label">Трафик превышен</span>
-    <span class="metric-card-value">{{ traffic_exceeded_clients_count }}</span>
-    <span class="metric-card-meta">Ограничены по квоте</span>
-  </a>
-  <a class="metric-card {% if renewal_open_count %}is-warning{% endif %}" href="/customers/?renewal=open">
-    <span class="metric-card-label">Открытые продления</span>
-    <span class="metric-card-value">{{ renewal_open_count }}</span>
-    <span class="metric-card-meta">За 24 часа: {{ renewal_requests_last_24h }}</span>
-  </a>
-  <a class="metric-card {% if failed_jobs_recent_count %}is-danger{% endif %}" href="/jobs/?signal=failed">
-    <span class="metric-card-label">Ошибки заданий</span>
-    <span class="metric-card-value">{{ failed_jobs_recent_count }}</span>
-    <span class="metric-card-meta">За последние 24 часа</span>
-  </a>
-</section>
+<div class="v4-dashboard">
+  <header class="v4-page-hero">
+    <div>
+      <p class="page-kicker">VPN Control · Оператор</p>
+      <h1>Обзор</h1>
+      <p class="v4-hero-copy">Состояние клиентов, инфраструктуры и операций без лишнего шума.</p>
+    </div>
 
-<div class="compact-page-grid cols-main">
-  <div class="console-stack">
-    <section class="section-block section-flat">
-      <div class="section-body">
-        <div class="section-header">
-          <div>
-            <h2 class="h6">Состояние инфраструктуры</h2>
-            <div class="section-meta">Последняя синхронизация: {% if last_runtime_sync %}{{ last_runtime_sync|date:'d.m.Y H:i' }}{% else %}нет данных{% endif %}</div>
-          </div>
-          {% if unhealthy_servers_count %}
-            <span class="badge status-badge status-danger">Есть проблемы</span>
-          {% elif degraded_servers_count or not_checked_servers_count %}
-            <span class="badge status-badge status-warning">Требует внимания</span>
-          {% else %}
-            <span class="badge status-badge status-success">Стабильно</span>
-          {% endif %}
-        </div>
+    <div class="v4-hero-actions">
+      <a class="btn btn-primary" href="{% url 'customers-onboarding' %}">
+        <span class="v4-btn-icon" aria-hidden="true">+</span>
+        Новый клиент
+      </a>
+    </div>
+  </header>
 
-        <div class="health-list">
-          <div class="health-row">
-            <div><div class="health-row-label">Здоровые серверы</div><div class="health-row-meta">Runtime отвечает без ошибок</div></div>
-            <div class="health-track"><span style="--value:{% if servers_count and healthy_servers_count == servers_count %}100{% elif healthy_servers_count %}65{% else %}0{% endif %}%"></span></div>
-            <div class="health-value">{{ healthy_servers_count }} / {{ servers_count }}</div>
-          </div>
-          <div class="health-row">
-            <div><div class="health-row-label">Ограниченная работоспособность</div><div class="health-row-meta">Неполная телеметрия или диагностика</div></div>
-            <div class="health-track"><span style="--value:{% if degraded_servers_count %}45{% else %}0{% endif %}%; background: var(--app-warning);"></span></div>
-            <div class="health-value">{{ degraded_servers_count }}</div>
-          </div>
-          <div class="health-row">
-            <div><div class="health-row-label">Серверы с ошибками</div><div class="health-row-meta">Нужна ручная проверка оператора</div></div>
-            <div class="health-track"><span style="--value:{% if unhealthy_servers_count %}45{% else %}0{% endif %}%; background: var(--app-danger);"></span></div>
-            <div class="health-value">{{ unhealthy_servers_count }}</div>
-          </div>
-          <div class="health-row">
-            <div><div class="health-row-label">Не проверены</div><div class="health-row-meta">Нет актуальной runtime-проверки</div></div>
-            <div class="health-track"><span style="--value:{% if not_checked_servers_count %}35{% else %}0{% endif %}%; background: var(--app-info);"></span></div>
-            <div class="health-value">{{ not_checked_servers_count }}</div>
-          </div>
-        </div>
+  <section class="v4-kpi-grid" aria-label="Ключевые показатели">
+    <a class="v4-kpi-card" href="{% url 'customers-list' %}">
+      <div class="v4-kpi-topline">
+        <span class="v4-kpi-icon is-blue" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="9" cy="8" r="3.5"/><path d="M3 20v-1.5A6.5 6.5 0 0 1 9.5 12h1A6.5 6.5 0 0 1 17 18.5V20"/><path d="M16 5.5a3.5 3.5 0 0 1 0 6.5M18 14a5 5 0 0 1 3 4.5V20"/></svg>
+        </span>
+        <span class="v4-kpi-label">Клиенты</span>
+      </div>
+      <div class="v4-kpi-value">{{ clients_total_count }}</div>
+      <div class="v4-kpi-meta"><strong>{{ active_clients_count }}</strong> активны сейчас</div>
+    </a>
 
-        {% if current_limitations %}
-        <div class="alert alert-warning mt-3 mb-0 py-2">
-          <strong>Текущие ограничения:</strong>
-          <ul class="mb-0 mt-1 ps-3">
-            {% for limitation in current_limitations %}<li>{{ limitation }}</li>{% endfor %}
-          </ul>
-        </div>
+    <a class="v4-kpi-card" href="{% url 'customers-list' %}?renewal=open">
+      <div class="v4-kpi-topline">
+        <span class="v4-kpi-icon is-violet" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 11a8 8 0 1 0 1.5 5"/><path d="M20 4v7h-7"/><path d="M12 8v4.5l3 2"/></svg>
+        </span>
+        <span class="v4-kpi-label">Продления</span>
+      </div>
+      <div class="v4-kpi-value">{{ renewal_open_count }}</div>
+      <div class="v4-kpi-meta"><strong>{{ renewal_requests_last_24h }}</strong> новых за 24 часа</div>
+    </a>
+
+    <a class="v4-kpi-card {% if expired_clients_count or traffic_exceeded_clients_count or failed_jobs_recent_count %}has-alert{% endif %}" href="{% url 'customers-list' %}?readiness=attention">
+      <div class="v4-kpi-topline">
+        <span class="v4-kpi-icon is-orange" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 4 21 20H3L12 4Z"/><path d="M12 9v5M12 17h.01"/></svg>
+        </span>
+        <span class="v4-kpi-label">Требуют внимания</span>
+      </div>
+      <div class="v4-kpi-value">{{ expired_clients_count|add:traffic_exceeded_clients_count|add:failed_jobs_recent_count }}</div>
+      <div class="v4-kpi-meta">Сроки, квоты и ошибки операций</div>
+    </a>
+
+    <a class="v4-kpi-card {% if unhealthy_servers_count %}has-alert{% endif %}" href="/servers/">
+      <div class="v4-kpi-topline">
+        <span class="v4-kpi-icon is-green" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><path d="M7 7h.01M7 17h.01M11 7h6M11 17h6"/></svg>
+        </span>
+        <span class="v4-kpi-label">Инфраструктура</span>
+      </div>
+      <div class="v4-kpi-value">{{ healthy_servers_count }} <span>/ {{ servers_count }}</span></div>
+      <div class="v4-kpi-meta">
+        {% if unhealthy_servers_count %}
+          <strong class="text-danger">{{ unhealthy_servers_count }}</strong> серверов с ошибками
+        {% elif degraded_servers_count or not_checked_servers_count %}
+          Есть серверы без полной диагностики
+        {% else %}
+          Все проверенные серверы в норме
         {% endif %}
       </div>
-    </section>
+    </a>
+  </section>
 
-    <section class="section-block section-flat section-jobs">
-      <div class="section-body">
-        <div class="section-header">
-          <div>
-            <h2 class="h6">Последние задания</h2>
-            <div class="section-meta">Фоновые операции и изменения runtime</div>
-          </div>
-          <a class="small text-decoration-none" href="/jobs/">Все задания</a>
+  <div class="v4-dashboard-grid">
+    <section class="v4-panel v4-attention-panel">
+      <div class="v4-panel-head">
+        <div>
+          <span class="v4-panel-eyebrow">Очередь оператора</span>
+          <h2>Требует внимания</h2>
         </div>
-        <div class="table-shell table-shell-soft">
-          <table class="table table-sm align-middle">
-            <thead><tr><th>ID</th><th>Действие</th><th>Сервер</th><th>Статус</th><th>Время</th></tr></thead>
-            <tbody>
-              {% for row in jobs_recent_rows %}
-              <tr>
-                <td><a href="/jobs/{{ row.job.id }}/">#{{ row.job.id }}</a></td>
-                <td class="table-primary-cell"><span class="primary">{{ row.action_label }}</span>{% if row.warning_hint %}<span class="meta d-block">{{ row.warning_hint|truncatechars:72 }}</span>{% endif %}</td>
-                <td>{% if row.job.server %}{{ row.job.server.name }}{% else %}<span class="text-secondary">—</span>{% endif %}</td>
-                <td><span class="badge status-badge {% if row.job_signal == 'failed' %}status-danger{% elif row.job_signal == 'warning' or row.job_signal == 'degraded_success' %}status-warning{% elif row.job_signal == 'success' %}status-success{% else %}status-neutral{% endif %}">{% if row.job_signal == 'failed' %}Ошибка{% elif row.job_signal == 'warning' %}Предупреждение{% elif row.job_signal == 'degraded_success' %}Деградация{% elif row.job_signal == 'success' %}Успех{% elif row.job.status == 'running' %}Выполняется{% else %}Ожидает{% endif %}</span></td>
-                <td class="text-nowrap">{{ row.job.created_at|date:'d.m.Y H:i' }}</td>
-              </tr>
-              {% empty %}
-              <tr><td colspan="5"><div class="empty-state compact-empty">Заданий пока нет.</div></td></tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
+        <a href="{% url 'customers-list' %}?readiness=attention">Все клиенты</a>
       </div>
-    </section>
-  </div>
 
-  <div class="console-stack">
-    <section class="section-block section-flat">
-      <div class="section-body">
-        <div class="section-header"><h2 class="h6">Быстрые действия</h2><span class="section-meta">Частые операции</span></div>
-        <div class="quick-action-grid">
-          <a class="quick-action" href="/clients/new/"><span class="quick-action-symbol">+</span><span>Добавить клиента</span></a>
-          <a class="quick-action" href="/servers/"><span class="quick-action-symbol">S</span><span>Открыть серверы</span></a>
-          <a class="quick-action" href="/customers/?renewal=open"><span class="quick-action-symbol">↻</span><span>Обработать продления</span></a>
-          <a class="quick-action" href="/jobs/"><span class="quick-action-symbol">✓</span><span>Проверить задания</span></a>
-        </div>
-      </div>
-    </section>
-
-    <section class="section-block section-flat section-attention">
-      <div class="section-body">
-        <div class="section-header"><h2 class="h6">Требует внимания</h2><span class="section-meta">Открыть проблемную выборку</span></div>
-        <div class="queue-list queue-list-clean">
-          {% for item in attention_items %}
-          <div class="queue-item">
-            <a href="{{ item.url }}" class="title text-decoration-none">{{ item.title }}</a>
-            <a href="{{ item.url }}" class="badge status-badge {% if item.tone == 'danger' %}status-danger{% elif item.tone == 'warning' %}status-warning{% elif item.tone == 'success' %}status-success{% else %}status-neutral{% endif %} text-decoration-none">{{ item.count }}</a>
-          </div>
-          {% empty %}
-          <div class="empty-state compact-empty">Проблемных зон не обнаружено.</div>
-          {% endfor %}
-        </div>
-      </div>
-    </section>
-
-    <section class="section-block section-flat section-renewals">
-      <div class="section-body">
-        <div class="section-header"><h2 class="h6">Очередь продлений</h2><a class="small text-decoration-none" href="/customers/?renewal=open">Открыть очередь</a></div>
-        <div class="kv-inline mb-2">
-          <div><div class="k">Открытые</div><div class="v">{{ renewal_open_count }}</div></div>
-          <div><div class="k">За 24 часа</div><div class="v">{{ renewal_requests_last_24h }}</div></div>
-          <div><div class="k">За 7 дней</div><div class="v">{{ renewal_requests_last_7d }}</div></div>
-        </div>
-        <div class="queue-list queue-list-clean">
-          {% for log in recent_renewal_requests %}
-          <div class="queue-item">
-            <div>
-              {% if log.account_id %}
-                <a
-                  class="title text-decoration-none"
-                  href="/customers/{{ log.account_id }}/"
-                >
-                  {{ log.account.display_name }}
-                </a>
-              {% elif log.client_id %}
-                <a
-                  class="title text-decoration-none"
-                  href="/clients/{{ log.client_id }}/"
-                >
-                  {{ log.client.name }}
-                </a>
-              {% else %}
-                <span class="title">
-                  Заявка #{{ log.pk }}
-                </span>
-              {% endif %}
-              <div class="meta">
-                {{ log.created_at|date:'d.m.Y H:i' }}
-              </div>
-            </div>
-            <span class="badge status-badge status-neutral">
-              {{ log.get_status_display }}
+      <div class="v4-attention-list">
+        {% for item in attention_items %}
+          <a class="v4-attention-row" href="{{ item.url }}">
+            <span class="v4-signal-dot {% if item.tone == 'danger' %}is-danger{% elif item.tone == 'warning' %}is-warning{% elif item.tone == 'success' %}is-success{% else %}is-neutral{% endif %}"></span>
+            <span class="v4-attention-copy">
+              <strong>{{ item.title }}</strong>
+              <span>Открыть проблемную выборку</span>
             </span>
+            <span class="v4-count-pill">{{ item.count }}</span>
+            <span class="v4-row-arrow" aria-hidden="true">→</span>
+          </a>
+        {% empty %}
+          <div class="v4-empty-state">
+            <span class="v4-empty-icon">✓</span>
+            <strong>Критичных задач нет</strong>
+            <span>Проблемные зоны сейчас не обнаружены.</span>
           </div>
-          {% empty %}
-          <div class="empty-state compact-empty">Новых заявок нет.</div>
-          {% endfor %}
-        </div>
+        {% endfor %}
       </div>
+
+      {% if current_limitations %}
+        <div class="v4-inline-warning">
+          <strong>Текущие ограничения</strong>
+          <span>{% for limitation in current_limitations %}{{ limitation }}{% if not forloop.last %} · {% endif %}{% endfor %}</span>
+        </div>
+      {% endif %}
     </section>
 
-    <section class="section-block section-flat section-audit">
-      <div class="section-body">
-        <div class="section-header"><h2 class="h6">Последний аудит</h2><a class="small text-decoration-none" href="/audit/">Открыть журнал</a></div>
-        <div class="activity-list activity-list-clean">
-          {% for row in audit_recent_rows %}
-          <div class="activity-item">
-            <div><div class="title">{{ row.action_label }}</div><div class="meta">{{ row.log.created_at|date:'d.m.Y H:i' }} · {% if row.log.actor %}{{ row.log.actor.username }}{% else %}система{% endif %}</div></div>
-          </div>
-          {% empty %}
-          <div class="empty-state compact-empty">Записей аудита пока нет.</div>
-          {% endfor %}
+    <section class="v4-panel v4-infra-panel">
+      <div class="v4-panel-head">
+        <div>
+          <span class="v4-panel-eyebrow">Runtime</span>
+          <h2>Инфраструктура</h2>
         </div>
+        <a href="/servers/">Все серверы</a>
+      </div>
+
+      <div class="v4-infra-status">
+        <div class="v4-infra-orb {% if unhealthy_servers_count %}is-danger{% elif degraded_servers_count or not_checked_servers_count %}is-warning{% else %}is-ok{% endif %}">
+          <span>{{ healthy_servers_count }}</span>
+          <small>online</small>
+        </div>
+        <div class="v4-infra-copy">
+          {% if unhealthy_servers_count %}
+            <strong>Есть проблемы</strong>
+            <span>{{ unhealthy_servers_count }} серверов требуют ручной проверки.</span>
+          {% elif degraded_servers_count or not_checked_servers_count %}
+            <strong>Частичная диагностика</strong>
+            <span>Некоторые серверы работают без полной телеметрии.</span>
+          {% else %}
+            <strong>Система стабильна</strong>
+            <span>Проверенные серверы отвечают без ошибок.</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="v4-infra-breakdown">
+        <div><span class="v4-signal-dot is-success"></span><span>Здоровые</span><strong>{{ healthy_servers_count }}</strong></div>
+        <div><span class="v4-signal-dot is-warning"></span><span>Degraded</span><strong>{{ degraded_servers_count }}</strong></div>
+        <div><span class="v4-signal-dot is-danger"></span><span>Ошибки</span><strong>{{ unhealthy_servers_count }}</strong></div>
+        <div><span class="v4-signal-dot is-neutral"></span><span>Не проверены</span><strong>{{ not_checked_servers_count }}</strong></div>
+      </div>
+
+      <div class="v4-sync-note">
+        Последняя синхронизация:
+        <strong>{% if last_runtime_sync %}{{ last_runtime_sync|date:'d.m.Y H:i' }}{% else %}нет данных{% endif %}</strong>
       </div>
     </section>
   </div>
+
+  <section class="v4-panel v4-activity-panel">
+    <div class="v4-panel-head">
+      <div>
+        <span class="v4-panel-eyebrow">Runtime & automation</span>
+        <h2>Последние операции</h2>
+      </div>
+      <a href="/jobs/">Открыть журнал</a>
+    </div>
+
+    <div class="v4-activity-table-wrap">
+      <table class="table v4-activity-table align-middle">
+        <thead>
+          <tr>
+            <th>Операция</th>
+            <th>Сервер</th>
+            <th>Статус</th>
+            <th class="text-end">Время</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in jobs_recent_rows %}
+            <tr>
+              <td>
+                <a class="v4-operation-link" href="/jobs/{{ row.job.id }}/">{{ row.action_label }}</a>
+                {% if row.warning_hint %}<span class="v4-operation-meta">{{ row.warning_hint|truncatechars:84 }}</span>{% endif %}
+              </td>
+              <td>{% if row.job.server %}{{ row.job.server.name }}{% else %}<span class="text-secondary">—</span>{% endif %}</td>
+              <td>
+                <span class="v4-status-pill {% if row.job_signal == 'failed' %}is-danger{% elif row.job_signal == 'warning' or row.job_signal == 'degraded_success' %}is-warning{% elif row.job_signal == 'success' %}is-success{% else %}is-neutral{% endif %}">
+                  {% if row.job_signal == 'failed' %}Ошибка{% elif row.job_signal == 'warning' %}Предупреждение{% elif row.job_signal == 'degraded_success' %}Деградация{% elif row.job_signal == 'success' %}Успех{% elif row.job.status == 'running' %}Выполняется{% else %}Ожидает{% endif %}
+                </span>
+              </td>
+              <td class="text-end text-nowrap">{{ row.job.created_at|date:'d.m.Y H:i' }}</td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="4"><div class="v4-empty-state compact"><strong>Операций пока нет</strong></div></td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer class="v4-dashboard-footer">
+    <div>
+      <span>Продления за 7 дней</span>
+      <strong>{{ renewal_requests_last_7d }}</strong>
+    </div>
+    <div>
+      <span>Ошибки заданий за 24 часа</span>
+      <strong>{{ failed_jobs_recent_count }}</strong>
+    </div>
+    <a href="/audit/">Последний аудит →</a>
+  </footer>
 </div>
 {% endblock %}
