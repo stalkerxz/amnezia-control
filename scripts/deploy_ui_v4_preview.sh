@@ -41,10 +41,7 @@ rollback_from_state() {
 
   [[ "$previous_head" =~ ^[0-9a-f]{40}$ ]] || die "invalid PREVIOUS_HEAD in state file"
   [[ -z "$target_head" || "$target_head" =~ ^[0-9a-f]{40}$ ]] || die "invalid TARGET_HEAD in state file"
-
-  if [[ -n "$(git status --porcelain)" ]]; then
-    die "working tree is dirty; rollback aborted"
-  fi
+  [[ -z "$(git status --porcelain)" ]] || die "working tree is dirty; rollback aborted"
 
   restore_previous_revision "$previous_head" "$previous_branch"
   rm -f "$STATE_FILE"
@@ -75,9 +72,7 @@ git fetch --no-tags origin "$TARGET_BRANCH"
 TARGET_HEAD="$(git rev-parse FETCH_HEAD)"
 echo "target: $TARGET_HEAD"
 
-if [[ "$PREVIOUS_HEAD" == "$TARGET_HEAD" ]]; then
-  die "target UI v4 revision is already deployed"
-fi
+[[ "$PREVIOUS_HEAD" != "$TARGET_HEAD" ]] || die "target UI v4 revision is already deployed"
 
 log "Verifying that UI v4 contains the currently deployed revision"
 if ! git merge-base --is-ancestor "$PREVIOUS_HEAD" "$TARGET_HEAD"; then
@@ -105,7 +100,7 @@ log "Validating current Docker Compose configuration"
 
 log "Creating full pre-preview backup"
 bash scripts/backup_all.sh
-BACKUP_DIR="$(find backups/runs -mindepth 1 -maxdepth 1 -type d -printf '%T@ %p\n' 2>/dev/null | sort -nr | head -1 | cut -d' ' -f2- || true)"
+BACKUP_DIR="$(ls -1dt backups/runs/*/ 2>/dev/null | head -1 | sed 's:/$::' || true)"
 [[ -n "$BACKUP_DIR" ]] || die "backup completed but latest backup directory could not be determined"
 bash scripts/verify_backup.sh "$BACKUP_DIR"
 echo "backup: $BACKUP_DIR"
