@@ -1,109 +1,87 @@
 {% extends 'partials/base.html' %}
-{% load i18n %}
+{% load static i18n %}
 
-{% block title %}Настройки · amnezia-control{% endblock %}
+{% block title %}{% trans "Настройки" %} · VPN Control{% endblock %}
 
 {% block content %}
-<div class="page-header">
-  <p class="page-kicker">Операторская · Конфигурация</p>
-  <h1 class="h3 mb-1">{% trans "Настройки" %}</h1>
-  <p class="page-subtle">{% trans "Компактные параметры платформы: изменяемые значения, язык и контекст окружения." %}</p>
-</div>
+<link href="{% static 'css/app-v4-layout.css' %}" rel="stylesheet">
+<link href="{% static 'css/app-v4-system.css' %}" rel="stylesheet">
 
-<div class="compact-page-grid cols-main">
-  <div class="console-stack">
-    <section class="section-block section-flat">
-      <div class="section-body">
-        <div class="section-header"><h2 class="h6">{% trans "Редактируемые параметры" %}</h2></div>
-        <form method="post" class="row g-2">
-          {% csrf_token %}
-          <div class="col-md-6">
-            <label class="form-label" for="id_portal_link_lifetime_days">{{ form.portal_link_lifetime_days.label }}</label>
-            {{ form.portal_link_lifetime_days }}
-          </div>
-          <div class="col-md-6">
-            <label class="form-label" for="id_portal_renewal_cooldown_hours">{{ form.portal_renewal_cooldown_hours.label }}</label>
-            {{ form.portal_renewal_cooldown_hours }}
-          </div>
-          <div class="col-12"><button type="submit" class="btn btn-primary">{% trans "Сохранить" %}</button></div>
-        </form>
-      </div>
-    </section>
+<div class="v4-system-page">
+  <header class="v4-page-hero v4-system-hero">
+    <div>
+      <p class="page-kicker">VPN Control · System</p>
+      <h1>{% trans "Настройки" %}</h1>
+      <p class="v4-hero-copy">{% trans "Параметры клиентского кабинета, уведомлений и окружения без технического шума." %}</p>
+    </div>
+  </header>
 
-
-    <section class="section-block section-flat section-quiet">
-      <div class="section-body py-2">
-        <div class="section-header"><h2 class="h6">{% trans "Напоминания об истечении VPN-клиентов" %}</h2></div>
-        <div class="kv-inline">
-          <div><div class="k">{% trans "Статус" %}</div><div class="v">{% if expiration_reminder_enabled %}{% trans "вкл" %}{% else %}{% trans "выкл" %}{% endif %}</div></div>
-          <div><div class="k">{% trans "Каналы" %}</div><div class="v">{% if expiration_reminder_channels %}{{ expiration_reminder_channels|join:", " }}{% else %}{% trans "не настроены" %}{% endif %}</div></div>
-          <div><div class="k">{% trans "Email получатели" %}</div><div class="v">{% if expiration_reminder_recipients %}{{ expiration_reminder_recipients|join:", " }}{% else %}{% trans "не настроены" %}{% endif %}</div></div>
-          <div><div class="k">{% trans "Telegram chat ids" %}</div><div class="v">{{ expiration_reminder_telegram_chat_count }}</div></div>
-          <div><div class="k">{% trans "Пороги" %}</div><div class="v">{% if expiration_reminder_thresholds %}{{ expiration_reminder_thresholds|join:", " }} {% trans "дн." %}{% else %}—{% endif %}</div></div>
+  <div class="v4-settings-grid">
+    <div class="v4-settings-stack">
+      <section class="v4-system-panel mb-0">
+        <div class="v4-system-panel-head"><div><span class="v4-panel-eyebrow">Portal</span><h2>{% trans "Клиентский кабинет" %}</h2><p>{% trans "Параметры, которые можно менять из интерфейса." %}</p></div></div>
+        <div class="v4-system-panel-body">
+          <form method="post" class="row g-3">
+            {% csrf_token %}
+            <div class="col-md-6"><label class="form-label" for="id_portal_link_lifetime_days">{{ form.portal_link_lifetime_days.label }}</label>{{ form.portal_link_lifetime_days }}</div>
+            <div class="col-md-6"><label class="form-label" for="id_portal_renewal_cooldown_hours">{{ form.portal_renewal_cooldown_hours.label }}</label>{{ form.portal_renewal_cooldown_hours }}</div>
+            <div class="col-12"><button type="submit" class="btn btn-primary">{% trans "Сохранить изменения" %}</button></div>
+          </form>
         </div>
-        {% if expiration_reminder_last_logs %}
-          <div class="table-responsive mt-3">
-            <table class="table table-sm mb-0">
-              <thead><tr><th>{% trans "Клиент" %}</th><th>{% trans "Порог" %}</th><th>{% trans "Дата истечения" %}</th><th>{% trans "Отправлено" %}</th></tr></thead>
-              <tbody>
-                {% for log in expiration_reminder_last_logs %}
-                  <tr>
-                    <td>#{{ log.client_id }} {{ log.client.name }}</td>
-                    <td>{{ log.threshold_days }} {% trans "дн." %}</td>
-                    <td>{{ log.expires_at_snapshot|date:'Y-m-d H:i' }}</td>
-                    <td>{{ log.sent_at|date:'Y-m-d H:i' }}</td>
-                  </tr>
-                {% endfor %}
-              </tbody>
-            </table>
+      </section>
+
+      <section class="v4-system-panel mb-0">
+        <div class="v4-system-panel-head"><div><span class="v4-panel-eyebrow">Notifications</span><h2>{% trans "Напоминания об истечении" %}</h2><p>{% trans "Текущая конфигурация каналов и порогов уведомлений." %}</p></div></div>
+        <div class="v4-system-panel-body">
+          <div class="v4-settings-kv">
+            <div><span>{% trans "Статус" %}</span><strong>{% if expiration_reminder_enabled %}<span class="v4-server-status is-success">{% trans "Включено" %}</span>{% else %}<span class="v4-server-status is-neutral">{% trans "Выключено" %}</span>{% endif %}</strong></div>
+            <div><span>{% trans "Каналы" %}</span><strong>{% if expiration_reminder_channels %}{{ expiration_reminder_channels|join:", " }}{% else %}{% trans "Не настроены" %}{% endif %}</strong></div>
+            <div><span>{% trans "Email получатели" %}</span><strong>{% if expiration_reminder_recipients %}{{ expiration_reminder_recipients|join:", " }}{% else %}{% trans "Не настроены" %}{% endif %}</strong></div>
+            <div><span>{% trans "Telegram chat ids" %}</span><strong>{{ expiration_reminder_telegram_chat_count }}</strong></div>
+            <div><span>{% trans "Пороги" %}</span><strong>{% if expiration_reminder_thresholds %}{{ expiration_reminder_thresholds|join:", " }} {% trans "дн." %}{% else %}—{% endif %}</strong></div>
+            <div><span>{% trans "Проверка лимитов" %}</span><strong>{{ limits_enforce_every_minutes }} {% trans "мин" %}</strong></div>
           </div>
-        {% endif %}
-      </div>
-    </section>
 
-    <section class="section-block section-flat section-quiet">
-      <div class="section-body py-2">
-        <div class="section-header"><h2 class="h6">{% trans "Параметры только для чтения" %}</h2></div>
-        <div class="kv-inline">
-          <div><div class="k">{% trans "Интервал проверки лимитов" %}</div><div class="v">{{ limits_enforce_every_minutes }} {% trans "мин" %}</div></div>
+          {% if expiration_reminder_last_logs %}
+            <div class="v4-system-table-wrap mt-3">
+              <table class="table v4-system-table align-middle">
+                <thead><tr><th>{% trans "Клиент" %}</th><th>{% trans "Порог" %}</th><th>{% trans "Истекает" %}</th><th>{% trans "Отправлено" %}</th></tr></thead>
+                <tbody>{% for log in expiration_reminder_last_logs %}<tr><td>#{{ log.client_id }} {{ log.client.name }}</td><td>{{ log.threshold_days }} {% trans "дн." %}</td><td>{{ log.expires_at_snapshot|date:'d.m.Y H:i' }}</td><td>{{ log.sent_at|date:'d.m.Y H:i' }}</td></tr>{% endfor %}</tbody>
+              </table>
+            </div>
+          {% endif %}
         </div>
-      </div>
-    </section>
-  </div>
+      </section>
+    </div>
 
-  <div class="console-stack">
-    <section class="section-block section-flat">
-      <div class="section-body">
-        <div class="section-header"><h2 class="h6">{% trans "Язык интерфейса" %}</h2></div>
-        <form method="post" action="{% url 'set_language' %}" class="row g-2 align-items-end">
-          {% csrf_token %}
-          <input type="hidden" name="next" value="{{ request.path }}">
-          <div class="col-8">
+    <div class="v4-settings-stack">
+      <section class="v4-system-panel mb-0">
+        <div class="v4-system-panel-head"><div><span class="v4-panel-eyebrow">Interface</span><h2>{% trans "Язык" %}</h2></div></div>
+        <div class="v4-system-panel-body">
+          <form method="post" action="{% url 'set_language' %}" class="d-grid gap-2">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ request.path }}">
             {% get_current_language as LANGUAGE_CODE %}
             {% get_available_languages as LANGUAGES %}
-            <label class="form-label" for="id_language">{% trans "Язык" %}</label>
-            <select class="form-select" id="id_language" name="language">
-              {% for lang_code, lang_name in LANGUAGES %}
-                <option value="{{ lang_code }}" {% if lang_code == LANGUAGE_CODE %}selected{% endif %}>{{ lang_name }}</option>
-              {% endfor %}
-            </select>
-          </div>
-          <div class="col-4"><button type="submit" class="btn btn-outline-primary w-100">{% trans "Применить" %}</button></div>
-        </form>
-      </div>
-    </section>
-
-    <section class="section-block section-flat section-quiet">
-      <div class="section-body py-2">
-        <div class="section-header"><h2 class="h6">{% trans "Окружение" %}</h2></div>
-        <div class="kv-inline">
-          <div><div class="k">{% trans "Часовой пояс" %}</div><div class="v">{{ timezone_name }}</div></div>
-          <div><div class="k">{% trans "Режим отладки" %}</div><div class="v">{% if debug_enabled %}{% trans "вкл" %}{% else %}{% trans "выкл" %}{% endif %}</div></div>
-          <div><div class="k">{% trans "Версия приложения" %}</div><div class="v">{{ app_version }}</div></div>
-          <div><div class="k">{% trans "Версия Python" %}</div><div class="v">{{ python_version }}</div></div>
+            <label class="form-label" for="id_language">{% trans "Язык интерфейса" %}</label>
+            <select class="form-select" id="id_language" name="language">{% for lang_code, lang_name in LANGUAGES %}<option value="{{ lang_code }}" {% if lang_code == LANGUAGE_CODE %}selected{% endif %}>{{ lang_name }}</option>{% endfor %}</select>
+            <button type="submit" class="btn btn-outline-primary mt-1">{% trans "Применить" %}</button>
+          </form>
         </div>
-      </div>
-    </section>
+      </section>
+
+      <section class="v4-system-panel mb-0">
+        <div class="v4-system-panel-head"><div><span class="v4-panel-eyebrow">Environment</span><h2>{% trans "Окружение" %}</h2><p>{% trans "Только для чтения." %}</p></div></div>
+        <div class="v4-system-panel-body">
+          <div class="v4-settings-kv">
+            <div><span>{% trans "Часовой пояс" %}</span><strong>{{ timezone_name }}</strong></div>
+            <div><span>{% trans "Debug" %}</span><strong>{% if debug_enabled %}{% trans "Включён" %}{% else %}{% trans "Выключен" %}{% endif %}</strong></div>
+            <div><span>{% trans "Версия приложения" %}</span><strong>{{ app_version }}</strong></div>
+            <div><span>{% trans "Python" %}</span><strong>{{ python_version }}</strong></div>
+          </div>
+        </div>
+      </section>
+    </div>
   </div>
 </div>
 {% endblock %}
