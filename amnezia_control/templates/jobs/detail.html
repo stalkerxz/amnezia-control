@@ -12,49 +12,57 @@
 
   <header class="v4-page-hero v4-system-hero">
     <div>
-      <p class="page-kicker">VPN Control · Операция</p>
-      <h1>Операция #{{ job.id }}</h1>
-      <p class="v4-hero-copy"><code>{{ job.action }}</code></p>
+      <p class="page-kicker">VPN Control · Операция #{{ job.id }}</p>
+      <h1>{{ job.action }}</h1>
+      <p class="v4-hero-copy">Технические параметры и события выполнения конкретной операции.</p>
     </div>
   </header>
 
-  {% if job_signal == 'failed' %}<div class="alert alert-danger">Операция завершилась с ошибкой. Проверьте stderr, exit code и payload.</div>{% elif job_signal == 'degraded_success' %}<div class="alert alert-warning">Операция завершена, но использован деградированный путь выполнения.</div>{% elif job_signal == 'warning' %}<div class="alert alert-warning">Операция выполнена с предупреждением.</div>{% endif %}
+  {% if job_signal == 'failed' %}<div class="v4-operation-banner is-danger"><strong>Операция завершилась с ошибкой</strong><span>Сначала проверьте stderr и exit code, затем payload.</span></div>{% elif job_signal == 'degraded_success' %}<div class="v4-operation-banner is-warning"><strong>Выполнено по деградированному пути</strong><span>Результат получен, но выполнение требует внимания.</span></div>{% elif job_signal == 'warning' %}<div class="v4-operation-banner is-warning"><strong>Операция выполнена с предупреждением</strong><span>Проверьте события выполнения ниже.</span></div>{% endif %}
 
   <section class="v4-system-summary-grid">
-    <div class="v4-system-summary"><span>Сигнал</span><strong><span class="v4-status-pill {% if job_signal == 'failed' %}is-danger{% elif job_signal == 'warning' or job_signal == 'degraded_success' %}is-warning{% elif job_signal == 'success' %}is-success{% else %}is-neutral{% endif %}">{% if job_signal == 'failed' %}Ошибка{% elif job_signal == 'warning' %}Предупреждение{% elif job_signal == 'degraded_success' %}Деградация{% elif job_signal == 'success' %}Успех{% else %}В процессе{% endif %}</span></strong><small>Операционный результат</small></div>
+    <div class="v4-system-summary"><span>Результат</span><strong><span class="v4-status-pill {% if job_signal == 'failed' %}is-danger{% elif job_signal == 'warning' or job_signal == 'degraded_success' %}is-warning{% elif job_signal == 'success' %}is-success{% else %}is-neutral{% endif %}">{% if job_signal == 'failed' %}Ошибка{% elif job_signal == 'warning' %}Предупреждение{% elif job_signal == 'degraded_success' %}Деградация{% elif job_signal == 'success' %}Успех{% else %}В процессе{% endif %}</span></strong><small>Операционный сигнал</small></div>
     <div class="v4-system-summary"><span>Сервер</span><strong>{% if job.server %}{{ job.server.name }}{% else %}—{% endif %}</strong><small>Контур выполнения</small></div>
-    <div class="v4-system-summary"><span>Инициатор</span><strong>{% if job.actor %}{{ job.actor.username }}{% else %}система{% endif %}</strong><small>{% if job.actor_id == request.user.id %}Текущий оператор{% else %}Источник задания{% endif %}</small></div>
-    <div class="v4-system-summary"><span>Тех. статус</span><strong>{{ job.get_status_display }}</strong><small>{{ job.created_at|date:'d.m.Y H:i:s' }}</small></div>
+    <div class="v4-system-summary"><span>Инициатор</span><strong>{% if job.actor %}{{ job.actor.username }}{% else %}Система{% endif %}</strong><small>{% if job.actor_id == request.user.id %}Вы{% else %}Источник задания{% endif %}</small></div>
+    <div class="v4-system-summary"><span>Статус</span><strong>{{ job.get_status_display }}</strong><small>{{ job.created_at|date:'d.m.Y H:i:s' }}</small></div>
   </section>
 
-  <section class="v4-system-panel">
-    <div class="v4-system-panel-head"><div><span class="v4-panel-eyebrow">Input</span><h2>Payload</h2><p>Параметры, с которыми была запущена операция.</p></div></div>
-    <div class="v4-system-panel-body"><pre class="v4-log mb-0">{{ payload_pretty }}</pre></div>
-  </section>
+  <div class="v4-operation-detail-grid">
+    <section class="v4-system-panel mb-0">
+      <div class="v4-system-panel-head"><div><span class="v4-panel-eyebrow">Execution</span><h2>События выполнения</h2><p>Запуск: {{ job.started_at|default:'—' }} · завершение: {{ job.finished_at|default:'—' }}</p></div></div>
+      {% if events %}
+        <div class="v4-system-table-wrap">
+          <table class="table v4-system-table v4-events-table align-middle">
+            <thead><tr><th>Время</th><th>Уровень</th><th>Сообщение</th><th>Exit</th><th class="text-end">Вывод</th></tr></thead>
+            <tbody>
+              {% for e in events %}
+                <tr class="v4-event-row {% if e.level == 'error' %}is-danger{% elif e.level == 'warning' %}is-warning{% endif %}">
+                  <td class="text-nowrap"><span class="v4-date-primary">{{ e.created_at|date:'d.m.Y' }}</span><div class="v4-system-meta">{{ e.created_at|date:'H:i:s' }}</div></td>
+                  <td><span class="v4-status-pill {% if e.level == 'error' %}is-danger{% elif e.level == 'warning' %}is-warning{% else %}is-neutral{% endif %}">{{ e.level }}</span></td>
+                  <td>{{ e.message }}</td>
+                  <td>{{ e.exit_code|default:'—' }}</td>
+                  <td class="text-end">
+                    {% if e.stdout or e.stderr %}
+                      <button class="v4-icon-action" type="button" data-bs-toggle="collapse" data-bs-target="#event-output-{{ e.id }}" aria-expanded="false" aria-label="Показать вывод события">•••</button>
+                    {% else %}<span class="text-secondary">—</span>{% endif %}
+                  </td>
+                </tr>
+                {% if e.stdout or e.stderr %}
+                  <tr class="v4-detail-row"><td colspan="5" class="p-0 border-0"><div class="collapse" id="event-output-{{ e.id }}"><div class="v4-collapse-body"><div class="v4-event-output-grid">{% if e.stderr %}<div class="v4-output-block is-danger"><h3>stderr</h3><pre class="v4-log is-danger mb-0">{{ e.stderr }}</pre></div>{% endif %}{% if e.stdout %}<div class="v4-output-block"><h3>stdout</h3><pre class="v4-log mb-0">{{ e.stdout }}</pre></div>{% endif %}</div></div></div></td></tr>
+                {% endif %}
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="v4-empty-state compact"><strong>Событий пока нет</strong></div>
+      {% endif %}
+    </section>
 
-  <section class="v4-system-panel">
-    <div class="v4-system-panel-head"><div><span class="v4-panel-eyebrow">Execution</span><h2>События выполнения</h2><p>Запуск: {{ job.started_at|default:'—' }} · завершение: {{ job.finished_at|default:'—' }}</p></div></div>
-    {% if events %}
-      <div class="v4-system-table-wrap">
-        <table class="table v4-system-table align-middle">
-          <thead><tr><th>Время</th><th>Уровень</th><th>Сообщение</th><th>Exit</th><th>stdout</th><th>stderr</th></tr></thead>
-          <tbody>
-            {% for e in events %}
-              <tr>
-                <td class="text-nowrap">{{ e.created_at|date:'d.m.Y H:i:s' }}</td>
-                <td><span class="v4-status-pill {% if e.level == 'error' %}is-danger{% elif e.level == 'warning' %}is-warning{% else %}is-neutral{% endif %}">{{ e.level }}</span></td>
-                <td>{{ e.message }}</td>
-                <td>{{ e.exit_code|default:'—' }}</td>
-                <td>{% if e.stdout %}<pre class="v4-log mb-0">{{ e.stdout }}</pre>{% else %}<span class="text-secondary">—</span>{% endif %}</td>
-                <td>{% if e.stderr %}<pre class="v4-log is-danger mb-0">{{ e.stderr }}</pre>{% else %}<span class="text-secondary">—</span>{% endif %}</td>
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    {% else %}
-      <div class="v4-empty-state compact"><strong>Событий пока нет</strong></div>
-    {% endif %}
-  </section>
+    <section class="v4-system-panel mb-0 v4-payload-panel">
+      <div class="v4-system-panel-head"><div><span class="v4-panel-eyebrow">Input</span><h2>Payload</h2><p>Параметры запуска.</p></div></div>
+      <div class="v4-system-panel-body"><pre class="v4-log mb-0">{{ payload_pretty }}</pre></div>
+    </section>
+  </div>
 </div>
 {% endblock %}
