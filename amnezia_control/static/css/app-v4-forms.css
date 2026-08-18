@@ -6,6 +6,54 @@
   margin: 0 auto;
 }
 
+.v4-form-page .v4-back-link {
+  display: inline-flex;
+  margin-bottom: 8px;
+  color: #64758b !important;
+  font-size: .63rem;
+  font-weight: 620;
+  text-decoration: none;
+}
+.v4-form-page .v4-back-link:hover { color: #8ebcff !important; }
+
+.v4-form-page .v4-status-pill {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  min-height: 25px;
+  padding: 4px 8px;
+  border: 1px solid var(--v4-border);
+  border-radius: 999px;
+  background: rgba(74,95,126,.10);
+  color: #99a7ba;
+  font-size: .66rem;
+  font-weight: 680;
+  white-space: nowrap;
+}
+.v4-form-page .v4-status-pill::before {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  content: "";
+}
+.v4-form-page .v4-status-pill.is-success {
+  border-color: rgba(72,213,151,.17);
+  background: rgba(72,213,151,.08);
+  color: #64dfa7;
+}
+.v4-form-page .v4-status-pill.is-warning {
+  border-color: rgba(243,185,79,.17);
+  background: rgba(243,185,79,.08);
+  color: #efbd63;
+}
+.v4-form-page .v4-status-pill.is-danger {
+  border-color: rgba(255,101,119,.17);
+  background: rgba(255,101,119,.08);
+  color: #ff7d8c;
+}
+.v4-form-page .v4-status-pill.is-neutral { color: #8695a9; }
+
 .v4-form-hero {
   display: flex;
   gap: 20px;
@@ -14,7 +62,6 @@
   margin-bottom: 18px;
 }
 .v4-form-hero-copy { max-width: 760px; }
-.v4-form-hero .v4-back-link { margin-bottom: 8px; }
 .v4-form-hero h1 {
   margin: 0;
   color: #f7f9fd;
