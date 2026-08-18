@@ -1,0 +1,166 @@
+/* VPN Control UI v4 — renewal queue workspace. */
+
+.v4-renewals-page { width: 100%; }
+
+.v4-renewal-toolbar {
+  margin-bottom: 12px;
+}
+
+.v4-renewal-filter-details {
+  position: relative;
+  display: inline-block;
+}
+
+.v4-renewal-filter-details > summary {
+  display: inline-flex;
+  min-height: 30px;
+  gap: 6px;
+  align-items: center;
+  padding: 5px 10px;
+  border: 1px solid rgba(113,145,196,.11);
+  border-radius: 9px;
+  background: rgba(14,22,37,.58);
+  color: #7f8da2;
+  cursor: pointer;
+  font-size: .62rem;
+  font-weight: 650;
+  list-style: none;
+}
+.v4-renewal-filter-details > summary::-webkit-details-marker { display: none; }
+.v4-renewal-filter-details > summary:hover,
+.v4-renewal-filter-details[open] > summary {
+  border-color: rgba(76,141,255,.24);
+  background: rgba(52,83,137,.12);
+  color: #c9d7e9;
+}
+
+.v4-renewal-filter-panel {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(160px,1fr)) auto auto;
+  gap: 9px;
+  align-items: end;
+  margin-top: 9px;
+  padding: 11px;
+  border: 1px solid var(--v4-border);
+  border-radius: 12px;
+  background: linear-gradient(165deg, rgba(15,24,40,.94), rgba(9,16,28,.94));
+  box-shadow: 0 16px 40px rgba(0,0,0,.13);
+}
+.v4-renewal-filter-panel label { display: grid; gap: 5px; }
+.v4-renewal-filter-panel label > span,
+.v4-renewal-filter-panel .form-check-label {
+  color: #65758b;
+  font-size: .58rem;
+  font-weight: 630;
+}
+.v4-renewal-filter-panel .form-check { align-self: center; margin: 0; }
+
+.v4-renewal-table tbody tr.v4-renewal-row.is-open {
+  background: linear-gradient(90deg, rgba(243,185,79,.035), transparent) !important;
+}
+.v4-renewal-table tbody tr.v4-renewal-row.is-open td:first-child {
+  box-shadow: inset 2px 0 0 rgba(243,185,79,.46);
+}
+
+.v4-renewal-client {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.v4-renewal-client > a {
+  overflow: hidden;
+  color: #dfe7f2 !important;
+  font-size: .7rem;
+  font-weight: 690;
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.v4-renewal-client > a:hover { color: #8dbbff !important; }
+.v4-renewal-client > span {
+  margin-top: 2px;
+  color: #5d6d83;
+  font-size: .56rem;
+}
+
+.v4-renewal-request-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.v4-renewal-request-meta strong {
+  color: #bdc8d7;
+  font-size: .65rem;
+  font-weight: 650;
+}
+.v4-renewal-request-meta span {
+  color: #5d6d83;
+  font-size: .56rem;
+}
+
+.v4-renewal-file {
+  display: inline-flex;
+  max-width: 180px;
+  gap: 5px;
+  align-items: center;
+  padding: 4px 7px;
+  border: 1px solid rgba(76,141,255,.13);
+  border-radius: 7px;
+  background: rgba(53,88,151,.06);
+  color: #86aee8 !important;
+  font-size: .57rem;
+  text-decoration: none;
+}
+.v4-renewal-file:hover {
+  border-color: rgba(76,141,255,.26);
+  background: rgba(53,88,151,.12);
+  color: #bad4ff !important;
+}
+
+.v4-renewal-actions-cell { white-space: nowrap; }
+.v4-renewal-actions-cell .btn { min-height: 29px; padding: 4px 8px !important; font-size: .59rem !important; }
+
+.v4-renewal-action-wrap {
+  padding: 10px 12px 12px;
+  border-top: 1px solid rgba(121,149,191,.07);
+  background: rgba(6,12,21,.30);
+}
+.v4-renewal-action-card {
+  display: grid;
+  grid-template-columns: minmax(260px,1.5fr) 150px minmax(320px,1fr);
+  gap: 10px;
+  align-items: end;
+  padding: 11px;
+  border: 1px solid rgba(121,149,191,.09);
+  border-radius: 10px;
+  background: rgba(8,15,26,.48);
+}
+.v4-renewal-action-card label { display: grid; gap: 5px; }
+.v4-renewal-action-card label > span {
+  color: #67778d;
+  font-size: .57rem;
+  font-weight: 620;
+}
+.v4-renewal-action-buttons {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+.v4-renewal-action-buttons .btn { min-height: 30px; padding: 4px 8px !important; font-size: .58rem !important; }
+
+.v4-renewal-empty {
+  min-height: 170px;
+}
+
+@media (max-width: 1199.98px) {
+  .v4-renewal-filter-panel { grid-template-columns: repeat(2, minmax(180px,1fr)); }
+  .v4-renewal-action-card { grid-template-columns: 1fr 160px; }
+  .v4-renewal-action-buttons { grid-column: 1 / -1; justify-content: flex-start; }
+}
+
+@media (max-width: 767.98px) {
+  .v4-renewal-filter-panel,
+  .v4-renewal-action-card { grid-template-columns: 1fr; }
+  .v4-renewal-action-buttons { grid-column: auto; }
+}
