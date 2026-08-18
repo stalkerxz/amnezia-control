@@ -14,7 +14,7 @@
     <div>
       <p class="page-kicker">VPN Control · Сервер</p>
       <h1>{{ server.name }}</h1>
-      <p class="v4-hero-copy">Готовность runtime, endpoint, подсети и протоколов перед выпуском доступа.</p>
+      <p class="v4-hero-copy">Готовность runtime, endpoint, подсетей и протоколов перед выпуском клиентского доступа.</p>
     </div>
     <div class="v4-hero-actions">
       <form method="post" action="{% url 'servers-sync-runtime' pk=server.id %}" class="m-0">
@@ -28,7 +28,7 @@
   <section class="v4-system-summary-grid" aria-label="Сводка сервера">
     <div class="v4-system-summary"><span>Endpoint</span><strong><code>{{ endpoint_display }}</code></strong><small>Публичная точка подключения</small></div>
     <div class="v4-system-summary"><span>Протоколы</span><strong>{{ ready_protocols }} / {{ total_protocols }}</strong><small>Готовы к выпуску доступа</small></div>
-    <div class="v4-system-summary"><span>Runtime sync</span><strong>{{ server.last_runtime_sync_at|date:'d.m.Y H:i'|default:'—' }}</strong><small>Последняя синхронизация</small></div>
+    <div class="v4-system-summary"><span>Runtime sync</span><strong>{% if server.last_runtime_sync_at %}{{ server.last_runtime_sync_at|date:'d.m.Y H:i' }}{% else %}—{% endif %}</strong><small>Последняя синхронизация</small></div>
     <div class="v4-system-summary"><span>Состояние</span><strong><span class="v4-server-status {% if server.health_status == 'healthy' %}is-success{% elif server.health_status == 'degraded' %}is-warning{% elif server.health_status == 'unhealthy' %}is-danger{% else %}is-neutral{% endif %}">{{ server_health_label }}</span></strong><small>Runtime health</small></div>
   </section>
 
@@ -37,20 +37,20 @@
       <div>
         <span class="v4-panel-eyebrow">Readiness</span>
         <h2>Готовность сервера</h2>
-        <p>Импорт runtime peers отключён; новые подключения создаются через управляемый workflow.</p>
+        <p>Новые подключения создаются через управляемый workflow; runtime используется как источник состояния.</p>
       </div>
       <a class="btn btn-sm btn-outline-primary" href="{% url 'customers-onboarding' %}">Новый клиент</a>
     </div>
     <div class="v4-system-panel-body">
       {% if server_health_reasons %}
         <div class="v4-inline-warning mb-0">
-          <strong>Диагностика</strong>
+          <strong>Требует внимания</strong>
           <span>{% for reason in server_health_reasons %}{{ reason }}{% if not forloop.last %} · {% endif %}{% endfor %}</span>
         </div>
       {% else %}
-        <div class="v4-ready-state">
+        <div class="v4-ready-state v4-server-ready-state">
           <span class="v4-ready-icon">✓</span>
-          <div><strong>Критичных замечаний нет</strong><span>Runtime не сообщает причин деградации.</span></div>
+          <div><strong>Сервер готов к работе</strong><span>Runtime не сообщает причин деградации.</span></div>
         </div>
       {% endif %}
     </div>
@@ -60,12 +60,12 @@
     <div class="v4-system-panel-head">
       <div>
         <span class="v4-panel-eyebrow">Protocols</span>
-        <h2>Протоколы и готовность</h2>
-        <p>Endpoint, подсеть, контейнер и AWG2 metadata должны быть готовы одновременно.</p>
+        <h2>Протоколы</h2>
+        <p>Готовность endpoint, подсети, контейнера и служебных metadata.</p>
       </div>
     </div>
     <div class="v4-system-table-wrap">
-      <table class="table v4-system-table align-middle">
+      <table class="table v4-system-table v4-protocol-table align-middle">
         <thead>
           <tr>
             <th>Протокол</th>
@@ -73,13 +73,13 @@
             <th>Подсеть</th>
             <th>Endpoint</th>
             <th>Peers</th>
-            <th>AWG2 metadata</th>
+            <th>Metadata</th>
             <th class="text-end">Готовность</th>
           </tr>
         </thead>
         <tbody>
           {% for row in protocol_rows %}
-            <tr>
+            <tr class="v4-protocol-row {% if row.protocol.runtime_metadata.subnet_ready and row.protocol.runtime_metadata.endpoint_host_ready and row.protocol.runtime_metadata.endpoint_port_ready %}is-success{% else %}is-warning{% endif %}">
               <td><span class="badge badge-soft {% if row.protocol.protocol_type == 'awg2' %}badge-protocol-awg2{% else %}badge-protocol-awg{% endif %}">{{ row.protocol.protocol_type|upper }}</span></td>
               <td>
                 <div class="v4-system-primary">{{ row.protocol.container_name|default:'—' }}</div>
