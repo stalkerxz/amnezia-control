@@ -12,20 +12,23 @@
     <div>
       <p class="page-kicker">VPN Control · Система</p>
       <h1>Аудит</h1>
-      <p class="v4-hero-copy">История действий операторов и системы с быстрым просмотром изменённых сущностей и payload.</p>
+      <p class="v4-hero-copy">История действий операторов и системы. Основные события читаются в таблице, технический payload раскрывается только при необходимости.</p>
     </div>
   </header>
 
-  <form method="get" class="v4-system-toolbar">
-    <div class="v4-system-filter-grid v4-audit-filter-grid">
-      <label><span>Действие</span><input id="id_q" class="form-control" name="q" value="{{ q }}" placeholder="vpn.client.reissue"></label>
-      <label><span>Тип сущности</span><select class="form-select" name="entity_type"><option value="">Все</option>{% for value in entity_type_choices %}<option value="{{ value }}" {% if value == entity_type_filter %}selected{% endif %}>{{ value }}</option>{% endfor %}</select></label>
-      <label><span>Дата с</span><input class="form-control" type="date" name="created_from" value="{{ created_from }}"></label>
-      <label><span>Оператор</span><select class="form-select" name="operator_scope"><option value="all" {% if operator_scope != 'mine' %}selected{% endif %}>Все</option><option value="mine" {% if operator_scope == 'mine' %}selected{% endif %}>Только мои</option></select></label>
-      <button class="btn btn-primary" type="submit">Применить</button>
-      <a href="{% url 'audit-list' %}" class="btn btn-outline-secondary">Сбросить</a>
-    </div>
-  </form>
+  <details class="v4-system-filter-details" {% if q or entity_type_filter or created_from or operator_scope == 'mine' %}open{% endif %}>
+    <summary>Фильтры журнала</summary>
+    <form method="get" class="v4-system-toolbar">
+      <div class="v4-system-filter-grid v4-audit-filter-grid">
+        <label><span>Действие</span><input id="id_q" class="form-control" name="q" value="{{ q }}" placeholder="vpn.client.reissue"></label>
+        <label><span>Тип сущности</span><select class="form-select" name="entity_type"><option value="">Все</option>{% for value in entity_type_choices %}<option value="{{ value }}" {% if value == entity_type_filter %}selected{% endif %}>{{ value }}</option>{% endfor %}</select></label>
+        <label><span>Дата с</span><input class="form-control" type="date" name="created_from" value="{{ created_from }}"></label>
+        <label><span>Оператор</span><select class="form-select" name="operator_scope"><option value="all" {% if operator_scope != 'mine' %}selected{% endif %}>Все</option><option value="mine" {% if operator_scope == 'mine' %}selected{% endif %}>Только мои</option></select></label>
+        <button class="btn btn-primary" type="submit">Применить</button>
+        <a href="{% url 'audit-list' %}" class="btn btn-outline-secondary">Сбросить</a>
+      </div>
+    </form>
+  </details>
 
   {% if log_rows %}
     <section class="v4-system-panel">
@@ -33,28 +36,35 @@
         <div>
           <span class="v4-panel-eyebrow">Security & changes</span>
           <h2>Журнал событий</h2>
-          {% if page_obj %}<p>Всего по текущему фильтру: {{ page_obj.paginator.count }}</p>{% endif %}
+          {% if page_obj %}<p>{{ page_obj.paginator.count }} событий по текущему фильтру</p>{% endif %}
         </div>
       </div>
 
       <div class="v4-system-table-wrap">
-        <table class="table v4-system-table align-middle">
-          <thead><tr><th>Дата</th><th>Инициатор</th><th>Действие</th><th>Сущность</th><th class="text-end">Детали</th></tr></thead>
+        <table class="table v4-system-table v4-audit-table align-middle">
+          <thead><tr><th>Время</th><th>Инициатор</th><th>Действие</th><th>Объект</th><th class="text-end"><span class="visually-hidden">Детали</span></th></tr></thead>
           <tbody>
             {% for row in log_rows %}
               {% with l=row.log %}
-                <tr>
-                  <td class="text-nowrap">{{ l.created_at|date:'d.m.Y H:i:s' }}</td>
-                  <td>{% if l.actor %}<span class="v4-system-primary">{{ l.actor.username }}</span>{% if l.actor_id == request.user.id %}<div class="v4-system-meta">текущий оператор</div>{% else %}<div class="v4-system-meta">другой оператор</div>{% endif %}{% else %}<span class="text-secondary">система</span>{% endif %}</td>
+                <tr class="v4-audit-row {% if not l.actor %}is-system{% endif %}">
+                  <td class="text-nowrap"><span class="v4-date-primary">{{ l.created_at|date:'d.m.Y' }}</span><div class="v4-system-meta">{{ l.created_at|date:'H:i:s' }}</div></td>
+                  <td>
+                    {% if l.actor %}
+                      <span class="v4-actor-pill">{{ l.actor.username }}</span>
+                      {% if l.actor_id == request.user.id %}<div class="v4-system-meta">вы</div>{% endif %}
+                    {% else %}
+                      <span class="v4-actor-pill is-system">Система</span>
+                    {% endif %}
+                  </td>
                   <td><code class="v4-system-mono">{{ l.action }}</code><div class="v4-system-meta">{{ l.entity_type }}</div></td>
-                  <td><span class="v4-status-pill is-neutral">{{ l.entity_type }}</span> <span class="v4-system-meta d-inline">#{{ l.entity_id }}</span></td>
-                  <td class="text-end"><button class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#audit-details-{{ l.id }}" type="button">Просмотр</button></td>
+                  <td><span class="v4-entity-pill">{{ l.entity_type }}</span><span class="v4-system-meta d-inline ms-1">#{{ l.entity_id }}</span></td>
+                  <td class="text-end"><button class="v4-icon-action" data-bs-toggle="collapse" data-bs-target="#audit-details-{{ l.id }}" type="button" aria-label="Показать детали события">•••</button></td>
                 </tr>
-                <tr>
+                <tr class="v4-detail-row">
                   <td colspan="5" class="p-0 border-0">
                     <div class="collapse" id="audit-details-{{ l.id }}">
                       <div class="v4-collapse-body">
-                        <div class="v4-system-meta mb-2">Детали события</div>
+                        <div class="v4-system-meta mb-2">Payload события</div>
                         <pre class="v4-log mb-0">{{ row.details_pretty }}</pre>
                       </div>
                     </div>
