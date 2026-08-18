@@ -1,82 +1,99 @@
 {% extends 'partials/base.html' %}
+{% load static %}
+
+{% block title %}Серверы · VPN Control{% endblock %}
+
 {% block content %}
-<div class="page-header d-flex justify-content-between align-items-start gap-3 flex-wrap">
-  <div>
-    <p class="page-kicker">Операторская · Сервер</p>
-    <h1 class="h3 mb-1">Серверы</h1>
-    <p class="text-secondary mb-0">Состояние контура, синхронизация runtime и готовность к операциям.</p>
+<link href="{% static 'css/app-v4-layout.css' %}" rel="stylesheet">
+<link href="{% static 'css/app-v4-system.css' %}" rel="stylesheet">
+
+<div class="v4-system-page">
+  <header class="v4-page-hero v4-system-hero">
+    <div>
+      <p class="page-kicker">VPN Control · Инфраструктура</p>
+      <h1>Серверы</h1>
+      <p class="v4-hero-copy">Runtime, доступность протоколов и мониторинг серверов в одном рабочем экране.</p>
+    </div>
+  </header>
+
+  <div class="v4-system-chips" aria-label="Фильтр состояния серверов">
+    {% for item in health_filters %}
+      <a href="{{ item.url }}" class="v4-system-chip {% if item.active %}active{% endif %}">{{ item.label }}</a>
+    {% endfor %}
   </div>
+
+  {% if servers %}
+    <section class="v4-system-panel">
+      <div class="v4-system-panel-head">
+        <div>
+          <span class="v4-panel-eyebrow">Runtime</span>
+          <h2>Инфраструктура</h2>
+          <p>Показано серверов: {{ servers|length }}</p>
+        </div>
+      </div>
+
+      <div class="v4-system-table-wrap">
+        <table class="table v4-system-table align-middle">
+          <thead>
+            <tr>
+              <th>Сервер</th>
+              <th>SSH</th>
+              <th>Состояние</th>
+              <th>Последняя sync</th>
+              <th class="text-end">Мониторинг</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for s in servers %}
+              <tr>
+                <td>
+                  <a class="v4-system-primary" href="/servers/{{ s.obj.id }}/">{{ s.obj.name }}</a>
+                  {% if s.health_reasons %}<div class="v4-system-meta">{{ s.health_reasons.0 }}</div>{% endif %}
+                </td>
+                <td><code class="v4-system-mono">{{ s.obj.ssh_username }}@{{ s.obj.host }}:{{ s.obj.port }}</code></td>
+                <td>
+                  <span class="v4-server-status {% if s.obj.health_status == 'healthy' %}is-success{% elif s.obj.health_status == 'degraded' %}is-warning{% elif s.obj.health_status == 'unhealthy' %}is-danger{% else %}is-neutral{% endif %}">{{ s.health_label }}</span>
+                </td>
+                <td class="text-nowrap">{{ s.obj.last_runtime_sync_at|date:'d.m.Y H:i'|default:'—' }}</td>
+                <td class="text-end">
+                  <a class="btn btn-sm btn-outline-primary" href="/servers/?{% if health_filter %}health={{ health_filter }}&{% endif %}monitor={{ s.obj.id }}">Обновить</a>
+                </td>
+              </tr>
+
+              {% if s.metrics %}
+                <tr>
+                  <td colspan="5" class="p-0">
+                    {% if s.metrics.errors %}
+                      <div class="alert alert-warning m-3 mb-0 py-2">{{ s.metrics.errors|join:'; ' }}</div>
+                    {% endif %}
+                    <div class="v4-server-metrics">
+                      <div class="v4-server-metric"><span>Host / uptime</span><strong>{{ s.metrics.hostname|default:'—' }}</strong><div class="v4-system-meta">{{ s.metrics.uptime|default:'—' }}</div></div>
+                      <div class="v4-server-metric"><span>Load / CPU</span><strong>{{ s.metrics.load_average.1|default:'—' }}</strong><div class="v4-system-meta">{{ s.metrics.cpu_cores|default:'—' }} CPU</div></div>
+                      <div class="v4-server-metric"><span>RAM</span><strong>{{ s.metrics.memory.used_percent|default:'—' }}%</strong><div class="v4-system-meta">{{ s.metrics.memory.used|default:'—' }} / {{ s.metrics.memory.total|default:'—' }}</div></div>
+                      <div class="v4-server-metric"><span>Disk /</span><strong>{{ s.metrics.disk_root.used_percent|default:'—' }}%</strong><div class="v4-system-meta">{{ s.metrics.disk_root.used|default:'—' }} / {{ s.metrics.disk_root.total|default:'—' }}</div></div>
+                      <div class="v4-server-metric"><span>Network</span><strong>{{ s.metrics.main_interface|default:'—' }}</strong><div class="v4-system-meta">RX {{ s.metrics.network.rx_bytes|default:'—' }} · TX {{ s.metrics.network.tx_bytes|default:'—' }}</div></div>
+                      <div class="v4-server-protocols">
+                        <strong>Docker:</strong>
+                        {% if s.metrics.docker.available %}
+                          {% for c in s.metrics.docker.containers %}{{ c.name }}={{ c.status }}{% if not forloop.last %} · {% endif %}{% empty %}нет активных контейнеров{% endfor %}
+                        {% else %}недоступно{% endif %}
+                        <br>
+                        <strong>Протоколы:</strong>
+                        {% for p in s.metrics.protocols %}
+                          {{ p.protocol_type|upper }}{% if p.available %} FILE {{ p.peer_counts.file_peers }} / LIVE {{ p.peer_counts.live_peers }}{% else %} недоступен{% endif %}{% if not forloop.last %} · {% endif %}
+                        {% empty %}нет включённых протоколов{% endfor %}
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              {% endif %}
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  {% else %}
+    <section class="v4-system-panel"><div class="v4-empty-state"><strong>Серверы ещё не добавлены</strong><span>После добавления сервера здесь появится его runtime-состояние.</span></div></section>
+  {% endif %}
 </div>
-<div class="mb-3 d-flex flex-wrap gap-2">
-  {% for item in health_filters %}
-    <a href="{{ item.url }}" class="badge status-badge {% if item.active %}status-success{% else %}status-neutral{% endif %} text-decoration-none">{{ item.label }}</a>
-  {% endfor %}
-</div>
-{% if servers %}
-<div class="table-responsive card p-2">
-  <table class="table table-hover align-middle mb-0">
-    <thead>
-      <tr><th>Имя</th><th>SSH</th><th>Здоровье</th><th>Мониторинг</th><th>Последняя sync</th></tr>
-    </thead>
-    <tbody>
-      {% for s in servers %}
-      <tr>
-        <td><a href="/servers/{{ s.obj.id }}/" class="fw-semibold text-decoration-none">{{ s.obj.name }}</a></td>
-        <td class="text-break-soft"><code>{{ s.obj.ssh_username }}@{{ s.obj.host }}:{{ s.obj.port }}</code></td>
-        <td>
-          <span class="badge status-badge {% if s.obj.health_status == 'healthy' %}status-success{% elif s.obj.health_status == 'degraded' %}status-warning{% elif s.obj.health_status == 'unhealthy' %}status-danger{% else %}status-neutral{% endif %}">
-            {{ s.health_label }}
-          </span>
-          {% if s.health_reasons %}
-          <div class="small text-secondary mt-1">{{ s.health_reasons.0 }}</div>
-          {% endif %}
-        </td>
-        <td>
-          <a class="btn btn-sm btn-outline-primary" href="/servers/?{% if health_filter %}health={{ health_filter }}&{% endif %}monitor={{ s.obj.id }}">Обновить мониторинг</a>
-        </td>
-        <td>{{ s.obj.last_runtime_sync_at|default:'—' }}</td>
-      </tr>
-      {% if s.metrics %}
-      <tr>
-        <td colspan="5" class="bg-light-subtle">
-          {% if s.metrics.errors %}
-            <div class="alert alert-warning py-2 mb-2">{{ s.metrics.errors|join:'; ' }}</div>
-          {% endif %}
-          <div class="small"><strong>Host:</strong> {{ s.metrics.hostname }} | <strong>Uptime:</strong> {{ s.metrics.uptime|default:'—' }}</div>
-          <div class="small"><strong>Load:</strong> {{ s.metrics.load_average.1|default:'—' }} / {{ s.metrics.load_average.5|default:'—' }} / {{ s.metrics.load_average.15|default:'—' }} | <strong>CPU:</strong> {{ s.metrics.cpu_cores|default:'—' }}</div>
-          <div class="small"><strong>RAM:</strong> total {{ s.metrics.memory.total|default:'—' }}, used {{ s.metrics.memory.used|default:'—' }}, free {{ s.metrics.memory.free|default:'—' }} ({{ s.metrics.memory.used_percent|default:'—' }}%)</div>
-          <div class="small"><strong>Disk /:</strong> total {{ s.metrics.disk_root.total|default:'—' }}, used {{ s.metrics.disk_root.used|default:'—' }}, free {{ s.metrics.disk_root.free|default:'—' }} ({{ s.metrics.disk_root.used_percent|default:'—' }}%)</div>
-          <div class="small"><strong>Net:</strong> {{ s.metrics.main_interface|default:'—' }} | RX {{ s.metrics.network.rx_bytes|default:'—' }} / TX {{ s.metrics.network.tx_bytes|default:'—' }}</div>
-          <div class="small"><strong>Docker:</strong>
-            {% if s.metrics.docker.available %}
-              {% for c in s.metrics.docker.containers %}<span class="me-2">{{ c.name }}={{ c.status }}{% if c.is_protocol_container %} (protocol){% endif %}</span>{% empty %}нет активных контейнеров{% endfor %}
-            {% else %}
-              недоступно
-            {% endif %}
-          </div>
-          <div class="small mt-1"><strong>Протоколы:</strong></div>
-          {% for p in s.metrics.protocols %}
-          <div class="small">{{ p.protocol_type|upper }} · container={{ p.container_name|default:'—' }} · iface={{ p.interface|default:'—' }} · cfg={{ p.config_path|default:'—' }}
-            {% if p.available %}
-              · FILE {{ p.peer_counts.file_peers }} / LIVE {{ p.peer_counts.live_peers }}
-            {% else %}
-              · недоступно{% if p.error %}: {{ p.error }}{% endif %}
-            {% endif %}
-          </div>
-          {% empty %}
-          <div class="small text-secondary">Нет включённых протоколов</div>
-          {% endfor %}
-        </td>
-      </tr>
-      {% endif %}
-      {% endfor %}
-    </tbody>
-  </table>
-</div>
-{% else %}
-<div class="empty-state">
-  <h2 class="h6 mb-2">Серверы ещё не добавлены</h2>
-  <p class="mb-0">После добавления сервера здесь появится его состояние и история синхронизации runtime.</p>
-</div>
-{% endif %}
 {% endblock %}
