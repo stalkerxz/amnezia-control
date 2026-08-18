@@ -3,7 +3,7 @@ set -euo pipefail
 
 COMPOSE=(docker compose)
 
-if ! "${COMPOSE[@]}" ps --status running web >/dev/null 2>&1; then
+if ! "${COMPOSE[@]}" ps --status running --services 2>/dev/null | grep -qx web; then
   echo "ERROR: web service is not running"
   exit 1
 fi
