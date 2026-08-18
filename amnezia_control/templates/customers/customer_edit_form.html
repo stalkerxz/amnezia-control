@@ -1,172 +1,72 @@
 {% extends 'partials/base.html' %}
+{% load static %}
 
-{% block title %}
-Редактировать {{ account.display_name }} · amnezia-control
-{% endblock %}
+{% block title %}Редактировать {{ account.display_name }} · VPN Control{% endblock %}
 
 {% block content %}
+<link href="{% static 'css/app-v4-forms.css' %}" rel="stylesheet">
 
-<div class="page-header d-flex justify-content-between align-items-start gap-2 flex-wrap">
+<div class="v4-form-page">
+  <header class="v4-form-hero">
+    <div class="v4-form-hero-copy">
+      <a class="v4-back-link" href="{% url 'customers-detail' account.pk %}">← {{ account.display_name }}</a>
+      <p class="page-kicker">VPN Control · Клиент</p>
+      <h1>Редактировать клиента</h1>
+      <p>Изменение имени, email и срока не перевыпускает VPN-конфигурации, не меняет ключи и IP-адреса.</p>
+    </div>
+  </header>
 
-  <div>
+  <form method="post">
+    {% csrf_token %}
+    <div class="v4-form-layout">
+      <div class="v4-form-main">
+        <section class="v4-form-card">
+          <div class="v4-form-card-head">
+            <div><h2>Данные аккаунта</h2><p>Изменения применяются к существующему аккаунту.</p></div>
+          </div>
 
-    <p class="page-kicker">
-      Операторская · Аккаунты
-    </p>
+          {% if form.non_field_errors %}<div class="alert alert-danger mb-3">{{ form.non_field_errors }}</div>{% endif %}
 
-    <h1 class="h3 mb-1">
-      Редактировать клиента
-    </h1>
+          <div class="v4-field-grid">
+            <div class="v4-field">
+              <label class="form-label" for="{{ form.display_name.id_for_label }}">{{ form.display_name.label }}</label>
+              {{ form.display_name }}
+              {% for error in form.display_name.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+            </div>
 
-    <p class="page-subtle mb-0">
-      Имя, email и срок аккаунта.
-      Изменения не перевыпускают VPN-конфигурации.
-    </p>
+            <div class="v4-field">
+              <label class="form-label" for="{{ form.email.id_for_label }}">{{ form.email.label }}</label>
+              {{ form.email }}
+              {% for error in form.email.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+            </div>
 
-  </div>
+            <div class="v4-field">
+              <label class="form-label" for="{{ form.expires_at.id_for_label }}">{{ form.expires_at.label }}</label>
+              {{ form.expires_at }}
+              <div class="form-text">Пустое поле означает доступ без срока. Новый срок применяется ко всем VPN-подключениям аккаунта.</div>
+              {% for error in form.expires_at.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+            </div>
+          </div>
+        </section>
 
+        <div class="v4-form-actions">
+          <button type="submit" class="btn btn-primary">Сохранить изменения</button>
+          <a href="{% url 'customers-detail' account.pk %}" class="btn btn-outline-secondary">Отмена</a>
+        </div>
+      </div>
 
-  <div class="action-cluster">
-
-    <a
-      href="{% url 'customers-detail' account.pk %}"
-      class="btn btn-outline-secondary"
-    >
-      Отмена
-    </a>
-
-  </div>
-
+      <aside class="v4-form-aside">
+        <section class="v4-context-card">
+          <h3>Не изменится</h3>
+          <div class="v4-context-list">
+            <div class="v4-context-row"><span>VPN-ключи</span><strong>Без изменений</strong></div>
+            <div class="v4-context-row"><span>IP-адреса</span><strong>Без изменений</strong></div>
+            <div class="v4-context-row"><span>Конфигурации</span><strong>Не перевыпускаются</strong></div>
+          </div>
+        </section>
+        <div class="v4-context-note">Изменение срока аккаунта влияет на срок доступа, но не создаёт новые конфигурации.</div>
+      </aside>
+    </div>
+  </form>
 </div>
-
-
-<section class="section-block">
-
-  <div class="section-body">
-
-    <form method="post" class="row g-3">
-
-      {% csrf_token %}
-
-
-      {% if form.non_field_errors %}
-
-        <div class="col-12">
-
-          <div class="alert alert-danger">
-            {{ form.non_field_errors }}
-          </div>
-
-        </div>
-
-      {% endif %}
-
-
-      <div class="col-12 col-lg-6">
-
-        <label
-          for="{{ form.display_name.id_for_label }}"
-          class="form-label"
-        >
-          {{ form.display_name.label }}
-        </label>
-
-        {{ form.display_name }}
-
-        {% for error in form.display_name.errors %}
-          <div class="text-danger small mt-1">
-            {{ error }}
-          </div>
-        {% endfor %}
-
-      </div>
-
-
-      <div class="col-12 col-lg-6">
-
-        <label
-          for="{{ form.email.id_for_label }}"
-          class="form-label"
-        >
-          {{ form.email.label }}
-        </label>
-
-        {{ form.email }}
-
-        {% for error in form.email.errors %}
-          <div class="text-danger small mt-1">
-            {{ error }}
-          </div>
-        {% endfor %}
-
-      </div>
-
-
-      <div class="col-12 col-lg-6">
-
-        <label
-          for="{{ form.expires_at.id_for_label }}"
-          class="form-label"
-        >
-          {{ form.expires_at.label }}
-        </label>
-
-        {{ form.expires_at }}
-
-        {% for error in form.expires_at.errors %}
-          <div class="text-danger small mt-1">
-            {{ error }}
-          </div>
-        {% endfor %}
-
-        <div class="form-text">
-          Оставьте поле пустым для аккаунта без ограничения срока.
-          Новый срок применяется ко всем VPN-подключениям аккаунта.
-        </div>
-
-      </div>
-
-
-      <div class="col-12">
-
-        <div class="alert alert-secondary mb-0 small">
-          Изменение срока аккаунта не создаёт новые VPN-ключи,
-          не меняет IP-адреса и не перевыпускает
-          сохранённые конфигурации.
-        </div>
-
-      </div>
-
-
-      <div class="col-12">
-
-        <hr>
-
-      </div>
-
-
-      <div class="col-12 d-flex gap-2">
-
-        <button
-          type="submit"
-          class="btn btn-primary"
-        >
-          Сохранить
-        </button>
-
-        <a
-          href="{% url 'customers-detail' account.pk %}"
-          class="btn btn-outline-secondary"
-        >
-          Отмена
-        </a>
-
-      </div>
-
-    </form>
-
-  </div>
-
-</section>
-
 {% endblock %}
