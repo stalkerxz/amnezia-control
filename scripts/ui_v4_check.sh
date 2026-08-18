@@ -43,6 +43,7 @@ STATIC_ASSETS = [
     "css/app-v4-customers.css",
     "css/app-v4-detail.css",
     "css/app-v4-system.css",
+    "css/app-v4-polish.css",
 ]
 
 for template_name in TEMPLATES:
