@@ -189,6 +189,9 @@ class OperatorMetadataEditTest(
                 "email": (
                     "new@example.com"
                 ),
+                "expires_at": (
+                    "2030-01-15T12:30"
+                ),
             },
         )
 
@@ -210,9 +213,28 @@ class OperatorMetadataEditTest(
             "new@example.com",
         )
 
-        self.assertEqual(
+        self.assertIsNotNone(
+            self.account.expires_at,
+        )
+
+        self.assertNotEqual(
             self.account.expires_at,
             old_expiry,
+        )
+
+        self.assertEqual(
+            self.account.expires_at.year,
+            2030,
+        )
+
+        self.assertEqual(
+            self.account.expires_at.month,
+            1,
+        )
+
+        self.assertEqual(
+            self.account.expires_at.day,
+            15,
         )
 
         self.assertEqual(
@@ -220,10 +242,27 @@ class OperatorMetadataEditTest(
             "new@example.com",
         )
 
+        self.vpn.refresh_from_db()
+
         self.assertEqual(
-            before,
-            self._vpn_snapshot(),
+            self.vpn.expires_at,
+            self.account.expires_at,
         )
+
+        after = self._vpn_snapshot()
+
+        for key in (
+            "name",
+            "status",
+            "public_key",
+            "address",
+            "revision_count",
+            "revision_hash",
+        ):
+            self.assertEqual(
+                before[key],
+                after[key],
+            )
 
     def test_operator_can_edit_device_metadata_without_vpn_mutation(
         self,
@@ -390,6 +429,16 @@ class OperatorMetadataEditTest(
         self.assertContains(
             response,
             "Редактировать аккаунт",
+        )
+
+        edit_url = reverse(
+            "customers-edit",
+            args=[self.account.pk],
+        )
+
+        self.assertContains(
+            response,
+            f'href="{edit_url}"',
         )
 
         self.assertContains(

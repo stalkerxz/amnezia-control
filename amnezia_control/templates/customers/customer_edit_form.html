@@ -19,8 +19,8 @@
     </h1>
 
     <p class="page-subtle mb-0">
-      Изменение имени и email не меняет
-      существующие подключения и сохранённые конфигурации.
+      Имя, email и срок аккаунта.
+      Изменения не перевыпускают VPN-конфигурации.
     </p>
 
   </div>
@@ -102,33 +102,37 @@
       </div>
 
 
+      <div class="col-12 col-lg-6">
+
+        <label
+          for="{{ form.expires_at.id_for_label }}"
+          class="form-label"
+        >
+          {{ form.expires_at.label }}
+        </label>
+
+        {{ form.expires_at }}
+
+        {% for error in form.expires_at.errors %}
+          <div class="text-danger small mt-1">
+            {{ error }}
+          </div>
+        {% endfor %}
+
+        <div class="form-text">
+          Оставьте поле пустым для аккаунта без ограничения срока.
+          Новый срок применяется ко всем VPN-подключениям аккаунта.
+        </div>
+
+      </div>
+
+
       <div class="col-12">
 
-        <div class="alert alert-secondary mb-0">
-
-          <div class="fw-semibold">
-            Срок аккаунта
-          </div>
-
-          <div class="small mt-1">
-
-            {% if account.expires_at %}
-
-              Сейчас:
-              {{ account.expires_at|date:"d.m.Y H:i" }}
-
-            {% else %}
-
-              Сейчас: без срока.
-
-            {% endif %}
-
-            Срок изменяется через продление аккаунта,
-            чтобы он синхронно обновлялся у всех
-            VPN-подключений.
-
-          </div>
-
+        <div class="alert alert-secondary mb-0 small">
+          Изменение срока аккаунта не создаёт новые VPN-ключи,
+          не меняет IP-адреса и не перевыпускает
+          сохранённые конфигурации.
         </div>
 
       </div>

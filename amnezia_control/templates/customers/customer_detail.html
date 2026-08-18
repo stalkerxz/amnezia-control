@@ -95,6 +95,13 @@
       {% endif %}
 
       <a
+        class="btn btn-outline-secondary"
+        href="{% url 'customers-edit' account.pk %}"
+      >
+        Редактировать аккаунт
+      </a>
+
+      <a
         class="btn btn-primary"
         href="{% url 'customers-device-create' account.pk %}"
       >
@@ -978,7 +985,7 @@
         </span>
 
         <span class="text-secondary small">
-          Редактирование и объединение аккаунта
+          Объединение аккаунтов
         </span>
 
       </summary>
@@ -986,16 +993,6 @@
 
       <div class="mt-4">
 
-        <div class="mb-4">
-
-          <a
-            href="{% url 'customers-edit' account.pk %}"
-            class="btn btn-outline-secondary"
-          >
-            Редактировать аккаунт
-          </a>
-
-        </div>
 
 
 

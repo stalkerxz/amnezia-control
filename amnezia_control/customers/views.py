@@ -238,6 +238,11 @@ def customer_edit_view(request, pk):
                                 "email"
                             ]
                         ),
+                        expires_at=(
+                            form.cleaned_data[
+                                "expires_at"
+                            ]
+                        ),
                         actor=request.user,
                     )
                 )

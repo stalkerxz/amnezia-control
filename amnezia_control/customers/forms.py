@@ -127,10 +127,12 @@ class CustomerAccountEditForm(forms.ModelForm):
         fields = (
             "display_name",
             "email",
+            "expires_at",
         )
         labels = {
             "display_name": "Имя клиента",
             "email": "Email",
+            "expires_at": "Срок аккаунта",
         }
         widgets = {
             "display_name": forms.TextInput(
@@ -144,7 +146,23 @@ class CustomerAccountEditForm(forms.ModelForm):
                     "class": "form-control",
                 }
             ),
+            "expires_at": forms.DateTimeInput(
+                attrs={
+                    "class": "form-control",
+                    "type": "datetime-local",
+                },
+                format="%Y-%m-%dT%H:%M",
+            ),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.fields["expires_at"].required = False
+
+        self.fields["expires_at"].input_formats = [
+            "%Y-%m-%dT%H:%M",
+        ]
 
     def clean_display_name(self):
         value = (
