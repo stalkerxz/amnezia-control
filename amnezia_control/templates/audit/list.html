@@ -17,7 +17,7 @@
   </header>
 
   <form method="get" class="v4-system-toolbar">
-    <div class="v4-system-filter-grid" style="grid-template-columns: minmax(220px,1.4fr) minmax(160px,1fr) minmax(150px,.8fr) minmax(130px,.7fr) auto auto;">
+    <div class="v4-system-filter-grid v4-audit-filter-grid">
       <label><span>Действие</span><input id="id_q" class="form-control" name="q" value="{{ q }}" placeholder="vpn.client.reissue"></label>
       <label><span>Тип сущности</span><select class="form-select" name="entity_type"><option value="">Все</option>{% for value in entity_type_choices %}<option value="{{ value }}" {% if value == entity_type_filter %}selected{% endif %}>{{ value }}</option>{% endfor %}</select></label>
       <label><span>Дата с</span><input class="form-control" type="date" name="created_from" value="{{ created_from }}"></label>
