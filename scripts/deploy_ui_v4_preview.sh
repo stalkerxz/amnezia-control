@@ -86,10 +86,10 @@ printf '%s\n' "$changed_files"
 while IFS= read -r path; do
   [[ -z "$path" ]] && continue
   case "$path" in
-    amnezia_control/templates/*|amnezia_control/static/css/*|scripts/ui_v4_check.sh|scripts/deploy_ui_v4_preview.sh)
+    amnezia_control/templates/*|amnezia_control/static/css/*|scripts/ui_v4_check.sh|scripts/deploy_ui_v4_preview.sh|amnezia_control/customers/portal_urls.py|amnezia_control/customers/portal_selfservice.py|amnezia_control/customers/test_customer_portal_reissue.py)
       ;;
     *)
-      die "non-UI change detected in preview range: $path"
+      die "change outside approved preview scope detected: $path"
       ;;
   esac
 done <<< "$changed_files"
