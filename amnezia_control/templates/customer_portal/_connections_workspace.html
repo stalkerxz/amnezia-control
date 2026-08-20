@@ -42,6 +42,11 @@
                 {% if client.cabinet_qr_allowed %}
                   <a href="{% url 'customer-portal-vpn-qr' client.pk %}" class="btn btn-outline-primary btn-sm" target="_blank" rel="noopener">QR-код</a>
                 {% endif %}
+                <form method="post" action="{% url 'customer-portal-vpn-reissue' client.pk %}" onsubmit="return confirm('Перевыпустить конфигурацию? Предыдущая конфигурация перестанет работать. После перевыпуска скачайте новую.');">
+                  {% csrf_token %}
+                  <input type="hidden" name="confirm_reissue" value="1">
+                  <button type="submit" class="btn btn-sm portal-reissue-button">Перевыпустить</button>
+                </form>
               </div>
             {% else %}
               <div class="portal-connection-unavailable">
@@ -49,8 +54,17 @@
                 {% elif row.device_expired %}Срок устройства истёк.
                 {% elif row.device.status != 'active' %}Устройство отключено.
                 {% elif client.status != 'active' %}Подключение отключено.
-                {% else %}Конфигурация временно недоступна.{% endif %}
+                {% else %}Конфигурация ещё не выпущена или временно недоступна.{% endif %}
               </div>
+              {% if not blocked and not row.device_expired and row.device.status == 'active' and client.status == 'active' and not client.revisions.exists %}
+                <div class="portal-connection-actions">
+                  <form method="post" action="{% url 'customer-portal-vpn-reissue' client.pk %}" onsubmit="return confirm('Выпустить новую конфигурацию для этого подключения?');">
+                    {% csrf_token %}
+                    <input type="hidden" name="confirm_reissue" value="1">
+                    <button type="submit" class="btn btn-primary btn-sm">Выпустить</button>
+                  </form>
+                </div>
+              {% endif %}
             {% endif %}
           </section>
         {% endfor %}
@@ -74,6 +88,11 @@
                 {% if client.cabinet_qr_allowed %}
                   <a href="{% url 'customer-portal-vpn-qr' client.pk %}" class="btn btn-outline-primary btn-sm" target="_blank" rel="noopener">QR-код</a>
                 {% endif %}
+                <form method="post" action="{% url 'customer-portal-vpn-reissue' client.pk %}" onsubmit="return confirm('Перевыпустить конфигурацию? Предыдущая конфигурация перестанет работать. После перевыпуска скачайте новую.');">
+                  {% csrf_token %}
+                  <input type="hidden" name="confirm_reissue" value="1">
+                  <button type="submit" class="btn btn-sm portal-reissue-button">Перевыпустить</button>
+                </form>
               </div>
             {% else %}
               <div class="portal-connection-unavailable">
@@ -81,8 +100,17 @@
                 {% elif row.device_expired %}Срок устройства истёк.
                 {% elif row.device.status != 'active' %}Устройство отключено.
                 {% elif client.status != 'active' %}Подключение отключено.
-                {% else %}Конфигурация временно недоступна.{% endif %}
+                {% else %}Конфигурация ещё не выпущена или временно недоступна.{% endif %}
               </div>
+              {% if not blocked and not row.device_expired and row.device.status == 'active' and client.status == 'active' and not client.revisions.exists %}
+                <div class="portal-connection-actions">
+                  <form method="post" action="{% url 'customer-portal-vpn-reissue' client.pk %}" onsubmit="return confirm('Выпустить новую конфигурацию для этого подключения?');">
+                    {% csrf_token %}
+                    <input type="hidden" name="confirm_reissue" value="1">
+                    <button type="submit" class="btn btn-primary btn-sm">Выпустить</button>
+                  </form>
+                </div>
+              {% endif %}
             {% endif %}
           </section>
         {% endfor %}
@@ -103,6 +131,11 @@
             {% if xhttp.cabinet_download_allowed %}
               <div class="portal-connection-actions">
                 <a href="{% url 'customer-portal-xhttp-download' xhttp.pk %}" class="btn btn-primary btn-sm">Скачать</a>
+                <form method="post" action="{% url 'customer-portal-xhttp-reissue' xhttp.pk %}" onsubmit="return confirm('Перевыпустить альтернативную конфигурацию? Предыдущая конфигурация перестанет работать. После перевыпуска скачайте новую.');">
+                  {% csrf_token %}
+                  <input type="hidden" name="confirm_reissue" value="1">
+                  <button type="submit" class="btn btn-sm portal-reissue-button">Перевыпустить</button>
+                </form>
               </div>
             {% else %}
               <div class="portal-connection-unavailable">
@@ -110,8 +143,17 @@
                 {% elif row.device_expired %}Срок устройства истёк.
                 {% elif row.device.status != 'active' %}Устройство отключено.
                 {% elif xhttp.status != 'active' %}Подключение отключено.
-                {% else %}Конфигурация временно недоступна.{% endif %}
+                {% else %}Конфигурация ещё не выпущена или временно недоступна.{% endif %}
               </div>
+              {% if not blocked and not row.device_expired and row.device.status == 'active' and xhttp.status == 'active' and not xhttp.config_blob_encrypted %}
+                <div class="portal-connection-actions">
+                  <form method="post" action="{% url 'customer-portal-xhttp-reissue' xhttp.pk %}" onsubmit="return confirm('Выпустить новую альтернативную конфигурацию?');">
+                    {% csrf_token %}
+                    <input type="hidden" name="confirm_reissue" value="1">
+                    <button type="submit" class="btn btn-primary btn-sm">Выпустить</button>
+                  </form>
+                </div>
+              {% endif %}
             {% endif %}
           </section>
         {% endfor %}
@@ -128,9 +170,23 @@
             {% if client.cabinet_download_allowed %}
               <div class="portal-connection-actions">
                 <a href="{% url 'customer-portal-vpn-download' client.pk %}" class="btn btn-outline-primary btn-sm">Скачать</a>
+                <form method="post" action="{% url 'customer-portal-vpn-reissue' client.pk %}" onsubmit="return confirm('Перевыпустить конфигурацию? Предыдущая конфигурация перестанет работать. После перевыпуска скачайте новую.');">
+                  {% csrf_token %}
+                  <input type="hidden" name="confirm_reissue" value="1">
+                  <button type="submit" class="btn btn-sm portal-reissue-button">Перевыпустить</button>
+                </form>
               </div>
             {% else %}
-              <div class="portal-connection-unavailable">Конфигурация сейчас недоступна.</div>
+              <div class="portal-connection-unavailable">Конфигурация ещё не выпущена или сейчас недоступна.</div>
+              {% if not blocked and not row.device_expired and row.device.status == 'active' and client.status == 'active' and not client.revisions.exists %}
+                <div class="portal-connection-actions">
+                  <form method="post" action="{% url 'customer-portal-vpn-reissue' client.pk %}" onsubmit="return confirm('Выпустить новую конфигурацию для этого подключения?');">
+                    {% csrf_token %}
+                    <input type="hidden" name="confirm_reissue" value="1">
+                    <button type="submit" class="btn btn-primary btn-sm">Выпустить</button>
+                  </form>
+                </div>
+              {% endif %}
             {% endif %}
           </section>
         {% endfor %}
