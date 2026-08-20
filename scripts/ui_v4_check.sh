@@ -56,6 +56,7 @@ TEMPLATES = [
 
 STATIC_ASSETS = [
     "css/app-v4.css",
+    "css/app-v4-shell.css",
     "css/app-v4-layout.css",
     "css/app-v4-customers.css",
     "css/app-v4-detail.css",
@@ -65,6 +66,7 @@ STATIC_ASSETS = [
     "css/app-v4-forms.css",
     "css/app-v4-access.css",
     "css/app-v4-portal.css",
+    "css/app-v4-portal-polish.css",
     "css/app-v4-polish.css",
 ]
 
@@ -114,7 +116,7 @@ for name, args, kwargs in URLS:
     value = reverse(name, args=args, kwargs=kwargs)
     print(f"url OK: {name} -> {value}")
 
-# The operator shell owns only core v4 styles. Composition belongs to individual pages.
+# The operator shell owns core v4 + shell geometry only. Composition belongs to individual pages.
 base = get_template("partials/base.html")
 rf = RequestFactory()
 auth_user = SimpleNamespace(is_authenticated=True, username="ui-v4-check")
@@ -130,6 +132,7 @@ composition_assets = (
     "app-v4-forms.css",
     "app-v4-access.css",
     "app-v4-portal.css",
+    "app-v4-portal-polish.css",
 )
 
 for path in (
@@ -154,7 +157,7 @@ for path in (
             f"page composition CSS leaked into base shell on {path}: "
             + ", ".join(leaked_composition)
         )
-    for required_core in ("app-v4.css", "app-v4-polish.css"):
+    for required_core in ("app-v4.css", "app-v4-shell.css", "app-v4-polish.css"):
         if required_core not in html:
             raise RuntimeError(
                 f"core v4 stylesheet missing from shell on {path}: {required_core}"
@@ -222,18 +225,26 @@ for template_name, required_assets in TEMPLATE_STYLE_REQUIREMENTS.items():
             )
     print(f"page CSS ownership OK: {template_name}")
 
-# The customer portal is a separate consumer shell and must not inherit legacy/operator composition.
+# The customer portal is a separate consumer shell and must not inherit legacy/operator CSS.
+portal_base = get_template("customer_portal/base.html")
 portal_base_source = (template_root / "customer_portal/base.html").read_text(encoding="utf-8")
-for forbidden in (*legacy_assets, *composition_assets[:-1], "app-v4-polish.css"):
+for forbidden in (*legacy_assets, *composition_assets[:-2], "app-v4-shell.css", "app-v4-polish.css"):
     if forbidden in portal_base_source:
         raise RuntimeError(f"operator/legacy stylesheet leaked into customer portal: {forbidden}")
-for required in ("app.css", "app-v4.css", "app-v4-portal.css"):
+for required in ("app.css", "app-v4.css", "app-v4-portal.css", "app-v4-portal-polish.css"):
     if portal_base_source.count(required) != 1:
         raise RuntimeError(
             f"customer portal stylesheet ownership error: {required} "
             f"occurs {portal_base_source.count(required)} times"
         )
 print("customer portal CSS isolation OK")
+
+portal_login_html = portal_base.render(
+    {"request": rf.get("/cabinet/login/"), "user": auth_user}
+)
+if "portal-shell-user" in portal_login_html:
+    raise RuntimeError("authenticated session controls leaked into customer portal login")
+print("customer portal login shell OK")
 
 portal_home_source = (template_root / "customer_portal/home.html").read_text(encoding="utf-8")
 if "app-v4-layout.css" in portal_home_source or "app-v2.css" in portal_home_source:
@@ -242,6 +253,12 @@ print("customer portal home composition OK")
 
 # Self-contained page layers must retain the shared primitives they use.
 CSS_MARKERS = {
+    "css/app-v4-shell.css": (
+        ".nav-icon svg",
+        ".sidebar-account-avatar",
+        ".topbar-user-avatar",
+        ".sidebar-toggle svg",
+    ),
     "css/app-v4-forms.css": (
         ".v4-form-page .v4-back-link",
         ".v4-form-page .v4-status-pill",
@@ -254,6 +271,11 @@ CSS_MARKERS = {
         ".portal-v4-status-card",
         ".portal-device-card",
         ".portal-login-card",
+    ),
+    "css/app-v4-portal-polish.css": (
+        ".portal-v4-account-chip",
+        ".portal-login-shell",
+        ".portal-connection-actions",
     ),
 }
 for asset, markers in CSS_MARKERS.items():
