@@ -7,5 +7,7 @@ class ServersConfig(AppConfig):
 
     def ready(self):
         from .agent_backend import install_agent_backend
+        from .agent_vpn_hooks import install_agent_vpn_hooks
 
         install_agent_backend()
+        install_agent_vpn_hooks()
