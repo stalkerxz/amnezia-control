@@ -47,14 +47,33 @@ body.customer-portal-shell .portal-connection-copy > small {
   line-height: 1.45;
 }
 body.customer-portal-shell .portal-connection-actions {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  flex-wrap: wrap;
   margin-top: auto;
   padding-top: 13px;
+}
+body.customer-portal-shell .portal-connection-actions form {
+  margin: 0;
 }
 body.customer-portal-shell .portal-connection-actions .btn {
   min-width: 82px;
   min-height: 31px;
   padding: 4px 10px;
   font-size: .62rem !important;
+}
+body.customer-portal-shell .portal-reissue-button {
+  border: 1px solid rgba(132,119,255,.30);
+  background: rgba(117,91,255,.055);
+  color: #aeb8ff;
+  box-shadow: none;
+}
+body.customer-portal-shell .portal-reissue-button:hover,
+body.customer-portal-shell .portal-reissue-button:focus-visible {
+  border-color: rgba(132,119,255,.48);
+  background: rgba(117,91,255,.12);
+  color: #e0e4ff;
 }
 
 body.customer-portal-shell .portal-v4-help-card {
