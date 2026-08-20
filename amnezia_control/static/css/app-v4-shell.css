@@ -1,0 +1,134 @@
+/* VPN Control UI v4 — operator shell geometry.
+   Keeps sidebar/topbar primitives independent from page composition layers. */
+
+body.app-shell .sidebar .nav-link {
+  display: flex;
+  align-items: center;
+}
+
+body.app-shell .nav-icon {
+  display: inline-grid;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  place-items: center;
+  line-height: 0;
+}
+body.app-shell .nav-icon svg {
+  display: block;
+  width: 18px !important;
+  height: 18px !important;
+  max-width: 18px;
+  max-height: 18px;
+  fill: none;
+  stroke-width: 1.65;
+}
+
+body.app-shell .sidebar-system > summary .nav-icon {
+  width: 17px;
+  height: 17px;
+  flex-basis: 17px;
+}
+body.app-shell .sidebar-system > summary .nav-icon svg {
+  width: 17px !important;
+  height: 17px !important;
+}
+
+body.app-shell .sidebar-toggle {
+  display: grid;
+  place-items: center;
+  padding: 0 !important;
+}
+body.app-shell .sidebar-toggle svg {
+  display: block;
+  width: 17px !important;
+  height: 17px !important;
+  max-width: 17px;
+  max-height: 17px;
+  stroke-width: 1.7;
+}
+
+body.app-shell .sidebar-account {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+}
+body.app-shell .sidebar-account-copy {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+body.app-shell .sidebar-account-avatar,
+body.app-shell .topbar-user-avatar {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  place-items: center;
+  border-radius: 50%;
+  font-size: .64rem;
+  font-weight: 720;
+  line-height: 1;
+}
+body.app-shell .sidebar-account-name,
+body.app-shell .topbar-user-name {
+  overflow: hidden;
+  font-size: .68rem;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+body.app-shell .sidebar-account-role,
+body.app-shell .topbar-user-role {
+  margin-top: 1px;
+  font-size: .56rem;
+  line-height: 1.25;
+}
+
+body.app-shell .sidebar-account-logout {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  place-items: center;
+  border-radius: 9px;
+  color: #65758b !important;
+  text-decoration: none;
+}
+body.app-shell .sidebar-account-logout:hover {
+  background: rgba(72, 96, 135, .08);
+  color: #b9c8dc !important;
+}
+body.app-shell .sidebar-account-logout svg {
+  display: block;
+  width: 16px !important;
+  height: 16px !important;
+  max-width: 16px;
+  max-height: 16px;
+  stroke-width: 1.7;
+}
+
+body.app-shell .topbar-left,
+body.app-shell .topbar-user {
+  display: flex;
+  align-items: center;
+}
+body.app-shell .topbar-left {
+  min-width: 0;
+  gap: 10px;
+}
+body.app-shell .topbar-context,
+body.app-shell .topbar-user-copy {
+  min-width: 0;
+}
+body.app-shell .topbar-user {
+  flex: 0 0 auto;
+  gap: 8px;
+}
+body.app-shell .topbar-user-copy {
+  display: flex;
+  flex-direction: column;
+}
+
+@media (max-width: 575.98px) {
+  body.app-shell .topbar-user-copy { display: none; }
+}
