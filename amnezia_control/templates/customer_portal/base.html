@@ -11,6 +11,7 @@
   <link href="{% static 'css/app.css' %}" rel="stylesheet">
   <link href="{% static 'css/app-v4.css' %}" rel="stylesheet">
   <link href="{% static 'css/app-v4-portal.css' %}" rel="stylesheet">
+  <link href="{% static 'css/app-v4-portal-polish.css' %}" rel="stylesheet">
 </head>
 
 <body class="customer-portal-shell">
@@ -18,10 +19,10 @@
     <div class="portal-shell-bar">
       <a class="portal-brand" href="{% url 'customer-portal-home' %}">
         <span class="portal-brand-mark" aria-hidden="true">A</span>
-        <span>VPN</span>
+        <span>VPN Control</span>
       </a>
 
-      {% if user.is_authenticated %}
+      {% if user.is_authenticated and request.path != '/cabinet/login/' %}
         <div class="portal-shell-user">
           <div class="portal-shell-user-copy">
             <strong>{{ user.username }}</strong>
