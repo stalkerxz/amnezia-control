@@ -2,11 +2,20 @@ from django.db import models
 
 
 class Server(models.Model):
+    class RuntimeBackend(models.TextChoices):
+        DOCKER = "docker", "Docker / Amnezia container"
+        AWG_AGENT = "awg_agent", "AWG agent over SSH"
+
     name = models.CharField(max_length=120, unique=True)
     host = models.CharField(max_length=255, default="127.0.0.1")
     port = models.PositiveIntegerField(default=22)
     ssh_username = models.CharField(max_length=120, default="amnezia")
     ssh_private_key_path = models.CharField(max_length=255, blank=True)
+    runtime_backend = models.CharField(
+        max_length=24,
+        choices=RuntimeBackend.choices,
+        default=RuntimeBackend.DOCKER,
+    )
     is_enabled = models.BooleanField(default=True)
     health_status = models.CharField(max_length=30, default="unknown")
     public_endpoint_host = models.CharField(max_length=255, blank=True)
