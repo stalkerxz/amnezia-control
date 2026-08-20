@@ -4,6 +4,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
+from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect
 from django.utils import timezone
 from django.views.decorators.http import require_POST
@@ -266,7 +267,7 @@ def customer_vpn_reissue_view(request, pk):
                 actor=request.user,
             )
 
-    except PermissionDenied:
+    except (PermissionDenied, Http404):
         raise
     except Exception:
         messages.error(
@@ -349,7 +350,7 @@ def customer_xhttp_reissue_view(request, pk):
                 actor=request.user,
             )
 
-    except PermissionDenied:
+    except (PermissionDenied, Http404):
         raise
     except Exception:
         messages.error(
