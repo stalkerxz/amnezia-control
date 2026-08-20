@@ -1,0 +1,103 @@
+/* VPN Control UI v4 — final customer portal polish. */
+
+body.customer-portal-shell .portal-v4-account-chip {
+  display: none;
+}
+
+body.customer-portal-shell .portal-v4-header {
+  align-items: flex-end;
+  margin-bottom: 14px;
+}
+
+body.customer-portal-shell .portal-v4-status-card {
+  padding: 18px;
+}
+
+body.customer-portal-shell .portal-device-card {
+  border-color: rgba(125,157,205,.12);
+}
+body.customer-portal-shell .portal-device-head {
+  padding-top: 13px;
+  padding-bottom: 11px;
+}
+body.customer-portal-shell .portal-device-title-line h3 {
+  font-size: .82rem;
+}
+body.customer-portal-shell .portal-device-connections {
+  align-items: stretch;
+}
+body.customer-portal-shell .portal-connection-card {
+  display: flex;
+  min-height: 132px;
+  flex-direction: column;
+  border-color: rgba(113,151,216,.13);
+  background: linear-gradient(155deg, rgba(13,24,41,.86), rgba(7,14,25,.76));
+}
+body.customer-portal-shell .portal-connection-card.is-alt {
+  border-color: rgba(155,92,255,.16);
+}
+body.customer-portal-shell .portal-connection-copy > span {
+  color: #6f83a0;
+}
+body.customer-portal-shell .portal-connection-copy > strong {
+  font-size: .75rem;
+  letter-spacing: -.01em;
+}
+body.customer-portal-shell .portal-connection-copy > small {
+  line-height: 1.45;
+}
+body.customer-portal-shell .portal-connection-actions {
+  margin-top: auto;
+  padding-top: 13px;
+}
+body.customer-portal-shell .portal-connection-actions .btn {
+  min-width: 82px;
+  min-height: 31px;
+  padding: 4px 10px;
+  font-size: .62rem !important;
+}
+
+body.customer-portal-shell .portal-v4-help-card {
+  border-color: rgba(125,157,205,.08);
+  background: rgba(10,18,31,.48);
+  box-shadow: none;
+  opacity: .78;
+}
+body.customer-portal-shell .portal-v4-help-card h3 {
+  font-size: .7rem;
+}
+body.customer-portal-shell .portal-v4-help-card p {
+  font-size: .59rem;
+}
+
+body.customer-portal-shell .portal-login-shell {
+  min-height: calc(100vh - 170px);
+}
+body.customer-portal-shell .portal-login-card {
+  width: min(100%, 420px);
+  padding: 22px;
+}
+body.customer-portal-shell .portal-login-card h1 {
+  font-size: 1.18rem;
+}
+body.customer-portal-shell .portal-login-form .form-control {
+  min-height: 42px;
+}
+body.customer-portal-shell .portal-login-form .btn {
+  min-height: 40px;
+}
+
+@media (max-width: 767.98px) {
+  body.customer-portal-shell .portal-v4-header {
+    align-items: flex-start;
+  }
+  body.customer-portal-shell .portal-v4-status-card {
+    padding: 15px;
+  }
+  body.customer-portal-shell .portal-connection-card {
+    min-height: 0;
+  }
+  body.customer-portal-shell .portal-connection-actions .btn {
+    min-width: 0;
+  }
+}
