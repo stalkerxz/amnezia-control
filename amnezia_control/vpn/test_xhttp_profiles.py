@@ -139,3 +139,48 @@ class XHTTPPerformanceProfileTest(TestCase):
         self.assertEqual(created.performance_profile, XHTTPDevice.PerformanceProfile.TURBO)
         payload = json.loads(XHTTPDeviceService.latest_config(created))
         self.assertEqual(xhttp_settings(payload)["scMinPostsIntervalMs"], 5)
+
+    @patch("vpn.xhttp_services.XHTTPRuntimeAdapter.add")
+    def test_view_without_profile_defaults_to_standard(self, add_mock):
+        self.client.force_login(self.user)
+        response = self.client.post(
+            reverse("xhttp-devices"),
+            {
+                "device": self.client_device.pk,
+                "server": self.server.pk,
+                "name": "Legacy POST",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        created = XHTTPDevice.objects.get(name="Legacy POST")
+        self.assertEqual(
+            created.performance_profile,
+            XHTTPDevice.PerformanceProfile.STANDARD,
+        )
+
+    @patch("vpn.xhttp_services.XHTTPRuntimeAdapter.add")
+    @patch("vpn.xhttp_services.XHTTPRuntimeAdapter.remove")
+    def test_rotate_can_switch_standard_to_turbo(self, remove_mock, add_mock):
+        device = XHTTPDeviceService.create_device(
+            device=self.client_device,
+            server=self.server,
+            name="Switchable",
+            actor=self.user,
+        )
+        add_mock.reset_mock()
+
+        XHTTPDeviceService.rotate(
+            device=device,
+            actor=self.user,
+            performance_profile=XHTTPDevice.PerformanceProfile.TURBO,
+        )
+        device.refresh_from_db()
+
+        self.assertEqual(
+            device.performance_profile,
+            XHTTPDevice.PerformanceProfile.TURBO,
+        )
+        payload = json.loads(XHTTPDeviceService.latest_config(device))
+        self.assertEqual(xhttp_settings(payload)["scMinPostsIntervalMs"], 5)
+        remove_mock.assert_called()
+        add_mock.assert_called_once()
