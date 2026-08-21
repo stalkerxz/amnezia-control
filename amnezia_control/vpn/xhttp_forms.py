@@ -1,10 +1,7 @@
 from django import forms
 from django.utils import timezone
 
-from customers.models import (
-    ClientDevice,
-    CustomerAccount,
-)
+from customers.models import ClientDevice, CustomerAccount
 from servers.models import Server
 
 from .models import XHTTPDevice
@@ -32,85 +29,61 @@ class XHTTPDeviceCreateForm(forms.Form):
         ),
     )
 
+    performance_profile = forms.ChoiceField(
+        label="Профиль",
+        choices=XHTTPDevice.PerformanceProfile.choices,
+        initial=XHTTPDevice.PerformanceProfile.STANDARD,
+        required=False,
+        help_text=(
+            "Standard: 2048 / 30 ms / 1800. "
+            "Turbo: 4096 / 5 ms / 3500."
+        ),
+    )
+
     def __init__(self, *args, **kwargs):
-        super().__init__(
-            *args,
-            **kwargs,
-        )
+        super().__init__(*args, **kwargs)
 
         self.fields["device"].queryset = (
             ClientDevice.objects
             .filter(
-                status=(
-                    ClientDevice.Status.ACTIVE
-                ),
-                account__status=(
-                    CustomerAccount.Status.ACTIVE
-                ),
+                status=ClientDevice.Status.ACTIVE,
+                account__status=CustomerAccount.Status.ACTIVE,
             )
-            .select_related(
-                "account",
-            )
-            .order_by(
-                "account__display_name",
-                "name",
-                "id",
-            )
+            .select_related("account")
+            .order_by("account__display_name", "name", "id")
         )
 
         self.fields["server"].queryset = (
             Server.objects
-            .filter(
-                is_enabled=True,
-            )
-            .order_by(
-                "name",
-                "id",
-            )
+            .filter(is_enabled=True)
+            .order_by("name", "id")
+        )
+
+    def clean_performance_profile(self):
+        return (
+            self.cleaned_data.get("performance_profile")
+            or XHTTPDevice.PerformanceProfile.STANDARD
         )
 
     def clean(self):
         cleaned_data = super().clean()
-
-        device = cleaned_data.get(
-            "device"
-        )
-
-        name = (
-            cleaned_data.get("name")
-            or ""
-        ).strip()
-
+        device = cleaned_data.get("device")
+        name = (cleaned_data.get("name") or "").strip()
         cleaned_data["name"] = name
 
         if device is None:
             return cleaned_data
 
         if (
-            device.account.expires_at
-            is not None
-            and device.account.expires_at
-            <= timezone.now()
+            device.account.expires_at is not None
+            and device.account.expires_at <= timezone.now()
         ):
-            self.add_error(
-                "device",
-                "Срок действия аккаунта истёк.",
-            )
+            self.add_error("device", "Срок действия аккаунта истёк.")
 
-        if (
-            name
-            and XHTTPDevice.objects.filter(
-                device=device,
-                name=name,
-            ).exists()
-        ):
+        if name and XHTTPDevice.objects.filter(device=device, name=name).exists():
             self.add_error(
                 "name",
-                (
-                    "У этого устройства уже есть "
-                    "XHTTP-подключение "
-                    "с таким названием."
-                ),
+                "У этого устройства уже есть XHTTP-подключение с таким названием.",
             )
 
         return cleaned_data

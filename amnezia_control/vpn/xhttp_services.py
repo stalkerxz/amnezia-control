@@ -50,6 +50,18 @@ class XHTTPClientSettings:
         if self.server_max_header_bytes < 8192:
             raise RuntimeError("XHTTP_SERVER_MAX_HEADER_BYTES слишком мал.")
 
+    def transport_values(self, performance_profile: str) -> tuple[int, int, int]:
+        if performance_profile == XHTTPDevice.PerformanceProfile.STANDARD:
+            return (
+                self.sc_max_each_post_bytes,
+                self.sc_min_posts_interval_ms,
+                self.uplink_chunk_size,
+            )
+        if performance_profile == XHTTPDevice.PerformanceProfile.TURBO:
+            # Measured stable Yandex CDN profile: 4096 / 5 ms / 3500.
+            return 4096, 5, 3500
+        raise ValueError("Неизвестный XHTTP performance profile.")
+
 
 class XHTTPRuntimeAdapter:
     HELPER_PATH = "/usr/local/sbin/amnezia-control-xhttp"
@@ -97,75 +109,50 @@ class XHTTPDeviceService:
     @staticmethod
     def is_device_available(device: ClientDevice) -> bool:
         account = device.account
-
         if device.status != ClientDevice.Status.ACTIVE:
             return False
-
-        if (
-            device.expires_at is not None
-            and device.expires_at <= timezone.now()
-        ):
+        if device.expires_at is not None and device.expires_at <= timezone.now():
             return False
-
         if account.status != CustomerAccount.Status.ACTIVE:
             return False
-
-        if (
-            account.expires_at is not None
-            and account.expires_at <= timezone.now()
-        ):
+        if account.expires_at is not None and account.expires_at <= timezone.now():
             return False
-
         return True
 
     @classmethod
     def _assert_device_available(cls, device: ClientDevice):
         if device.status != ClientDevice.Status.ACTIVE:
-            raise RuntimeError(
-                "XHTTP доступен только для активного устройства."
-            )
-
-        if (
-            device.expires_at is not None
-            and device.expires_at <= timezone.now()
-        ):
-            raise RuntimeError(
-                "XHTTP недоступен: срок устройства истёк."
-            )
+            raise RuntimeError("XHTTP доступен только для активного устройства.")
+        if device.expires_at is not None and device.expires_at <= timezone.now():
+            raise RuntimeError("XHTTP недоступен: срок устройства истёк.")
 
         account = device.account
-
         if account.status != CustomerAccount.Status.ACTIVE:
-            raise RuntimeError(
-                "XHTTP доступен только для активного аккаунта."
-            )
-
-        if (
-            account.expires_at is not None
-            and account.expires_at <= timezone.now()
-        ):
-            raise RuntimeError(
-                "XHTTP недоступен: срок аккаунта истёк."
-            )
+            raise RuntimeError("XHTTP доступен только для активного аккаунта.")
+        if account.expires_at is not None and account.expires_at <= timezone.now():
+            raise RuntimeError("XHTTP недоступен: срок аккаунта истёк.")
 
     @staticmethod
-    def _runtime_server(
-        device: XHTTPDevice,
-    ):
+    def _runtime_server(device: XHTTPDevice):
         return device.server
 
     @classmethod
-    def _assert_owner_available(
-        cls,
-        device: XHTTPDevice,
-    ):
-        cls._assert_device_available(
-            device.device
-        )
+    def _assert_owner_available(cls, device: XHTTPDevice):
+        cls._assert_device_available(device.device)
 
     @staticmethod
-    def build_happ_config(*, client_uuid: uuid.UUID, device_name: str) -> str:
+    def build_happ_config(
+        *,
+        client_uuid: uuid.UUID,
+        device_name: str,
+        performance_profile: str = XHTTPDevice.PerformanceProfile.STANDARD,
+    ) -> str:
         runtime = XHTTPClientSettings.from_django_settings()
+        sc_max_each_post_bytes, sc_min_posts_interval_ms, uplink_chunk_size = (
+            runtime.transport_values(performance_profile)
+        )
+        profile_label = dict(XHTTPDevice.PerformanceProfile.choices)[performance_profile]
+
         config = {
             "log": {"loglevel": "info"},
             "inbounds": [
@@ -211,9 +198,9 @@ class XHTTPDeviceService:
                             "uplinkHTTPMethod": "GET",
                             "uplinkDataPlacement": "header",
                             "uplinkDataKey": "X-Data",
-                            "scMaxEachPostBytes": runtime.sc_max_each_post_bytes,
-                            "scMinPostsIntervalMs": runtime.sc_min_posts_interval_ms,
-                            "uplinkChunkSize": runtime.uplink_chunk_size,
+                            "scMaxEachPostBytes": sc_max_each_post_bytes,
+                            "scMinPostsIntervalMs": sc_min_posts_interval_ms,
+                            "uplinkChunkSize": uplink_chunk_size,
                             "serverMaxHeaderBytes": runtime.server_max_header_bytes,
                         },
                         "sockopt": {"tcpNoDelay": True},
@@ -223,9 +210,13 @@ class XHTTPDeviceService:
                 {"tag": "direct", "protocol": "freedom", "settings": {}},
                 {"tag": "block", "protocol": "blackhole", "settings": {}},
             ],
-            "remarks": f"Yandex CDN XHTTP — {device_name}",
+            "remarks": f"Yandex CDN XHTTP {profile_label} — {device_name}",
             "meta": {
-                "serverDescription": "VLESS/XHTTP packet-up GET через Yandex CDN",
+                "serverDescription": (
+                    "VLESS/XHTTP packet-up GET через Yandex CDN "
+                    f"({profile_label})"
+                ),
+                "performanceProfile": performance_profile,
                 "managedBy": "amnezia-control",
             },
         }
@@ -250,90 +241,51 @@ class XHTTPDeviceService:
         server,
         name: str,
         actor,
+        performance_profile: str = XHTTPDevice.PerformanceProfile.STANDARD,
     ) -> XHTTPDevice:
         normalized_name = name.strip()
-
         if not normalized_name:
-            raise ValueError(
-                "Название устройства "
-                "не может быть пустым."
-            )
+            raise ValueError("Название устройства не может быть пустым.")
+        if performance_profile not in XHTTPDevice.PerformanceProfile.values:
+            raise ValueError("Неизвестный XHTTP performance profile.")
 
-        cls._assert_device_available(
-            device
-        )
+        cls._assert_device_available(device)
 
         if server is None:
-            raise ValueError(
-                "Для XHTTP необходимо "
-                "выбрать сервер."
-            )
-
+            raise ValueError("Для XHTTP необходимо выбрать сервер.")
         if not server.is_enabled:
-            raise RuntimeError(
-                "Выбранный XHTTP-сервер отключён."
-            )
-
-        if XHTTPDevice.objects.filter(
-            device=device,
-            name=normalized_name,
-        ).exists():
+            raise RuntimeError("Выбранный XHTTP-сервер отключён.")
+        if XHTTPDevice.objects.filter(device=device, name=normalized_name).exists():
             raise ValueError(
-                "У этого устройства уже есть "
-                "XHTTP-подключение "
-                "с таким названием."
+                "У этого устройства уже есть XHTTP-подключение с таким названием."
             )
 
         client_uuid = uuid.uuid4()
-
-        xray_email = cls._xray_email(
-            client_uuid
-        )
-
-        adapter = XHTTPRuntimeAdapter(
-            server
-        )
-
-        adapter.add(
-            client_uuid=client_uuid,
-            xray_email=xray_email,
-            actor=actor,
-        )
+        xray_email = cls._xray_email(client_uuid)
+        adapter = XHTTPRuntimeAdapter(server)
+        adapter.add(client_uuid=client_uuid, xray_email=xray_email, actor=actor)
 
         try:
             plaintext = cls.build_happ_config(
                 client_uuid=client_uuid,
                 device_name=normalized_name,
+                performance_profile=performance_profile,
             )
-
             with transaction.atomic():
                 xhttp_device = XHTTPDevice(
                     device=device,
                     server=server,
                     name=normalized_name,
+                    performance_profile=performance_profile,
                     client_uuid=client_uuid,
                     xray_email=xray_email,
-                    status=(
-                        XHTTPDevice.Status.ACTIVE
-                    ),
-                    disable_reason=(
-                        XHTTPDevice
-                        .DisableReason
-                        .NONE
-                    ),
-                    last_applied_at=(
-                        timezone.now()
-                    ),
+                    status=XHTTPDevice.Status.ACTIVE,
+                    disable_reason=XHTTPDevice.DisableReason.NONE,
+                    last_applied_at=timezone.now(),
                     last_error="",
                 )
-
-                cls._store_config(
-                    device=xhttp_device,
-                    plaintext=plaintext,
-                )
-
+                cls._store_config(device=xhttp_device, plaintext=plaintext)
                 xhttp_device.save()
-
                 AuditService.log(
                     actor,
                     "xhttp.device.create",
@@ -342,11 +294,10 @@ class XHTTPDeviceService:
                     {
                         "device_id": device.pk,
                         "server_id": server.pk,
+                        "performance_profile": performance_profile,
                     },
                 )
-
                 return xhttp_device
-
         except Exception:
             try:
                 adapter.remove(
@@ -356,15 +307,23 @@ class XHTTPDeviceService:
                 )
             except Exception:
                 pass
-
             raise
 
-
     @classmethod
-    def rotate(cls, *, device: XHTTPDevice, actor):
+    def rotate(
+        cls,
+        *,
+        device: XHTTPDevice,
+        actor,
+        performance_profile: str | None = None,
+    ):
         if device.status == XHTTPDevice.Status.DELETED:
             raise RuntimeError("Удалённое устройство нельзя перевыпустить.")
         cls._assert_owner_available(device)
+
+        target_profile = performance_profile or device.performance_profile
+        if target_profile not in XHTTPDevice.PerformanceProfile.values:
+            raise ValueError("Неизвестный XHTTP performance profile.")
 
         was_active = device.status == XHTTPDevice.Status.ACTIVE
         old_uuid = device.client_uuid
@@ -383,12 +342,21 @@ class XHTTPDeviceService:
                 raise
 
         try:
-            plaintext = cls.build_happ_config(client_uuid=new_uuid, device_name=device.name)
+            plaintext = cls.build_happ_config(
+                client_uuid=new_uuid,
+                device_name=device.name,
+                performance_profile=target_profile,
+            )
             with transaction.atomic():
                 device.client_uuid = new_uuid
+                device.performance_profile = target_profile
                 device.xray_email = new_email
-                device.status = XHTTPDevice.Status.ACTIVE if was_active else XHTTPDevice.Status.DISABLED
-                device.disable_reason = XHTTPDevice.DisableReason.NONE if was_active else old_reason
+                device.status = (
+                    XHTTPDevice.Status.ACTIVE if was_active else XHTTPDevice.Status.DISABLED
+                )
+                device.disable_reason = (
+                    XHTTPDevice.DisableReason.NONE if was_active else old_reason
+                )
                 device.last_applied_at = timezone.now()
                 device.last_error = ""
                 cls._store_config(device=device, plaintext=plaintext)
@@ -396,6 +364,7 @@ class XHTTPDeviceService:
                     update_fields=[
                         "client_uuid",
                         "xray_email",
+                        "performance_profile",
                         "status",
                         "disable_reason",
                         "config_blob_encrypted",
@@ -405,7 +374,13 @@ class XHTTPDeviceService:
                         "updated_at",
                     ]
                 )
-                AuditService.log(actor, "xhttp.device.rotate", "XHTTPDevice", device.id)
+                AuditService.log(
+                    actor,
+                    "xhttp.device.rotate",
+                    "XHTTPDevice",
+                    device.id,
+                    {"performance_profile": target_profile},
+                )
         except Exception:
             if was_active:
                 try:
@@ -449,7 +424,13 @@ class XHTTPDeviceService:
                     "updated_at",
                 ]
             )
-            AuditService.log(actor, "xhttp.device.disable", "XHTTPDevice", device.id, {"reason": reason})
+            AuditService.log(
+                actor,
+                "xhttp.device.disable",
+                "XHTTPDevice",
+                device.id,
+                {"reason": reason},
+            )
         except Exception:
             try:
                 adapter.add(client_uuid=device.client_uuid, xray_email=device.xray_email, actor=actor)
@@ -531,12 +512,7 @@ class XHTTPDeviceService:
         )
 
     @classmethod
-    def disable_for_device(
-        cls,
-        *,
-        client_device: ClientDevice,
-        actor,
-    ):
+    def disable_for_device(cls, *, client_device: ClientDevice, actor):
         for xhttp_device in client_device.xhttp_devices.filter(
             status=XHTTPDevice.Status.ACTIVE,
         ):
@@ -547,20 +523,11 @@ class XHTTPDeviceService:
             )
 
     @classmethod
-    def enable_for_device(
-        cls,
-        *,
-        client_device: ClientDevice,
-        actor,
-    ):
+    def enable_for_device(cls, *, client_device: ClientDevice, actor):
         if not cls.is_device_available(client_device):
             return
-
         for xhttp_device in client_device.xhttp_devices.filter(
             status=XHTTPDevice.Status.DISABLED,
             disable_reason=XHTTPDevice.DisableReason.CLIENT,
         ):
-            cls.enable(
-                device=xhttp_device,
-                actor=actor,
-            )
+            cls.enable(device=xhttp_device, actor=actor)

@@ -6,21 +6,13 @@
 
 <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
   <div>
-    <h1 class="h3 mb-1">
-      VLESS / XHTTP через Yandex CDN
-    </h1>
-
+    <h1 class="h3 mb-1">VLESS / XHTTP через Yandex CDN</h1>
     <p class="text-secondary mb-0">
-      Независимые резервные подключения,
-      привязанные к устройствам клиента.
+      Независимые резервные подключения, привязанные к устройствам клиента.
     </p>
   </div>
-
-  <span class="badge text-bg-warning">
-    CDN
-  </span>
+  <span class="badge text-bg-warning">CDN</span>
 </div>
-
 
 <div class="alert alert-info">
   XHTTP больше не зависит от конкретного AWG2 FULL/SELECTIVE peer.
@@ -28,168 +20,115 @@
   и отдельное VLESS/XHTTP-подключение.
 </div>
 
+<div class="alert alert-light border">
+  <strong>Standard</strong> — 2048 / 30 ms / 1800, максимально консервативный профиль.
+  <strong class="ms-2">Turbo</strong> — 4096 / 5 ms / 3500, оптимизированный профиль
+  Yandex CDN с повышенной скоростью отдачи.
+</div>
 
 <section class="card mb-3">
   <div class="card-body">
+    <h2 class="h6 mb-3">Добавить VLESS/XHTTP</h2>
 
-    <h2 class="h6 mb-3">
-      Добавить VLESS/XHTTP
-    </h2>
-
-    <form
-      method="post"
-      class="row g-3 align-items-end"
-    >
+    <form method="post" class="row g-3 align-items-end">
       {% csrf_token %}
 
-      <div class="col-lg-4">
-        <label
-          class="form-label"
-          for="id_device"
-        >
-          {{ form.device.label }}
-        </label>
-
+      <div class="col-lg-3">
+        <label class="form-label" for="id_device">{{ form.device.label }}</label>
         {{ form.device }}
-
         {% for error in form.device.errors %}
-          <div class="text-danger small mt-1">
-            {{ error }}
-          </div>
+          <div class="text-danger small mt-1">{{ error }}</div>
         {% endfor %}
       </div>
 
-
-      <div class="col-lg-3">
-        <label
-          class="form-label"
-          for="id_server"
-        >
-          {{ form.server.label }}
-        </label>
-
+      <div class="col-lg-2">
+        <label class="form-label" for="id_server">{{ form.server.label }}</label>
         {{ form.server }}
-
         {% for error in form.server.errors %}
-          <div class="text-danger small mt-1">
-            {{ error }}
-          </div>
+          <div class="text-danger small mt-1">{{ error }}</div>
         {% endfor %}
       </div>
-
 
       <div class="col-lg-3">
-        <label
-          class="form-label"
-          for="id_name"
-        >
-          {{ form.name.label }}
-        </label>
-
+        <label class="form-label" for="id_name">{{ form.name.label }}</label>
         {{ form.name }}
-
         {% for error in form.name.errors %}
-          <div class="text-danger small mt-1">
-            {{ error }}
-          </div>
+          <div class="text-danger small mt-1">{{ error }}</div>
         {% endfor %}
       </div>
 
+      <div class="col-lg-2">
+        <label class="form-label" for="id_performance_profile">
+          {{ form.performance_profile.label }}
+        </label>
+        {{ form.performance_profile }}
+        {% for error in form.performance_profile.errors %}
+          <div class="text-danger small mt-1">{{ error }}</div>
+        {% endfor %}
+      </div>
 
       <div class="col-lg-2 d-grid">
-        <button
-          class="btn btn-primary"
-          type="submit"
-        >
-          Создать XHTTP
-        </button>
+        <button class="btn btn-primary" type="submit">Создать XHTTP</button>
       </div>
 
-
       {% for error in form.non_field_errors %}
-        <div class="col-12 text-danger small">
-          {{ error }}
-        </div>
+        <div class="col-12 text-danger small">{{ error }}</div>
       {% endfor %}
-
     </form>
-
   </div>
 </section>
 
-
 <section class="card">
   <div class="card-body p-0">
-
     <div class="d-flex justify-content-between align-items-center px-3 pt-3">
-      <h2 class="h6 mb-0">
-        Подключения
-      </h2>
-
-      <span class="text-secondary small">
-        {{ devices|length }} шт.
-      </span>
+      <h2 class="h6 mb-0">Подключения</h2>
+      <span class="text-secondary small">{{ devices|length }} шт.</span>
     </div>
 
-
     {% if devices %}
-
       <div class="table-responsive mt-2">
         <table class="table table-hover align-middle mb-0">
-
           <thead>
             <tr>
               <th>Клиент / устройство</th>
               <th>Сервер</th>
+              <th>Профиль</th>
               <th>Статус</th>
               <th>UUID</th>
               <th>Применено</th>
-              <th class="text-end">
-                Действия
-              </th>
+              <th class="text-end">Действия</th>
             </tr>
           </thead>
-
           <tbody>
-
             {% for device in devices %}
-
               <tr>
-
                 <td>
-                  <div class="fw-semibold">
-                    {{ device.name }}
-                  </div>
-
+                  <div class="fw-semibold">{{ device.name }}</div>
                   <div class="small text-secondary">
-                    {{ device.device.account.display_name }}
-                    ·
-                    {{ device.device.name }}
+                    {{ device.device.account.display_name }} · {{ device.device.name }}
                   </div>
-
                   {% if device.last_error %}
-                    <div class="small text-danger mt-1">
-                      {{ device.last_error }}
-                    </div>
+                    <div class="small text-danger mt-1">{{ device.last_error }}</div>
                   {% endif %}
                 </td>
 
+                <td>{{ device.server.name }}</td>
 
                 <td>
-                  {{ device.server.name }}
+                  {% if device.performance_profile == 'turbo' %}
+                    <span class="badge text-bg-primary">Turbo</span>
+                    <div class="small text-secondary mt-1">4096 / 5 ms / 3500</div>
+                  {% else %}
+                    <span class="badge text-bg-secondary">Standard</span>
+                    <div class="small text-secondary mt-1">2048 / 30 ms / 1800</div>
+                  {% endif %}
                 </td>
-
 
                 <td>
                   {% if device.status == 'active' %}
-                    <span class="badge text-bg-success">
-                      Активно
-                    </span>
+                    <span class="badge text-bg-success">Активно</span>
                   {% else %}
-                    <span class="badge text-bg-secondary">
-                      Отключено
-                    </span>
-
+                    <span class="badge text-bg-secondary">Отключено</span>
                     {% if device.disable_reason != 'none' %}
                       <div class="small text-secondary mt-1">
                         {{ device.get_disable_reason_display }}
@@ -198,13 +137,9 @@
                   {% endif %}
                 </td>
 
-
                 <td>
-                  <code class="user-select-all">
-                    {{ device.client_uuid }}
-                  </code>
+                  <code class="user-select-all">{{ device.client_uuid }}</code>
                 </td>
-
 
                 <td>
                   {% if device.last_applied_at %}
@@ -214,10 +149,8 @@
                   {% endif %}
                 </td>
 
-
                 <td>
                   <div class="d-flex flex-wrap gap-1 justify-content-end">
-
                     <a
                       class="btn btn-sm btn-outline-primary"
                       href="{% url 'xhttp-device-download' device.id %}"
@@ -225,55 +158,44 @@
                       Скачать JSON
                     </a>
 
-
                     {% if device.status == 'active' %}
-
-                      <form
-                        method="post"
-                        action="{% url 'xhttp-device-action' device.id 'check' %}"
-                      >
+                      <form method="post" action="{% url 'xhttp-device-action' device.id 'check' %}">
                         {% csrf_token %}
-                        <button class="btn btn-sm btn-outline-info">
-                          Проверить
-                        </button>
+                        <button class="btn btn-sm btn-outline-info">Проверить</button>
                       </form>
 
-                      <form
-                        method="post"
-                        action="{% url 'xhttp-device-action' device.id 'disable' %}"
-                      >
+                      <form method="post" action="{% url 'xhttp-device-action' device.id 'disable' %}">
                         {% csrf_token %}
-                        <button class="btn btn-sm btn-outline-warning">
-                          Отключить
-                        </button>
+                        <button class="btn btn-sm btn-outline-warning">Отключить</button>
                       </form>
-
                     {% else %}
-
-                      <form
-                        method="post"
-                        action="{% url 'xhttp-device-action' device.id 'enable' %}"
-                      >
+                      <form method="post" action="{% url 'xhttp-device-action' device.id 'enable' %}">
                         {% csrf_token %}
-                        <button class="btn btn-sm btn-outline-success">
-                          Включить
-                        </button>
+                        <button class="btn btn-sm btn-outline-success">Включить</button>
                       </form>
-
                     {% endif %}
-
 
                     <form
                       method="post"
                       action="{% url 'xhttp-device-action' device.id 'rotate' %}"
+                      class="d-flex gap-1"
                       onsubmit="return confirm('Старый UUID перестанет работать. Продолжить?');"
                     >
                       {% csrf_token %}
-                      <button class="btn btn-sm btn-outline-secondary">
-                        Перевыпустить
-                      </button>
+                      <select
+                        name="performance_profile"
+                        class="form-select form-select-sm"
+                        aria-label="Профиль при перевыпуске"
+                      >
+                        <option value="standard" {% if device.performance_profile == 'standard' %}selected{% endif %}>
+                          Standard
+                        </option>
+                        <option value="turbo" {% if device.performance_profile == 'turbo' %}selected{% endif %}>
+                          Turbo
+                        </option>
+                      </select>
+                      <button class="btn btn-sm btn-outline-secondary">Перевыпустить</button>
                     </form>
-
 
                     <form
                       method="post"
@@ -281,47 +203,29 @@
                       onsubmit="return confirm('Удалить подключение и отозвать UUID?');"
                     >
                       {% csrf_token %}
-                      <button class="btn btn-sm btn-outline-danger">
-                        Удалить
-                      </button>
+                      <button class="btn btn-sm btn-outline-danger">Удалить</button>
                     </form>
-
                   </div>
                 </td>
-
               </tr>
-
             {% endfor %}
-
           </tbody>
-
         </table>
       </div>
-
     {% else %}
-
-      <div class="p-3 text-secondary">
-        VLESS/XHTTP-подключения ещё не созданы.
-      </div>
-
+      <div class="p-3 text-secondary">VLESS/XHTTP-подключения ещё не созданы.</div>
     {% endif %}
-
   </div>
 </section>
-
 
 <script>
   document
     .querySelectorAll('input:not([type="hidden"])')
-    .forEach(
-      (element) => element.classList.add('form-control')
-    );
+    .forEach((element) => element.classList.add('form-control'));
 
   document
     .querySelectorAll('select')
-    .forEach(
-      (element) => element.classList.add('form-select')
-    );
+    .forEach((element) => element.classList.add('form-select'));
 </script>
 
 {% endblock %}
