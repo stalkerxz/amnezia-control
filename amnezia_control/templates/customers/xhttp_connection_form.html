@@ -12,15 +12,15 @@
       <a class="v4-back-link" href="{% url 'customers-device-connection-create' device.pk %}">← Выбор подключения</a>
       <p class="page-kicker">VPN Control · Альтернативное подключение</p>
       <h1>Создать альтернативное подключение</h1>
-      <p>Отдельный способ подключения для {{ device.name }}. FULL и SELECT этого устройства останутся без изменений.</p>
+      <p>Отдельный VLESS/XHTTP через Yandex CDN для {{ device.name }}. FULL и SELECT этого устройства останутся без изменений.</p>
     </div>
   </header>
 
   <div class="v4-inline-summary">
     <div class="v4-inline-summary-item"><span>Клиент</span><strong>{{ account.display_name }}</strong></div>
     <div class="v4-inline-summary-item"><span>Устройство</span><strong>{{ device.name }}</strong></div>
-    <div class="v4-inline-summary-item"><span>Тип</span><strong>ALT</strong></div>
-    <div class="v4-inline-summary-item"><span>Существующие VPN</span><strong>Не изменяются</strong></div>
+    <div class="v4-inline-summary-item"><span>Тип</span><strong>ALT · XHTTP</strong></div>
+    <div class="v4-inline-summary-item"><span>FULL / SELECT</span><strong>Без изменений</strong></div>
   </div>
 
   <form method="post">
@@ -29,7 +29,10 @@
       <div class="v4-form-main">
         <section class="v4-form-card">
           <div class="v4-form-card-head">
-            <div><h2>Параметры подключения</h2><p>Выберите понятное название и сервер для альтернативного маршрута.</p></div>
+            <div>
+              <h2>Параметры подключения</h2>
+              <p>Выберите сервер, название и профиль производительности.</p>
+            </div>
           </div>
 
           {% if form.non_field_errors %}<div class="alert alert-danger mb-3">{{ form.non_field_errors }}</div>{% endif %}
@@ -38,7 +41,7 @@
             <div class="v4-field">
               <label class="form-label" for="{{ form.name.id_for_label }}">Название подключения</label>
               {{ form.name }}
-              <div class="form-text">Например: Резервное подключение.</div>
+              <div class="form-text">Например: Yandex CDN Turbo.</div>
               {% for error in form.name.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
             </div>
 
@@ -47,6 +50,16 @@
               {{ form.server }}
               <div class="form-text">По умолчанию выбран основной доступный сервер.</div>
               {% for error in form.server.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+            </div>
+
+            <div class="v4-field is-wide">
+              <label class="form-label" for="{{ form.performance_profile.id_for_label }}">Профиль XHTTP</label>
+              {{ form.performance_profile }}
+              <div class="form-text">
+                <strong>Standard</strong> — 2048 / 30 ms / 1800. Стабильный базовый режим.
+                <strong>Turbo</strong> — 4096 / 5 ms / 3500. Подтверждённый ускоренный профиль без XMUX.
+              </div>
+              {% for error in form.performance_profile.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
             </div>
 
             {% for error in form.device.errors %}
@@ -63,16 +76,22 @@
 
       <aside class="v4-form-aside">
         <section class="v4-context-card">
-          <h3>После подтверждения</h3>
+          <h3>Профили</h3>
           <div class="v4-context-list">
-            <div class="v4-context-row"><span>Тип</span><strong>Альтернативное</strong></div>
-            <div class="v4-context-row"><span>Конфигурация</span><strong>Будет создана</strong></div>
+            <div class="v4-context-row"><span>Standard</span><strong>2048 / 30 / 1800</strong></div>
+            <div class="v4-context-row"><span>Turbo</span><strong>4096 / 5 / 3500</strong></div>
+            <div class="v4-context-row"><span>XMUX</span><strong>Отключён</strong></div>
             <div class="v4-context-row"><span>FULL / SELECT</span><strong>Без изменений</strong></div>
           </div>
         </section>
-        <div class="v4-context-note">Подключение создаётся только после нажатия «Создать подключение». Другие конфигурации устройства не перевыпускаются.</div>
+        <div class="v4-context-note">Выбранный профиль сохраняется у подключения. При обычном перевыпуске он останется прежним; профиль можно изменить прямо при перевыпуске в карточке клиента.</div>
       </aside>
     </div>
   </form>
 </div>
+
+<script>
+  document.querySelectorAll('.v4-form-page input:not([type="hidden"])').forEach((element) => element.classList.add('form-control'));
+  document.querySelectorAll('.v4-form-page select').forEach((element) => element.classList.add('form-select'));
+</script>
 {% endblock %}
