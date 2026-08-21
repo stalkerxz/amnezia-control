@@ -310,10 +310,20 @@ class XHTTPDeviceService:
             raise
 
     @classmethod
-    def rotate(cls, *, device: XHTTPDevice, actor):
+    def rotate(
+        cls,
+        *,
+        device: XHTTPDevice,
+        actor,
+        performance_profile: str | None = None,
+    ):
         if device.status == XHTTPDevice.Status.DELETED:
             raise RuntimeError("Удалённое устройство нельзя перевыпустить.")
         cls._assert_owner_available(device)
+
+        target_profile = performance_profile or device.performance_profile
+        if target_profile not in XHTTPDevice.PerformanceProfile.values:
+            raise ValueError("Неизвестный XHTTP performance profile.")
 
         was_active = device.status == XHTTPDevice.Status.ACTIVE
         old_uuid = device.client_uuid
@@ -335,10 +345,11 @@ class XHTTPDeviceService:
             plaintext = cls.build_happ_config(
                 client_uuid=new_uuid,
                 device_name=device.name,
-                performance_profile=device.performance_profile,
+                performance_profile=target_profile,
             )
             with transaction.atomic():
                 device.client_uuid = new_uuid
+                device.performance_profile = target_profile
                 device.xray_email = new_email
                 device.status = (
                     XHTTPDevice.Status.ACTIVE if was_active else XHTTPDevice.Status.DISABLED
@@ -353,6 +364,7 @@ class XHTTPDeviceService:
                     update_fields=[
                         "client_uuid",
                         "xray_email",
+                        "performance_profile",
                         "status",
                         "disable_reason",
                         "config_blob_encrypted",
@@ -362,7 +374,13 @@ class XHTTPDeviceService:
                         "updated_at",
                     ]
                 )
-                AuditService.log(actor, "xhttp.device.rotate", "XHTTPDevice", device.id)
+                AuditService.log(
+                    actor,
+                    "xhttp.device.rotate",
+                    "XHTTPDevice",
+                    device.id,
+                    {"performance_profile": target_profile},
+                )
         except Exception:
             if was_active:
                 try:
