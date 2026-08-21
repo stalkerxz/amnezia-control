@@ -178,9 +178,22 @@
                     <form
                       method="post"
                       action="{% url 'xhttp-device-action' device.id 'rotate' %}"
-                      onsubmit="return confirm('Старый UUID перестанет работать. Выбранный XHTTP-профиль будет сохранён. Продолжить?');"
+                      class="d-flex gap-1"
+                      onsubmit="return confirm('Старый UUID перестанет работать. Продолжить?');"
                     >
                       {% csrf_token %}
+                      <select
+                        name="performance_profile"
+                        class="form-select form-select-sm"
+                        aria-label="Профиль при перевыпуске"
+                      >
+                        <option value="standard" {% if device.performance_profile == 'standard' %}selected{% endif %}>
+                          Standard
+                        </option>
+                        <option value="turbo" {% if device.performance_profile == 'turbo' %}selected{% endif %}>
+                          Turbo
+                        </option>
+                      </select>
                       <button class="btn btn-sm btn-outline-secondary">Перевыпустить</button>
                     </form>
 
