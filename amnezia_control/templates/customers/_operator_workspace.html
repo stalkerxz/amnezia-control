@@ -177,13 +177,21 @@
 
     <article class="v4-connection-card {% if not row.xhttp %}is-empty{% endif %}">
       <div class="v4-connection-card-head">
-        <div><span>ALT</span><h4>Альтернативное</h4><p>Дополнительный способ подключения</p></div>
+        <div><span>ALT</span><h4>Альтернативное</h4><p>VLESS/XHTTP через Yandex CDN</p></div>
         <b>{{ row.xhttp|length }}</b>
       </div>
       {% for xhttp in row.xhttp %}
         <div class="v4-connection-item">
           <div class="v4-connection-item-head">
-            <div><strong>{{ xhttp.name }}</strong><small>Подключение #{{ xhttp.pk }}{% if xhttp.disable_reason != 'none' %} · {{ xhttp.get_disable_reason_display }}{% endif %}</small></div>
+            <div>
+              <strong>{{ xhttp.name }}</strong>
+              <small>
+                {{ xhttp.get_performance_profile_display }}
+                {% if xhttp.performance_profile == 'turbo' %} · 4096 / 5 ms / 3500{% else %} · 2048 / 30 ms / 1800{% endif %}
+                · #{{ xhttp.pk }}
+                {% if xhttp.disable_reason != 'none' %} · {{ xhttp.get_disable_reason_display }}{% endif %}
+              </small>
+            </div>
             {% if xhttp.status == 'active' %}<span class="v4-status-pill is-success">Активно</span>{% elif xhttp.status == 'disabled' %}<span class="v4-status-pill is-warning">Отключено</span>{% else %}<span class="v4-status-pill is-neutral">{{ xhttp.get_status_display }}</span>{% endif %}
           </div>
           {% if xhttp.last_error %}<div class="v4-connection-error">{{ xhttp.last_error }}</div>{% endif %}
@@ -196,7 +204,15 @@
               <form method="post" action="{% url 'customers-xhttp-action' xhttp.pk 'enable' %}">{% csrf_token %}<button type="submit" class="btn btn-sm btn-outline-success">Включить</button></form>
             {% endif %}
             {% if row.can_add_connections %}
-              <form method="post" action="{% url 'customers-xhttp-action' xhttp.pk 'rotate' %}" onsubmit="return confirm('Перевыпустить параметры альтернативного подключения? Ранее скачанная конфигурация перестанет работать.');">{% csrf_token %}<button type="submit" class="btn btn-sm btn-outline-secondary">Перевыпустить</button></form>
+              <form method="post" action="{% url 'customers-xhttp-action' xhttp.pk 'rotate' %}" class="d-flex align-items-center gap-1" onsubmit="return confirm('Перевыпустить альтернативное подключение с выбранным профилем? Ранее скачанная конфигурация перестанет работать.');">
+                {% csrf_token %}
+                <label class="visually-hidden" for="xhttp-profile-{{ xhttp.pk }}">Профиль XHTTP</label>
+                <select id="xhttp-profile-{{ xhttp.pk }}" name="performance_profile" class="form-select form-select-sm" aria-label="Профиль XHTTP">
+                  <option value="standard" {% if xhttp.performance_profile == 'standard' %}selected{% endif %}>Standard</option>
+                  <option value="turbo" {% if xhttp.performance_profile == 'turbo' %}selected{% endif %}>Turbo</option>
+                </select>
+                <button type="submit" class="btn btn-sm btn-outline-secondary">Перевыпустить</button>
+              </form>
             {% endif %}
             <form method="post" action="{% url 'customers-xhttp-action' xhttp.pk 'delete' %}" onsubmit="return confirm('Удалить альтернативное подключение?');">{% csrf_token %}<button type="submit" class="btn btn-sm btn-outline-danger">Удалить</button></form>
           </div>
