@@ -149,6 +149,10 @@ class XHTTPDevice(models.Model):
         MANUAL = "manual", "Вручную"
         CLIENT = "client", "Недоступен аккаунт/устройство"
 
+    class PerformanceProfile(models.TextChoices):
+        STANDARD = "standard", "Standard"
+        TURBO = "turbo", "Turbo"
+
     # Logical owner of the VLESS/XHTTP connection.
     device = models.ForeignKey(
         "customers.ClientDevice",
@@ -165,6 +169,11 @@ class XHTTPDevice(models.Model):
     )
 
     name = models.CharField(max_length=120)
+    performance_profile = models.CharField(
+        max_length=16,
+        choices=PerformanceProfile.choices,
+        default=PerformanceProfile.STANDARD,
+    )
     client_uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     xray_email = models.CharField(max_length=120, unique=True)
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.ACTIVE)
