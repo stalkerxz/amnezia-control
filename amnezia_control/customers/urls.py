@@ -16,14 +16,16 @@ from .views import (
     customer_device_access_update_view,
     customer_device_status_view,
     customer_device_vpn_create_view,
-    customer_device_xhttp_create_view,
     customer_edit_view,
     customer_onboarding_view,
     customer_status_view,
-    customer_xhttp_action_view,
     customers_list_view,
     merge_customer_view,
     move_device_view,
+)
+from .xhttp_profile_views import (
+    customer_device_xhttp_create_view,
+    customer_xhttp_action_view,
 )
 
 urlpatterns = [
