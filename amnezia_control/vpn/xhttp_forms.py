@@ -33,6 +33,7 @@ class XHTTPDeviceCreateForm(forms.Form):
         label="Профиль",
         choices=XHTTPDevice.PerformanceProfile.choices,
         initial=XHTTPDevice.PerformanceProfile.STANDARD,
+        required=False,
         help_text=(
             "Standard: 2048 / 30 ms / 1800. "
             "Turbo: 4096 / 5 ms / 3500."
@@ -56,6 +57,12 @@ class XHTTPDeviceCreateForm(forms.Form):
             Server.objects
             .filter(is_enabled=True)
             .order_by("name", "id")
+        )
+
+    def clean_performance_profile(self):
+        return (
+            self.cleaned_data.get("performance_profile")
+            or XHTTPDevice.PerformanceProfile.STANDARD
         )
 
     def clean(self):
