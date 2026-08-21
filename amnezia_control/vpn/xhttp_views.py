@@ -149,7 +149,16 @@ def xhttp_device_action_view(request, pk: int, action: str):
 
     callback, success_message = handler
     try:
-        callback(device=device, actor=request.user)
+        callback_kwargs = {
+            "device": device,
+            "actor": request.user,
+        }
+        if action == "rotate":
+            callback_kwargs["performance_profile"] = (
+                request.POST.get("performance_profile")
+                or device.performance_profile
+            )
+        callback(**callback_kwargs)
         if device.last_error:
             device.last_error = ""
             device.save(update_fields=["last_error", "updated_at"])
