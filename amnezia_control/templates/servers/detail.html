@@ -1,133 +1,136 @@
 {% extends 'partials/base.html' %}
+{% load static %}
+
+{% block title %}{{ server.name }} · Сервер · VPN Control{% endblock %}
+
 {% block content %}
-<div class="page-header d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
-  <div>
-    <p class="page-kicker">Операторская · Сервер</p>
-    <h1 class="h3 mb-1">Контур сервера: {{ server.name }}</h1>
-    <p class="text-secondary mb-0">Контроль готовности runtime, диагностика протоколов и безопасные действия оператора.</p>
-  </div>
-  <div class="d-flex gap-2 flex-wrap">
-    <form method="post" action="{% url 'servers-sync-runtime' pk=server.id %}">
-      {% csrf_token %}
-      <button class="btn btn-primary">Синхронизировать состояние</button>
-    </form>
-    <a class="btn btn-success" href="{% url 'clients-create' %}">Создать клиента</a>
-    <a class="btn btn-outline-secondary" href="{% url 'jobs-list' %}">Открыть задания</a>
-  </div>
-</div>
+<link href="{% static 'css/app-v4-layout.css' %}" rel="stylesheet">
+<link href="{% static 'css/app-v4-system.css' %}" rel="stylesheet">
+<link href="{% static 'css/app-v4-system-detail.css' %}" rel="stylesheet">
 
-<section class="section-block section-flat section-quiet mb-3">
-  <div class="section-body py-2">
-    <div class="summary-strip summary-strip-compact">
-      <div class="summary-item span-2"><div class="label">Сервер</div><div class="value">{{ server.name }}</div></div>
-      <div class="summary-item span-3"><div class="label">Публичный endpoint</div><div class="value"><code>{{ endpoint_display }}</code></div></div>
-      <div class="summary-item span-2"><div class="label">Протоколы</div><div class="value">{{ ready_protocols }} / {{ total_protocols }}</div></div>
-      <div class="summary-item span-3"><div class="label">Синхронизация runtime</div><div class="value">{{ server.last_runtime_sync_at|date:'d.m.Y H:i'|default:'—' }}</div></div>
-      <div class="summary-item span-2"><div class="label">Состояние</div><div class="value"><span class="badge status-badge {% if server.health_status == 'healthy' %}status-success{% elif server.health_status == 'degraded' %}status-warning{% elif server.health_status == 'unhealthy' %}status-danger{% else %}status-neutral{% endif %}">{{ server_health_label }}</span></div></div>
+<div class="v4-system-page">
+  <a class="v4-back-link" href="{% url 'servers-list' %}">← Все серверы</a>
+
+  <header class="v4-page-hero v4-system-hero">
+    <div>
+      <p class="page-kicker">VPN Control · Сервер</p>
+      <h1>{{ server.name }}</h1>
+      <p class="v4-hero-copy">Готовность runtime, endpoint, подсетей и протоколов перед выпуском клиентского доступа.</p>
     </div>
-  </div>
-</section>
+    <div class="v4-hero-actions">
+      <form method="post" action="{% url 'servers-sync-runtime' pk=server.id %}" class="m-0">
+        {% csrf_token %}
+        <button class="btn btn-primary" type="submit">Синхронизировать</button>
+      </form>
+      <a class="btn btn-outline-secondary" href="{% url 'jobs-list' %}">Операции</a>
+    </div>
+  </header>
 
-<section class="section-block section-flat mb-3">
-  <div class="section-body">
-    <div class="section-header">
+  <section class="v4-system-summary-grid" aria-label="Сводка сервера">
+    <div class="v4-system-summary"><span>Endpoint</span><strong><code>{{ endpoint_display }}</code></strong><small>Публичная точка подключения</small></div>
+    <div class="v4-system-summary"><span>Протоколы</span><strong>{{ ready_protocols }} / {{ total_protocols }}</strong><small>Готовы к выпуску доступа</small></div>
+    <div class="v4-system-summary"><span>Runtime sync</span><strong>{% if server.last_runtime_sync_at %}{{ server.last_runtime_sync_at|date:'d.m.Y H:i' }}{% else %}—{% endif %}</strong><small>Последняя синхронизация</small></div>
+    <div class="v4-system-summary"><span>Состояние</span><strong><span class="v4-server-status {% if server.health_status == 'healthy' %}is-success{% elif server.health_status == 'degraded' %}is-warning{% elif server.health_status == 'unhealthy' %}is-danger{% else %}is-neutral{% endif %}">{{ server_health_label }}</span></strong><small>Runtime health</small></div>
+  </section>
+
+  <section class="v4-system-panel">
+    <div class="v4-system-panel-head">
       <div>
-        <h2 class="h6 mb-1">Операторский контекст</h2>
-        <div class="small text-secondary">Импорт peers отключён. Создание клиента выполняется только через форму с обязательной preflight-проверкой.</div>
+        <span class="v4-panel-eyebrow">Readiness</span>
+        <h2>Готовность сервера</h2>
+        <p>Новые подключения создаются через управляемый workflow; runtime используется как источник состояния.</p>
+      </div>
+      <a class="btn btn-sm btn-outline-primary" href="{% url 'customers-onboarding' %}">Новый клиент</a>
+    </div>
+    <div class="v4-system-panel-body">
+      {% if server_health_reasons %}
+        <div class="v4-inline-warning mb-0">
+          <strong>Требует внимания</strong>
+          <span>{% for reason in server_health_reasons %}{{ reason }}{% if not forloop.last %} · {% endif %}{% endfor %}</span>
+        </div>
+      {% else %}
+        <div class="v4-ready-state v4-server-ready-state">
+          <span class="v4-ready-icon">✓</span>
+          <div><strong>Сервер готов к работе</strong><span>Runtime не сообщает причин деградации.</span></div>
+        </div>
+      {% endif %}
+    </div>
+  </section>
+
+  <section class="v4-system-panel">
+    <div class="v4-system-panel-head">
+      <div>
+        <span class="v4-panel-eyebrow">Protocols</span>
+        <h2>Протоколы</h2>
+        <p>Готовность endpoint, подсети, контейнера и служебных metadata.</p>
       </div>
     </div>
-    <ul class="small text-secondary mb-3">
-      {% for reason in server_health_reasons %}
-      <li>{{ reason }}</li>
-      {% empty %}
-      <li>Нет данных о проверке. Запустите синхронизацию runtime.</li>
-      {% endfor %}
-    </ul>
-    <div class="d-flex flex-wrap gap-2">
-      <form method="post" action="{% url 'servers-sync-runtime' pk=server.id %}">
-        {% csrf_token %}
-        <button class="btn btn-primary btn-sm">Проверить состояние runtime</button>
-      </form>
-      <a class="btn btn-success btn-sm" href="{% url 'clients-create' %}">Перейти к безопасному созданию клиента</a>
+    <div class="v4-system-table-wrap">
+      <table class="table v4-system-table v4-protocol-table align-middle">
+        <thead>
+          <tr>
+            <th>Протокол</th>
+            <th>Контейнер</th>
+            <th>Подсеть</th>
+            <th>Endpoint</th>
+            <th>Peers</th>
+            <th>Metadata</th>
+            <th class="text-end">Готовность</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in protocol_rows %}
+            <tr class="v4-protocol-row {% if row.protocol.runtime_metadata.subnet_ready and row.protocol.runtime_metadata.endpoint_host_ready and row.protocol.runtime_metadata.endpoint_port_ready %}is-success{% else %}is-warning{% endif %}">
+              <td><span class="badge badge-soft {% if row.protocol.protocol_type == 'awg2' %}badge-protocol-awg2{% else %}badge-protocol-awg{% endif %}">{{ row.protocol.protocol_type|upper }}</span></td>
+              <td>
+                <div class="v4-system-primary">{{ row.protocol.container_name|default:'—' }}</div>
+                <div class="v4-system-meta">{{ row.protocol.container_status|default:'не обнаружен' }}</div>
+              </td>
+              <td>
+                {% if row.protocol.runtime_metadata.subnet_ready %}
+                  <span class="v4-status-pill is-success">{{ row.protocol.runtime_metadata.subnet }}</span>
+                {% else %}
+                  <span class="v4-status-pill is-warning">Не обнаружена</span>
+                {% endif %}
+              </td>
+              <td>
+                <code class="v4-system-mono">{{ row.protocol.runtime_metadata.public_host|default:'—' }}:{{ row.protocol.runtime_metadata.udp_port|default:'—' }}</code>
+                <div class="v4-system-meta">{% if row.protocol.runtime_metadata.endpoint_host_ready and row.protocol.runtime_metadata.endpoint_port_ready %}готов{% else %}неполный{% endif %}</div>
+              </td>
+              <td>
+                <div>{{ row.peer_source_label }}</div>
+                {% if row.peer_source_hint %}<div class="v4-system-meta">{{ row.peer_source_hint }}</div>{% endif %}
+                <div class="v4-system-meta">{{ row.protocol.runtime_metadata.config_path|default:'—' }}</div>
+              </td>
+              <td>
+                {% if row.protocol.protocol_type == 'awg2' %}
+                  {% if row.protocol.runtime_metadata.awg2_missing_keys %}
+                    <span class="v4-status-pill is-danger">Нет обязательных</span>
+                    <div class="v4-system-meta"><code>{{ row.protocol.runtime_metadata.awg2_missing_keys|join:', ' }}</code></div>
+                  {% elif row.protocol.runtime_metadata.awg2_optional_missing_keys %}
+                    <span class="v4-status-pill is-warning">Неполные</span>
+                    <div class="v4-system-meta"><code>{{ row.protocol.runtime_metadata.awg2_optional_missing_keys|join:', ' }}</code></div>
+                  {% else %}
+                    <span class="v4-status-pill is-success">Готово</span>
+                  {% endif %}
+                {% else %}
+                  <span class="text-secondary">—</span>
+                {% endif %}
+              </td>
+              <td class="text-end">
+                {% if row.protocol.runtime_metadata.subnet_ready and row.protocol.runtime_metadata.endpoint_host_ready and row.protocol.runtime_metadata.endpoint_port_ready %}
+                  <span class="v4-server-status is-success">Готово</span>
+                {% else %}
+                  <span class="v4-server-status is-warning">Внимание</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="7"><div class="v4-empty-state compact"><strong>Протоколы не обнаружены</strong><span>Запустите синхронизацию runtime.</span></div></td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
-  </div>
-</section>
-
-<div class="section-block section-flat mb-2">
-  <div class="section-body py-2">
-    <h2 class="h6 mb-2">Диагностика протоколов и готовности</h2>
-    <p class="text-secondary mb-0">Подсеть, endpoint, контейнер и ключи AWG/AWG2 должны быть готовы до выпуска нового доступа.</p>
-  </div>
-</div>
-
-<div class="table-responsive section-block table-shell p-2 diagnostics-table-shell">
-  <table class="table table-hover align-middle mb-0">
-    <thead>
-      <tr>
-        <th>Протокол</th>
-        <th>Контейнер</th>
-        <th>Подсеть</th>
-        <th>Endpoint</th>
-        <th>Источник peers</th>
-        <th>AWG2 ключи</th>
-        <th class="text-end">Статус</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for row in protocol_rows %}
-      <tr>
-        <td><span class="badge badge-soft {% if row.protocol.protocol_type == 'awg2' %}badge-protocol-awg2{% else %}badge-protocol-awg{% endif %}">{{ row.protocol.protocol_type|upper }}</span></td>
-        <td>
-          <div>{{ row.protocol.container_name|default:'—' }}</div>
-          <div class="small text-secondary">{{ row.protocol.container_status|default:'не обнаружен' }}</div>
-        </td>
-        <td>
-          {% if row.protocol.runtime_metadata.subnet_ready %}
-          <span class="badge status-badge status-success">{{ row.protocol.runtime_metadata.subnet }}</span>
-          {% else %}
-          <span class="badge status-badge status-warning">Подсеть не обнаружена</span>
-          {% endif %}
-        </td>
-        <td>
-          <div><code>{{ row.protocol.runtime_metadata.public_host|default:'—' }}:{{ row.protocol.runtime_metadata.udp_port|default:'—' }}</code></div>
-          {% if row.protocol.runtime_metadata.endpoint_host_ready and row.protocol.runtime_metadata.endpoint_port_ready %}
-            <span class="badge status-badge status-success mt-1">Endpoint заполнен</span>
-          {% else %}
-            <span class="badge status-badge status-warning mt-1">Endpoint неполный</span>
-          {% endif %}
-        </td>
-        <td>
-          <div>{{ row.peer_source_label }}</div>
-          {% if row.peer_source_hint %}<div class="small text-secondary">{{ row.peer_source_hint }}</div>{% endif %}
-          <div class="small text-secondary">Конфигурация: {{ row.protocol.runtime_metadata.config_path|default:'—' }}</div>
-        </td>
-        <td>
-          {% if row.protocol.protocol_type == 'awg2' %}
-            {% if row.protocol.runtime_metadata.awg2_missing_keys %}
-              <span class="badge status-badge status-danger mb-1">Не хватает обязательных</span>
-              <div><code>{{ row.protocol.runtime_metadata.awg2_missing_keys|join:', ' }}</code></div>
-            {% elif row.protocol.runtime_metadata.awg2_optional_missing_keys %}
-              <span class="badge status-badge status-warning mb-1">Не хватает дополнительных</span>
-              <div><code>{{ row.protocol.runtime_metadata.awg2_optional_missing_keys|join:', ' }}</code></div>
-            {% else %}
-              <span class="badge status-badge status-success">Проверка ключей пройдена</span>
-            {% endif %}
-          {% else %}
-            <span class="text-secondary">Не применяется</span>
-          {% endif %}
-        </td>
-        <td class="text-end">
-          {% if row.protocol.runtime_metadata.subnet_ready and row.protocol.runtime_metadata.endpoint_host_ready and row.protocol.runtime_metadata.endpoint_port_ready %}
-          <span class="badge status-badge status-success">Готово</span>
-          {% else %}
-          <span class="badge status-badge status-warning">Требует внимания</span>
-          {% endif %}
-        </td>
-      </tr>
-      {% empty %}
-      <tr><td colspan="7"><div class="empty-state my-2">Протоколы не обнаружены. Выполните синхронизацию runtime.</div></td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
+  </section>
 </div>
 {% endblock %}

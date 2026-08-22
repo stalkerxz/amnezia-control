@@ -1,147 +1,102 @@
 {% extends 'partials/base.html' %}
+{% load static %}
+
+{% block title %}Операции · VPN Control{% endblock %}
+
 {% block content %}
-<div class="page-header d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
-  <div>
-    <p class="page-kicker">Операторская · Задания</p>
-    <h1 class="h3 mb-1">Операционные задания</h1>
-    <p class="text-secondary mb-0">Отделяйте реальные ошибки от предупреждений и успешно выполненных деградированных сценариев.</p>
+<link href="{% static 'css/app-v4-layout.css' %}" rel="stylesheet">
+<link href="{% static 'css/app-v4-system.css' %}" rel="stylesheet">
+
+<div class="v4-system-page">
+  <header class="v4-page-hero v4-system-hero">
+    <div>
+      <p class="page-kicker">VPN Control · Runtime</p>
+      <h1>Операции</h1>
+      <p class="v4-hero-copy">Фоновые действия и изменения runtime. Ошибки и деградации выделены как операционный сигнал, технический статус остаётся доступен вторым уровнем.</p>
+    </div>
+  </header>
+
+  <div class="v4-system-chips" aria-label="Быстрые фильтры операций">
+    <a class="v4-system-chip {% if not signal_filter and operator_scope != 'mine' %}active{% endif %}" href="{% url 'jobs-list' %}">Все</a>
+    <a class="v4-system-chip is-danger {% if signal_filter == 'failed' %}active{% endif %}" href="{% url 'jobs-list' %}?signal=failed">Ошибки</a>
+    <a class="v4-system-chip is-warning {% if signal_filter == 'warning' %}active{% endif %}" href="{% url 'jobs-list' %}?signal=warning">Предупреждения</a>
+    <a class="v4-system-chip is-warning {% if signal_filter == 'degraded_success' %}active{% endif %}" href="{% url 'jobs-list' %}?signal=degraded_success">Деградация</a>
+    <a class="v4-system-chip {% if operator_scope == 'mine' %}active{% endif %}" href="{% url 'jobs-list' %}?operator_scope=mine">Мои</a>
   </div>
-</div>
 
-<form method="get" class="card card-body filter-panel mb-3">
-  <div class="row g-2 align-items-end">
-    <div class="col-xl-3 col-md-4">
-      <label class="form-label" for="id_signal">Операционный сигнал</label>
-      <select class="form-select" id="id_signal" name="signal">
-        <option value="" {% if not signal_filter %}selected{% endif %}>Все</option>
-        <option value="failed" {% if signal_filter == 'failed' %}selected{% endif %}>Только ошибки</option>
-        <option value="warning" {% if signal_filter == 'warning' %}selected{% endif %}>Только предупреждения</option>
-        <option value="degraded_success" {% if signal_filter == 'degraded_success' %}selected{% endif %}>Успех с деградацией</option>
-      </select>
-    </div>
-    <div class="col-xl-3 col-md-4">
-      <label class="form-label" for="id_action">Действие</label>
-      <input class="form-control" id="id_action" name="action" value="{{ action_filter }}" placeholder="Например, server.sync_runtime">
-    </div>
-    <div class="col-xl-2 col-md-3">
-      <label class="form-label" for="id_status">Статус</label>
-      <select class="form-select" id="id_status" name="status">
-        <option value="">Все</option>
-        {% for value, label in status_choices %}
-          <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>
-        {% endfor %}
-      </select>
-    </div>
-    <div class="col-xl-3 col-md-3">
-      <label class="form-label" for="id_created_from">Создано с даты</label>
-      <input class="form-control" id="id_created_from" type="date" name="created_from" value="{{ created_from }}">
-    </div>
-    <div class="col-xl-2 col-md-3">
-      <label class="form-label" for="id_operator_scope">Операторы</label>
-      <select class="form-select" id="id_operator_scope" name="operator_scope">
-        <option value="all" {% if operator_scope != 'mine' %}selected{% endif %}>Все</option>
-        <option value="mine" {% if operator_scope == 'mine' %}selected{% endif %}>Мои</option>
-      </select>
-    </div>
-    <div class="col-xl-2 col-md-2"><button class="btn btn-primary w-100">Применить</button></div>
-    <div class="col-xl-2 col-md-12"><a class="btn btn-outline-secondary w-100" href="{% url 'jobs-list' %}">Сброс</a></div>
-  </div>
-</form>
+  <details class="v4-system-filter-details" {% if action_filter or status_filter or created_from or operator_scope == 'mine' %}open{% endif %}>
+    <summary>Расширенные фильтры</summary>
+    <form method="get" class="v4-system-toolbar">
+      <div class="v4-system-filter-grid">
+        <label><span>Операционный сигнал</span><select class="form-select" name="signal"><option value="" {% if not signal_filter %}selected{% endif %}>Все</option><option value="failed" {% if signal_filter == 'failed' %}selected{% endif %}>Ошибки</option><option value="warning" {% if signal_filter == 'warning' %}selected{% endif %}>Предупреждения</option><option value="degraded_success" {% if signal_filter == 'degraded_success' %}selected{% endif %}>Деградация</option></select></label>
+        <label><span>Действие</span><input class="form-control" name="action" value="{{ action_filter }}" placeholder="server.sync_runtime"></label>
+        <label><span>Тех. статус</span><select class="form-select" name="status"><option value="">Все</option>{% for value, label in status_choices %}<option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+        <label><span>Создано с даты</span><input class="form-control" type="date" name="created_from" value="{{ created_from }}"></label>
+        <label><span>Оператор</span><select class="form-select" name="operator_scope"><option value="all" {% if operator_scope != 'mine' %}selected{% endif %}>Все</option><option value="mine" {% if operator_scope == 'mine' %}selected{% endif %}>Только мои</option></select></label>
+        <button class="btn btn-primary" type="submit">Применить</button>
+        <a class="btn btn-outline-secondary" href="{% url 'jobs-list' %}">Сбросить</a>
+      </div>
+    </form>
+  </details>
 
-<div class="d-flex flex-wrap gap-2 mb-3">
-  <a class="btn btn-sm {% if signal_filter == 'failed' %}btn-danger{% else %}btn-outline-danger{% endif %}" href="{% url 'jobs-list' %}?signal=failed">Только ошибки</a>
-  <a class="btn btn-sm {% if signal_filter == 'warning' %}btn-warning{% else %}btn-outline-warning{% endif %}" href="{% url 'jobs-list' %}?signal=warning">Только предупреждения</a>
-  <a class="btn btn-sm {% if signal_filter == 'degraded_success' %}btn-warning{% else %}btn-outline-warning{% endif %}" href="{% url 'jobs-list' %}?signal=degraded_success">Успех с деградацией</a>
-  <a class="btn btn-sm {% if not signal_filter %}btn-secondary{% else %}btn-outline-secondary{% endif %}" href="{% url 'jobs-list' %}">Все</a>
-  <a class="btn btn-sm {% if operator_scope == 'mine' %}btn-primary{% else %}btn-outline-primary{% endif %}" href="{% url 'jobs-list' %}?operator_scope=mine">Мои</a>
-</div>
-
-{% if job_rows %}
-<div class="table-responsive card p-2">
-<table class="table table-hover align-middle mb-0">
-<thead><tr><th>ID / Действие</th><th>Сервер</th><th>Инициатор</th><th>Статус</th><th>Создано</th><th class="text-end">Детали</th></tr></thead>
-<tbody>
-{% for row in job_rows %}
-{% with j=row.job %}
-<tr>
-  <td>
-    <a href="/jobs/{{ j.id }}/" class="fw-semibold text-decoration-none">#{{ j.id }}</a>
-    <div><code>{{ j.action }}</code></div>
-  </td>
-  <td>{{ j.server.name }}</td>
-  <td>
-    {% if j.actor %}
-      {{ j.actor.username }}
-      {% if j.actor_id == request.user.id %}<span class="badge status-badge status-success">Мой</span>{% else %}<span class="badge status-badge status-neutral">Другой оператор</span>{% endif %}
-    {% else %}
-      <span class="text-secondary">система</span>
-    {% endif %}
-  </td>
-  <td>
-    <span class="badge status-badge {% if row.job_signal == 'failed' %}status-danger{% elif row.job_signal == 'warning' or row.job_signal == 'degraded_success' %}status-warning{% elif row.job_signal == 'success' %}status-success{% else %}status-neutral{% endif %}">
-      {% if row.job_signal == 'failed' %}Ошибка{% elif row.job_signal == 'warning' %}Успех с предупреждением{% elif row.job_signal == 'degraded_success' %}Успех с деградацией{% elif row.job_signal == 'success' %}Успех{% elif j.status == 'running' %}Выполняется{% else %}Ожидает{% endif %}
-    </span>
-    <div class="small text-secondary mt-1">Тех. статус: {{ j.get_status_display }}</div>
-  </td>
-  <td>{{ j.created_at|date:'d.m.Y H:i:s' }}</td>
-  <td class="text-end">
-    <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#job-details-{{ j.id }}" aria-expanded="false">
-      Быстрый просмотр
-    </button>
-  </td>
-</tr>
-<tr class="collapse-row">
-  <td colspan="6" class="p-0 border-0">
-    <div class="collapse" id="job-details-{{ j.id }}">
-      <div class="p-3 border-top">
-        <div class="row g-3">
-          <div class="col-lg-4">
-            <h2 class="h6">Payload</h2>
-            <pre class="log mb-0">{{ row.payload_pretty }}</pre>
-          </div>
-          <div class="col-lg-4">
-            <h2 class="h6">stdout</h2>
-            {% if row.latest_event and row.latest_event.stdout %}
-              <pre class="log mb-0">{{ row.latest_event.stdout }}</pre>
-            {% else %}
-              <div class="text-secondary small">stdout отсутствует</div>
-            {% endif %}
-          </div>
-          <div class="col-lg-4">
-            <h2 class="h6">stderr</h2>
-            {% if row.latest_event and row.latest_event.stderr %}
-              <pre class="log mb-0 text-danger">{{ row.latest_event.stderr }}</pre>
-            {% else %}
-              <div class="text-secondary small">stderr отсутствует</div>
-            {% endif %}
-          </div>
+  {% if job_rows %}
+    <section class="v4-system-panel">
+      <div class="v4-system-panel-head">
+        <div>
+          <span class="v4-panel-eyebrow">Operations log</span>
+          <h2>Журнал операций</h2>
+          {% if page_obj %}<p>{{ page_obj.paginator.count }} операций по текущему фильтру</p>{% endif %}
         </div>
       </div>
-    </div>
-  </td>
-</tr>
-{% endwith %}
-{% endfor %}
-</tbody>
-</table>
+
+      <div class="v4-system-table-wrap">
+        <table class="table v4-system-table v4-operations-table align-middle">
+          <thead><tr><th>Операция</th><th>Сервер</th><th>Инициатор</th><th>Сигнал</th><th>Создано</th><th class="text-end"><span class="visually-hidden">Детали</span></th></tr></thead>
+          <tbody>
+            {% for row in job_rows %}
+              {% with j=row.job %}
+                <tr class="v4-operation-row {% if row.job_signal == 'failed' %}is-danger{% elif row.job_signal == 'warning' or row.job_signal == 'degraded_success' %}is-warning{% elif row.job_signal == 'success' %}is-success{% endif %}">
+                  <td>
+                    <a class="v4-system-primary" href="/jobs/{{ j.id }}/">{% if row.action_label %}{{ row.action_label }}{% else %}{{ j.action }}{% endif %}</a>
+                    <div class="v4-system-meta"><code>#{{ j.id }} · {{ j.action }}</code> · {{ j.get_status_display }}</div>
+                  </td>
+                  <td>{% if j.server %}<span class="v4-server-inline">{{ j.server.name }}</span>{% else %}<span class="text-secondary">—</span>{% endif %}</td>
+                  <td>{% if j.actor %}{{ j.actor.username }}{% if j.actor_id == request.user.id %}<div class="v4-system-meta">вы</div>{% endif %}{% else %}<span class="text-secondary">система</span>{% endif %}</td>
+                  <td><span class="v4-status-pill {% if row.job_signal == 'failed' %}is-danger{% elif row.job_signal == 'warning' or row.job_signal == 'degraded_success' %}is-warning{% elif row.job_signal == 'success' %}is-success{% else %}is-neutral{% endif %}">{% if row.job_signal == 'failed' %}Ошибка{% elif row.job_signal == 'warning' %}Предупреждение{% elif row.job_signal == 'degraded_success' %}Деградация{% elif row.job_signal == 'success' %}Успех{% elif j.status == 'running' %}Выполняется{% else %}Ожидает{% endif %}</span></td>
+                  <td class="text-nowrap"><span class="v4-date-primary">{{ j.created_at|date:'d.m.Y' }}</span><div class="v4-system-meta">{{ j.created_at|date:'H:i:s' }}</div></td>
+                  <td class="text-end"><button class="v4-icon-action" type="button" data-bs-toggle="collapse" data-bs-target="#job-details-{{ j.id }}" aria-expanded="false" aria-label="Показать технические детали">•••</button></td>
+                </tr>
+                <tr class="v4-detail-row">
+                  <td colspan="6" class="p-0 border-0">
+                    <div class="collapse" id="job-details-{{ j.id }}">
+                      <div class="v4-collapse-body">
+                        <div class="v4-collapse-grid">
+                          <div><h3>Payload</h3><pre class="v4-log mb-0">{{ row.payload_pretty }}</pre></div>
+                          <div><h3>stdout</h3>{% if row.latest_event and row.latest_event.stdout %}<pre class="v4-log mb-0">{{ row.latest_event.stdout }}</pre>{% else %}<div class="v4-system-meta">stdout отсутствует</div>{% endif %}</div>
+                          <div><h3>stderr</h3>{% if row.latest_event and row.latest_event.stderr %}<pre class="v4-log is-danger mb-0">{{ row.latest_event.stderr }}</pre>{% else %}<div class="v4-system-meta">stderr отсутствует</div>{% endif %}</div>
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              {% endwith %}
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    {% if page_obj and page_obj.paginator.num_pages > 1 %}
+      <nav class="v4-system-pagination" aria-label="Навигация по операциям">
+        <ul class="pagination pagination-sm mb-0">
+          <li class="page-item {% if not page_obj.has_previous %}disabled{% endif %}"><a class="page-link" href="?signal={{ signal_filter|urlencode }}&action={{ action_filter|urlencode }}&status={{ status_filter|urlencode }}&created_from={{ created_from|urlencode }}&operator_scope={{ operator_scope|urlencode }}&page={% if page_obj.has_previous %}{{ page_obj.previous_page_number }}{% else %}1{% endif %}">Назад</a></li>
+          <li class="page-item disabled"><span class="page-link">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span></li>
+          <li class="page-item {% if not page_obj.has_next %}disabled{% endif %}"><a class="page-link" href="?signal={{ signal_filter|urlencode }}&action={{ action_filter|urlencode }}&status={{ status_filter|urlencode }}&created_from={{ created_from|urlencode }}&operator_scope={{ operator_scope|urlencode }}&page={% if page_obj.has_next %}{{ page_obj.next_page_number }}{% else %}{{ page_obj.paginator.num_pages }}{% endif %}">Далее</a></li>
+        </ul>
+      </nav>
+    {% endif %}
+  {% else %}
+    <section class="v4-system-panel"><div class="v4-empty-state"><strong>Операций пока нет</strong><span>Изменения runtime и фоновые задания появятся здесь.</span></div></section>
+  {% endif %}
 </div>
-{% if page_obj and page_obj.paginator.num_pages > 1 %}
-<nav class="mt-3" aria-label="Навигация по заданиям">
-  <ul class="pagination pagination-sm mb-0">
-    <li class="page-item {% if not page_obj.has_previous %}disabled{% endif %}">
-      <a class="page-link" href="?signal={{ signal_filter|urlencode }}&action={{ action_filter|urlencode }}&status={{ status_filter|urlencode }}&created_from={{ created_from|urlencode }}&operator_scope={{ operator_scope|urlencode }}&page={% if page_obj.has_previous %}{{ page_obj.previous_page_number }}{% else %}1{% endif %}">Назад</a>
-    </li>
-    <li class="page-item disabled"><span class="page-link">Стр. {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span></li>
-    <li class="page-item {% if not page_obj.has_next %}disabled{% endif %}">
-      <a class="page-link" href="?signal={{ signal_filter|urlencode }}&action={{ action_filter|urlencode }}&status={{ status_filter|urlencode }}&created_from={{ created_from|urlencode }}&operator_scope={{ operator_scope|urlencode }}&page={% if page_obj.has_next %}{{ page_obj.next_page_number }}{% else %}{{ page_obj.paginator.num_pages }}{% endif %}">Вперёд</a>
-    </li>
-  </ul>
-</nav>
-{% endif %}
-{% else %}
-<div class="empty-state">
-  <h2 class="h6 mb-2">Заданий пока нет</h2>
-  <p class="mb-0">Когда запустятся операции по серверам и клиентам, они появятся здесь.</p>
-</div>
-{% endif %}
 {% endblock %}

@@ -1,160 +1,94 @@
 {% extends 'partials/base.html' %}
+{% load static %}
 
-{% block title %}
-Создать кабинет · {{ account.display_name }}
-{% endblock %}
+{% block title %}Создать кабинет · {{ account.display_name }}{% endblock %}
 
 {% block content %}
+<link href="{% static 'css/app-v4-forms.css' %}" rel="stylesheet">
+<link href="{% static 'css/app-v4-access.css' %}" rel="stylesheet">
 
-<div class="page-header d-flex justify-content-between align-items-start gap-2 flex-wrap">
+<div class="v4-access-shell">
+  <a class="v4-access-back" href="{% url 'customers-detail' account.pk %}">← {{ account.display_name }}</a>
 
-  <div>
-    <p class="page-kicker">
-      Операторская · Клиентский кабинет
-    </p>
-
-    <h1 class="h3 mb-1">
-      Создать клиентский логин
-    </h1>
-
-    <p class="page-subtle mb-0">
-      {{ account.display_name }}
-      {% if account.email %}
-        · {{ account.email }}
-      {% endif %}
-    </p>
-  </div>
-
-  <a
-    href="{% url 'customers-detail' account.pk %}"
-    class="btn btn-outline-secondary"
-  >
-    К аккаунту
-  </a>
-
-</div>
-
-
-<section class="section-block">
-
-  <div class="section-body">
-
-    <div class="alert alert-info">
-      Эта учётная запись предназначена только
-      для <strong>/cabinet/</strong>.
-      Права оператора, staff и Django admin
-      клиенту не выдаются.
+  <header class="v4-access-header">
+    <div>
+      <p class="page-kicker mb-1">Клиентский доступ</p>
+      <h1>Создать личный кабинет</h1>
+      <p>Выдайте клиенту отдельный логин для просмотра своих устройств, подключений и продления. Операторские права не создаются.</p>
     </div>
+  </header>
 
+  <div class="v4-access-grid">
+    <section class="v4-access-card">
+      <div class="v4-access-card-head">
+        <div>
+          <span>Учётные данные</span>
+          <h2>Логин клиента</h2>
+          <p>Пароль после создания больше не отображается.</p>
+        </div>
+      </div>
+      <div class="v4-access-card-body">
+        {% if form.non_field_errors %}
+          <div class="alert alert-danger">{% for error in form.non_field_errors %}<div>{{ error }}</div>{% endfor %}</div>
+        {% endif %}
 
-    <form
-      method="post"
-      class="row g-3"
-    >
+        <form method="post">
+          {% csrf_token %}
+          <div class="v4-access-form-grid">
+            <div class="is-wide">
+              <label class="form-label" for="{{ form.username.id_for_label }}">{{ form.username.label }}</label>
+              {{ form.username }}
+              {% for error in form.username.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+            </div>
 
-      {% csrf_token %}
+            <div>
+              <label class="form-label" for="{{ form.password1.id_for_label }}">{{ form.password1.label }}</label>
+              {{ form.password1 }}
+              {% for error in form.password1.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+            </div>
 
-      {% if form.non_field_errors %}
-        <div class="col-12">
-          <div class="alert alert-danger">
-            {% for error in form.non_field_errors %}
-              <div>{{ error }}</div>
-            {% endfor %}
+            <div>
+              <label class="form-label" for="{{ form.password2.id_for_label }}">{{ form.password2.label }}</label>
+              {{ form.password2 }}
+              {% for error in form.password2.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+            </div>
+          </div>
+
+          <div class="v4-access-actions">
+            <button type="submit" class="btn btn-primary">Создать кабинет</button>
+            <a href="{% url 'customers-detail' account.pk %}" class="btn btn-outline-secondary">Отмена</a>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <aside class="v4-access-stack">
+      <div class="v4-access-card">
+        <div class="v4-access-card-head">
+          <div><span>Что получит клиент</span><h2>Только личный кабинет</h2></div>
+        </div>
+        <div class="v4-access-card-body">
+          <div class="v4-access-info">
+            <span class="v4-access-info-icon">i</span>
+            <div>Учётная запись предназначена только для <strong>/cabinet/</strong>. Staff, Django Admin и операторские права клиенту не выдаются.</div>
           </div>
         </div>
-      {% endif %}
+      </div>
 
-
-      <div class="col-12 col-lg-6">
-
-        <label
-          class="form-label"
-          for="{{ form.username.id_for_label }}"
-        >
-          {{ form.username.label }}
-        </label>
-
-        {{ form.username }}
-
-        {% for error in form.username.errors %}
-          <div class="text-danger small mt-1">
-            {{ error }}
+      <div class="v4-access-card">
+        <div class="v4-access-card-head">
+          <div><span>Клиент</span><h2>{{ account.display_name }}</h2></div>
+        </div>
+        <div class="v4-access-card-body">
+          <div class="v4-access-summary" style="grid-template-columns:1fr; margin:0;">
+            <div class="v4-access-summary-item">
+              <small>Email</small>
+              <strong>{% if account.email %}{{ account.email }}{% else %}Не указан{% endif %}</strong>
+            </div>
           </div>
-        {% endfor %}
-
+        </div>
       </div>
-
-
-      <div class="col-12 col-lg-6"></div>
-
-
-      <div class="col-12 col-lg-6">
-
-        <label
-          class="form-label"
-          for="{{ form.password1.id_for_label }}"
-        >
-          {{ form.password1.label }}
-        </label>
-
-        {{ form.password1 }}
-
-        {% for error in form.password1.errors %}
-          <div class="text-danger small mt-1">
-            {{ error }}
-          </div>
-        {% endfor %}
-
-      </div>
-
-
-      <div class="col-12 col-lg-6">
-
-        <label
-          class="form-label"
-          for="{{ form.password2.id_for_label }}"
-        >
-          {{ form.password2.label }}
-        </label>
-
-        {{ form.password2 }}
-
-        {% for error in form.password2.errors %}
-          <div class="text-danger small mt-1">
-            {{ error }}
-          </div>
-        {% endfor %}
-
-      </div>
-
-
-      <div class="col-12">
-        <hr>
-      </div>
-
-
-      <div class="col-12 d-flex gap-2">
-
-        <button
-          type="submit"
-          class="btn btn-primary"
-        >
-          Создать кабинет
-        </button>
-
-        <a
-          href="{% url 'customers-detail' account.pk %}"
-          class="btn btn-outline-secondary"
-        >
-          Отмена
-        </a>
-
-      </div>
-
-    </form>
-
+    </aside>
   </div>
-
-</section>
-
+</div>
 {% endblock %}

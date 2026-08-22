@@ -1,265 +1,157 @@
 {% extends 'customer_portal/base.html' %}
 
-{% block title %}
-{{ account.display_name }} · VPN
-{% endblock %}
-
+{% block title %}{{ account.display_name }} · VPN{% endblock %}
 
 {% block content %}
+<div class="customer-portal-v4">
+  <header class="portal-v4-header">
+    <div>
+      <span class="portal-v4-kicker">Личный кабинет VPN</span>
+      <h1>{{ account.display_name }}</h1>
+      <p>Здесь находятся ваши устройства, подключения и срок доступа.</p>
+    </div>
 
-<div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-4">
-
-  <div>
-
-    <p class="text-secondary mb-1">
-      Личный кабинет
-    </p>
-
-    <h1 class="h3 mb-1">
-      {{ account.display_name }}
-    </h1>
-
-    {% if account.email %}
-      <div class="text-secondary">
-        {{ account.email }}
-      </div>
-    {% endif %}
-
-  </div>
-
-
-  <div class="text-end">
-
-    {% if blocked %}
-      <span class="badge text-bg-warning">
-        Доступ ограничен
+    <div class="portal-v4-account-chip">
+      <span class="portal-v4-avatar">{{ account.display_name|slice:':1' }}</span>
+      <span>
+        <strong>{{ account.display_name }}</strong>
+        {% if account.email %}<small>{{ account.email }}</small>{% endif %}
       </span>
-    {% else %}
-      <span class="badge text-bg-success">
-        Активен
-      </span>
-    {% endif %}
-
-  </div>
-
-</div>
-
-
-{% if account.status == 'disabled' %}
-
-  <div class="alert alert-warning">
-    Аккаунт временно отключён.
-    Уже выпущенные подключения отображаются,
-    но управление доступом ограничено.
-  </div>
-
-{% elif expired %}
-
-  <div class="alert alert-warning">
-    Срок действия аккаунта истёк
-    {% if account.expires_at %}
-      {{ account.expires_at|date:"d.m.Y H:i" }}
-    {% endif %}.
-  </div>
-
-{% endif %}
-
-
-<div class="row g-3 mb-4">
-
-  <div class="col-12 col-md-4">
-
-    <div class="card h-100">
-      <div class="card-body">
-
-        <div class="text-secondary small">
-          Статус
-        </div>
-
-        <div class="fs-5 fw-semibold">
-          {{ account.get_status_display }}
-        </div>
-
-      </div>
     </div>
+  </header>
 
-  </div>
-
-
-  <div class="col-12 col-md-4">
-
-    <div class="card h-100">
-      <div class="card-body">
-
-        <div class="text-secondary small">
-          Устройства
-        </div>
-
-        <div class="fs-5 fw-semibold">
-          {{ account.devices.all|length }}
-        </div>
-
-      </div>
-    </div>
-
-  </div>
-
-
-  <div class="col-12 col-md-4">
-
-    <div class="card h-100">
-      <div class="card-body">
-
-        <div class="text-secondary small">
-          Действует до
-        </div>
-
-        <div class="fs-5 fw-semibold">
-
-          {% if account.expires_at %}
-            {{ account.expires_at|date:"d.m.Y" }}
-          {% else %}
-            Без срока
-          {% endif %}
-
-        </div>
-
-      </div>
-    </div>
-
-  </div>
-
-</div>
-
-
-<section class="card mb-4">
-
-  <div class="card-body">
-
-    <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
-
+  {% if account.status == 'disabled' %}
+    <div class="portal-v4-alert is-warning">
+      <span class="portal-v4-alert-icon">!</span>
       <div>
-
-        <div class="text-secondary small">
-          Подписка
-        </div>
-
-        <h2 class="h5 mb-1">
-          Продление доступа
-        </h2>
-
-        <div class="text-secondary small">
-          Одна заявка продлевает весь аккаунт
-          и все его устройства.
-        </div>
-
+        <strong>Доступ временно отключён</strong>
+        <span>Существующие подключения сохранены, но скачивание конфигураций сейчас недоступно.</span>
       </div>
+    </div>
+  {% elif expired %}
+    <div class="portal-v4-alert is-warning">
+      <span class="portal-v4-alert-icon">!</span>
+      <div>
+        <strong>Срок доступа закончился</strong>
+        <span>{% if account.expires_at %}Доступ завершился {{ account.expires_at|date:'d.m.Y H:i' }}.{% else %}Отправьте запрос на продление.{% endif %}</span>
+      </div>
+    </div>
+  {% endif %}
 
-      {% if open_renewal_request %}
-        <span class="badge text-bg-info">
-          {{ open_renewal_request.get_status_display }}
-        </span>
-      {% endif %}
-
+  <section class="portal-v4-status-card {% if blocked %}is-blocked{% else %}is-active{% endif %}">
+    <div class="portal-v4-status-main">
+      <div class="portal-v4-shield" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3 20 6v5c0 5-3.4 8.6-8 10-4.6-1.4-8-5-8-10V6l8-3Z"/><path d="m8.5 12 2.2 2.2 4.8-5"/></svg>
+      </div>
+      <div>
+        <span class="portal-v4-status-label">Состояние</span>
+        <h2>{% if blocked %}VPN недоступен{% else %}VPN работает{% endif %}</h2>
+        <p>
+          {% if blocked %}
+            Для восстановления доступа требуется продление или включение аккаунта оператором.
+          {% elif account.expires_at %}
+            Доступ действует до {{ account.expires_at|date:'d.m.Y' }}.
+          {% else %}
+            Доступ активен без установленного срока.
+          {% endif %}
+        </p>
+      </div>
     </div>
 
+    <div class="portal-v4-status-metrics">
+      <div>
+        <span>Устройства</span>
+        <strong>{{ workspace.device_total }}</strong>
+        <small>{{ workspace.active_device_total }} активных</small>
+      </div>
+      <div>
+        <span>Подключения</span>
+        <strong>{{ workspace.connection_total }}</strong>
+        <small>{{ workspace.active_connection_total }} активных</small>
+      </div>
+      <div>
+        <span>Доступ до</span>
+        <strong class="is-date">{% if account.expires_at %}{{ account.expires_at|date:'d.m.Y' }}{% else %}Без срока{% endif %}</strong>
+        <small>{% if blocked %}нужна проверка{% else %}аккаунт активен{% endif %}</small>
+      </div>
+    </div>
+  </section>
 
-    {% if open_renewal_request %}
-
-      <div class="alert alert-info mb-0">
-
-        <div class="fw-semibold">
-          Заявка уже открыта
+  <div class="portal-v4-main-grid">
+    <section class="portal-v4-connections-panel">
+      <div class="portal-v4-section-head">
+        <div>
+          <span>Подключения</span>
+          <h2>Мои устройства</h2>
+          <p>Скачайте конфигурацию для нужного устройства. Повторное скачивание не создаёт новое подключение.</p>
         </div>
+        <span class="portal-v4-availability {% if blocked %}is-warning{% endif %}">
+          {% if blocked %}Скачивание ограничено{% else %}Доступно{% endif %}
+        </span>
+      </div>
 
-        <div class="small mt-1">
-          Создана:
-          {{ open_renewal_request.created_at|date:"d.m.Y H:i" }}
+      {% include 'customer_portal/_connections_workspace.html' %}
+    </section>
+
+    <aside class="portal-v4-side-column">
+      <section class="portal-v4-renewal-card">
+        <div class="portal-v4-renewal-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M7 3v4M17 3v4M3 10h18"/></svg>
         </div>
+        <span class="portal-v4-card-kicker">Доступ</span>
+        <h2>Продление</h2>
 
-        {% if open_renewal_request.operator_note %}
-          <div class="small mt-2">
-            Комментарий оператора:
-            {{ open_renewal_request.operator_note }}
-          </div>
+        {% if account.expires_at %}
+          <div class="portal-v4-expiry-date">{{ account.expires_at|date:'d.m.Y' }}</div>
+          <p>До этой даты действуют аккаунт и доступные подключения.</p>
+        {% else %}
+          <div class="portal-v4-expiry-date">Без срока</div>
+          <p>Дата окончания доступа не установлена.</p>
         {% endif %}
 
-      </div>
-
-    {% elif renewal_allowed %}
-
-      {% if latest_renewal_request %}
-
-        <div class="small text-secondary mb-3">
-          Последняя заявка:
-          {{ latest_renewal_request.get_status_display }}
-          ·
-          {{ latest_renewal_request.updated_at|date:"d.m.Y H:i" }}
-        </div>
-
-      {% endif %}
-
-
-      <form
-        method="post"
-        enctype="multipart/form-data"
-        action="{% url 'customer-portal-renewal-request' %}"
-        class="row g-3 align-items-end"
-      >
-
-        {% csrf_token %}
-
-        <div class="col-12 col-lg-8">
-
-          <label
-            class="form-label"
-            for="{{ renewal_form.attachment.id_for_label }}"
-          >
-            Подтверждающий файл
-          </label>
-
-          {{ renewal_form.attachment }}
-
-          <div class="form-text">
-            Необязательно. JPG/JPEG/PDF, до 5 МБ.
+        {% if open_renewal_request %}
+          <div class="portal-v4-request-state">
+            <div>
+              <strong>{{ open_renewal_request.get_status_display }}</strong>
+              <small>Заявка от {{ open_renewal_request.created_at|date:'d.m.Y H:i' }}</small>
+            </div>
           </div>
 
-        </div>
+          {% if open_renewal_request.operator_note %}
+            <div class="portal-v4-operator-note">
+              <span>Комментарий</span>
+              {{ open_renewal_request.operator_note }}
+            </div>
+          {% endif %}
 
+        {% elif renewal_allowed %}
+          {% if latest_renewal_request %}
+            <div class="portal-v4-last-request">Последняя заявка: {{ latest_renewal_request.get_status_display }} · {{ latest_renewal_request.updated_at|date:'d.m.Y' }}</div>
+          {% endif %}
 
-        <div class="col-12 col-lg-4">
+          <form method="post" enctype="multipart/form-data" action="{% url 'customer-portal-renewal-request' %}" class="portal-v4-renewal-form">
+            {% csrf_token %}
+            <label class="form-label" for="{{ renewal_form.attachment.id_for_label }}">Подтверждающий файл</label>
+            {{ renewal_form.attachment }}
+            <div class="form-text">Необязательно · JPG/JPEG/PDF до 5 МБ</div>
+            <button type="submit" class="btn btn-primary w-100">Запросить продление</button>
+          </form>
+        {% else %}
+          <div class="portal-v4-request-state is-muted">
+            <div>
+              <strong>Новая заявка недоступна</strong>
+              <small>Свяжитесь с оператором для восстановления аккаунта.</small>
+            </div>
+          </div>
+        {% endif %}
+      </section>
 
-          <button
-            type="submit"
-            class="btn btn-outline-primary w-100"
-          >
-            Запросить продление
-          </button>
-
-        </div>
-
-      </form>
-
-    {% else %}
-
-      <div class="text-secondary">
-        Для отключённого аккаунта отправка
-        новой заявки недоступна.
-      </div>
-
-    {% endif %}
-
+      <section class="portal-v4-help-card">
+        <span class="portal-v4-card-kicker">Важно</span>
+        <h3>Повторное скачивание безопасно</h3>
+        <p>Вы получите уже выпущенную конфигурацию. Ключи и параметры подключения не изменятся.</p>
+      </section>
+    </aside>
   </div>
-
-</section>
-
-
-{% include 'customer_portal/_connections_workspace.html' %}
-
-
-<div class="alert alert-secondary mt-4 mb-0">
-  Повторное скачивание использует уже выпущенную
-  конфигурацию и не создаёт новое подключение.
 </div>
-
 {% endblock %}

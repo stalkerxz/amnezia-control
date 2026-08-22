@@ -1,336 +1,161 @@
 {% extends 'partials/base.html' %}
+{% load static %}
 
-{% block title %}Новый клиент · amnezia-control{% endblock %}
+{% block title %}Новый клиент · VPN Control{% endblock %}
 
 {% block content %}
+<link href="{% static 'css/app-v4-forms.css' %}" rel="stylesheet">
 
-<div class="page-header">
-  <div>
-    <p class="page-kicker">
-      Операторская · Новый клиент
-    </p>
+<div class="v4-form-page">
+  <header class="v4-form-hero">
+    <div class="v4-form-hero-copy">
+      <a class="v4-back-link" href="{% url 'customers-list' %}">← Все клиенты</a>
+      <p class="page-kicker">VPN Control · Новый клиент</p>
+      <h1>Создать клиента</h1>
+      <p>Создайте аккаунт, первое устройство и при необходимости личный кабинет. VPN-подключения выпускаются после создания клиента.</p>
+    </div>
+  </header>
 
-    <h1 class="h3 mb-1">
-      Создать клиента
-    </h1>
-
-    <p class="page-subtle mb-0">
-      Аккаунт, первое устройство и личный кабинет
-      создаются одной операцией.
-      VPN-подключения выпускаются следующим шагом.
-    </p>
+  <div class="v4-workflow-steps" aria-label="Этапы создания клиента">
+    <div class="v4-workflow-step is-current"><b>1</b><span>Аккаунт</span></div>
+    <div class="v4-workflow-step is-current"><b>2</b><span>Устройство</span></div>
+    <div class="v4-workflow-step"><b>3</b><span>Подключения после создания</span></div>
   </div>
+
+  <form method="post" novalidate>
+    {% csrf_token %}
+
+    {% if form.non_field_errors %}
+      <div class="alert alert-danger mb-3">{{ form.non_field_errors }}</div>
+    {% endif %}
+
+    <div class="v4-form-layout">
+      <div class="v4-form-main">
+        <section class="v4-step-card">
+          <div class="v4-step-head">
+            <span class="v4-step-number">1</span>
+            <div class="v4-step-copy">
+              <h2>Аккаунт клиента</h2>
+              <p>Имя, контакт и общий срок доступа.</p>
+            </div>
+          </div>
+          <div class="v4-step-body">
+            <div class="v4-field-grid">
+              <div class="v4-field">
+                <label class="form-label" for="{{ form.display_name.id_for_label }}">{{ form.display_name.label }}</label>
+                {{ form.display_name }}
+                {% for error in form.display_name.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+              </div>
+
+              <div class="v4-field">
+                <label class="form-label" for="{{ form.email.id_for_label }}">{{ form.email.label }}</label>
+                {{ form.email }}
+                <div class="form-text">Можно оставить пустым, если email не используется.</div>
+                {% for error in form.email.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+              </div>
+
+              <div class="v4-field">
+                <label class="form-label" for="{{ form.expires_at.id_for_label }}">{{ form.expires_at.label }}</label>
+                {{ form.expires_at }}
+                <div class="form-text">Пустое поле означает доступ без срока.</div>
+                {% for error in form.expires_at.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="v4-step-card">
+          <div class="v4-step-head">
+            <span class="v4-step-number">2</span>
+            <div class="v4-step-copy">
+              <h2>Первое устройство</h2>
+              <p>Дайте устройству понятное имя. FULL, SELECT и альтернативное подключение добавляются следующим шагом.</p>
+            </div>
+          </div>
+          <div class="v4-step-body">
+            <div class="v4-field-grid">
+              <div class="v4-field">
+                <label class="form-label" for="{{ form.device_name.id_for_label }}">{{ form.device_name.label }}</label>
+                {{ form.device_name }}
+                {% for error in form.device_name.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+              </div>
+
+              <div class="v4-field">
+                <label class="form-label" for="{{ form.device_platform.id_for_label }}">{{ form.device_platform.label }}</label>
+                {{ form.device_platform }}
+                {% for error in form.device_platform.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+              </div>
+
+              <div class="v4-field is-wide">
+                <label class="form-label" for="{{ form.device_notes.id_for_label }}">{{ form.device_notes.label }}</label>
+                {{ form.device_notes }}
+                <div class="form-text">Необязательно. Здесь удобно оставить модель телефона, владельца или служебную заметку.</div>
+                {% for error in form.device_notes.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="v4-step-card">
+          <div class="v4-step-head">
+            <span class="v4-step-number">3</span>
+            <div class="v4-step-copy">
+              <h2>Личный кабинет</h2>
+              <p>Необязательный доступ клиента к собственным устройствам и конфигурациям.</p>
+            </div>
+          </div>
+          <div class="v4-step-body">
+            <div class="v4-login-toggle v4-check-card mb-3">
+              {{ form.create_login }}
+              <div>
+                <label class="form-check-label" for="{{ form.create_login.id_for_label }}">{{ form.create_login.label }}</label>
+                <div class="v4-check-copy">Если выключено, кабинет можно создать позже из карточки клиента.</div>
+              </div>
+            </div>
+
+            <div class="v4-field-grid v4-login-fields">
+              <div class="v4-field">
+                <label class="form-label" for="{{ form.username.id_for_label }}">{{ form.username.label }}</label>
+                {{ form.username }}
+                <div class="form-text">Если пусто, используется email клиента.</div>
+                {% for error in form.username.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+              </div>
+
+              <div class="v4-field">
+                <label class="form-label" for="{{ form.password1.id_for_label }}">{{ form.password1.label }}</label>
+                {{ form.password1 }}
+                {% for error in form.password1.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+              </div>
+
+              <div class="v4-field">
+                <label class="form-label" for="{{ form.password2.id_for_label }}">{{ form.password2.label }}</label>
+                {{ form.password2 }}
+                {% for error in form.password2.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <div class="v4-form-actions">
+          <button type="submit" class="btn btn-primary">Создать клиента</button>
+          <a href="{% url 'customers-list' %}" class="btn btn-outline-secondary">Отмена</a>
+        </div>
+      </div>
+
+      <aside class="v4-form-aside">
+        <section class="v4-context-card">
+          <h3>Что будет создано</h3>
+          <div class="v4-context-list">
+            <div class="v4-context-row"><span>Аккаунт</span><strong>Активный</strong></div>
+            <div class="v4-context-row"><span>Устройство</span><strong>1 устройство</strong></div>
+            <div class="v4-context-row"><span>VPN</span><strong>Пока нет</strong></div>
+            <div class="v4-context-row"><span>Кабинет</span><strong>По выбору</strong></div>
+          </div>
+        </section>
+
+        <div class="v4-context-note">Создание клиента не генерирует VPN-ключи и не меняет существующие подключения. После сохранения откроется карточка клиента, где можно выпустить FULL, SELECT или альтернативное подключение.</div>
+      </aside>
+    </div>
+  </form>
 </div>
-
-
-<form method="post" novalidate>
-  {% csrf_token %}
-
-  {% if form.non_field_errors %}
-    <div class="alert alert-danger">
-      {{ form.non_field_errors }}
-    </div>
-  {% endif %}
-
-
-  <section class="section-block">
-    <div class="section-body">
-
-      <div class="section-header-compact">
-        <div>
-          <p class="page-kicker mb-1">
-            Шаг 1
-          </p>
-
-          <h2 class="h5 mb-1">
-            Клиент
-          </h2>
-
-          <div class="small text-secondary">
-            Основные данные и срок аккаунта.
-          </div>
-        </div>
-      </div>
-
-
-      <div class="row g-3">
-
-        <div class="col-12 col-lg-6">
-          <label
-            class="form-label"
-            for="{{ form.display_name.id_for_label }}"
-          >
-            {{ form.display_name.label }}
-          </label>
-
-          {{ form.display_name }}
-
-          {% for error in form.display_name.errors %}
-            <div class="text-danger small mt-1">
-              {{ error }}
-            </div>
-          {% endfor %}
-        </div>
-
-
-        <div class="col-12 col-lg-6">
-          <label
-            class="form-label"
-            for="{{ form.email.id_for_label }}"
-          >
-            {{ form.email.label }}
-          </label>
-
-          {{ form.email }}
-
-          {% for error in form.email.errors %}
-            <div class="text-danger small mt-1">
-              {{ error }}
-            </div>
-          {% endfor %}
-        </div>
-
-
-        <div class="col-12 col-lg-6">
-          <label
-            class="form-label"
-            for="{{ form.expires_at.id_for_label }}"
-          >
-            {{ form.expires_at.label }}
-          </label>
-
-          {{ form.expires_at }}
-
-          <div class="form-text">
-            Оставьте пустым для аккаунта без срока.
-          </div>
-
-          {% for error in form.expires_at.errors %}
-            <div class="text-danger small mt-1">
-              {{ error }}
-            </div>
-          {% endfor %}
-        </div>
-
-      </div>
-
-    </div>
-  </section>
-
-
-  <section class="section-block">
-    <div class="section-body">
-
-      <div class="section-header-compact">
-        <div>
-          <p class="page-kicker mb-1">
-            Шаг 2
-          </p>
-
-          <h2 class="h5 mb-1">
-            Первое устройство
-          </h2>
-
-          <div class="small text-secondary">
-            После создания для устройства можно добавить
-            «Весь интернет через VPN»,
-            «Только выбранные сервисы»
-            и «Альтернативное подключение».
-          </div>
-        </div>
-      </div>
-
-
-      <div class="row g-3">
-
-        <div class="col-12 col-lg-6">
-          <label
-            class="form-label"
-            for="{{ form.device_name.id_for_label }}"
-          >
-            {{ form.device_name.label }}
-          </label>
-
-          {{ form.device_name }}
-
-          {% for error in form.device_name.errors %}
-            <div class="text-danger small mt-1">
-              {{ error }}
-            </div>
-          {% endfor %}
-        </div>
-
-
-        <div class="col-12 col-lg-6">
-          <label
-            class="form-label"
-            for="{{ form.device_platform.id_for_label }}"
-          >
-            {{ form.device_platform.label }}
-          </label>
-
-          {{ form.device_platform }}
-
-          {% for error in form.device_platform.errors %}
-            <div class="text-danger small mt-1">
-              {{ error }}
-            </div>
-          {% endfor %}
-        </div>
-
-
-        <div class="col-12">
-          <label
-            class="form-label"
-            for="{{ form.device_notes.id_for_label }}"
-          >
-            {{ form.device_notes.label }}
-          </label>
-
-          {{ form.device_notes }}
-
-          {% for error in form.device_notes.errors %}
-            <div class="text-danger small mt-1">
-              {{ error }}
-            </div>
-          {% endfor %}
-        </div>
-
-      </div>
-
-    </div>
-  </section>
-
-
-  <section class="section-block">
-    <div class="section-body">
-
-      <div class="section-header-compact">
-        <div>
-          <p class="page-kicker mb-1">
-            Шаг 3
-          </p>
-
-          <h2 class="h5 mb-1">
-            Личный кабинет
-          </h2>
-
-          <div class="small text-secondary">
-            Кабинет можно создать сейчас или позже
-            из карточки клиента.
-          </div>
-        </div>
-      </div>
-
-
-      <div class="form-check mb-3">
-        {{ form.create_login }}
-
-        <label
-          class="form-check-label"
-          for="{{ form.create_login.id_for_label }}"
-        >
-          {{ form.create_login.label }}
-        </label>
-      </div>
-
-
-      <div class="row g-3">
-
-        <div class="col-12 col-lg-4">
-          <label
-            class="form-label"
-            for="{{ form.username.id_for_label }}"
-          >
-            {{ form.username.label }}
-          </label>
-
-          {{ form.username }}
-
-          <div class="form-text">
-            Если поле пустое, используется Email клиента.
-          </div>
-
-          {% for error in form.username.errors %}
-            <div class="text-danger small mt-1">
-              {{ error }}
-            </div>
-          {% endfor %}
-        </div>
-
-
-        <div class="col-12 col-lg-4">
-          <label
-            class="form-label"
-            for="{{ form.password1.id_for_label }}"
-          >
-            {{ form.password1.label }}
-          </label>
-
-          {{ form.password1 }}
-
-          {% for error in form.password1.errors %}
-            <div class="text-danger small mt-1">
-              {{ error }}
-            </div>
-          {% endfor %}
-        </div>
-
-
-        <div class="col-12 col-lg-4">
-          <label
-            class="form-label"
-            for="{{ form.password2.id_for_label }}"
-          >
-            {{ form.password2.label }}
-          </label>
-
-          {{ form.password2 }}
-
-          {% for error in form.password2.errors %}
-            <div class="text-danger small mt-1">
-              {{ error }}
-            </div>
-          {% endfor %}
-        </div>
-
-      </div>
-
-    </div>
-  </section>
-
-
-  <section class="section-block section-quiet">
-    <div class="section-body">
-
-      <div class="alert alert-info">
-        Подключения на этом этапе не создаются и не изменяются.
-        После создания клиента вы попадёте в его рабочую область
-        и сможете отдельно добавить нужные подключения.
-      </div>
-
-
-      <div class="d-flex gap-2 flex-wrap">
-
-        <button
-          type="submit"
-          class="btn btn-primary"
-        >
-          Создать клиента
-        </button>
-
-        <a
-          href="{% url 'customers-list' %}"
-          class="btn btn-outline-secondary"
-        >
-          Отмена
-        </a>
-
-      </div>
-
-    </div>
-  </section>
-
-</form>
-
 {% endblock %}

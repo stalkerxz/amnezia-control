@@ -1,396 +1,143 @@
 {% extends 'partials/base.html' %}
+{% load static %}
 
-{% block title %}
-Управление кабинетом · {{ account.display_name }}
-{% endblock %}
-
+{% block title %}Управление кабинетом · {{ account.display_name }}{% endblock %}
 
 {% block content %}
+<link href="{% static 'css/app-v4-forms.css' %}" rel="stylesheet">
+<link href="{% static 'css/app-v4-access.css' %}" rel="stylesheet">
 
-<div class="page-header d-flex justify-content-between align-items-start gap-3 flex-wrap">
+<div class="v4-access-shell">
+  <a class="v4-access-back" href="{% url 'customers-detail' account.pk %}">← {{ account.display_name }}</a>
 
-  <div>
+  <header class="v4-access-header">
+    <div>
+      <p class="page-kicker mb-1">Клиентский доступ</p>
+      <h1>Личный кабинет</h1>
+      <p>Логин клиента управляется отдельно от VPN. Смена пароля или отключение входа не меняет ключи, IP-адреса и сохранённые конфигурации.</p>
+    </div>
+  </header>
 
-    <p class="page-kicker">
-      Операторская · Клиентский кабинет
-    </p>
+  <section class="v4-access-summary" aria-label="Состояние клиентского доступа">
+    <div class="v4-access-summary-item">
+      <small>Логин</small>
+      <strong>{{ customer_user.username }}</strong>
+      <em>учётная запись клиента</em>
+    </div>
+    <div class="v4-access-summary-item">
+      <small>Email</small>
+      <strong>{{ customer_user.email|default:"Не указан" }}</strong>
+      <em>контакт кабинета</em>
+    </div>
+    <div class="v4-access-summary-item">
+      <small>Вход</small>
+      <strong>{% if customer_user.is_active %}Разрешён{% else %}Отключён{% endif %}</strong>
+      <em>{% if customer_user.is_active %}клиент может войти{% else %}учётные данные заблокированы{% endif %}</em>
+    </div>
+  </section>
 
-    <h1 class="h3 mb-1">
-      Управление доступом
-    </h1>
-
-    <p class="page-subtle mb-0">
-      {{ account.display_name }}
-    </p>
-
-  </div>
-
-
-  <a
-    href="{% url 'customers-detail' account.pk %}"
-    class="btn btn-outline-secondary"
-  >
-    К аккаунту
-  </a>
-
-</div>
-
-
-<section class="section-block section-quiet">
-
-  <div class="section-body">
-
-    <div class="summary-strip">
-
-      <div class="summary-item span-4">
-        <div class="label">
-          Логин
+  <div class="v4-access-grid">
+    <div class="v4-access-stack">
+      <section class="v4-access-card">
+        <div class="v4-access-card-head">
+          <div>
+            <span>Доступ клиенту</span>
+            <h2>Страница входа</h2>
+            <p>Общий адрес личного кабинета. Клиент входит под выданным логином и паролем.</p>
+          </div>
         </div>
-
-        <div class="value">
-          {{ customer_user.username }}
+        <div class="v4-access-card-body">
+          <div class="v4-access-url">
+            <small>Адрес</small>
+            <code>{{ request.scheme }}://{{ request.get_host }}{% url 'customer-portal-login' %}</code>
+            <a href="{% url 'customer-portal-login' %}" target="_blank" rel="noopener" class="btn btn-outline-primary btn-sm">Открыть страницу входа ↗</a>
+          </div>
+          <div class="v4-access-info mt-3">
+            <span class="v4-access-info-icon">i</span>
+            <div>Логин: <strong>{{ customer_user.username }}</strong>. Текущий пароль не отображается; при необходимости установите новый ниже.</div>
+          </div>
         </div>
-      </div>
+      </section>
 
-
-      <div class="summary-item span-4">
-        <div class="label">
-          Email
+      <section class="v4-access-card">
+        <div class="v4-access-card-head">
+          <div>
+            <span>Безопасность</span>
+            <h2>Установить новый пароль</h2>
+            <p>VPN-подключения и конфигурации останутся прежними.</p>
+          </div>
         </div>
-
-        <div class="value">
-          {{ customer_user.email|default:"—" }}
-        </div>
-      </div>
-
-
-      <div class="summary-item span-4">
-        <div class="label">
-          Доступ
-        </div>
-
-        <div class="value">
-
-          {% if customer_user.is_active %}
-            <span class="text-success">
-              Включён
-            </span>
-          {% else %}
-            <span class="text-warning">
-              Отключён
-            </span>
+        <div class="v4-access-card-body">
+          {% if form.non_field_errors %}
+            <div class="alert alert-danger">{% for error in form.non_field_errors %}<div>{{ error }}</div>{% endfor %}</div>
           {% endif %}
-
+          <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="password">
+            <div class="v4-access-form-grid">
+              <div>
+                <label class="form-label" for="{{ form.password1.id_for_label }}">{{ form.password1.label }}</label>
+                {{ form.password1 }}
+                {% for error in form.password1.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+              </div>
+              <div>
+                <label class="form-label" for="{{ form.password2.id_for_label }}">{{ form.password2.label }}</label>
+                {{ form.password2 }}
+                {% for error in form.password2.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+              </div>
+            </div>
+            <div class="v4-access-actions"><button type="submit" class="btn btn-primary">Изменить пароль</button></div>
+          </form>
         </div>
-      </div>
-
+      </section>
     </div>
 
-  </div>
-
-</section>
-
-<section class="section-block">
-
-  <div class="section-body">
-
-    <div class="section-header-compact">
-
-      <div>
-
-        <p class="page-kicker mb-1">
-          Ссылка клиенту
-        </p>
-
-        <h2 class="h5 mb-1">
-          Ссылка на личный кабинет
-        </h2>
-
-        <div class="text-secondary small">
-          Эта страница входа общая для клиентов.
-          Для входа клиент использует выданный логин и пароль.
+    <aside class="v4-access-stack">
+      <section class="v4-access-card">
+        <div class="v4-access-card-head">
+          <div><span>Состояние</span><h2>Вход в кабинет</h2></div>
         </div>
+        <div class="v4-access-card-body">
+          <div class="v4-access-state {% if not customer_user.is_active %}is-disabled{% endif %}">
+            <span class="v4-access-state-dot"></span>
+            <div>
+              <strong>{% if customer_user.is_active %}Вход разрешён{% else %}Вход отключён{% endif %}</strong>
+              <small>Сам VPN продолжает работать независимо от этого переключателя.</small>
+            </div>
+          </div>
 
-      </div>
-
-    </div>
-
-
-    <div class="border rounded-3 p-3">
-
-      <div class="small text-secondary mb-1">
-        Адрес страницы входа
-      </div>
-
-      <div class="fw-semibold text-break">
-        {{ request.scheme }}://{{ request.get_host }}{% url 'customer-portal-login' %}
-      </div>
-
-
-      <div class="d-flex gap-2 flex-wrap mt-3">
-
-        <a
-          href="{% url 'customer-portal-login' %}"
-          target="_blank"
-          rel="noopener"
-          class="btn btn-primary"
-        >
-          Открыть страницу входа
-        </a>
-
-      </div>
-
-
-      <div class="small text-secondary mt-3">
-        Логин клиента:
-        <strong>
-          {{ customer_user.username }}
-        </strong>.
-        Пароль после создания не отображается.
-        При необходимости установите новый пароль ниже.
-      </div>
-
-    </div>
-
-  </div>
-
-</section>
-
-
-
-<section class="section-block">
-
-  <div class="section-body">
-
-    <div class="section-header-compact">
-      <div>
-
-        <p class="page-kicker mb-1">
-          Пароль
-        </p>
-
-        <h2 class="h5 mb-1">
-          Установить новый пароль
-        </h2>
-
-        <div class="text-secondary small">
-          Подключения и сохранённые конфигурации
-          при смене пароля не изменяются.
-        </div>
-
-      </div>
-    </div>
-
-
-    <form
-      method="post"
-      class="row g-3"
-    >
-
-      {% csrf_token %}
-
-      <input
-        type="hidden"
-        name="action"
-        value="password"
-      >
-
-
-      {% if form.non_field_errors %}
-        <div class="col-12">
-          <div class="alert alert-danger">
-            {% for error in form.non_field_errors %}
-              <div>{{ error }}</div>
-            {% endfor %}
+          <div class="v4-access-actions">
+            {% if customer_user.is_active %}
+              <form method="post" onsubmit="return confirm('Отключить клиенту вход в кабинет? VPN-подключения останутся без изменений.');">
+                {% csrf_token %}<input type="hidden" name="action" value="disable">
+                <button type="submit" class="btn btn-outline-warning">Отключить вход</button>
+              </form>
+            {% else %}
+              <form method="post">
+                {% csrf_token %}<input type="hidden" name="action" value="enable">
+                <button type="submit" class="btn btn-outline-success">Включить вход</button>
+              </form>
+            {% endif %}
           </div>
         </div>
-      {% endif %}
+      </section>
 
-
-      <div class="col-12 col-lg-6">
-
-        <label
-          class="form-label"
-          for="{{ form.password1.id_for_label }}"
-        >
-          {{ form.password1.label }}
-        </label>
-
-        {{ form.password1 }}
-
-        {% for error in form.password1.errors %}
-          <div class="text-danger small mt-1">
-            {{ error }}
+      <section class="v4-access-card v4-access-danger">
+        <div class="v4-access-card-head">
+          <div>
+            <span>Редкая операция</span>
+            <h2>Отвязать кабинет</h2>
+            <p>Старый пользователь будет заблокирован. Устройства и VPN не удаляются.</p>
           </div>
-        {% endfor %}
-
-      </div>
-
-
-      <div class="col-12 col-lg-6">
-
-        <label
-          class="form-label"
-          for="{{ form.password2.id_for_label }}"
-        >
-          {{ form.password2.label }}
-        </label>
-
-        {{ form.password2 }}
-
-        {% for error in form.password2.errors %}
-          <div class="text-danger small mt-1">
-            {{ error }}
-          </div>
-        {% endfor %}
-
-      </div>
-
-
-      <div class="col-12">
-
-        <button
-          type="submit"
-          class="btn btn-primary"
-        >
-          Изменить пароль
-        </button>
-
-      </div>
-
-    </form>
-
-  </div>
-
-</section>
-
-
-<section class="section-block">
-
-  <div class="section-body">
-
-    <div class="section-header-compact">
-
-      <div>
-
-        <p class="page-kicker mb-1">
-          Доступ
-        </p>
-
-        <h2 class="h5 mb-1">
-          Вход в кабинет
-        </h2>
-
-        <div class="text-secondary small">
-          Отключение логина не удаляет
-          клиента, его устройства или подключения.
         </div>
-
-      </div>
-
-    </div>
-
-
-    {% if customer_user.is_active %}
-
-      <form method="post">
-        {% csrf_token %}
-
-        <input
-          type="hidden"
-          name="action"
-          value="disable"
-        >
-
-        <button
-          type="submit"
-          class="btn btn-warning"
-          onclick="return confirm('Отключить клиенту вход в кабинет?');"
-        >
-          Отключить вход
-        </button>
-
-      </form>
-
-    {% else %}
-
-      <form method="post">
-        {% csrf_token %}
-
-        <input
-          type="hidden"
-          name="action"
-          value="enable"
-        >
-
-        <button
-          type="submit"
-          class="btn btn-success"
-        >
-          Включить вход
-        </button>
-
-      </form>
-
-    {% endif %}
-
-  </div>
-
-</section>
-
-
-<section class="section-block">
-
-  <div class="section-body">
-
-    <div class="section-header-compact">
-
-      <div>
-
-        <p class="page-kicker mb-1">
-          Отвязка
-        </p>
-
-        <h2 class="h5 mb-1">
-          Удалить привязку кабинета
-        </h2>
-
-        <div class="text-secondary small">
-          Старый пользователь будет заблокирован,
-          его пароль станет недействительным.
-          После этого для клиента можно будет создать новый логин.
-          Устройства и подключения не удаляются.
+        <div class="v4-access-card-body">
+          <form method="post" onsubmit="return confirm('Отвязать клиентский логин? Старые учётные данные перестанут работать. Сохранённые VPN-конфигурации останутся без изменений.');">
+            {% csrf_token %}<input type="hidden" name="action" value="detach">
+            <button type="submit" class="btn btn-outline-danger">Отвязать кабинет</button>
+          </form>
         </div>
-
-      </div>
-
-    </div>
-
-
-    <form
-      method="post"
-      onsubmit="return confirm('Отвязать клиентский логин? Старые учётные данные перестанут работать. Сохранённые конфигурации останутся без изменений.');"
-    >
-
-      {% csrf_token %}
-
-      <input
-        type="hidden"
-        name="action"
-        value="detach"
-      >
-
-      <button
-        type="submit"
-        class="btn btn-outline-danger"
-      >
-        Отвязать кабинет
-      </button>
-
-    </form>
-
+      </section>
+    </aside>
   </div>
-
-</section>
-
+</div>
 {% endblock %}

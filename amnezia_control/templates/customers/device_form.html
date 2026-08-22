@@ -1,149 +1,70 @@
 {% extends 'partials/base.html' %}
+{% load static %}
 
 {% block title %}Новое устройство · {{ account.display_name }}{% endblock %}
 
 {% block content %}
+<link href="{% static 'css/app-v4-forms.css' %}" rel="stylesheet">
 
-<div class="page-header d-flex justify-content-between align-items-start gap-2 flex-wrap">
+<div class="v4-form-page">
+  <header class="v4-form-hero">
+    <div class="v4-form-hero-copy">
+      <a class="v4-back-link" href="{% url 'customers-detail' account.pk %}">← {{ account.display_name }}</a>
+      <p class="page-kicker">VPN Control · Устройство</p>
+      <h1>Добавить устройство</h1>
+      <p>Создайте устройство внутри аккаунта. VPN-подключения выбираются отдельно после сохранения.</p>
+    </div>
+  </header>
 
-  <div>
-    <p class="page-kicker">
-      Операторская · Устройство
-    </p>
+  <form method="post">
+    {% csrf_token %}
+    <div class="v4-form-layout">
+      <div class="v4-form-main">
+        <section class="v4-form-card">
+          <div class="v4-form-card-head"><div><h2>Устройство</h2><p>Имя, платформа и необязательная заметка.</p></div></div>
 
-    <h1 class="h3 mb-1">
-      Добавить устройство
-    </h1>
+          {% if form.non_field_errors %}<div class="alert alert-danger mb-3">{{ form.non_field_errors }}</div>{% endif %}
 
-    <p class="page-subtle mb-0">
-      Аккаунт:
-      <strong>{{ account.display_name }}</strong>
-    </p>
-  </div>
+          <div class="v4-field-grid">
+            <div class="v4-field">
+              <label class="form-label" for="{{ form.name.id_for_label }}">{{ form.name.label }}</label>
+              {{ form.name }}
+              <div class="form-text">Например: iPhone 15, MacBook, Windows PC.</div>
+              {% for error in form.name.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+            </div>
 
-  <div class="action-cluster">
-    <a
-      href="{% url 'customers-detail' account.pk %}"
-      class="btn btn-outline-secondary"
-    >
-      К аккаунту
-    </a>
-  </div>
+            <div class="v4-field">
+              <label class="form-label" for="{{ form.platform.id_for_label }}">{{ form.platform.label }}</label>
+              {{ form.platform }}
+              {% for error in form.platform.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+            </div>
 
+            <div class="v4-field is-wide">
+              <label class="form-label" for="{{ form.notes.id_for_label }}">{{ form.notes.label }}</label>
+              {{ form.notes }}
+              <div class="form-text">Необязательно. Служебная заметка видна оператору.</div>
+              {% for error in form.notes.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+            </div>
+          </div>
+        </section>
+
+        <div class="v4-form-actions">
+          <button type="submit" class="btn btn-primary">Добавить устройство</button>
+          <a href="{% url 'customers-detail' account.pk %}" class="btn btn-outline-secondary">Отмена</a>
+        </div>
+      </div>
+
+      <aside class="v4-form-aside">
+        <section class="v4-context-card">
+          <h3>{{ account.display_name }}</h3>
+          <div class="v4-context-list">
+            <div class="v4-context-row"><span>Аккаунт</span><strong>{{ account.display_name }}</strong></div>
+            <div class="v4-context-row"><span>После создания</span><strong>0 подключений</strong></div>
+          </div>
+        </section>
+        <div class="v4-context-note">На одном устройстве можно использовать FULL, SELECT и альтернативное подключение одновременно.</div>
+      </aside>
+    </div>
+  </form>
 </div>
-
-
-<section class="section-block">
-  <div class="section-body">
-
-    <form method="post" class="row g-3">
-      {% csrf_token %}
-
-      {% if form.non_field_errors %}
-        <div class="col-12">
-          <div class="alert alert-danger">
-            {{ form.non_field_errors }}
-          </div>
-        </div>
-      {% endif %}
-
-
-      <div class="col-12 col-lg-6">
-
-        <label
-          for="{{ form.name.id_for_label }}"
-          class="form-label"
-        >
-          {{ form.name.label }}
-        </label>
-
-        {{ form.name }}
-
-        {% for error in form.name.errors %}
-          <div class="text-danger small mt-1">
-            {{ error }}
-          </div>
-        {% endfor %}
-
-      </div>
-
-
-      <div class="col-12 col-lg-6">
-
-        <label
-          for="{{ form.platform.id_for_label }}"
-          class="form-label"
-        >
-          {{ form.platform.label }}
-        </label>
-
-        {{ form.platform }}
-
-        {% for error in form.platform.errors %}
-          <div class="text-danger small mt-1">
-            {{ error }}
-          </div>
-        {% endfor %}
-
-      </div>
-
-
-      <div class="col-12">
-
-        <label
-          for="{{ form.notes.id_for_label }}"
-          class="form-label"
-        >
-          {{ form.notes.label }}
-        </label>
-
-        {{ form.notes }}
-
-        {% for error in form.notes.errors %}
-          <div class="text-danger small mt-1">
-            {{ error }}
-          </div>
-        {% endfor %}
-
-      </div>
-
-
-      <div class="col-12">
-        <div class="alert alert-secondary mb-0">
-          Подключения добавляются отдельно после
-          создания устройства.
-          На одном устройстве можно использовать
-          несколько типов подключения.
-        </div>
-      </div>
-
-
-      <div class="col-12">
-        <hr>
-      </div>
-
-
-      <div class="col-12 d-flex gap-2">
-
-        <button
-          type="submit"
-          class="btn btn-primary"
-        >
-          Добавить устройство
-        </button>
-
-        <a
-          href="{% url 'customers-detail' account.pk %}"
-          class="btn btn-outline-secondary"
-        >
-          Отмена
-        </a>
-
-      </div>
-
-    </form>
-
-  </div>
-</section>
-
 {% endblock %}

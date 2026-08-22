@@ -1,132 +1,72 @@
 {% extends 'partials/base.html' %}
+{% load static %}
 
-{% block title %}Новый аккаунт · amnezia-control{% endblock %}
+{% block title %}Новый аккаунт · VPN Control{% endblock %}
 
 {% block content %}
+<link href="{% static 'css/app-v4-forms.css' %}" rel="stylesheet">
 
-<div class="page-header d-flex justify-content-between align-items-start gap-2 flex-wrap">
-  <div>
-    <p class="page-kicker">
-      Операторская · Аккаунты
-    </p>
+<div class="v4-form-page">
+  <header class="v4-form-hero">
+    <div class="v4-form-hero-copy">
+      <a class="v4-back-link" href="{% url 'customers-list' %}">← Все клиенты</a>
+      <p class="page-kicker">VPN Control · Аккаунт</p>
+      <h1>Новый аккаунт клиента</h1>
+      <p>Создайте только аккаунт без устройства и VPN. Этот режим удобен для предварительного заведения клиента.</p>
+    </div>
+  </header>
 
-    <h1 class="h3 mb-1">
-      Новый аккаунт клиента
-    </h1>
+  <form method="post">
+    {% csrf_token %}
+    <div class="v4-form-layout">
+      <div class="v4-form-main">
+        <section class="v4-form-card">
+          <div class="v4-form-card-head">
+            <div><h2>Основные данные</h2><p>Имя, контакт и срок доступа аккаунта.</p></div>
+          </div>
 
-    <p class="page-subtle mb-0">
-      Один аккаунт может содержать несколько устройств
-      и несколько VPN-подключений.
-    </p>
-  </div>
+          {% if form.non_field_errors %}<div class="alert alert-danger mb-3">{{ form.non_field_errors }}</div>{% endif %}
 
-  <div class="action-cluster">
-    <a
-      href="{% url 'customers-list' %}"
-      class="btn btn-outline-secondary"
-    >
-      Отмена
-    </a>
-  </div>
+          <div class="v4-field-grid">
+            <div class="v4-field">
+              <label class="form-label" for="{{ form.display_name.id_for_label }}">{{ form.display_name.label }}</label>
+              {{ form.display_name }}
+              {% for error in form.display_name.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+            </div>
+
+            <div class="v4-field">
+              <label class="form-label" for="{{ form.email.id_for_label }}">{{ form.email.label }}</label>
+              {{ form.email }}
+              {% for error in form.email.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+            </div>
+
+            <div class="v4-field">
+              <label class="form-label" for="{{ form.expires_at.id_for_label }}">{{ form.expires_at.label }}</label>
+              {{ form.expires_at }}
+              <div class="form-text">Пустое поле означает доступ без срока.</div>
+              {% for error in form.expires_at.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+            </div>
+          </div>
+        </section>
+
+        <div class="v4-form-actions">
+          <button type="submit" class="btn btn-primary">Создать аккаунт</button>
+          <a href="{% url 'customers-list' %}" class="btn btn-outline-secondary">Отмена</a>
+        </div>
+      </div>
+
+      <aside class="v4-form-aside">
+        <section class="v4-context-card">
+          <h3>После создания</h3>
+          <div class="v4-context-list">
+            <div class="v4-context-row"><span>Устройства</span><strong>0</strong></div>
+            <div class="v4-context-row"><span>VPN</span><strong>0</strong></div>
+            <div class="v4-context-row"><span>Кабинет</span><strong>Не создаётся</strong></div>
+          </div>
+        </section>
+        <div class="v4-context-note">Для обычного нового клиента удобнее использовать «Новый клиент»: там аккаунт и первое устройство создаются одной операцией.</div>
+      </aside>
+    </div>
+  </form>
 </div>
-
-
-<section class="section-block">
-  <div class="section-body">
-
-    <form method="post" class="row g-3">
-      {% csrf_token %}
-
-      {% if form.non_field_errors %}
-        <div class="col-12">
-          <div class="alert alert-danger">
-            {{ form.non_field_errors }}
-          </div>
-        </div>
-      {% endif %}
-
-
-      <div class="col-12 col-lg-6">
-        <label
-          for="{{ form.display_name.id_for_label }}"
-          class="form-label"
-        >
-          {{ form.display_name.label }}
-        </label>
-
-        {{ form.display_name }}
-
-        {% for error in form.display_name.errors %}
-          <div class="text-danger small mt-1">
-            {{ error }}
-          </div>
-        {% endfor %}
-      </div>
-
-
-      <div class="col-12 col-lg-6">
-        <label
-          for="{{ form.email.id_for_label }}"
-          class="form-label"
-        >
-          {{ form.email.label }}
-        </label>
-
-        {{ form.email }}
-
-        {% for error in form.email.errors %}
-          <div class="text-danger small mt-1">
-            {{ error }}
-          </div>
-        {% endfor %}
-      </div>
-
-
-      <div class="col-12 col-lg-6">
-        <label
-          for="{{ form.expires_at.id_for_label }}"
-          class="form-label"
-        >
-          {{ form.expires_at.label }}
-        </label>
-
-        {{ form.expires_at }}
-
-        <div class="form-text">
-          Можно оставить пустым — аккаунт будет без срока.
-        </div>
-
-        {% for error in form.expires_at.errors %}
-          <div class="text-danger small mt-1">
-            {{ error }}
-          </div>
-        {% endfor %}
-      </div>
-
-
-      <div class="col-12">
-        <hr>
-      </div>
-
-      <div class="col-12 d-flex gap-2">
-        <button
-          type="submit"
-          class="btn btn-primary"
-        >
-          Создать аккаунт
-        </button>
-
-        <a
-          href="{% url 'customers-list' %}"
-          class="btn btn-outline-secondary"
-        >
-          Отмена
-        </a>
-      </div>
-
-    </form>
-
-  </div>
-</section>
-
 {% endblock %}

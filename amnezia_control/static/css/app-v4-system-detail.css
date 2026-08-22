@@ -1,0 +1,101 @@
+/* VPN Control UI v4 — server and operation detail surfaces. */
+
+.v4-system-page > .v4-back-link {
+  display: inline-flex;
+  margin-bottom: 12px;
+  color: #64758b !important;
+  font-size: .63rem;
+  font-weight: 620;
+  text-decoration: none;
+}
+.v4-system-page > .v4-back-link:hover { color: #8ebcff !important; }
+
+.v4-protocol-row,
+.v4-event-row { position: relative; }
+.v4-protocol-row::before,
+.v4-event-row::before {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 2px;
+  background: transparent;
+  content: "";
+}
+.v4-protocol-row.is-success::before { background: rgba(72,213,151,.28); }
+.v4-protocol-row.is-warning::before,
+.v4-event-row.is-warning::before { background: rgba(243,185,79,.55); }
+.v4-event-row.is-danger::before { background: rgba(255,101,119,.68); }
+.v4-protocol-row.is-warning { background: rgba(243,185,79,.012); }
+.v4-event-row.is-warning { background: rgba(243,185,79,.014); }
+.v4-event-row.is-danger { background: rgba(255,101,119,.018); }
+
+.v4-server-ready-state {
+  min-height: 64px !important;
+}
+
+.v4-operation-banner {
+  display: flex;
+  gap: 4px;
+  flex-direction: column;
+  margin-bottom: 12px;
+  padding: 11px 13px;
+  border: 1px solid rgba(121,149,191,.10);
+  border-radius: 11px;
+  background: rgba(66,88,123,.035);
+}
+.v4-operation-banner strong { font-size: .69rem; }
+.v4-operation-banner span { color: #67778d; font-size: .6rem; }
+.v4-operation-banner.is-warning {
+  border-color: rgba(243,185,79,.16);
+  background: rgba(243,185,79,.035);
+}
+.v4-operation-banner.is-warning strong { color: #d0aa62; }
+.v4-operation-banner.is-warning span { color: #81735a; }
+.v4-operation-banner.is-danger {
+  border-color: rgba(255,101,119,.17);
+  background: rgba(255,101,119,.035);
+}
+.v4-operation-banner.is-danger strong { color: #e9828e; }
+.v4-operation-banner.is-danger span { color: #8a646b; }
+
+.v4-operation-detail-grid {
+  display: grid;
+  grid-template-columns: minmax(0,1.65fr) minmax(300px,.75fr);
+  gap: 12px;
+  align-items: start;
+}
+.v4-payload-panel {
+  position: sticky;
+  top: 76px;
+}
+.v4-payload-panel .v4-log {
+  max-height: 520px;
+}
+
+.v4-events-table { min-width: 720px; }
+.v4-event-output-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0,1fr));
+  gap: 10px;
+}
+.v4-event-output-grid:has(.v4-output-block:only-child) {
+  grid-template-columns: 1fr;
+}
+.v4-output-block h3 {
+  margin: 0 0 6px;
+  color: #78899f;
+  font-size: .57rem;
+  font-weight: 720;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.v4-output-block.is-danger h3 { color: #c47782; }
+
+@media (max-width: 1099.98px) {
+  .v4-operation-detail-grid { grid-template-columns: 1fr; }
+  .v4-payload-panel { position: static; }
+}
+@media (max-width: 767.98px) {
+  .v4-event-output-grid { grid-template-columns: 1fr; }
+}

@@ -1,291 +1,73 @@
 {% extends 'partials/base.html' %}
+{% load static %}
 
-{% block title %}
-{% if form.routing_mode.value == 'selective' %}
-Подключение выбранных сервисов
-{% else %}
-Подключение всего интернета
-{% endif %}
-· {{ device.name }}
-{% endblock %}
+{% block title %}{% if form.routing_mode.value == 'selective' %}Подключение выбранных сервисов{% else %}Подключение всего интернета{% endif %} · {{ device.name }}{% endblock %}
 
 {% block content %}
+<link href="{% static 'css/app-v4-forms.css' %}" rel="stylesheet">
 
-<div class="page-header d-flex justify-content-between align-items-start gap-2 flex-wrap">
-
-  <div>
-
-    <p class="page-kicker">
-      Операторская · Подключение
-    </p>
-
-    {% if form.routing_mode.value == 'selective' %}
-
-      <h1 class="h3 mb-1">
-        Только выбранные сервисы
-      </h1>
-
-      <p class="page-subtle mb-0">
-        Через VPN будут направлены только
-        настроенные маршруты.
-      </p>
-
-    {% else %}
-
-      <h1 class="h3 mb-1">
-        Весь интернет через VPN
-      </h1>
-
-      <p class="page-subtle mb-0">
-        Весь интернет-трафик устройства
-        будет направлен через VPN.
-      </p>
-
-    {% endif %}
-
-  </div>
-
-
-  <div class="action-cluster">
-
-    <a
-      href="{% url 'customers-device-connection-create' device.pk %}"
-      class="btn btn-outline-secondary"
-    >
-      Назад к выбору
-    </a>
-
-  </div>
-
-</div>
-
-
-<section class="section-block section-quiet">
-
-  <div class="section-body">
-
-    <div class="summary-strip">
-
-      <div class="summary-item span-3">
-
-        <div class="label">
-          Клиент
-        </div>
-
-        <div class="value">
-          {{ account.display_name }}
-        </div>
-
-      </div>
-
-
-      <div class="summary-item span-3">
-
-        <div class="label">
-          Устройство
-        </div>
-
-        <div class="value">
-          {{ device.name }}
-        </div>
-
-      </div>
-
-
-      <div class="summary-item span-3">
-
-        <div class="label">
-          Сервер
-        </div>
-
-        <div class="value">
-          {{ server.name }}
-        </div>
-
-      </div>
-
-
-      <div class="summary-item span-3">
-
-        <div class="label">
-          Срок
-        </div>
-
-        <div class="value">
-
-          {% if account.expires_at %}
-            {{ account.expires_at|date:"d.m.Y H:i" }}
-          {% else %}
-            Без срока
-          {% endif %}
-
-        </div>
-
-      </div>
-
+<div class="v4-form-page">
+  <header class="v4-form-hero">
+    <div class="v4-form-hero-copy">
+      <a class="v4-back-link" href="{% url 'customers-device-connection-create' device.pk %}">← Выбор подключения</a>
+      <p class="page-kicker">VPN Control · Подтверждение</p>
+      {% if form.routing_mode.value == 'selective' %}
+        <h1>Только выбранные сервисы</h1>
+        <p>Будет выпущено выборочное VPN-подключение для {{ device.name }}. Остальной интернет продолжит работать напрямую.</p>
+      {% else %}
+        <h1>Весь интернет через VPN</h1>
+        <p>Будет выпущено основное VPN-подключение для {{ device.name }}. Весь интернет устройства будет направлен через VPN.</p>
+      {% endif %}
     </div>
+  </header>
 
+  <div class="v4-inline-summary">
+    <div class="v4-inline-summary-item"><span>Клиент</span><strong>{{ account.display_name }}</strong></div>
+    <div class="v4-inline-summary-item"><span>Устройство</span><strong>{{ device.name }}</strong></div>
+    <div class="v4-inline-summary-item"><span>Сервер</span><strong>{{ server.name }}</strong></div>
+    <div class="v4-inline-summary-item"><span>Срок аккаунта</span><strong>{% if account.expires_at %}{{ account.expires_at|date:'d.m.Y H:i' }}{% else %}Без срока{% endif %}</strong></div>
   </div>
 
-</section>
+  <form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="routing_mode" value="{{ form.routing_mode.value|default:'full' }}">
 
+    <div class="v4-form-layout">
+      <div class="v4-form-main">
+        {% if form.non_field_errors %}
+          <div class="alert alert-danger">{% for error in form.non_field_errors %}<div>{{ error }}</div>{% endfor %}</div>
+        {% endif %}
+        {% if form.routing_mode.errors %}
+          <div class="alert alert-danger">{% for error in form.routing_mode.errors %}<div>{{ error }}</div>{% endfor %}</div>
+        {% endif %}
+        {% if form.protocol_type.errors %}
+          <div class="alert alert-danger">{% for error in form.protocol_type.errors %}<div>{{ error }}</div>{% endfor %}</div>
+        {% endif %}
 
-<section class="section-block">
+        <section class="v4-confirm-card">
+          <span class="v4-confirm-badge">{% if form.routing_mode.value == 'selective' %}SELECT{% else %}FULL{% endif %}</span>
+          <h2>{% if form.routing_mode.value == 'selective' %}Подключение выбранных сервисов готово к выпуску{% else %}Основное подключение готово к выпуску{% endif %}</h2>
+          <p>Имя подключения, срок действия и остальные управляемые параметры наследуются от аккаунта и устройства. Технические параметры выбранного режима подставятся автоматически.</p>
+        </section>
 
-  <div class="section-body">
+        <div class="v4-form-actions">
+          <button type="submit" class="btn btn-primary">Создать подключение</button>
+          <a href="{% url 'customers-device-connection-create' device.pk %}" class="btn btn-outline-secondary">Отмена</a>
+        </div>
+      </div>
 
-    <form
-      method="post"
-      class="row g-3"
-    >
-
-      {% csrf_token %}
-
-      <input
-        type="hidden"
-        name="routing_mode"
-        value="{{ form.routing_mode.value|default:'full' }}"
-      >
-
-
-      {% if form.non_field_errors %}
-
-        <div class="col-12">
-
-          <div class="alert alert-danger">
-
-            {% for error in form.non_field_errors %}
-              <div>
-                {{ error }}
-              </div>
-            {% endfor %}
-
+      <aside class="v4-form-aside">
+        <section class="v4-context-card">
+          <h3>Что изменится</h3>
+          <div class="v4-context-list">
+            <div class="v4-context-row"><span>Новое подключение</span><strong>{% if form.routing_mode.value == 'selective' %}SELECT{% else %}FULL{% endif %}</strong></div>
+            <div class="v4-context-row"><span>Существующие VPN</span><strong>Без изменений</strong></div>
+            <div class="v4-context-row"><span>Устройство</span><strong>{{ device.name }}</strong></div>
           </div>
-
-        </div>
-
-      {% endif %}
-
-
-      {% if form.routing_mode.errors %}
-
-        <div class="col-12">
-
-          <div class="alert alert-danger">
-
-            {% for error in form.routing_mode.errors %}
-              <div>
-                {{ error }}
-              </div>
-            {% endfor %}
-
-          </div>
-
-        </div>
-
-      {% endif %}
-
-
-      {% if form.protocol_type.errors %}
-
-        <div class="col-12">
-
-          <div class="alert alert-danger">
-
-            {% for error in form.protocol_type.errors %}
-              <div>
-                {{ error }}
-              </div>
-            {% endfor %}
-
-          </div>
-
-        </div>
-
-      {% endif %}
-
-
-      <div class="col-12">
-
-        <div class="border rounded-3 p-4">
-
-          {% if form.routing_mode.value == 'selective' %}
-
-            <div class="fw-semibold">
-              Будет создан профиль
-              «Только выбранные сервисы»
-            </div>
-
-            <div class="small text-secondary mt-2">
-              Параметры выбранного режима
-              будут подставлены автоматически.
-              Подключение будет создано после подтверждения.
-            </div>
-
-          {% else %}
-
-            <div class="fw-semibold">
-              Будет создан профиль
-              «Весь интернет через VPN»
-            </div>
-
-            <div class="small text-secondary mt-2">
-              Параметры выбранного режима
-              будут подставлены автоматически.
-              Подключение будет создано после подтверждения.
-            </div>
-
-          {% endif %}
-
-        </div>
-
-      </div>
-
-
-      <div class="col-12">
-
-        <div class="alert alert-secondary mb-0">
-          Имя подключения, email и срок действия
-          наследуются от клиента и устройства.
-          Существующие подключения не изменяются.
-        </div>
-
-      </div>
-
-
-      <div class="col-12">
-        <hr>
-      </div>
-
-
-      <div class="col-12 d-flex gap-2 flex-wrap">
-
-        <button
-          type="submit"
-          class="btn btn-primary"
-        >
-
-          {% if form.routing_mode.value == 'selective' %}
-            Создать подключение
-          {% else %}
-            Создать подключение
-          {% endif %}
-
-        </button>
-
-        <a
-          href="{% url 'customers-device-connection-create' device.pk %}"
-          class="btn btn-outline-secondary"
-        >
-          Отмена
-        </a>
-
-      </div>
-
-    </form>
-
-  </div>
-
-</section>
-
+        </section>
+        <div class="v4-context-note">После подтверждения будет создано реальное VPN-подключение и сохранена конфигурация для скачивания.</div>
+      </aside>
+    </div>
+  </form>
+</div>
 {% endblock %}
