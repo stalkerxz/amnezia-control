@@ -35,6 +35,17 @@
 
   <div class="row g-3">
     <div class="col-lg-6">
+      <label class="form-label" for="{{ form.server.id_for_label }}">{{ form.server.label }}</label>
+      {{ form.server }}
+      <div class="form-text">
+        VPN-конфигурация и peer будут созданы именно на выбранном сервере.
+      </div>
+      {% for error in form.server.errors %}
+        <div class="text-danger small mt-1">{{ error }}</div>
+      {% endfor %}
+    </div>
+
+    <div class="col-lg-6">
       <label class="form-label" for="{{ form.name.id_for_label }}">{{ form.name.label }}</label>
       {{ form.name }}
       {% for error in form.name.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
@@ -137,6 +148,7 @@
     const panel = document.getElementById('clientPreflight');
     const endpoint = panel.dataset.endpoint;
     const protocolSelect = document.getElementById('id_protocol_type');
+    const serverSelect = document.getElementById('id_server');
     const checksEl = document.getElementById('preflightChecks');
     const summaryEl = document.getElementById('preflightSummary');
     const retryBtn = document.getElementById('preflightRetry');
@@ -171,8 +183,16 @@
       checksEl.innerHTML = '<div class="empty-state compact-empty">Выполняется безопасная проверка без изменения runtime.</div>';
 
       const protocol = protocolSelect?.value || 'awg2';
+      const serverId = serverSelect?.value || '';
       try {
-        const response = await fetch(`${endpoint}?protocol=${encodeURIComponent(protocol)}`, {headers: {'X-Requested-With': 'XMLHttpRequest'}});
+        const query = new URLSearchParams({
+          protocol,
+          server_id: serverId,
+        });
+        const response = await fetch(
+          `${endpoint}?${query.toString()}`,
+          {headers: {'X-Requested-With': 'XMLHttpRequest'}},
+        );
         const data = await response.json();
         checksEl.innerHTML = '';
         (data.checks || []).forEach((item) => checksEl.appendChild(renderCheck(item)));
@@ -202,6 +222,16 @@
 
     retryBtn.addEventListener('click', runPreflight);
     protocolSelect?.addEventListener('change', runPreflight);
+
+    serverSelect?.addEventListener('change', () => {
+      const url = new URL(window.location.href);
+      url.searchParams.set(
+        'server_id',
+        serverSelect.value,
+      );
+      window.location.assign(url.toString());
+    });
+
     runPreflight();
   })();
 </script>

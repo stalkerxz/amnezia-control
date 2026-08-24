@@ -17,6 +17,10 @@ class Server(models.Model):
         default=RuntimeBackend.DOCKER,
     )
     is_enabled = models.BooleanField(default=True)
+    is_default_for_new_clients = models.BooleanField(
+        default=False,
+        help_text="Использовать этот сервер по умолчанию при выпуске новых VPN-клиентов.",
+    )
     health_status = models.CharField(max_length=30, default="unknown")
     public_endpoint_host = models.CharField(max_length=255, blank=True)
     public_endpoint_port = models.PositiveIntegerField(null=True, blank=True)

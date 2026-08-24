@@ -43,11 +43,51 @@ class ClientCreationPreflightMiddleware:
     @classmethod
     def _creation_target(cls, request):
         if request.path == "/clients/new/":
-            server = Server.objects.filter(is_enabled=True).first()
-            protocol_type = (request.POST.get("protocol_type") or VPNClient.ProtocolType.AWG2).strip().lower()
-            if not server or protocol_type not in {VPNClient.ProtocolType.AWG, VPNClient.ProtocolType.AWG2}:
+            servers = (
+                Server.objects
+                .filter(is_enabled=True)
+                .order_by(
+                    "-is_default_for_new_clients",
+                    "name",
+                    "id",
+                )
+            )
+
+            raw_server_id = (
+                request.POST.get("server")
+                or ""
+            ).strip()
+
+            server = None
+
+            if raw_server_id.isdigit():
+                server = servers.filter(
+                    pk=int(raw_server_id)
+                ).first()
+
+            if server is None:
+                server = servers.first()
+
+            protocol_type = (
+                request.POST.get("protocol_type")
+                or VPNClient.ProtocolType.AWG2
+            ).strip().lower()
+
+            if (
+                not server
+                or protocol_type not in {
+                    VPNClient.ProtocolType.AWG,
+                    VPNClient.ProtocolType.AWG2,
+                }
+            ):
                 return None
-            return server, protocol_type, "clients-create", {}
+
+            return (
+                server,
+                protocol_type,
+                "clients-create",
+                {},
+            )
 
         match = cls.server_create_pattern.match(request.path)
         if not match:

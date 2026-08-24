@@ -18,7 +18,13 @@ from portal.models import ClientPortalAccess, ClientRenewalRequest
 from portal.services import PortalAccessService
 from notifications.services import NotificationEventType, NotificationService
 from servers.models import Server, ServerProtocol
-from .forms import VPNClientBulkLimitsUpdateForm, VPNClientCreateForm, VPNClientLimitsUpdateForm, VPNClientListFilterForm
+from .forms import (
+    VPNClientBulkLimitsUpdateForm,
+    VPNClientCreateForm,
+    VPNClientLimitsUpdateForm,
+    VPNClientListFilterForm,
+    client_creation_servers,
+)
 from .models import VPNClient
 from .services import VPNClientPolicyService, VPNClientService
 
@@ -288,17 +294,41 @@ def clients_import_view(request):
 @login_required
 @user_passes_test(_admin_required)
 def clients_create_view(request):
-    server = Server.objects.filter(is_enabled=True).first()
-    if not server:
+    servers = client_creation_servers()
+    default_server = servers.first()
+
+    if not default_server:
         messages.error(request, "Сервер не настроен")
         return redirect("clients-list")
 
+    raw_server_id = (
+        request.POST.get("server")
+        if request.method == "POST"
+        else request.GET.get("server_id")
+    )
+    raw_server_id = (raw_server_id or "").strip()
+
+    selected_server = None
+    if raw_server_id.isdigit():
+        selected_server = servers.filter(
+            pk=int(raw_server_id)
+        ).first()
+
+    server = selected_server or default_server
+
     if request.method == "POST":
-        form = VPNClientCreateForm(request.POST, server=server)
+        form = VPNClientCreateForm(
+            request.POST,
+            server=server,
+        )
         if form.is_valid():
             try:
+                selected_server = (
+                    form.cleaned_data.get("server")
+                    or server
+                )
                 client = VPNClientService.create_client(
-                    server=server,
+                    server=selected_server,
                     name=form.cleaned_data["name"],
                     protocol_type=form.cleaned_data["protocol_type"],
                     routing_mode=(
@@ -311,12 +341,29 @@ def clients_create_view(request):
                     actor=request.user,
                 )
                 messages.success(request, "Клиент создан")
-                return redirect("clients-detail", pk=client.id)
+                return redirect(
+                    "clients-detail",
+                    pk=client.id,
+                )
             except Exception as exc:
-                messages.error(request, f"Ошибка создания клиента: {exc}")
+                messages.error(
+                    request,
+                    f"Ошибка создания клиента: {exc}",
+                )
     else:
-        form = VPNClientCreateForm(server=server)
-    return render(request, "vpn/clients_create.html", {"form": form})
+        form = VPNClientCreateForm(
+            server=server,
+            initial={"server": server.pk},
+        )
+
+    return render(
+        request,
+        "vpn/clients_create.html",
+        {
+            "form": form,
+            "selected_server": server,
+        },
+    )
 
 
 @login_required

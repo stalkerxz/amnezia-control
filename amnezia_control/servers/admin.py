@@ -15,12 +15,20 @@ class ServerAdmin(admin.ModelAdmin):
         "public_endpoint_host",
         "public_endpoint_port",
         "is_enabled",
+        "is_default_for_new_clients",
         "health_status",
         "last_runtime_sync_at",
         "updated_at",
     )
     search_fields = ("name", "host", "public_endpoint_host", "ssh_username")
-    list_filter = ("runtime_backend", "is_enabled", "health_status", "created_at", "updated_at")
+    list_filter = (
+        "runtime_backend",
+        "is_enabled",
+        "is_default_for_new_clients",
+        "health_status",
+        "created_at",
+        "updated_at",
+    )
     readonly_fields = ("last_runtime_sync_at", "created_at", "updated_at")
     ordering = ("name",)
     fieldsets = (
@@ -38,7 +46,17 @@ class ServerAdmin(admin.ModelAdmin):
             },
         ),
         (_("Публичная точка доступа"), {"fields": ("public_endpoint_host", "public_endpoint_port")}),
-        (_("Состояние"), {"fields": ("is_enabled", "health_status", "last_runtime_sync_at")}),
+        (
+            _("Состояние"),
+            {
+                "fields": (
+                    "is_enabled",
+                    "is_default_for_new_clients",
+                    "health_status",
+                    "last_runtime_sync_at",
+                )
+            },
+        ),
         (_("Техническое"), {"fields": ("created_at", "updated_at")}),
     )
 

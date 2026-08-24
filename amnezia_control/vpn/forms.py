@@ -3,7 +3,19 @@ from datetime import timedelta
 from django import forms
 from django.utils import timezone
 
-from servers.models import ProtocolProfile, ServerProtocol
+from servers.models import ProtocolProfile, Server, ServerProtocol
+
+
+def client_creation_servers():
+    return (
+        Server.objects
+        .filter(is_enabled=True)
+        .order_by(
+            "-is_default_for_new_clients",
+            "name",
+            "id",
+        )
+    )
 
 from .models import VPNClient
 
@@ -38,6 +50,12 @@ class VPNClientCreateForm(forms.Form):
         TRAFFIC_UNIT_GB: 1024**3,
     }
 
+    server = forms.ModelChoiceField(
+        queryset=Server.objects.none(),
+        required=False,
+        label="Сервер",
+        empty_label=None,
+    )
     name = forms.CharField(label="Имя клиента", max_length=120)
     contact_email = forms.EmailField(required=False, label="Контактный email")
     protocol_type = forms.ChoiceField(label="Протокол", choices=VPNClient.ProtocolType.choices)
@@ -100,6 +118,16 @@ class VPNClientCreateForm(forms.Form):
     def __init__(self, *args, server=None, **kwargs):
         self.server = server
         super().__init__(*args, **kwargs)
+
+        if "server" in self.fields:
+            self.fields["server"].queryset = (
+                client_creation_servers()
+            )
+            if self.server:
+                self.fields["server"].initial = (
+                    self.server.pk
+                )
+
         if "protocol_type" in self.fields:
             available_protocols = self._available_protocol_choices()
             self.fields["protocol_type"].choices = available_protocols
@@ -211,6 +239,21 @@ class VPNClientCreateForm(forms.Form):
 
     def clean(self):
         cleaned_data = super().clean()
+
+        selected_server = (
+            cleaned_data.get("server")
+            or self.server
+        )
+
+        if not selected_server:
+            self.add_error(
+                "server",
+                "Выберите сервер.",
+            )
+        else:
+            self.server = selected_server
+            cleaned_data["server"] = selected_server
+
         protocol_type = cleaned_data.get("protocol_type")
         routing_mode = (
             cleaned_data.get("routing_mode")
@@ -265,6 +308,7 @@ class VPNClientCreateForm(forms.Form):
 
 
 class VPNClientLimitsUpdateForm(VPNClientCreateForm):
+    server = None
     name = None
     protocol_type = None
     routing_mode = None
