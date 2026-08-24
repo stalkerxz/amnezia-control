@@ -1,11 +1,17 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, user_passes_test
+from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404, redirect, render
 
 from .models import Server
 from .services import ServerService
-from vpn.models import VPNClient
+from vpn.models import VPNClient, XHTTPDevice
 from vpn.services import VPNClientService
+from vpn.server_selection import (
+    ROUTING_MODE_FULL,
+    ROUTING_MODE_SELECTIVE,
+    vpn_server_mode_status,
+)
 
 
 def _admin_required(user):
@@ -37,7 +43,40 @@ def _peer_source_view(peer_source: str):
 @login_required
 @user_passes_test(_admin_required)
 def server_list_view(request):
-    servers_qs = Server.objects.prefetch_related("protocols").all()
+    servers_qs = (
+        Server.objects
+        .prefetch_related("protocols")
+        .annotate(
+            active_vpn_count=Count(
+                "clients",
+                filter=Q(
+                    clients__status=(
+                        VPNClient.Status.ACTIVE
+                    )
+                ),
+                distinct=True,
+            ),
+            disabled_vpn_count=Count(
+                "clients",
+                filter=Q(
+                    clients__status=(
+                        VPNClient.Status.DISABLED
+                    )
+                ),
+                distinct=True,
+            ),
+            active_xhttp_count=Count(
+                "xhttp_devices",
+                filter=~Q(
+                    xhttp_devices__status=(
+                        XHTTPDevice.Status.DELETED
+                    )
+                ),
+                distinct=True,
+            ),
+        )
+        .all()
+    )
     health_filter = request.GET.get("health", "").strip()
     if health_filter in {
         ServerService.HEALTH_HEALTHY,
@@ -52,11 +91,43 @@ def server_list_view(request):
     monitor_server_id = request.GET.get("monitor", "").strip()
     servers = []
     for server in servers_qs:
+        full_status = (
+            vpn_server_mode_status(
+                server=server,
+                routing_mode=(
+                    ROUTING_MODE_FULL
+                ),
+            )
+        )
+
+        selective_status = (
+            vpn_server_mode_status(
+                server=server,
+                routing_mode=(
+                    ROUTING_MODE_SELECTIVE
+                ),
+            )
+        )
+
+        pool_peer_count = max(
+            full_status["peer_count"],
+            selective_status["peer_count"],
+        )
+
+        pool_capacity = max(
+            full_status["capacity"],
+            selective_status["capacity"],
+        )
+
         item = {
             "obj": server,
             "health_label": _health_label(server.health_status),
             "health_reasons": ServerService.evaluate_health(server)["reasons"][:2],
             "metrics": None,
+            "full_status": full_status,
+            "selective_status": selective_status,
+            "pool_peer_count": pool_peer_count,
+            "pool_capacity": pool_capacity,
         }
         if monitor_server_id and monitor_server_id.isdigit() and int(monitor_server_id) == server.id:
             try:
@@ -178,3 +249,99 @@ def server_create_client_view(request, pk: int, protocol_type: str):
 
     messages.success(request, f"Клиент «{client.name}» создан ({client.protocol_type.upper()})")
     return redirect("clients-detail", pk=client.id)
+
+
+@login_required
+@user_passes_test(_admin_required)
+def server_toggle_vpn_pool_view(
+    request,
+    pk: int,
+):
+    server = get_object_or_404(
+        Server,
+        pk=pk,
+    )
+
+    if request.method != "POST":
+        return redirect(
+            "servers-list"
+        )
+
+    enable = (
+        request.POST.get("enabled")
+        == "1"
+    )
+
+    if enable:
+        full_status = (
+            vpn_server_mode_status(
+                server=server,
+                routing_mode=(
+                    ROUTING_MODE_FULL
+                ),
+            )
+        )
+
+        selective_status = (
+            vpn_server_mode_status(
+                server=server,
+                routing_mode=(
+                    ROUTING_MODE_SELECTIVE
+                ),
+            )
+        )
+
+        if not (
+            full_status["eligible"]
+            or selective_status["eligible"]
+        ):
+            reason = (
+                full_status["reason"]
+                or selective_status["reason"]
+                or "сервер не готов"
+            )
+
+            messages.error(
+                request,
+                (
+                    "Сервер нельзя включить "
+                    "в пул новых VPN: "
+                    f"{reason}."
+                ),
+            )
+
+            return redirect(
+                "servers-list"
+            )
+
+    server.accepts_new_vpn_clients = (
+        enable
+    )
+
+    server.save(
+        update_fields=[
+            "accepts_new_vpn_clients",
+            "updated_at",
+        ]
+    )
+
+    if enable:
+        messages.success(
+            request,
+            (
+                f"Сервер «{server.name}» "
+                "принимает новые VPN."
+            ),
+        )
+    else:
+        messages.success(
+            request,
+            (
+                f"Сервер «{server.name}» "
+                "исключён из пула новых VPN."
+            ),
+        )
+
+    return redirect(
+        "servers-list"
+    )

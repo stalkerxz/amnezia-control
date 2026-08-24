@@ -7,12 +7,18 @@ from .views import (
     server_import_peers_view,
     server_list_view,
     server_sync_runtime_view,
+    server_toggle_vpn_pool_view,
 )
 
 urlpatterns = [
     path("", server_list_view, name="servers-list"),
     path("<int:pk>/", server_detail_view, name="servers-detail"),
     path("<int:pk>/sync-runtime/", server_sync_runtime_view, name="servers-sync-runtime"),
+    path(
+        "<int:pk>/vpn-pool/",
+        server_toggle_vpn_pool_view,
+        name="servers-toggle-vpn-pool",
+    ),
     path("<int:pk>/create-client/<str:protocol_type>/", server_create_client_view, name="servers-create-client"),
 ]
 

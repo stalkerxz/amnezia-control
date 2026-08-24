@@ -21,6 +21,13 @@ class Server(models.Model):
         default=False,
         help_text="Использовать этот сервер по умолчанию при выпуске новых VPN-клиентов.",
     )
+    accepts_new_vpn_clients = models.BooleanField(
+        default=False,
+        help_text=(
+            "Разрешить автоматический и управляемый выпуск "
+            "новых VPN-клиентов на этот сервер."
+        ),
+    )
     health_status = models.CharField(max_length=30, default="unknown")
     public_endpoint_host = models.CharField(max_length=255, blank=True)
     public_endpoint_port = models.PositiveIntegerField(null=True, blank=True)

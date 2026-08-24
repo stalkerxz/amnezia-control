@@ -31,6 +31,10 @@ from servers.models import Server
 from vpn.forms import VPNClientCreateForm
 from vpn.models import VPNClient, XHTTPDevice
 from vpn.services import VPNClientService
+from vpn.server_selection import (
+    resolve_vpn_server_choice,
+    vpn_server_candidate_rows,
+)
 from vpn.xhttp_forms import XHTTPDeviceCreateForm
 from vpn.xhttp_services import XHTTPDeviceService
 
@@ -792,6 +796,22 @@ def customer_device_connection_create_view(
         .count()
     )
 
+    full_pool = vpn_server_candidate_rows(
+        routing_mode=(
+            VPNClientCreateForm
+            .ROUTING_MODE_FULL
+        ),
+    )
+
+    selective_pool = (
+        vpn_server_candidate_rows(
+            routing_mode=(
+                VPNClientCreateForm
+                .ROUTING_MODE_SELECTIVE
+            ),
+        )
+    )
+
     return render(
         request,
         (
@@ -806,6 +826,12 @@ def customer_device_connection_create_view(
                 has_selective
             ),
             "xhttp_total": xhttp_total,
+            "full_available": bool(
+                full_pool
+            ),
+            "selective_available": bool(
+                selective_pool
+            ),
         },
     )
 
@@ -850,24 +876,76 @@ def customer_device_vpn_create_view(request, device_id):
             "Срок действия устройства истёк."
         )
 
-    server = (
-        Server.objects
-        .filter(is_enabled=True)
-        .order_by("pk")
-        .first()
+    requested_routing_mode = (
+        (
+            request.POST.get("routing_mode")
+            if request.method == "POST"
+            else request.GET.get("routing_mode")
+        )
+        or VPNClientCreateForm.ROUTING_MODE_FULL
+    ).strip()
+
+    if requested_routing_mode not in {
+        VPNClientCreateForm.ROUTING_MODE_FULL,
+        VPNClientCreateForm.ROUTING_MODE_SELECTIVE,
+    }:
+        requested_routing_mode = (
+            VPNClientCreateForm
+            .ROUTING_MODE_FULL
+        )
+
+    server_rows = (
+        vpn_server_candidate_rows(
+            routing_mode=(
+                requested_routing_mode
+            ),
+        )
     )
+
+    server_choice = (
+        (
+            request.POST.get(
+                "server_choice"
+            )
+            if request.method == "POST"
+            else request.GET.get(
+                "server_choice"
+            )
+        )
+        or "auto"
+    ).strip()
+
+    try:
+        server = (
+            resolve_vpn_server_choice(
+                choice=server_choice,
+                routing_mode=(
+                    requested_routing_mode
+                ),
+            )
+        )
+    except ValueError as exc:
+        return HttpResponseBadRequest(
+            str(exc)
+        )
 
     if server is None:
         return HttpResponseBadRequest(
-            "Активный VPN-сервер не настроен."
+            (
+                "Нет доступного VPN-сервера "
+                "для выбранного режима."
+            )
         )
 
     if request.method == "POST":
         data = request.POST.copy()
 
         routing_mode = (
-            data.get("routing_mode")
-            or VPNClientCreateForm.ROUTING_MODE_FULL
+            requested_routing_mode
+        )
+
+        data["server"] = str(
+            server.pk
         )
 
         technical_name = _device_vpn_client_name(
@@ -974,19 +1052,6 @@ def customer_device_vpn_create_view(request, device_id):
                     )
 
     else:
-        requested_routing_mode = (
-            request.GET.get("routing_mode")
-            or VPNClientCreateForm.ROUTING_MODE_FULL
-        ).strip()
-
-        if requested_routing_mode not in {
-            VPNClientCreateForm.ROUTING_MODE_FULL,
-            VPNClientCreateForm.ROUTING_MODE_SELECTIVE,
-        }:
-            requested_routing_mode = (
-                VPNClientCreateForm.ROUTING_MODE_FULL
-            )
-
         form = VPNClientCreateForm(
             initial={
                 "protocol_type": VPNClient.ProtocolType.AWG2,
@@ -1009,6 +1074,8 @@ def customer_device_vpn_create_view(request, device_id):
             "device": device,
             "form": form,
             "server": server,
+            "server_rows": server_rows,
+            "server_choice": server_choice,
         },
     )
 

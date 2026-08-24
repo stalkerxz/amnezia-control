@@ -39,8 +39,12 @@
               <th>Сервер</th>
               <th>Доступ</th>
               <th>Состояние</th>
+              <th>Новые VPN</th>
+              <th>Режимы</th>
+              <th>VPN / XHTTP</th>
+              <th>Peers</th>
               <th>Последняя синхронизация</th>
-              <th class="text-end"><span class="visually-hidden">Мониторинг</span></th>
+              <th class="text-end"><span class="visually-hidden">Действия</span></th>
             </tr>
           </thead>
           <tbody>
@@ -57,6 +61,76 @@
                 <td>
                   <span class="v4-server-status {% if s.obj.health_status == 'healthy' %}is-success{% elif s.obj.health_status == 'degraded' %}is-warning{% elif s.obj.health_status == 'unhealthy' %}is-danger{% else %}is-neutral{% endif %}">{{ s.health_label }}</span>
                 </td>
+
+                <td>
+                  <form
+                    method="post"
+                    action="{% url 'servers-toggle-vpn-pool' s.obj.id %}"
+                    class="m-0"
+                  >
+                    {% csrf_token %}
+
+                    {% if s.obj.accepts_new_vpn_clients %}
+                      <input type="hidden" name="enabled" value="0">
+                      <button
+                        type="submit"
+                        class="btn btn-sm btn-success"
+                        title="Исключить сервер из автоматической выдачи"
+                      >
+                        Принимает
+                      </button>
+                    {% else %}
+                      <input type="hidden" name="enabled" value="1">
+                      <button
+                        type="submit"
+                        class="btn btn-sm btn-outline-secondary"
+                        title="Разрешить выпуск новых VPN на сервер"
+                      >
+                        Не принимает
+                      </button>
+                    {% endif %}
+                  </form>
+                </td>
+
+                <td>
+                  {% if s.full_status.eligible %}
+                    <span class="v4-status-pill is-success">FULL</span>
+                  {% else %}
+                    <span
+                      class="v4-status-pill is-neutral"
+                      title="{{ s.full_status.reason }}"
+                    >FULL —</span>
+                  {% endif %}
+
+                  {% if s.selective_status.eligible %}
+                    <span class="v4-status-pill is-success">SELECT</span>
+                  {% else %}
+                    <span
+                      class="v4-status-pill is-neutral"
+                      title="{{ s.selective_status.reason }}"
+                    >SELECT —</span>
+                  {% endif %}
+                </td>
+
+                <td>
+                  <div class="v4-system-primary">
+                    VPN {{ s.obj.active_vpn_count }}
+                  </div>
+                  <div class="v4-system-meta">
+                    disabled {{ s.obj.disabled_vpn_count }}
+                    · XHTTP {{ s.obj.active_xhttp_count }}
+                  </div>
+                </td>
+
+                <td>
+                  <div class="v4-system-primary">
+                    {{ s.pool_peer_count }}
+                  </div>
+                  <div class="v4-system-meta">
+                    ёмкость {{ s.pool_capacity }}
+                  </div>
+                </td>
+
                 <td class="text-nowrap">
                   {% if s.obj.last_runtime_sync_at %}<span class="v4-date-primary">{{ s.obj.last_runtime_sync_at|date:'d.m.Y' }}</span><div class="v4-system-meta">{{ s.obj.last_runtime_sync_at|date:'H:i' }}</div>{% else %}<span class="v4-system-meta">Нет данных</span>{% endif %}
                 </td>
@@ -67,7 +141,7 @@
 
               {% if s.metrics %}
                 <tr class="v4-detail-row">
-                  <td colspan="5" class="p-0">
+                  <td colspan="9" class="p-0">
                     {% if s.metrics.errors %}
                       <div class="v4-runtime-warning">{{ s.metrics.errors|join:'; ' }}</div>
                     {% endif %}

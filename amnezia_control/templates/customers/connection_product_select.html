@@ -37,8 +37,10 @@
         <div class="v4-product-action">
           {% if has_full %}
             <span class="v4-status-pill is-success">Уже создано</span>
-          {% else %}
+          {% elif full_available %}
             <a class="btn btn-primary" href="{% url 'customers-device-vpn-create' device.pk %}?routing_mode=full">Продолжить</a>
+          {% else %}
+            <span class="v4-status-pill is-warning">Нет доступного сервера</span>
           {% endif %}
         </div>
       </article>
@@ -51,8 +53,10 @@
         <div class="v4-product-action">
           {% if has_selective %}
             <span class="v4-status-pill is-success">Уже создано</span>
-          {% else %}
+          {% elif selective_available %}
             <a class="btn btn-outline-primary" href="{% url 'customers-device-vpn-create' device.pk %}?routing_mode=selective">Продолжить</a>
+          {% else %}
+            <span class="v4-status-pill is-warning">Нет доступного SELECT-сервера</span>
           {% endif %}
         </div>
       </article>
