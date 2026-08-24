@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Safely add, remove, or verify one managed XHTTP client in Xray."""
+"""Safely hot-add, hot-remove, or verify one managed XHTTP client in Xray."""
 
 from __future__ import annotations
 
+import copy
 import fcntl
 import json
 import os
@@ -19,6 +20,7 @@ from uuid import UUID
 CONFIG_PATH = Path("/usr/local/etc/xray/config.json")
 XRAY_BIN = Path("/usr/local/bin/xray")
 XRAY_SERVICE = "xray"
+XRAY_API_SERVER = "127.0.0.1:10085"
 LOCK_PATH = Path("/run/lock/amnezia-control-xhttp.lock")
 BACKUP_DIR = Path("/var/backups/amnezia-control")
 INBOUND_TAG = "vless-xhttp-yandex"
@@ -45,8 +47,9 @@ def run(command: list[str], *, check: bool = True) -> subprocess.CompletedProces
         timeout=30,
     )
     if check and result.returncode != 0:
-        detail = (result.stderr or result.stdout or "command failed").strip().splitlines()[-1]
-        raise ManagedError(f"Команда завершилась с ошибкой: {detail[:240]}")
+        detail = (result.stderr or result.stdout or "command failed").strip().splitlines()
+        message = detail[-1] if detail else "command failed"
+        raise ManagedError(f"Команда завершилась с ошибкой: {message[:240]}")
     return result
 
 
@@ -59,6 +62,9 @@ def validate_identity(uuid_text: str, email: str) -> tuple[str, str]:
         raise ManagedError("UUID должен быть в каноническом формате.")
     if not EMAIL_RE.fullmatch(email):
         raise ManagedError("Некорректная техническая метка клиента.")
+    expected_email = f"xhttp-{UUID(normalized_uuid).hex}"
+    if email != expected_email:
+        raise ManagedError("Техническая метка не соответствует UUID клиента.")
     return normalized_uuid, email
 
 
@@ -109,31 +115,41 @@ def client_list(inbound: dict) -> list[dict]:
     return clients
 
 
-def mutate(config: dict, action: str, uuid_text: str, email: str) -> bool:
-    clients = client_list(find_inbound(config))
+def identity_state(clients: list[dict], uuid_text: str, email: str) -> bool:
     exact = [item for item in clients if item.get("id") == uuid_text and item.get("email") == email]
     uuid_matches = [item for item in clients if item.get("id") == uuid_text]
     email_matches = [item for item in clients if item.get("email") == email]
 
+    if len(exact) == 1 and len(uuid_matches) == 1 and len(email_matches) == 1:
+        return True
+    if not exact and not uuid_matches and not email_matches:
+        return False
+    raise ManagedError("UUID или техническая метка конфликтуют с другой записью.")
+
+
+def mutate(config: dict, action: str, uuid_text: str, email: str) -> bool:
+    clients = client_list(find_inbound(config))
+    present = identity_state(clients, uuid_text, email)
+
     if action == "check":
-        if len(exact) != 1:
-            raise ManagedError("Клиент не найден в управляемом XHTTP inbound.")
+        if not present:
+            raise ManagedError("Клиент не найден в конфигурации Xray.")
         return False
 
     if action == "add":
-        if len(exact) == 1 and len(uuid_matches) == 1 and len(email_matches) == 1:
+        if present:
             return False
-        if uuid_matches or email_matches:
-            raise ManagedError("UUID или техническая метка уже заняты другой записью.")
         clients.append({"id": uuid_text, "email": email})
         return True
 
     if action == "remove":
-        if not uuid_matches and not email_matches:
+        if not present:
             return False
-        if len(exact) != 1 or len(uuid_matches) != 1 or len(email_matches) != 1:
-            raise ManagedError("UUID и техническая метка относятся к разным записям.")
-        clients.remove(exact[0])
+        clients[:] = [
+            item
+            for item in clients
+            if not (item.get("id") == uuid_text and item.get("email") == email)
+        ]
         return True
 
     raise ManagedError("Неизвестное действие.")
@@ -151,11 +167,56 @@ def ensure_service_active() -> None:
         raise ManagedError("Сервис Xray не активен.")
 
 
-def write_temp(config: dict, original_stat: os.stat_result) -> Path:
+def ensure_handler_api_config(config: dict) -> None:
+    api = config.get("api")
+    if not isinstance(api, dict):
+        raise ManagedError("Xray Handler API не настроен.")
+    if api.get("listen") != XRAY_API_SERVER:
+        raise ManagedError("Xray Handler API слушает неожиданный адрес.")
+    services = api.get("services") or []
+    if "HandlerService" not in services:
+        raise ManagedError("Xray HandlerService не включён.")
+    inbound = find_inbound(config)
+    if inbound.get("tag") != INBOUND_TAG:
+        raise ManagedError("Управляемый XHTTP inbound не имеет ожидаемый tag.")
+
+
+def runtime_users() -> list[dict]:
+    result = run(
+        [
+            str(XRAY_BIN),
+            "api",
+            "inbounduser",
+            f"--server={XRAY_API_SERVER}",
+            f"-tag={INBOUND_TAG}",
+        ]
+    )
+    try:
+        payload = json.loads(result.stdout or "{}")
+    except json.JSONDecodeError as exc:
+        raise ManagedError("Handler API вернул некорректный JSON.") from exc
+
+    raw_users = payload.get("users") or []
+    if not isinstance(raw_users, list):
+        raise ManagedError("Handler API вернул некорректный список пользователей.")
+
+    users = []
+    for item in raw_users:
+        if not isinstance(item, dict):
+            raise ManagedError("Handler API вернул некорректную запись пользователя.")
+        account = item.get("account") or {}
+        user_id = account.get("id")
+        email = item.get("email")
+        if user_id and email:
+            users.append({"id": str(user_id), "email": str(email)})
+    return users
+
+
+def write_temp_config(config: dict, *, directory: Path, original_stat: os.stat_result | None = None) -> Path:
     fd, raw_path = tempfile.mkstemp(
-        prefix=".config.amnezia-control-",
+        prefix=".amnezia-control-xhttp-",
         suffix=".json",
-        dir=str(CONFIG_PATH.parent),
+        dir=str(directory),
         text=True,
     )
     temp_path = Path(raw_path)
@@ -165,12 +226,21 @@ def write_temp(config: dict, original_stat: os.stat_result) -> Path:
             handle.write("\n")
             handle.flush()
             os.fsync(handle.fileno())
-        os.chmod(temp_path, stat.S_IMODE(original_stat.st_mode))
-        os.chown(temp_path, original_stat.st_uid, original_stat.st_gid)
+        if original_stat is not None:
+            os.chmod(temp_path, stat.S_IMODE(original_stat.st_mode))
+            os.chown(temp_path, original_stat.st_uid, original_stat.st_gid)
         return temp_path
     except Exception:
         temp_path.unlink(missing_ok=True)
         raise
+
+
+def fsync_directory(path: Path) -> None:
+    fd = os.open(path, os.O_RDONLY)
+    try:
+        os.fsync(fd)
+    finally:
+        os.close(fd)
 
 
 def backup_config() -> Path:
@@ -185,34 +255,181 @@ def backup_config() -> Path:
     return destination
 
 
-def replace_and_restart(config: dict) -> Path:
+def replace_persisted_config(config: dict) -> Path:
     original_stat = CONFIG_PATH.stat()
     backup = backup_config()
-    temp_path = write_temp(config, original_stat)
+    temp_path = write_temp_config(
+        config,
+        directory=CONFIG_PATH.parent,
+        original_stat=original_stat,
+    )
     try:
         test_config(temp_path)
         os.replace(temp_path, CONFIG_PATH)
-        run(["systemctl", "restart", XRAY_SERVICE])
-        ensure_service_active()
+        fsync_directory(CONFIG_PATH.parent)
         test_config(CONFIG_PATH)
         return backup
-    except Exception as exc:
+    except Exception:
         temp_path.unlink(missing_ok=True)
-        rollback_temp = None
+        raise
+
+
+def restore_persisted_config(backup: Path) -> None:
+    backup_config_value = load_config(backup)
+    original_stat = CONFIG_PATH.stat()
+    temp_path = write_temp_config(
+        backup_config_value,
+        directory=CONFIG_PATH.parent,
+        original_stat=original_stat,
+    )
+    try:
+        test_config(temp_path)
+        os.replace(temp_path, CONFIG_PATH)
+        fsync_directory(CONFIG_PATH.parent)
+        test_config(CONFIG_PATH)
+    finally:
+        temp_path.unlink(missing_ok=True)
+
+
+def build_single_user_api_config(config: dict, uuid_text: str, email: str) -> dict:
+    inbound = copy.deepcopy(find_inbound(config))
+    inbound.setdefault("settings", {})["clients"] = [
+        {"id": uuid_text, "email": email}
+    ]
+    return {
+        "log": {"loglevel": "warning"},
+        "inbounds": [inbound],
+        "outbounds": [
+            {
+                "tag": "direct",
+                "protocol": "freedom",
+                "settings": {},
+            }
+        ],
+    }
+
+
+def hot_add(config: dict, uuid_text: str, email: str) -> None:
+    api_config = build_single_user_api_config(config, uuid_text, email)
+    temp_path = write_temp_config(api_config, directory=Path("/tmp"))
+    try:
+        test_config(temp_path)
+        run(
+            [
+                str(XRAY_BIN),
+                "api",
+                "adu",
+                f"--server={XRAY_API_SERVER}",
+                str(temp_path),
+            ]
+        )
+    finally:
+        temp_path.unlink(missing_ok=True)
+
+
+def hot_remove(email: str) -> None:
+    run(
+        [
+            str(XRAY_BIN),
+            "api",
+            "rmu",
+            f"--server={XRAY_API_SERVER}",
+            f"-tag={INBOUND_TAG}",
+            email,
+        ]
+    )
+
+
+def ensure_runtime_state(config: dict, uuid_text: str, email: str, *, present: bool) -> None:
+    current = identity_state(runtime_users(), uuid_text, email)
+    if current == present:
+        return
+    if present:
+        hot_add(config, uuid_text, email)
+    else:
+        hot_remove(email)
+    final = identity_state(runtime_users(), uuid_text, email)
+    if final != present:
+        raise ManagedError("Не удалось восстановить runtime-состояние Xray.")
+
+
+def apply_action(action: str, uuid_text: str, email: str) -> tuple[bool, Path | None]:
+    original_config = load_config(CONFIG_PATH)
+    ensure_handler_api_config(original_config)
+    ensure_service_active()
+    test_config(CONFIG_PATH)
+
+    file_present_before = identity_state(
+        client_list(find_inbound(original_config)),
+        uuid_text,
+        email,
+    )
+    runtime_present_before = identity_state(runtime_users(), uuid_text, email)
+
+    if action == "check":
+        if not file_present_before or not runtime_present_before:
+            raise ManagedError("Клиент отсутствует в persisted config или running Xray.")
+        return False, None
+
+    desired_present = action == "add"
+    if action not in {"add", "remove"}:
+        raise ManagedError("Неизвестное действие.")
+
+    desired_config = copy.deepcopy(original_config)
+    file_changed = mutate(desired_config, action, uuid_text, email)
+    runtime_changed = runtime_present_before != desired_present
+    backup = None
+
+    try:
+        if file_changed:
+            backup = replace_persisted_config(desired_config)
+
+        if runtime_changed:
+            if desired_present:
+                hot_add(desired_config, uuid_text, email)
+            else:
+                hot_remove(email)
+
+        persisted_after = load_config(CONFIG_PATH)
+        ensure_handler_api_config(persisted_after)
+        file_present_after = identity_state(
+            client_list(find_inbound(persisted_after)),
+            uuid_text,
+            email,
+        )
+        runtime_present_after = identity_state(runtime_users(), uuid_text, email)
+
+        if file_present_after != desired_present or runtime_present_after != desired_present:
+            raise ManagedError("Persisted config и running Xray не сошлись после операции.")
+
+        return file_changed or runtime_changed, backup
+
+    except Exception as exc:
+        rollback_errors = []
+
+        if backup is not None:
+            try:
+                restore_persisted_config(backup)
+            except Exception as rollback_exc:
+                rollback_errors.append(f"config rollback: {rollback_exc}")
+
         try:
-            rollback_config = load_config(backup)
-            rollback_temp = write_temp(rollback_config, original_stat)
-            test_config(rollback_temp)
-            os.replace(rollback_temp, CONFIG_PATH)
-            run(["systemctl", "restart", XRAY_SERVICE])
-            ensure_service_active()
+            ensure_runtime_state(
+                original_config,
+                uuid_text,
+                email,
+                present=runtime_present_before,
+            )
         except Exception as rollback_exc:
-            if rollback_temp:
-                rollback_temp.unlink(missing_ok=True)
+            rollback_errors.append(f"runtime rollback: {rollback_exc}")
+
+        if rollback_errors:
             raise ManagedError(
-                f"Применение и автоматический откат завершились ошибкой: {rollback_exc}"
+                "Операция XHTTP завершилась ошибкой, а автоматический откат неполон: "
+                + "; ".join(rollback_errors)
             ) from exc
-        raise ManagedError(f"Изменение отменено автоматическим откатом: {exc}") from exc
+
+        raise ManagedError(f"Операция XHTTP отменена автоматическим откатом: {exc}") from exc
 
 
 def main() -> int:
@@ -229,14 +446,7 @@ def main() -> int:
     LOCK_PATH.parent.mkdir(parents=True, exist_ok=True)
     with LOCK_PATH.open("a+", encoding="utf-8") as lock_handle:
         fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX)
-        config = load_config(CONFIG_PATH)
-        changed = mutate(config, action, uuid_text, email)
-        backup = None
-        if changed:
-            backup = replace_and_restart(config)
-        else:
-            test_config(CONFIG_PATH)
-            ensure_service_active()
+        changed, backup = apply_action(action, uuid_text, email)
 
     emit(
         {
@@ -244,6 +454,8 @@ def main() -> int:
             "action": action,
             "changed": changed,
             "backup": str(backup) if backup else None,
+            "runtime": "hot-api",
+            "xray_restarted": False,
         }
     )
     return 0
