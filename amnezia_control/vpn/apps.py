@@ -6,4 +6,10 @@ class VpnConfig(AppConfig):
     name = "vpn"
 
     def ready(self):
+        from .xhttp_runtime_recovery import (
+            install_runtime_recovery,
+        )
+
+        install_runtime_recovery()
+
         from . import signals  # noqa: F401
