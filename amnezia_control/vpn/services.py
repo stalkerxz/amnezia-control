@@ -665,11 +665,6 @@ class VPNClientService:
         "DisableCookies",
     )
 
-    AWG31_DEFAULT_I1 = (
-        "<r 2><b 0x858000010001000000000669636c6f7564"
-        "03636f6d0000010001c00c000100010000105a00044d583737>"
-    )
-
     AWG31_PERSISTENT_KEEPALIVE = "25-35"
 
     @staticmethod
@@ -889,20 +884,10 @@ class VPNClientService:
                     f"{key} = {awg2_metadata[key]}"
                 )
 
-            i_values = {
-                key: awg2_metadata.get(key, "")
-                for key in optional
-            }
-
-            if not i_values["I1"]:
-                i_values["I1"] = (
-                    VPNClientService.AWG31_DEFAULT_I1
-                )
-
             for key in optional:
-                if i_values[key]:
+                if awg2_metadata.get(key):
                     interface_lines.append(
-                        f"{key} = {i_values[key]}"
+                        f"{key} = {awg2_metadata[key]}"
                     )
 
             for key in (

@@ -114,7 +114,7 @@ DisableCookies = on
             "12",
         )
 
-        self.assertIn(
+        self.assertNotIn(
             "I1",
             interface,
         )
@@ -127,6 +127,31 @@ DisableCookies = on
         self.assertEqual(
             peer["PersistentKeepalive"],
             "25-35",
+        )
+
+    def test_awg31_preserves_explicit_i1(self):
+        metadata = self.metadata()
+        metadata["I1"] = "<r 10><c 1>"
+
+        config = (
+            VPNClientService.build_awg2_client_config(
+                private_key="CLIENT",
+                address="10.8.1.99",
+                endpoint="64.188.96.240:49561",
+                server_public_key="SERVER",
+                awg2_metadata=metadata,
+            )
+        )
+
+        sections = (
+            VPNClientService._parse_config_sections(
+                config
+            )
+        )
+
+        self.assertEqual(
+            sections["Interface"]["I1"],
+            "<r 10><c 1>",
         )
 
     def test_awg31_rejects_small_s4(self):
