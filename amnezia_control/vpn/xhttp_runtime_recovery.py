@@ -6,6 +6,8 @@ fails before the caller receives a result. Command failures returned by the
 helper are not retried.
 """
 
+import paramiko
+
 from jobs.services import JobService
 
 from .services import RuntimeCommandService
@@ -20,6 +22,35 @@ class ResilientXHTTPRuntimeAdapter(XHTTPRuntimeAdapter):
     """XHTTP adapter with one idempotent retry for SSH transport failures."""
 
     MAX_TRANSPORT_ATTEMPTS = 2
+    TRANSPORT_EXCEPTIONS = (
+        EOFError,
+        OSError,
+        TimeoutError,
+        paramiko.SSHException,
+    )
+
+    def _record_executor_exception(
+        self,
+        *,
+        job,
+        action: str,
+        transport: bool,
+    ):
+        JobService.event(
+            job,
+            (
+                f"Transport failure during xhttp.{action}"
+                if transport
+                else f"Runtime failure during xhttp.{action}"
+            ),
+            level="error",
+            # XHTTP helper output is sensitive. Do not persist exception
+            # details here because SSH/auth exceptions may contain paths,
+            # hosts, or other operational metadata.
+            stderr="",
+            exit_code=None,
+        )
+        JobService.mark_done(job, ok=False)
 
     def _execute_once(
         self,
@@ -42,22 +73,29 @@ class ResilientXHTTPRuntimeAdapter(XHTTPRuntimeAdapter):
                 .executor_for_server(self.server)
                 .run(command)
             )
-        except Exception as exc:
+        except self.TRANSPORT_EXCEPTIONS as exc:
             # RuntimeCommandService.run currently cannot mark a Job failed
             # when its SSH executor raises before returning ExecutionResult.
             # Close the Job explicitly so transport failures never remain
             # indefinitely in the RUNNING state.
-            JobService.event(
-                job,
-                f"Transport failure during xhttp.{action}",
-                level="error",
-                stderr="",
-                exit_code=None,
+            self._record_executor_exception(
+                job=job,
+                action=action,
+                transport=True,
             )
-            JobService.mark_done(job, ok=False)
             raise XHTTPRuntimeTransportError(
                 f"XHTTP transport failed during {action}."
             ) from exc
+        except Exception:
+            # Validation/configuration failures are deterministic. They still
+            # need a closed Job, but retrying them could only repeat the same
+            # failure and is therefore intentionally forbidden.
+            self._record_executor_exception(
+                job=job,
+                action=action,
+                transport=False,
+            )
+            raise
 
         JobService.event(
             job,
