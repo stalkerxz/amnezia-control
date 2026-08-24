@@ -17,8 +17,25 @@ class ServerService:
         ServerProtocol.ProtocolType.AWG: "amnezia-awg",
         ServerProtocol.ProtocolType.AWG2: "amnezia-awg2",
     }
-    AWG2_REQUIRED_KEYS = ["Jc", "Jmin", "Jmax", "S1", "S2", "S3", "S4", "H1", "H2", "H3", "H4"]
-    AWG2_OPTIONAL_KEYS = ["I1", "I2", "I3", "I4", "I5"]
+    AWG2_REQUIRED_KEYS = [
+        "Jc", "Jmin", "Jmax",
+        "S1", "S2", "S3", "S4",
+        "H1", "H2", "H3", "H4",
+    ]
+    AWG2_OPTIONAL_KEYS = [
+        "I1", "I2", "I3", "I4", "I5",
+    ]
+    AWG31_REQUIRED_KEYS = [
+        "HeaderProtectionKey",
+        "ContentPaddingAddition",
+        "RekeyAfterTime",
+        "RekeyTimeout",
+        "RejectAfterTime",
+        "KeepaliveTimeout",
+        "MaxHandshakeAttempts",
+        "RandomTrailers",
+        "DisableCookies",
+    ]
     HEALTH_NOT_CHECKED = "not_checked"
     HEALTH_HEALTHY = "healthy"
     HEALTH_DEGRADED = "degraded"
@@ -357,7 +374,20 @@ class ServerService:
     @classmethod
     def _normalize_awg2_key(cls, key: str) -> str:
         compact = re.sub(r"[^A-Za-z0-9]", "", key).upper().replace("AWG2", "")
-        mapping = {"JC": "Jc", "JMIN": "Jmin", "JMAX": "Jmax"}
+        mapping = {
+            "JC": "Jc",
+            "JMIN": "Jmin",
+            "JMAX": "Jmax",
+            "HEADERPROTECTIONKEY": "HeaderProtectionKey",
+            "CONTENTPADDINGADDITION": "ContentPaddingAddition",
+            "REKEYAFTERTIME": "RekeyAfterTime",
+            "REKEYTIMEOUT": "RekeyTimeout",
+            "REJECTAFTERTIME": "RejectAfterTime",
+            "KEEPALIVETIMEOUT": "KeepaliveTimeout",
+            "MAXHANDSHAKEATTEMPTS": "MaxHandshakeAttempts",
+            "RANDOMTRAILERS": "RandomTrailers",
+            "DISABLECOOKIES": "DisableCookies",
+        }
         if compact in mapping:
             return mapping[compact]
         if compact and compact[0] in {"I", "S", "H"}:
@@ -367,7 +397,11 @@ class ServerService:
     @classmethod
     def _parse_awg2_metadata(cls, env_list, conf_text: str):
         discovered = {}
-        allowed = set(cls.AWG2_REQUIRED_KEYS + cls.AWG2_OPTIONAL_KEYS)
+        allowed = set(
+            cls.AWG2_REQUIRED_KEYS
+            + cls.AWG2_OPTIONAL_KEYS
+            + cls.AWG31_REQUIRED_KEYS
+        )
 
         for item in env_list:
             if "=" not in item:
@@ -501,8 +535,23 @@ class ServerService:
 
                 subnet, listen_port = cls._parse_interface_metadata(raw_iface_conf)
                 awg2_meta, awg2_required_missing, awg2_optional_missing = ({}, [], [])
+                awg31_required_missing = []
+
                 if protocol_type == ServerProtocol.ProtocolType.AWG2:
-                    awg2_meta, awg2_required_missing, awg2_optional_missing = cls._parse_awg2_metadata(config_env, raw_iface_conf)
+                    (
+                        awg2_meta,
+                        awg2_required_missing,
+                        awg2_optional_missing,
+                    ) = cls._parse_awg2_metadata(
+                        config_env,
+                        raw_iface_conf,
+                    )
+
+                    awg31_required_missing = [
+                        key
+                        for key in cls.AWG31_REQUIRED_KEYS
+                        if not awg2_meta.get(key)
+                    ]
 
                 udp_port = cls._parse_udp_port(inspect_data) or listen_port
                 discovered_public_host = cls._parse_public_host(inspect_data)
@@ -529,7 +578,24 @@ class ServerService:
                     "awg2_active_keys": sorted(awg2_meta.keys()),
                     "awg2_missing_keys": awg2_required_missing,
                     "awg2_optional_missing_keys": awg2_optional_missing,
-                    "awg2_metadata_ready": not awg2_required_missing if protocol_type == ServerProtocol.ProtocolType.AWG2 else True,
+                    "awg2_metadata_ready": (
+                        not awg2_required_missing
+                        if protocol_type
+                        == ServerProtocol.ProtocolType.AWG2
+                        else True
+                    ),
+                    "awg31_metadata_ready": (
+                        not awg31_required_missing
+                        if protocol_type
+                        == ServerProtocol.ProtocolType.AWG2
+                        else False
+                    ),
+                    "awg31_missing_keys": (
+                        awg31_required_missing
+                        if protocol_type
+                        == ServerProtocol.ProtocolType.AWG2
+                        else []
+                    ),
                 }
             else:
                 protocol.container_status = "missing"

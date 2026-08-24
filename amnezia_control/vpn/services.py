@@ -637,7 +637,40 @@ class VPNClientPolicyService:
 
 
 class VPNClientService:
-    AWG_INTERFACE_EXTRA_KEYS = ("Jc", "Jmin", "Jmax", "S1", "S2", "S3", "S4", "H1", "H2", "H3", "H4", "I1", "I2", "I3", "I4", "I5")
+    AWG_INTERFACE_EXTRA_KEYS = (
+        "Jc", "Jmin", "Jmax",
+        "S1", "S2", "S3", "S4",
+        "H1", "H2", "H3", "H4",
+        "I1", "I2", "I3", "I4", "I5",
+        "HeaderProtectionKey",
+        "ContentPaddingAddition",
+        "RekeyAfterTime",
+        "RekeyTimeout",
+        "RejectAfterTime",
+        "KeepaliveTimeout",
+        "MaxHandshakeAttempts",
+        "RandomTrailers",
+        "DisableCookies",
+    )
+
+    AWG31_REQUIRED_METADATA_KEYS = (
+        "HeaderProtectionKey",
+        "ContentPaddingAddition",
+        "RekeyAfterTime",
+        "RekeyTimeout",
+        "RejectAfterTime",
+        "KeepaliveTimeout",
+        "MaxHandshakeAttempts",
+        "RandomTrailers",
+        "DisableCookies",
+    )
+
+    AWG31_DEFAULT_I1 = (
+        "<r 2><b 0x858000010001000000000669636c6f7564"
+        "03636f6d0000010001c00c000100010000105a00044d583737>"
+    )
+
+    AWG31_PERSISTENT_KEEPALIVE = "25-35"
 
     @staticmethod
     def get_limit_state(client: VPNClient, now=None):
@@ -777,32 +810,142 @@ class VPNClientService:
         preshared_key: str = "",
         allowed_ips: str = "0.0.0.0/0, ::/0",
     ) -> str:
-        required = ("Jc", "Jmin", "Jmax", "S1", "S2", "S3", "S4", "H1", "H2", "H3", "H4")
-        optional = ("I1", "I2", "I3", "I4", "I5")
-        missing = [k for k in required if not awg2_metadata.get(k)]
+        required = (
+            "Jc", "Jmin", "Jmax",
+            "S1", "S2", "S3", "S4",
+            "H1", "H2", "H3", "H4",
+        )
+        optional = (
+            "I1", "I2", "I3", "I4", "I5",
+        )
+
+        missing = [
+            key
+            for key in required
+            if not awg2_metadata.get(key)
+        ]
+
         if missing:
-            raise RuntimeError(f"AWG2 metadata is incomplete: missing {', '.join(missing)}. Run runtime sync and verify live AWG2 config.")
+            raise RuntimeError(
+                "AWG2 metadata is incomplete: missing "
+                f"{', '.join(missing)}. "
+                "Run runtime sync and verify live AWG2 config."
+            )
+
+        awg31_enabled = bool(
+            awg2_metadata.get("HeaderProtectionKey")
+        )
+
+        if awg31_enabled:
+            missing31 = [
+                key
+                for key
+                in VPNClientService.AWG31_REQUIRED_METADATA_KEYS
+                if not awg2_metadata.get(key)
+            ]
+
+            if missing31:
+                raise RuntimeError(
+                    "AWG 3.1 metadata is incomplete: missing "
+                    f"{', '.join(missing31)}."
+                )
+
+            try:
+                paddings = [
+                    int(awg2_metadata[key])
+                    for key in ("S1", "S2", "S3", "S4")
+                ]
+            except (TypeError, ValueError) as exc:
+                raise RuntimeError(
+                    "AWG 3.1 S1-S4 must be integers."
+                ) from exc
+
+            if any(value < 12 for value in paddings):
+                raise RuntimeError(
+                    "AWG 3.1 HeaderProtectionKey requires "
+                    "S1-S4 >= 12."
+                )
+
+        interface_lines = [
+            "[Interface]",
+            f"PrivateKey = {private_key}",
+            f"Address = {address}/32",
+            "DNS = 1.1.1.1",
+        ]
 
         peer_lines = [
             "[Peer]",
             f"PublicKey = {server_public_key}",
         ]
+
         if preshared_key:
-            peer_lines.append(f"PresharedKey = {preshared_key}")
+            peer_lines.append(
+                f"PresharedKey = {preshared_key}"
+            )
+
+        if awg31_enabled:
+            for key in required:
+                interface_lines.append(
+                    f"{key} = {awg2_metadata[key]}"
+                )
+
+            i_values = {
+                key: awg2_metadata.get(key, "")
+                for key in optional
+            }
+
+            if not i_values["I1"]:
+                i_values["I1"] = (
+                    VPNClientService.AWG31_DEFAULT_I1
+                )
+
+            for key in optional:
+                if i_values[key]:
+                    interface_lines.append(
+                        f"{key} = {i_values[key]}"
+                    )
+
+            for key in (
+                VPNClientService
+                .AWG31_REQUIRED_METADATA_KEYS
+            ):
+                interface_lines.append(
+                    f"{key} = {awg2_metadata[key]}"
+                )
+
+            persistent_keepalive = (
+                VPNClientService
+                .AWG31_PERSISTENT_KEEPALIVE
+            )
+
+        else:
+            persistent_keepalive = "25"
+
         peer_lines.extend(
             [
                 f"Endpoint = {endpoint}",
                 f"AllowedIPs = {allowed_ips}",
-                "PersistentKeepalive = 25",
+                (
+                    "PersistentKeepalive = "
+                    f"{persistent_keepalive}"
+                ),
             ]
         )
-        peer_lines.extend(f"{k} = {awg2_metadata[k]}" for k in required)
-        peer_lines.extend(f"{k} = {awg2_metadata[k]}" for k in optional if awg2_metadata.get(k))
+
+        if not awg31_enabled:
+            peer_lines.extend(
+                f"{key} = {awg2_metadata[key]}"
+                for key in required
+            )
+            peer_lines.extend(
+                f"{key} = {awg2_metadata[key]}"
+                for key in optional
+                if awg2_metadata.get(key)
+            )
+
         return (
-            "[Interface]\n"
-            f"PrivateKey = {private_key}\n"
-            f"Address = {address}/32\n"
-            "DNS = 1.1.1.1\n\n"
+            "\n".join(interface_lines)
+            + "\n\n"
             + "\n".join(peer_lines)
             + "\n"
         )
