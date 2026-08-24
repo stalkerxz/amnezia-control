@@ -340,23 +340,70 @@ class ServerService:
 
     @staticmethod
     def _parse_interface_metadata(raw_conf: str):
+        """
+        Discover the IPv4 client address pool and listen port.
+
+        AWG configs may contain several Address lines, including
+        automatically persisted IPv6 link-local addresses (fe80::/10).
+        Client creation in the current runtime backend is IPv4-only,
+        so link-local/global IPv6 addresses must never replace the
+        IPv4 VPN subnet.
+        """
         subnet = ""
         listen_port = None
+        section = ""
+
         for line in raw_conf.splitlines():
             text = line.strip()
+
             if not text or text.startswith("#"):
                 continue
-            if text.lower().startswith("address") and "=" in text:
-                value = text.split("=", 1)[1].strip().split(",")[0].strip()
+
+            if text.startswith("[") and text.endswith("]"):
+                section = text.lower()
+                continue
+
+            if section not in {"", "[interface]"}:
+                continue
+
+            if (
+                text.lower().startswith("address")
+                and "=" in text
+            ):
+                raw_values = (
+                    text.split("=", 1)[1]
+                    .strip()
+                    .split(",")
+                )
+
+                for raw_value in raw_values:
+                    value = raw_value.strip()
+
+                    if not value:
+                        continue
+
+                    try:
+                        iface = ipaddress.ip_interface(value)
+                    except ValueError:
+                        continue
+
+                    if (
+                        iface.version == 4
+                        and not subnet
+                    ):
+                        subnet = str(iface.network)
+
+            if (
+                text.lower().startswith("listenport")
+                and "=" in text
+            ):
                 try:
-                    subnet = str(ipaddress.ip_interface(value).network)
-                except ValueError:
-                    subnet = ""
-            if text.lower().startswith("listenport") and "=" in text:
-                try:
-                    listen_port = int(text.split("=", 1)[1].strip())
+                    listen_port = int(
+                        text.split("=", 1)[1].strip()
+                    )
                 except ValueError:
                     listen_port = None
+
         return subnet, listen_port
 
     @staticmethod
