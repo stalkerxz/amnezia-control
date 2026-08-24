@@ -43,15 +43,15 @@
       <div class="v4-kpi-meta"><strong>{{ renewal_requests_last_24h }}</strong> новых за 24 часа</div>
     </a>
 
-    <a class="v4-kpi-card {% if expired_clients_count or traffic_exceeded_clients_count or failed_jobs_recent_count %}has-alert{% endif %}" href="{% url 'customers-list' %}?readiness=attention">
+    <a class="v4-kpi-card {% if customer_attention_count %}has-alert{% endif %}" href="{% url 'customers-list' %}?readiness=attention">
       <div class="v4-kpi-topline">
         <span class="v4-kpi-icon is-orange" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 4 21 20H3L12 4Z"/><path d="M12 9v5M12 17h.01"/></svg>
         </span>
         <span class="v4-kpi-label">Требуют внимания</span>
       </div>
-      <div class="v4-kpi-value">{{ expired_clients_count|add:traffic_exceeded_clients_count|add:failed_jobs_recent_count }}</div>
-      <div class="v4-kpi-meta">Сроки, квоты и ошибки операций</div>
+      <div class="v4-kpi-value">{{ customer_attention_count }}</div>
+      <div class="v4-kpi-meta">Клиенты, которым требуется действие</div>
     </a>
 
     <a class="v4-kpi-card {% if unhealthy_servers_count %}has-alert{% endif %}" href="/servers/">

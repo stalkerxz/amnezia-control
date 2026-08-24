@@ -3,8 +3,17 @@ import os
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, user_passes_test
-from django.db.models import Max
-from django.db.models import Prefetch
+from django.db.models import (
+    Case,
+    CharField,
+    Count,
+    F,
+    Max,
+    Prefetch,
+    Q,
+    Value,
+    When,
+)
 from django.http import JsonResponse
 from django.urls import reverse
 from django.shortcuts import redirect, render
@@ -12,13 +21,21 @@ from django.utils.translation import gettext as _
 from django.utils import timezone
 
 from audit.models import AuditLog
+from customers.models import (
+    ClientDevice,
+    CustomerAccount,
+)
 from jobs.models import Job, JobEvent
 from jobs.services import classify_job_signal
 from servers.models import Server, ServerProtocol
 from servers.services import ServerService
 from portal.models import ClientRenewalRequest
 from vpn.expiration_reminders import ClientExpirationReminderService
-from vpn.models import ClientExpirationReminderLog, VPNClient
+from vpn.models import (
+    ClientExpirationReminderLog,
+    VPNClient,
+    XHTTPDevice,
+)
 
 from .forms import SystemSettingsForm
 from .models import SystemSettings
@@ -26,6 +43,153 @@ from .models import SystemSettings
 
 def _admin_required(user):
     return user.is_authenticated and user.is_staff
+
+
+def _customer_dashboard_metrics():
+    """
+    Customer KPI values for the dashboard.
+
+    Keep these semantics aligned with /customers/:
+    - total excludes archived/deleted accounts;
+    - active means ACTIVE and not expired;
+    - attention uses the same readiness rules as
+      customers_list_view.
+    """
+    now = timezone.now()
+    expires_soon_at = (
+        now
+        + timezone.timedelta(days=7)
+    )
+
+    open_statuses = (
+        ClientRenewalRequest.Status.NEW,
+        ClientRenewalRequest.Status.IN_PROGRESS,
+    )
+
+    accounts = (
+        CustomerAccount.objects
+        .annotate(
+            device_count=Count(
+                "devices",
+                filter=~Q(
+                    devices__status=(
+                        ClientDevice.Status.DELETED
+                    )
+                ),
+                distinct=True,
+            ),
+            vpn_config_count=Count(
+                "devices__vpn_clients",
+                filter=(
+                    ~Q(
+                        devices__status=(
+                            ClientDevice.Status.DELETED
+                        )
+                    )
+                    & ~Q(
+                        devices__vpn_clients__status=(
+                            VPNClient.Status.DELETED
+                        )
+                    )
+                ),
+                distinct=True,
+            ),
+            xhttp_config_count=Count(
+                "devices__xhttp_devices",
+                filter=(
+                    ~Q(
+                        devices__status=(
+                            ClientDevice.Status.DELETED
+                        )
+                    )
+                    & ~Q(
+                        devices__xhttp_devices__status=(
+                            XHTTPDevice.Status.DELETED
+                        )
+                    )
+                ),
+                distinct=True,
+            ),
+            open_renewal_count=Count(
+                "renewal_requests",
+                filter=Q(
+                    renewal_requests__status__in=(
+                        open_statuses
+                    )
+                ),
+                distinct=True,
+            ),
+        )
+        .annotate(
+            connection_count=(
+                F("vpn_config_count")
+                + F("xhttp_config_count")
+            ),
+        )
+        .annotate(
+            readiness_code=Case(
+                When(
+                    status=CustomerAccount.Status.DELETED,
+                    then=Value("deleted"),
+                ),
+                When(
+                    status=CustomerAccount.Status.DISABLED,
+                    then=Value("disabled"),
+                ),
+                When(
+                    expires_at__lte=now,
+                    then=Value("expired"),
+                ),
+                When(
+                    open_renewal_count__gt=0,
+                    then=Value("renewal"),
+                ),
+                When(
+                    expires_at__gt=now,
+                    expires_at__lte=expires_soon_at,
+                    then=Value("expiring"),
+                ),
+                When(
+                    device_count=0,
+                    then=Value("no_devices"),
+                ),
+                When(
+                    connection_count=0,
+                    then=Value("no_connections"),
+                ),
+                default=Value("ready"),
+                output_field=CharField(),
+            ),
+        )
+        .exclude(
+            status=CustomerAccount.Status.DELETED
+        )
+    )
+
+    return {
+        "total": accounts.count(),
+        "active": (
+            accounts
+            .filter(
+                status=CustomerAccount.Status.ACTIVE
+            )
+            .filter(
+                Q(expires_at__isnull=True)
+                | Q(expires_at__gt=now)
+            )
+            .count()
+        ),
+        "attention": (
+            accounts
+            .filter(
+                status=CustomerAccount.Status.ACTIVE
+            )
+            .exclude(
+                readiness_code="ready"
+            )
+            .count()
+        ),
+    }
 
 
 def _job_action_label(action: str) -> str:
@@ -69,6 +233,7 @@ def dashboard_view(request):
     protocols = list(ServerProtocol.objects.all())
     protocol_map = {(protocol.server_id, protocol.protocol_type): protocol for protocol in protocols}
     clients = list(VPNClient.objects.select_related("server").all())
+    customer_metrics = _customer_dashboard_metrics()
 
     degraded_clients_count = 0
     for client in clients:
@@ -211,8 +376,9 @@ def dashboard_view(request):
         "degraded_servers_count": degraded_servers_count,
         "unhealthy_servers_count": sum(1 for state in server_health_states if state == ServerService.HEALTH_UNHEALTHY),
         "not_checked_servers_count": not_checked_servers_count,
-        "clients_total_count": len(clients),
-        "active_clients_count": sum(1 for client in clients if client.status == VPNClient.Status.ACTIVE),
+        "clients_total_count": customer_metrics["total"],
+        "active_clients_count": customer_metrics["active"],
+        "customer_attention_count": customer_metrics["attention"],
         "disabled_clients_count": sum(1 for client in clients if client.status == VPNClient.Status.DISABLED),
         "deleted_clients_count": attention_items[6]["count"],
         "expired_clients_count": attention_items[2]["count"],
