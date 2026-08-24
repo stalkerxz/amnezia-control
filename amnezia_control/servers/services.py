@@ -461,6 +461,77 @@ class ServerService:
             peers.append({"public_key": current["PublicKey"], "allowed_ips": current["AllowedIPs"]})
         return peers
 
+    @staticmethod
+    def _runtime_allowed_ips_valid(value: str) -> bool:
+        tokens = [
+            token.strip()
+            for token in (value or "").split(",")
+            if token.strip()
+        ]
+
+        if not tokens:
+            return False
+
+        try:
+            for token in tokens:
+                ipaddress.ip_network(
+                    token,
+                    strict=False,
+                )
+        except ValueError:
+            return False
+
+        return True
+
+    @classmethod
+    def _count_awg2_runtime_peers(
+        cls,
+        dump_text: str,
+        iface: str,
+    ) -> int:
+        """
+        Count only actual peer rows.
+
+        AWG 3.1 may emit an extended interface metadata
+        row containing many tab-separated columns. Counting
+        rows merely by column count therefore produces one
+        phantom peer.
+        """
+        count = 0
+
+        for line in dump_text.splitlines():
+            cols = [
+                column.strip()
+                for column in line.split("\t")
+            ]
+
+            if (
+                len(cols) >= 9
+                and iface
+                and cols[0] == iface
+            ):
+                public_key = cols[1]
+                allowed_ips = cols[4]
+
+            elif len(cols) >= 8:
+                public_key = cols[0]
+                allowed_ips = cols[3]
+
+            else:
+                continue
+
+            if not public_key:
+                continue
+
+            if not cls._runtime_allowed_ips_valid(
+                allowed_ips
+            ):
+                continue
+
+            count += 1
+
+        return count
+
     @classmethod
     def sync_runtime_state(cls, *, server: Server, actor):
         all_names = RuntimeCommandService.run(server, actor, "runtime.ps_all", "docker ps -a --format '{{.Names}}'").stdout.splitlines()
@@ -506,10 +577,16 @@ class ServerService:
                                 if dump_result is None:
                                     peer_source = "runtime telemetry unavailable; config fallback"
                                 else:
-                                    peer_count = sum(1 for line in dump_result.stdout.splitlines() if len(line.split("\t")) >= 8)
+                                    peer_count = cls._count_awg2_runtime_peers(
+                                    dump_result.stdout,
+                                    iface,
+                                )
                                     peer_source = "runtime wg dump"
                             else:
-                                peer_count = sum(1 for line in dump_result.stdout.splitlines() if len(line.split("\t")) >= 8)
+                                peer_count = cls._count_awg2_runtime_peers(
+                                    dump_result.stdout,
+                                    iface,
+                                )
                                 peer_source = "runtime wg dump"
                         else:
                             dump = RuntimeCommandService.run(server, actor, f"runtime.peers.{protocol_type}", f"docker exec {container_name} wg show dump").stdout
