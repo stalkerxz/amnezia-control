@@ -162,9 +162,9 @@ class JobsListViewTest(DjangoTestCase):
     def test_jobs_list_renders_filters_and_quick_view(self):
         self.client.force_login(self.user)
         response = self.client.get(reverse("jobs-list"))
-        self.assertContains(response, "Операционные задания")
+        self.assertContains(response, "Операции")
         self.assertContains(response, "Создано с даты")
-        self.assertContains(response, "Быстрый просмотр")
+        self.assertContains(response, "Показать технические детали")
 
     def test_jobs_list_filters_by_status(self):
         Job.objects.create(server=self.server, actor=self.user, action="vpn.client.create", status=Job.Status.SUCCESS)
@@ -209,4 +209,4 @@ class JobsListViewTest(DjangoTestCase):
         self.client.force_login(self.user)
         response = self.client.get(reverse("jobs-list"))
         self.assertContains(response, "Инициатор")
-        self.assertContains(response, "Мой")
+        self.assertContains(response, "вы")
