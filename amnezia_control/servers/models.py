@@ -28,6 +28,13 @@ class Server(models.Model):
             "новых VPN-клиентов на этот сервер."
         ),
     )
+    vpn_pool_locked = models.BooleanField(
+        default=False,
+        help_text=(
+            "Эксплуатационный запрет на включение сервера "
+            "в пул выпуска новых VPN-клиентов."
+        ),
+    )
     health_status = models.CharField(max_length=30, default="unknown")
     public_endpoint_host = models.CharField(max_length=255, blank=True)
     public_endpoint_port = models.PositiveIntegerField(null=True, blank=True)

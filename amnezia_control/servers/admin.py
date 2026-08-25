@@ -15,6 +15,8 @@ class ServerAdmin(admin.ModelAdmin):
         "public_endpoint_host",
         "public_endpoint_port",
         "is_enabled",
+        "accepts_new_vpn_clients",
+        "vpn_pool_locked",
         "is_default_for_new_clients",
         "health_status",
         "last_runtime_sync_at",
@@ -24,6 +26,8 @@ class ServerAdmin(admin.ModelAdmin):
     list_filter = (
         "runtime_backend",
         "is_enabled",
+        "accepts_new_vpn_clients",
+        "vpn_pool_locked",
         "is_default_for_new_clients",
         "health_status",
         "created_at",
@@ -51,6 +55,8 @@ class ServerAdmin(admin.ModelAdmin):
             {
                 "fields": (
                     "is_enabled",
+                    "accepts_new_vpn_clients",
+                    "vpn_pool_locked",
                     "is_default_for_new_clients",
                     "health_status",
                     "last_runtime_sync_at",

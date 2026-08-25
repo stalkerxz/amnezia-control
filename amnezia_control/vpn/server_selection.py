@@ -99,6 +99,7 @@ def vpn_server_candidate_rows(
         .filter(
             is_enabled=True,
             accepts_new_vpn_clients=True,
+            vpn_pool_locked=False,
             health_status="healthy",
         )
         .order_by(

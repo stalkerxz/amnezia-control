@@ -272,6 +272,20 @@ def server_toggle_vpn_pool_view(
         == "1"
     )
 
+    if enable and server.vpn_pool_locked:
+        messages.error(
+            request,
+            (
+                f"Сервер «{server.name}» нельзя включить "
+                "в пул новых VPN: эксплуатационная политика "
+                "запрещает выпуск новых подключений."
+            ),
+        )
+
+        return redirect(
+            "servers-list"
+        )
+
     if enable:
         full_status = (
             vpn_server_mode_status(
@@ -304,7 +318,7 @@ def server_toggle_vpn_pool_view(
             messages.error(
                 request,
                 (
-                    "Сервер нельзя включить "
+                    f"Сервер «{server.name}» нельзя включить "
                     "в пул новых VPN: "
                     f"{reason}."
                 ),

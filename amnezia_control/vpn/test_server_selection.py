@@ -22,6 +22,7 @@ class VPNServerSelectionTests(TestCase):
         name,
         peer_count=0,
         accepts=True,
+        locked=False,
         awg31_ready=True,
         full=True,
         selective=False,
@@ -34,6 +35,7 @@ class VPNServerSelectionTests(TestCase):
             is_enabled=True,
             is_default_for_new_clients=False,
             accepts_new_vpn_clients=accepts,
+            vpn_pool_locked=locked,
             health_status=health,
             public_endpoint_host=(
                 "203.0.113.10"
@@ -119,6 +121,39 @@ class VPNServerSelectionTests(TestCase):
             ),
             [],
         )
+
+    def test_locked_server_is_never_candidate(self):
+        self.make_server(
+            name="Policy locked",
+            accepts=True,
+            locked=True,
+            awg31_ready=True,
+        )
+
+        self.assertEqual(
+            vpn_server_candidate_rows(
+                routing_mode=(
+                    ROUTING_MODE_FULL
+                ),
+            ),
+            [],
+        )
+
+    def test_manual_choice_rejects_policy_locked_server(self):
+        locked = self.make_server(
+            name="Policy locked manual",
+            accepts=True,
+            locked=True,
+            awg31_ready=True,
+        )
+
+        with self.assertRaises(ValueError):
+            resolve_vpn_server_choice(
+                choice=str(locked.id),
+                routing_mode=(
+                    ROUTING_MODE_FULL
+                ),
+            )
 
     def test_requires_awg31_readiness(self):
         self.make_server(

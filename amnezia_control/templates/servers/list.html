@@ -70,7 +70,14 @@
                   >
                     {% csrf_token %}
 
-                    {% if s.obj.accepts_new_vpn_clients %}
+                    {% if s.obj.vpn_pool_locked %}
+                      <span
+                        class="v4-status-pill is-neutral"
+                        title="Эксплуатационная политика запрещает выпуск новых VPN на этом сервере"
+                      >
+                        Legacy · заблокирован
+                      </span>
+                    {% elif s.obj.accepts_new_vpn_clients %}
                       <input type="hidden" name="enabled" value="0">
                       <button
                         type="submit"
