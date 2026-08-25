@@ -49,6 +49,10 @@ def _protocol_runtime_ready(
                 "awg2_metadata_ready"
             )
             is True
+            and metadata.get(
+                "awg31_metadata_ready"
+            )
+            is True
         )
 
     return (

@@ -25,6 +25,19 @@ AWG2_META = {
     "H4": "1939083639",
 }
 
+AWG31_META = {
+    **AWG2_META,
+    "HeaderProtectionKey": "TEST-HPK",
+    "ContentPaddingAddition": "10-100",
+    "RekeyAfterTime": "100-120",
+    "RekeyTimeout": "3-7",
+    "RejectAfterTime": "150-180",
+    "KeepaliveTimeout": "5-15",
+    "MaxHandshakeAttempts": "15-20",
+    "RandomTrailers": "on",
+    "DisableCookies": "on",
+}
+
 
 class AgentBackendTest(TestCase):
     def setUp(self):
@@ -88,7 +101,7 @@ class AgentBackendTest(TestCase):
                 "interface_addresses": ["10.78.0.1/24"],
                 "peer_count": 15,
                 "reservation_count": 0,
-                "awg2_metadata": AWG2_META,
+                "awg2_metadata": AWG31_META,
             }
 
         agent_call.side_effect = result
@@ -107,6 +120,11 @@ class AgentBackendTest(TestCase):
         self.assertEqual(awg2.runtime_metadata["udp_port"], 51831)
         self.assertEqual(awg2.runtime_metadata["subnet"], "10.78.0.0/24")
         self.assertTrue(awg2.runtime_metadata["awg2_metadata_ready"])
+        self.assertTrue(awg2.runtime_metadata["awg31_metadata_ready"])
+        self.assertEqual(
+            awg2.runtime_metadata["awg31_missing_keys"],
+            [],
+        )
         self.assertEqual(server.health_status, "healthy")
 
         adapter = AdapterFactory.get_for_server(
@@ -114,6 +132,101 @@ class AgentBackendTest(TestCase):
             ServerProtocol.ProtocolType.AWG2,
         )
         self.assertIsInstance(adapter, RemoteAWG2AgentAdapter)
+
+    @patch("servers.agent_backend._agent_call")
+    def test_agent_sync_marks_old_awg2_not_awg31_ready(
+        self,
+        agent_call,
+    ):
+        server = Server.objects.create(
+            name="agent-old-awg2",
+            host="198.51.100.21",
+            public_endpoint_host="vpn.example.com",
+            runtime_backend=Server.RuntimeBackend.AWG_AGENT,
+        )
+
+        def result(
+            _server,
+            _actor,
+            agent,
+            operation,
+            **_kwargs,
+        ):
+            self.assertEqual(
+                operation,
+                "runtime_info",
+            )
+
+            if agent == "awg3":
+                return {
+                    "backend": "awg_agent",
+                    "agent": "awg3",
+                    "interface": "awg3",
+                    "interface_up": True,
+                    "config_path":
+                        "/etc/amnezia/amneziawg/awg3.conf",
+                    "udp_port": 51830,
+                    "subnet": "10.77.0.0/24",
+                    "interface_addresses": [
+                        "10.77.0.1/24",
+                    ],
+                    "peer_count": 10,
+                    "reservation_count": 0,
+                }
+
+            return {
+                "backend": "awg_agent",
+                "agent": "awg4",
+                "interface": "awg4",
+                "interface_up": True,
+                "config_path":
+                    "/etc/amnezia/amneziawg/awg4.conf",
+                "udp_port": 51831,
+                "subnet": "10.78.0.0/24",
+                "interface_addresses": [
+                    "10.78.0.1/24",
+                ],
+                "peer_count": 15,
+                "reservation_count": 0,
+                "awg2_metadata": AWG2_META,
+            }
+
+        agent_call.side_effect = result
+
+        ServerService.sync_runtime_state(
+            server=server,
+            actor=self.user,
+        )
+
+        awg2 = server.protocols.get(
+            protocol_type=(
+                ServerProtocol
+                .ProtocolType
+                .AWG2
+            )
+        )
+
+        self.assertTrue(
+            awg2.runtime_metadata[
+                "awg2_metadata_ready"
+            ]
+        )
+
+        self.assertFalse(
+            awg2.runtime_metadata[
+                "awg31_metadata_ready"
+            ]
+        )
+
+        self.assertEqual(
+            awg2.runtime_metadata[
+                "awg31_missing_keys"
+            ],
+            list(
+                ServerService
+                .AWG31_REQUIRED_KEYS
+            ),
+        )
 
     def test_agent_config_validation_keeps_agent_native_layout(self):
         config = "\n".join(

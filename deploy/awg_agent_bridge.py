@@ -82,6 +82,15 @@ AWG2_METADATA_KEYS = (
     "I3",
     "I4",
     "I5",
+    "HeaderProtectionKey",
+    "ContentPaddingAddition",
+    "RekeyAfterTime",
+    "RekeyTimeout",
+    "RejectAfterTime",
+    "KeepaliveTimeout",
+    "MaxHandshakeAttempts",
+    "RandomTrailers",
+    "DisableCookies",
 )
 
 MAX_TOKEN_BYTES = 64 * 1024

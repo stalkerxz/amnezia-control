@@ -350,6 +350,11 @@ def _sync_agent_runtime(server: Server, actor):
     optional_missing = [
         key for key in AWG2_OPTIONAL_KEYS if not awg2_meta.get(key)
     ]
+    awg31_required_missing = [
+        key
+        for key in ServerService.AWG31_REQUIRED_KEYS
+        if not awg2_meta.get(key)
+    ]
     awg2.container_name = AGENT_AWG4_SENTINEL
     awg2.container_status = (
         "running" if awg4_info.get("interface_up") else "exited"
@@ -361,6 +366,8 @@ def _sync_agent_runtime(server: Server, actor):
         "awg2_missing_keys": required_missing,
         "awg2_optional_missing_keys": optional_missing,
         "awg2_metadata_ready": not required_missing,
+        "awg31_metadata_ready": not awg31_required_missing,
+        "awg31_missing_keys": awg31_required_missing,
         "central_protocol_supported": True,
     }
     awg2.enabled = bool(awg4_info.get("interface_up"))

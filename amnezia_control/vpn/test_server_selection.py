@@ -171,7 +171,7 @@ class VPNServerSelectionTests(TestCase):
             )
         )
 
-    def test_agent_backend_uses_agent_readiness_contract(
+    def test_agent_backend_accepts_complete_readiness_contract(
         self,
     ):
         server = self.make_server(
@@ -205,6 +205,7 @@ class VPNServerSelectionTests(TestCase):
                 "central_protocol_supported":
                     True,
                 "awg2_metadata_ready": True,
+                "awg31_metadata_ready": True,
             }
         )
 
@@ -225,6 +226,59 @@ class VPNServerSelectionTests(TestCase):
                 ),
             ),
             server,
+        )
+
+    def test_agent_backend_requires_explicit_awg31_readiness(
+        self,
+    ):
+        server = self.make_server(
+            name="Agent AWG31 missing",
+            awg31_ready=False,
+            runtime_backend=(
+                Server.RuntimeBackend.AWG_AGENT
+            ),
+        )
+
+        protocol = server.protocols.get(
+            protocol_type=(
+                ServerProtocol
+                .ProtocolType
+                .AWG2
+            )
+        )
+
+        metadata = dict(
+            protocol.runtime_metadata
+            or {}
+        )
+
+        metadata.pop(
+            "awg31_metadata_ready",
+            None,
+        )
+
+        metadata.update(
+            {
+                "central_protocol_supported":
+                    True,
+                "awg2_metadata_ready": True,
+            }
+        )
+
+        protocol.runtime_metadata = metadata
+
+        protocol.save(
+            update_fields=[
+                "runtime_metadata",
+            ]
+        )
+
+        self.assertIsNone(
+            select_vpn_server(
+                routing_mode=(
+                    ROUTING_MODE_FULL
+                ),
+            )
         )
 
     def test_agent_backend_requires_awg2_readiness(
@@ -261,6 +315,7 @@ class VPNServerSelectionTests(TestCase):
                 "central_protocol_supported":
                     True,
                 "awg2_metadata_ready": False,
+                "awg31_metadata_ready": True,
             }
         )
 
@@ -316,6 +371,7 @@ class VPNServerSelectionTests(TestCase):
                 "central_protocol_supported":
                     False,
                 "awg2_metadata_ready": True,
+                "awg31_metadata_ready": True,
             }
         )
 
