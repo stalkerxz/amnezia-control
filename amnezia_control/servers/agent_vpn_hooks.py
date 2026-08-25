@@ -38,7 +38,7 @@ def _agent_routes(client: VPNClient) -> tuple[str, list[str]]:
         if not routes:
             raise RuntimeError("Selective AWG4 profile contains no routes")
         return "selective", routes
-    return "full", ["0.0.0.0/0"]
+    return "full", ["0.0.0.0/0", "::/0"]
 
 
 def _validate_agent_config(result: dict) -> tuple[str, str, str]:

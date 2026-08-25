@@ -267,6 +267,68 @@ class AgentBackendTest(TestCase):
         self.assertIn("Jc = 4\nJmin = 40", returned)
         self.assertLess(returned.index("Jc = 4"), returned.index("[Peer]"))
 
+    def test_agent_routes_use_full_dual_stack_default(
+        self,
+    ):
+        server = Server.objects.create(
+            name="agent-full-routes",
+            runtime_backend=(
+                Server.RuntimeBackend.AWG_AGENT
+            ),
+        )
+
+        protocol = ServerProtocol.objects.create(
+            server=server,
+            protocol_type=(
+                ServerProtocol.ProtocolType.AWG2
+            ),
+            enabled=True,
+            container_name="awg-agent:awg4",
+            container_status="running",
+            runtime_metadata={
+                "backend": "awg_agent",
+                "agent": "awg4",
+            },
+        )
+
+        profile = ProtocolProfile.objects.create(
+            server_protocol=protocol,
+            name="full",
+            protocol_type=(
+                ServerProtocol.ProtocolType.AWG2
+            ),
+            config_template=(
+                "# routing-mode: full\n"
+            ),
+        )
+
+        client = VPNClient.objects.create(
+            server=server,
+            name="full-client",
+            protocol_type=(
+                VPNClient.ProtocolType.AWG2
+            ),
+            profile=profile,
+            created_by=self.user,
+        )
+
+        mode, routes = _agent_routes(
+            client
+        )
+
+        self.assertEqual(
+            mode,
+            "full",
+        )
+
+        self.assertEqual(
+            routes,
+            [
+                "0.0.0.0/0",
+                "::/0",
+            ],
+        )
+
     def test_agent_routes_use_selective_profile(self):
         server = Server.objects.create(
             name="agent-routes",
