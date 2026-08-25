@@ -78,20 +78,83 @@ class RuntimeCommandService:
 
     @staticmethod
     def run(server: Server, actor, action: str, command: str, sensitive_output: bool = False):
-        job = JobService.create_job(server=server, actor=actor, action=action, payload={"command": command if not sensitive_output else "[REDACTED]"})
+        job = JobService.create_job(
+            server=server,
+            actor=actor,
+            action=action,
+            payload={
+                "command": (
+                    command
+                    if not sensitive_output
+                    else "[REDACTED]"
+                )
+            },
+        )
         JobService.mark_running(job)
-        result = RuntimeCommandService.executor_for_server(server).run(command)
+
+        try:
+            result = (
+                RuntimeCommandService
+                .executor_for_server(server)
+                .run(command)
+            )
+        except Exception as exc:
+            # Job lifecycle is authoritative.
+            # Finalize it before recording diagnostics so
+            # an event-write failure cannot leave RUNNING.
+            JobService.mark_done(
+                job,
+                ok=False,
+            )
+            JobService.event(
+                job,
+                f"Execution failed: {action}",
+                stderr=(
+                    ""
+                    if sensitive_output
+                    else str(exc)
+                ),
+                level="error",
+            )
+            raise
+
+        ok = (
+            result.exit_code == 0
+        )
+
+        # Persist terminal state before the diagnostic event.
+        JobService.mark_done(
+            job,
+            ok=ok,
+        )
+
         JobService.event(
             job,
             f"Executed {action}",
-            stdout="" if sensitive_output else result.stdout,
-            stderr="" if sensitive_output else result.stderr,
+            stdout=(
+                ""
+                if sensitive_output
+                else result.stdout
+            ),
+            stderr=(
+                ""
+                if sensitive_output
+                else result.stderr
+            ),
             exit_code=result.exit_code,
-            level="info" if result.exit_code == 0 else "error",
+            level=(
+                "info"
+                if ok
+                else "error"
+            ),
         )
-        JobService.mark_done(job, ok=result.exit_code == 0)
-        if result.exit_code != 0:
-            raise RuntimeError(result.stderr or f"command failed: {action}")
+
+        if not ok:
+            raise RuntimeError(
+                result.stderr
+                or f"command failed: {action}"
+            )
+
         return result
 
     @classmethod
@@ -107,31 +170,117 @@ class RuntimeCommandService:
         warn_on_expected_failure: bool = True,
         sensitive_output: bool = False,
     ):
-        job = JobService.create_job(server=server, actor=actor, action=action, payload={"command": command if not sensitive_output else "[REDACTED]"})
+        job = JobService.create_job(
+            server=server,
+            actor=actor,
+            action=action,
+            payload={
+                "command": (
+                    command
+                    if not sensitive_output
+                    else "[REDACTED]"
+                )
+            },
+        )
         JobService.mark_running(job)
-        result = cls.executor_for_server(server).run(command)
-        stderr_text = result.stderr or ""
-        matched_expected_error = result.exit_code != 0 and any(
-            pattern.lower() in stderr_text.lower() for pattern in expected_error_patterns
+
+        try:
+            result = (
+                cls.executor_for_server(server)
+                .run(command)
+            )
+        except Exception as exc:
+            JobService.mark_done(
+                job,
+                ok=False,
+            )
+            JobService.event(
+                job,
+                f"Execution failed: {action}",
+                stderr=(
+                    ""
+                    if sensitive_output
+                    else str(exc)
+                ),
+                level="error",
+            )
+            raise
+
+        stderr_text = (
+            result.stderr
+            or ""
         )
+
+        matched_expected_error = (
+            result.exit_code != 0
+            and any(
+                pattern.lower()
+                in stderr_text.lower()
+                for pattern
+                in expected_error_patterns
+            )
+        )
+
+        ok = (
+            result.exit_code == 0
+            or matched_expected_error
+        )
+
         level = (
-            "warning" if matched_expected_error and warn_on_expected_failure
-            else ("info" if result.exit_code == 0 or matched_expected_error else "error")
+            "warning"
+            if (
+                matched_expected_error
+                and warn_on_expected_failure
+            )
+            else (
+                "info"
+                if ok
+                else "error"
+            )
         )
-        message = fallback_message if matched_expected_error and warn_on_expected_failure else f"Executed {action}"
+
+        message = (
+            fallback_message
+            if (
+                matched_expected_error
+                and warn_on_expected_failure
+            )
+            else f"Executed {action}"
+        )
+
+        # Preserve terminal lifecycle state even if
+        # the diagnostic event itself cannot be saved.
+        JobService.mark_done(
+            job,
+            ok=ok,
+        )
+
         JobService.event(
             job,
             message,
-            stdout="" if sensitive_output else result.stdout,
-            stderr="" if sensitive_output else result.stderr,
+            stdout=(
+                ""
+                if sensitive_output
+                else result.stdout
+            ),
+            stderr=(
+                ""
+                if sensitive_output
+                else result.stderr
+            ),
             exit_code=result.exit_code,
             level=level,
         )
-        JobService.mark_done(job, ok=result.exit_code == 0 or matched_expected_error)
+
         if matched_expected_error:
             return None
+
         if result.exit_code != 0:
-            raise RuntimeError(result.stderr or f"command failed: {action}")
+            raise RuntimeError(
+                result.stderr
+                or f"command failed: {action}"
+            )
+
         return result
 
 
