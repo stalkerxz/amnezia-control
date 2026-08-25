@@ -24,6 +24,7 @@ class VPNServerSelectionTests(TestCase):
         accepts=True,
         locked=False,
         awg31_ready=True,
+        runtime_backend=Server.RuntimeBackend.DOCKER,
         full=True,
         selective=False,
         health="healthy",
@@ -36,6 +37,7 @@ class VPNServerSelectionTests(TestCase):
             is_default_for_new_clients=False,
             accepts_new_vpn_clients=accepts,
             vpn_pool_locked=locked,
+            runtime_backend=runtime_backend,
             health_status=health,
             public_endpoint_host=(
                 "203.0.113.10"
@@ -159,6 +161,221 @@ class VPNServerSelectionTests(TestCase):
         self.make_server(
             name="Old AWG",
             awg31_ready=False,
+        )
+
+        self.assertIsNone(
+            select_vpn_server(
+                routing_mode=(
+                    ROUTING_MODE_FULL
+                ),
+            )
+        )
+
+    def test_agent_backend_uses_agent_readiness_contract(
+        self,
+    ):
+        server = self.make_server(
+            name="Agent ready",
+            awg31_ready=False,
+            runtime_backend=(
+                Server.RuntimeBackend.AWG_AGENT
+            ),
+        )
+
+        protocol = server.protocols.get(
+            protocol_type=(
+                ServerProtocol
+                .ProtocolType
+                .AWG2
+            )
+        )
+
+        metadata = dict(
+            protocol.runtime_metadata
+            or {}
+        )
+
+        metadata.pop(
+            "awg31_metadata_ready",
+            None,
+        )
+
+        metadata.update(
+            {
+                "central_protocol_supported":
+                    True,
+                "awg2_metadata_ready": True,
+            }
+        )
+
+        protocol.runtime_metadata = (
+            metadata
+        )
+
+        protocol.save(
+            update_fields=[
+                "runtime_metadata",
+            ]
+        )
+
+        self.assertEqual(
+            select_vpn_server(
+                routing_mode=(
+                    ROUTING_MODE_FULL
+                ),
+            ),
+            server,
+        )
+
+    def test_agent_backend_requires_awg2_readiness(
+        self,
+    ):
+        server = self.make_server(
+            name="Agent AWG2 not ready",
+            awg31_ready=False,
+            runtime_backend=(
+                Server.RuntimeBackend.AWG_AGENT
+            ),
+        )
+
+        protocol = server.protocols.get(
+            protocol_type=(
+                ServerProtocol
+                .ProtocolType
+                .AWG2
+            )
+        )
+
+        metadata = dict(
+            protocol.runtime_metadata
+            or {}
+        )
+
+        metadata.pop(
+            "awg31_metadata_ready",
+            None,
+        )
+
+        metadata.update(
+            {
+                "central_protocol_supported":
+                    True,
+                "awg2_metadata_ready": False,
+            }
+        )
+
+        protocol.runtime_metadata = (
+            metadata
+        )
+
+        protocol.save(
+            update_fields=[
+                "runtime_metadata",
+            ]
+        )
+
+        self.assertIsNone(
+            select_vpn_server(
+                routing_mode=(
+                    ROUTING_MODE_FULL
+                ),
+            )
+        )
+
+    def test_agent_backend_requires_central_support(
+        self,
+    ):
+        server = self.make_server(
+            name="Agent central unsupported",
+            awg31_ready=False,
+            runtime_backend=(
+                Server.RuntimeBackend.AWG_AGENT
+            ),
+        )
+
+        protocol = server.protocols.get(
+            protocol_type=(
+                ServerProtocol
+                .ProtocolType
+                .AWG2
+            )
+        )
+
+        metadata = dict(
+            protocol.runtime_metadata
+            or {}
+        )
+
+        metadata.pop(
+            "awg31_metadata_ready",
+            None,
+        )
+
+        metadata.update(
+            {
+                "central_protocol_supported":
+                    False,
+                "awg2_metadata_ready": True,
+            }
+        )
+
+        protocol.runtime_metadata = (
+            metadata
+        )
+
+        protocol.save(
+            update_fields=[
+                "runtime_metadata",
+            ]
+        )
+
+        self.assertIsNone(
+            select_vpn_server(
+                routing_mode=(
+                    ROUTING_MODE_FULL
+                ),
+            )
+        )
+
+    def test_docker_backend_cannot_use_agent_metadata_to_bypass_awg31(
+        self,
+    ):
+        server = self.make_server(
+            name="Docker with forged agent metadata",
+            awg31_ready=False,
+        )
+
+        protocol = server.protocols.get(
+            protocol_type=(
+                ServerProtocol
+                .ProtocolType
+                .AWG2
+            )
+        )
+
+        metadata = dict(
+            protocol.runtime_metadata
+            or {}
+        )
+
+        metadata.update(
+            {
+                "backend": (
+                    Server
+                    .RuntimeBackend
+                    .AWG_AGENT
+                ),
+                "central_protocol_supported":
+                    True,
+                "awg2_metadata_ready": True,
+            }
+        )
+
+        protocol.runtime_metadata = metadata
+        protocol.save(
+            update_fields=[
+                "runtime_metadata",
+            ]
         )
 
         self.assertIsNone(

@@ -27,6 +27,38 @@ def _profile_is_selective(
     )
 
 
+def _protocol_runtime_ready(
+    protocol: ServerProtocol,
+    *,
+    server: Server,
+) -> bool:
+    metadata = (
+        protocol.runtime_metadata or {}
+    )
+
+    if (
+        server.runtime_backend
+        == Server.RuntimeBackend.AWG_AGENT
+    ):
+        return (
+            metadata.get(
+                "central_protocol_supported"
+            )
+            is True
+            and metadata.get(
+                "awg2_metadata_ready"
+            )
+            is True
+        )
+
+    return (
+        metadata.get(
+            "awg31_metadata_ready"
+        )
+        is True
+    )
+
+
 def _protocol_supports_mode(
     protocol: ServerProtocol,
     *,
@@ -138,11 +170,9 @@ def vpn_server_candidate_rows(
         if protocol.container_status != "running":
             continue
 
-        if (
-            metadata.get(
-                "awg31_metadata_ready"
-            )
-            is not True
+        if not _protocol_runtime_ready(
+            protocol,
+            server=server,
         ):
             continue
 
@@ -378,15 +408,22 @@ def vpn_server_mode_status(
         )
         return result
 
-    if (
-        metadata.get(
-            "awg31_metadata_ready"
-        )
-        is not True
+    if not _protocol_runtime_ready(
+        protocol,
+        server=server,
     ):
-        result["reason"] = (
-            "AWG 3.1 readiness не подтверждён"
-        )
+        if (
+            server.runtime_backend
+            == Server.RuntimeBackend.AWG_AGENT
+        ):
+            result["reason"] = (
+                "AWG agent readiness не подтверждён"
+            )
+        else:
+            result["reason"] = (
+                "AWG 3.1 readiness не подтверждён"
+            )
+
         return result
 
     if not metadata.get("subnet_ready"):
