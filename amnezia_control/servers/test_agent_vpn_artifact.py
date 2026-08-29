@@ -528,3 +528,355 @@ class AgentVPNArtifactTest(TestCase):
             .count(),
             0,
         )
+
+
+@override_settings(
+    CONFIG_ENCRYPTION_KEY=(
+        Fernet.generate_key().decode()
+    )
+)
+class AgentCreateRollbackTest(TestCase):
+
+    def setUp(self):
+        self.user = (
+            get_user_model()
+            .objects
+            .create_user(
+                "agent-create-rollback-admin",
+                password="test",
+                is_staff=True,
+            )
+        )
+
+        self.server = Server.objects.create(
+            name="agent-create-rollback",
+            host="127.0.0.1",
+            public_endpoint_host=(
+                "vpn.example.com"
+            ),
+            public_endpoint_port=51831,
+            runtime_backend=(
+                Server.RuntimeBackend
+                .AWG_AGENT
+            ),
+        )
+
+        self.protocol = (
+            ServerProtocol.objects.create(
+                server=self.server,
+                protocol_type=(
+                    ServerProtocol
+                    .ProtocolType
+                    .AWG2
+                ),
+                enabled=True,
+                container_status="running",
+            )
+        )
+
+        self.profile = (
+            ProtocolProfile.objects.create(
+                server_protocol=self.protocol,
+                name="full-create",
+                protocol_type=(
+                    ServerProtocol
+                    .ProtocolType
+                    .AWG2
+                ),
+                config_template=(
+                    "# routing-mode: full"
+                ),
+                status=(
+                    ProtocolProfile
+                    .ProfileStatus
+                    .ACTIVE
+                ),
+            )
+        )
+
+    def result(self) -> dict:
+        config = complete_config()
+
+        return {
+            "public_key":
+                "NEW_PUBLIC",
+
+            "address":
+                "10.78.0.50/32",
+
+            "conf":
+                config,
+
+            "vpn":
+                make_artifact(
+                    config
+                ),
+        }
+
+    @staticmethod
+    def fail_create_audit(
+        *args,
+        **kwargs,
+    ):
+        action = kwargs.get(
+            "action"
+        )
+
+        if (
+            action is None
+            and len(args) > 1
+        ):
+            action = args[1]
+
+        if action == "client.create":
+            raise RuntimeError(
+                "create audit failed"
+            )
+
+    def test_create_audit_failure_rolls_back_db_and_revokes_remote_peer(
+        self,
+    ):
+        client_name = (
+            "create-audit-failure"
+        )
+
+        class ObservingAdapter(
+            FakeAdapter
+        ):
+            client_exists_during_cleanup = (
+                None
+            )
+
+            def remove_peer(
+                adapter_self,
+                actor,
+                public_key,
+            ):
+                (
+                    adapter_self
+                    .client_exists_during_cleanup
+                ) = (
+                    VPNClient.objects
+                    .filter(
+                        name=client_name
+                    )
+                    .exists()
+                )
+
+                return super(
+                    ObservingAdapter,
+                    adapter_self,
+                ).remove_peer(
+                    actor,
+                    public_key,
+                )
+
+        fake = ObservingAdapter(
+            self.protocol,
+            self.result(),
+        )
+
+        with (
+            patch(
+                "vpn.services."
+                "AdapterFactory."
+                "get_for_server",
+                return_value=fake,
+            ),
+            patch(
+                "servers.agent_vpn_hooks."
+                "AdapterFactory.get_for_client",
+                return_value=fake,
+            ),
+            patch(
+                "vpn.services."
+                "AuditService.log",
+                side_effect=(
+                    self.fail_create_audit
+                ),
+            ),
+        ):
+            with self.assertRaisesRegex(
+                RuntimeError,
+                "create audit failed",
+            ):
+                (
+                    VPNClientService
+                    .create_client(
+                        server=self.server,
+                        name=client_name,
+                        protocol_type=(
+                            VPNClient
+                            .ProtocolType
+                            .AWG2
+                        ),
+                        actor=self.user,
+                        routing_mode="full",
+                    )
+                )
+
+        self.assertFalse(
+            VPNClient.objects.filter(
+                name=client_name
+            ).exists()
+        )
+
+        self.assertEqual(
+            fake.removed,
+            [
+                "NEW_PUBLIC",
+            ],
+        )
+
+        self.assertFalse(
+            fake
+            .client_exists_during_cleanup
+        )
+
+    def test_create_cleanup_failure_is_explicit_and_db_still_rolls_back(
+        self,
+    ):
+        client_name = (
+            "create-cleanup-failure"
+        )
+
+        class CleanupFailAdapter(
+            FakeAdapter
+        ):
+            def remove_peer(
+                adapter_self,
+                actor,
+                public_key,
+            ):
+                adapter_self.removed.append(
+                    public_key
+                )
+
+                raise RuntimeError(
+                    "cleanup failed"
+                )
+
+        fake = CleanupFailAdapter(
+            self.protocol,
+            self.result(),
+        )
+
+        with (
+            patch(
+                "vpn.services."
+                "AdapterFactory."
+                "get_for_server",
+                return_value=fake,
+            ),
+            patch(
+                "servers.agent_vpn_hooks."
+                "AdapterFactory.get_for_client",
+                return_value=fake,
+            ),
+            patch(
+                "vpn.services."
+                "AuditService.log",
+                side_effect=(
+                    self.fail_create_audit
+                ),
+            ),
+        ):
+            with self.assertRaisesRegex(
+                RuntimeError,
+                "remote AWG4 cleanup "
+                "was incomplete",
+            ):
+                (
+                    VPNClientService
+                    .create_client(
+                        server=self.server,
+                        name=client_name,
+                        protocol_type=(
+                            VPNClient
+                            .ProtocolType
+                            .AWG2
+                        ),
+                        actor=self.user,
+                        routing_mode="full",
+                    )
+                )
+
+        self.assertFalse(
+            VPNClient.objects.filter(
+                name=client_name
+            ).exists()
+        )
+
+        self.assertEqual(
+            fake.removed,
+            [
+                "NEW_PUBLIC",
+            ],
+        )
+
+    def test_create_success_keeps_peer_and_stores_vpn_artifact(
+        self,
+    ):
+        client_name = (
+            "create-success"
+        )
+
+        fake = FakeAdapter(
+            self.protocol,
+            self.result(),
+        )
+
+        with (
+            patch(
+                "vpn.services."
+                "AdapterFactory."
+                "get_for_server",
+                return_value=fake,
+            ),
+            patch(
+                "servers.agent_vpn_hooks."
+                "AdapterFactory.get_for_client",
+                return_value=fake,
+            ),
+        ):
+            client = (
+                VPNClientService
+                .create_client(
+                    server=self.server,
+                    name=client_name,
+                    protocol_type=(
+                        VPNClient
+                        .ProtocolType
+                        .AWG2
+                    ),
+                    actor=self.user,
+                    routing_mode="full",
+                )
+            )
+
+        client.refresh_from_db()
+
+        self.assertEqual(
+            client.runtime_peer_public_key,
+            "NEW_PUBLIC",
+        )
+
+        self.assertEqual(
+            client.runtime_address,
+            "10.78.0.50",
+        )
+
+        self.assertTrue(
+            VPNClientService
+            .latest_amneziavpn_config(
+                client
+            )
+            .startswith(
+                "vpn://"
+            )
+        )
+
+        self.assertEqual(
+            fake.removed,
+            [],
+        )

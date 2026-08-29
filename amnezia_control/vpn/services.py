@@ -1199,7 +1199,6 @@ class VPNClientService:
         }
 
     @staticmethod
-    @transaction.atomic
     def create_client(
         *,
         server,
@@ -1211,6 +1210,87 @@ class VPNClientService:
         traffic_limit_bytes=None,
         contact_email: str = "",
         device=None,
+    ):
+        cleanup_state: dict[str, str] = {}
+
+        try:
+            return (
+                VPNClientService
+                ._create_client_atomic(
+                    server=server,
+                    name=name,
+                    protocol_type=protocol_type,
+                    actor=actor,
+                    routing_mode=routing_mode,
+                    expires_at=expires_at,
+                    traffic_limit_bytes=(
+                        traffic_limit_bytes
+                    ),
+                    contact_email=contact_email,
+                    device=device,
+                    _cleanup_state=(
+                        cleanup_state
+                    ),
+                )
+            )
+
+        except Exception:
+            cleanup_public_key = str(
+                cleanup_state.get(
+                    "public_key"
+                )
+                or ""
+            ).strip()
+
+            cleanup_required = (
+                bool(cleanup_public_key)
+                and (
+                    server.runtime_backend
+                    == Server.RuntimeBackend.AWG_AGENT
+                )
+                and (
+                    protocol_type
+                    == VPNClient.ProtocolType.AWG2
+                )
+            )
+
+            if cleanup_required:
+                try:
+                    (
+                        AdapterFactory
+                        .get_for_server(
+                            server,
+                            protocol_type,
+                        )
+                        .remove_peer(
+                            actor,
+                            cleanup_public_key,
+                        )
+                    )
+
+                except Exception as cleanup_exc:
+                    raise RuntimeError(
+                        "VPN client creation failed "
+                        "and remote AWG4 cleanup "
+                        "was incomplete."
+                    ) from cleanup_exc
+
+            raise
+
+    @staticmethod
+    @transaction.atomic
+    def _create_client_atomic(
+        *,
+        server,
+        name: str,
+        protocol_type: str,
+        actor,
+        routing_mode: str | None = None,
+        expires_at=None,
+        traffic_limit_bytes=None,
+        contact_email: str = "",
+        device=None,
+        _cleanup_state: dict[str, str] | None = None,
     ):
         protocol = ServerProtocol.objects.filter(
             server=server,
@@ -1294,6 +1374,13 @@ class VPNClientService:
             device=device,
         )
         VPNClientService.reissue_config(client=client, actor=actor)
+
+        if _cleanup_state is not None:
+            _cleanup_state["public_key"] = str(
+                client.runtime_peer_public_key
+                or ""
+            ).strip()
+
         AuditService.log(actor, "client.create", "VPNClient", client.id, {"protocol_type": protocol_type})
         return client
 
