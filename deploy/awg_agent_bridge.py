@@ -34,6 +34,7 @@ AGENTS = {
     "awg4": {
         "socket": Path("/run/awg4-agent/agent.sock"),
         "config": Path("/etc/amnezia/amneziawg/awg4.conf"),
+        "endpoint_env": Path("/etc/awg4-agent.env"),
         "interface": "awg4",
     },
 }
@@ -190,6 +191,69 @@ def subnet_from_address(value: str) -> str:
         return ""
 
 
+def public_port_from_endpoint_env(
+    path: Path | None,
+) -> int | None:
+    """Return public UDP port from AWG_ENDPOINT, if configured."""
+
+    if path is None or not path.is_file():
+        return None
+
+    for raw_line in path.read_text(
+        encoding="utf-8"
+    ).splitlines():
+        line = raw_line.strip()
+
+        if (
+            not line
+            or line.startswith("#")
+            or not line.startswith("AWG_ENDPOINT=")
+        ):
+            continue
+
+        endpoint = line.split(
+            "=",
+            1,
+        )[1].strip()
+
+        if (
+            len(endpoint) >= 2
+            and endpoint[0] == endpoint[-1]
+            and endpoint[0] in {'"', "'"}
+        ):
+            endpoint = endpoint[1:-1].strip()
+
+        if endpoint.startswith("["):
+            marker = endpoint.rfind("]:")
+
+            if marker < 0:
+                return None
+
+            port_text = endpoint[
+                marker + 2:
+            ]
+        else:
+            if ":" not in endpoint:
+                return None
+
+            port_text = endpoint.rsplit(
+                ":",
+                1,
+            )[1]
+
+        try:
+            port = int(port_text)
+        except ValueError:
+            return None
+
+        if 1 <= port <= 65535:
+            return port
+
+        return None
+
+    return None
+
+
 def local_runtime_info(agent_name: str) -> dict[str, Any]:
     spec = AGENTS[agent_name]
     interface, peers = parse_config(spec["config"])
@@ -201,6 +265,13 @@ def local_runtime_info(agent_name: str) -> dict[str, Any]:
     except (TypeError, ValueError):
         listen_port = None
 
+    public_udp_port = (
+        public_port_from_endpoint_env(
+            spec.get("endpoint_env")
+        )
+        or listen_port
+    )
+
     return {
         "backend": "awg_agent",
         "agent": agent_name,
@@ -208,7 +279,7 @@ def local_runtime_info(agent_name: str) -> dict[str, Any]:
         "interface_up": bool(health.get("interface_up")),
         "config_path": str(spec["config"]),
         "listen_port": listen_port,
-        "udp_port": listen_port,
+        "udp_port": public_udp_port,
         "subnet": subnet_from_address(interface.get("Address", "")),
         "interface_addresses": [interface.get("Address", "")] if interface.get("Address") else [],
         "peer_count": len(peers),

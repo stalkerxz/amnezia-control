@@ -1,0 +1,193 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+INTERFACE="awg4"
+NETWORK="10.78.0.0/24"
+EXTERNAL_INTERFACE="ens3"
+FORWARD_CHAIN="AWG4-FORWARD"
+
+# Public client-facing UDP port intentionally differs
+# from the native AmneziaWG listen port.
+PUBLIC_UDP_PORT="51832"
+LISTEN_UDP_PORT="51831"
+
+
+front_door_up() {
+    iptables -t nat -C PREROUTING \
+        -i "$EXTERNAL_INTERFACE" \
+        -p udp \
+        --dport "$PUBLIC_UDP_PORT" \
+        -j REDIRECT \
+        --to-ports "$LISTEN_UDP_PORT" \
+        2>/dev/null \
+        || iptables -t nat -I PREROUTING 1 \
+            -i "$EXTERNAL_INTERFACE" \
+            -p udp \
+            --dport "$PUBLIC_UDP_PORT" \
+            -j REDIRECT \
+            --to-ports "$LISTEN_UDP_PORT"
+}
+
+
+front_door_down() {
+    iptables -t nat -D PREROUTING \
+        -i "$EXTERNAL_INTERFACE" \
+        -p udp \
+        --dport "$PUBLIC_UDP_PORT" \
+        -j REDIRECT \
+        --to-ports "$LISTEN_UDP_PORT" \
+        2>/dev/null \
+        || true
+}
+
+
+up() {
+    iptables -N "$FORWARD_CHAIN" \
+        2>/dev/null \
+        || true
+
+    iptables -F "$FORWARD_CHAIN"
+
+    iptables -A "$FORWARD_CHAIN" \
+        -m conntrack \
+        --ctstate INVALID \
+        -j DROP
+
+    iptables -A "$FORWARD_CHAIN" \
+        -i "$INTERFACE" \
+        -d 10.0.0.0/8 \
+        -j DROP
+
+    iptables -A "$FORWARD_CHAIN" \
+        -i "$INTERFACE" \
+        -d 100.64.0.0/10 \
+        -j DROP
+
+    iptables -A "$FORWARD_CHAIN" \
+        -i "$INTERFACE" \
+        -d 169.254.0.0/16 \
+        -j DROP
+
+    iptables -A "$FORWARD_CHAIN" \
+        -i "$INTERFACE" \
+        -d 172.16.0.0/12 \
+        -j DROP
+
+    iptables -A "$FORWARD_CHAIN" \
+        -i "$INTERFACE" \
+        -d 192.168.0.0/16 \
+        -j DROP
+
+    iptables -A "$FORWARD_CHAIN" \
+        -i "$INTERFACE" \
+        -d 224.0.0.0/4 \
+        -j DROP
+
+    iptables -A "$FORWARD_CHAIN" \
+        -i "$INTERFACE" \
+        -d 240.0.0.0/4 \
+        -j DROP
+
+    iptables -A "$FORWARD_CHAIN" \
+        -i "$INTERFACE" \
+        -o "$EXTERNAL_INTERFACE" \
+        -m conntrack \
+        --ctstate NEW,RELATED,ESTABLISHED \
+        -j ACCEPT
+
+    iptables -A "$FORWARD_CHAIN" \
+        -i "$EXTERNAL_INTERFACE" \
+        -o "$INTERFACE" \
+        -m conntrack \
+        --ctstate RELATED,ESTABLISHED \
+        -j ACCEPT
+
+    iptables -A "$FORWARD_CHAIN" \
+        -i "$INTERFACE" \
+        -j DROP
+
+    iptables -A "$FORWARD_CHAIN" \
+        -o "$INTERFACE" \
+        -j DROP
+
+    iptables -A "$FORWARD_CHAIN" \
+        -j RETURN
+
+    iptables -C DOCKER-USER \
+        -j "$FORWARD_CHAIN" \
+        2>/dev/null \
+        || iptables -I DOCKER-USER 1 \
+            -j "$FORWARD_CHAIN"
+
+    iptables -t nat -C POSTROUTING \
+        -s "$NETWORK" \
+        -o "$EXTERNAL_INTERFACE" \
+        -j MASQUERADE \
+        2>/dev/null \
+        || iptables -t nat -A POSTROUTING \
+            -s "$NETWORK" \
+            -o "$EXTERNAL_INTERFACE" \
+            -j MASQUERADE
+
+    iptables -C INPUT \
+        -i "$INTERFACE" \
+        -j DROP \
+        2>/dev/null \
+        || iptables -I INPUT 1 \
+            -i "$INTERFACE" \
+            -j DROP
+
+    front_door_up
+}
+
+
+down() {
+    front_door_down
+
+    iptables -D INPUT \
+        -i "$INTERFACE" \
+        -j DROP \
+        2>/dev/null \
+        || true
+
+    iptables -t nat -D POSTROUTING \
+        -s "$NETWORK" \
+        -o "$EXTERNAL_INTERFACE" \
+        -j MASQUERADE \
+        2>/dev/null \
+        || true
+
+    iptables -D DOCKER-USER \
+        -j "$FORWARD_CHAIN" \
+        2>/dev/null \
+        || true
+
+    iptables -F "$FORWARD_CHAIN" \
+        2>/dev/null \
+        || true
+
+    iptables -X "$FORWARD_CHAIN" \
+        2>/dev/null \
+        || true
+}
+
+
+case "${1:-}" in
+    up)
+        up
+        ;;
+    down)
+        down
+        ;;
+    restart)
+        down
+        up
+        ;;
+    *)
+        echo \
+            "Usage: $0 {up|down|restart}" \
+            >&2
+
+        exit 2
+        ;;
+esac
