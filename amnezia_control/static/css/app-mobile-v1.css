@@ -1,0 +1,332 @@
+/*
+ * VPN Control — Mobile Operator Shell V1
+ *
+ * Mobile-only presentation layer.
+ * Desktop shell remains owned by app-v4 / app-v4-shell.
+ */
+
+.mobile-bottom-nav {
+  display: none;
+}
+
+@media (max-width: 991.98px) {
+  body.app-shell .sidebar {
+    z-index: 1060;
+  }
+
+  body.app-shell .sidebar-overlay {
+    z-index: 1050;
+  }
+}
+
+@media (max-width: 767.98px) {
+  :root {
+    --mobile-nav-height: 64px;
+  }
+
+  html {
+    scroll-padding-bottom:
+      calc(
+        var(--mobile-nav-height)
+        + env(safe-area-inset-bottom)
+        + 12px
+      );
+  }
+
+  body.app-shell {
+    min-width: 320px;
+    overscroll-behavior-y: none;
+  }
+
+  body.app-shell .app-layout,
+  body.app-shell .app-main {
+    min-width: 0;
+    width: 100% !important;
+  }
+
+  body.app-shell .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 1020;
+
+    min-height:
+      calc(
+        54px
+        + env(safe-area-inset-top)
+      );
+
+    padding:
+      env(safe-area-inset-top)
+      12px
+      0
+      !important;
+
+    border-bottom-color:
+      rgba(126, 157, 205, .09)
+      !important;
+
+    background:
+      rgba(8, 14, 24, .93)
+      !important;
+
+    -webkit-backdrop-filter: blur(18px);
+    backdrop-filter: blur(18px);
+  }
+
+  body.app-shell .topbar-left {
+    min-width: 0;
+    gap: 9px;
+  }
+
+  body.app-shell .topbar-context {
+    min-width: 0;
+  }
+
+  body.app-shell .topbar-title {
+    max-width: calc(100vw - 96px);
+    overflow: hidden;
+
+    font-size: .88rem;
+    font-weight: 720;
+
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  body.app-shell .topbar-subtitle {
+    display: none;
+  }
+
+  body.app-shell .topbar-user {
+    display: none;
+  }
+
+  body.app-shell .sidebar-toggle {
+    width: 40px !important;
+    height: 40px !important;
+    flex: 0 0 40px !important;
+
+    border-radius: 12px !important;
+  }
+
+  body.app-shell .content {
+    width: 100%;
+    min-width: 0;
+
+    padding:
+      14px
+      12px
+      calc(
+        var(--mobile-nav-height)
+        + env(safe-area-inset-bottom)
+        + 22px
+      )
+      !important;
+  }
+
+  body.app-shell .app-alert {
+    margin-bottom: 10px;
+    border-radius: 12px;
+  }
+
+  .mobile-bottom-nav {
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 1035;
+
+    display: grid;
+    grid-template-columns:
+      repeat(5, minmax(0, 1fr));
+    align-items: end;
+
+    min-height:
+      calc(
+        var(--mobile-nav-height)
+        + env(safe-area-inset-bottom)
+      );
+
+    padding:
+      6px
+      max(8px, env(safe-area-inset-right))
+      calc(
+        6px
+        + env(safe-area-inset-bottom)
+      )
+      max(8px, env(safe-area-inset-left));
+
+    border-top:
+      1px solid rgba(126, 157, 205, .11);
+
+    background:
+      rgba(7, 13, 22, .95);
+
+    box-shadow:
+      0 -12px 34px rgba(0, 0, 0, .28);
+
+    -webkit-backdrop-filter: blur(20px);
+    backdrop-filter: blur(20px);
+  }
+
+  .mobile-nav-item {
+    position: relative;
+
+    display: flex;
+    min-width: 0;
+    min-height: 50px;
+    padding: 4px 2px;
+
+    flex-direction: column;
+    gap: 3px;
+    align-items: center;
+    justify-content: center;
+
+    border: 0;
+    border-radius: 12px;
+
+    background: transparent;
+
+    color: #687a91 !important;
+
+    font: inherit;
+    text-align: center;
+    text-decoration: none;
+
+    cursor: pointer;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .mobile-nav-item:hover,
+  .mobile-nav-item:focus-visible {
+    background: rgba(79, 124, 255, .07);
+    color: #a8bddd !important;
+  }
+
+  .mobile-nav-item:focus-visible {
+    outline:
+      2px solid rgba(91, 142, 255, .7);
+    outline-offset: 1px;
+  }
+
+  .mobile-nav-item.active {
+    color: #8eb7ff !important;
+  }
+
+  .mobile-nav-item.active::after {
+    position: absolute;
+    bottom: 0;
+
+    width: 18px;
+    height: 2px;
+
+    border-radius: 999px;
+
+    background: #669cff;
+
+    content: "";
+  }
+
+  .mobile-nav-icon {
+    display: grid;
+    width: 23px;
+    height: 23px;
+
+    place-items: center;
+
+    line-height: 0;
+  }
+
+  .mobile-nav-icon svg {
+    display: block;
+    width: 21px;
+    height: 21px;
+
+    stroke-width: 1.7;
+  }
+
+  .mobile-nav-label {
+    max-width: 100%;
+    overflow: hidden;
+
+    font-size: .58rem;
+    font-weight: 650;
+    line-height: 1.05;
+
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mobile-nav-create {
+    overflow: visible;
+  }
+
+  .mobile-nav-create .mobile-nav-icon {
+    width: 44px;
+    height: 44px;
+    margin-top: -16px;
+
+    border:
+      1px solid rgba(123, 164, 255, .45);
+    border-radius: 15px;
+
+    background:
+      linear-gradient(
+        145deg,
+        #5687ff,
+        #3f68e8
+      );
+
+    color: #fff;
+
+    box-shadow:
+      0 8px 24px rgba(63, 104, 232, .34);
+  }
+
+  .mobile-nav-create .mobile-nav-icon svg {
+    width: 23px;
+    height: 23px;
+    stroke-width: 2;
+  }
+
+  .mobile-nav-create .mobile-nav-label {
+    color: #91a8c9;
+  }
+
+  .mobile-nav-create.active::after {
+    display: none;
+  }
+
+  body.sidebar-open .mobile-bottom-nav {
+    opacity: .32;
+    pointer-events: none;
+  }
+
+  body.app-shell .sidebar {
+    padding-bottom:
+      env(safe-area-inset-bottom);
+  }
+}
+
+@media (max-width: 379.98px) {
+  .mobile-nav-label {
+    font-size: .54rem;
+  }
+
+  .mobile-nav-item {
+    padding-inline: 0;
+  }
+
+  .mobile-nav-create .mobile-nav-icon {
+    width: 42px;
+    height: 42px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mobile-bottom-nav,
+  .mobile-nav-item {
+    transition: none !important;
+  }
+}

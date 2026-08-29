@@ -3,6 +3,7 @@
   const toggle = document.getElementById('sidebarToggle');
   const sidebar = document.getElementById('appSidebar');
   const overlay = document.getElementById('sidebarOverlay');
+  const mobileMoreToggle = document.getElementById('mobileMoreToggle');
   const media = window.matchMedia('(max-width: 991.98px)');
   const storageKey = 'amnezia-control.sidebar-collapsed';
 
@@ -29,6 +30,10 @@
       ? body.classList.contains('sidebar-open')
       : !body.classList.contains('sidebar-collapsed');
     toggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+    mobileMoreToggle?.setAttribute(
+      'aria-expanded',
+      expanded ? 'true' : 'false',
+    );
   };
 
   const closeMobileSidebar = () => {
@@ -48,6 +53,13 @@
       body.classList.toggle('sidebar-collapsed');
       saveCollapsed(body.classList.contains('sidebar-collapsed'));
     }
+    updateA11yState();
+  });
+
+  mobileMoreToggle?.addEventListener('click', () => {
+    if (!media.matches) return;
+
+    body.classList.add('sidebar-open');
     updateA11yState();
   });
 
