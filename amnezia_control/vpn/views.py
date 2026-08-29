@@ -373,33 +373,106 @@ def clients_detail_view(request, pk: int):
     limits_form = VPNClientLimitsUpdateForm(client=client)
     revision = client.revisions.first()
     revision_count = client.revisions.count()
+
+    is_agent_awg2 = (
+        client.server.runtime_backend
+        == Server.RuntimeBackend.AWG_AGENT
+        and client.protocol_type
+        == VPNClient.ProtocolType.AWG2
+    )
+
+    has_amneziavpn_artifact = bool(
+        revision
+        and (
+            revision.amneziavpn_blob_encrypted
+            or ""
+        ).strip()
+    )
+
+    amneziavpn_artifact_missing = bool(
+        revision
+        and is_agent_awg2
+        and not has_amneziavpn_artifact
+    )
+
+    amneziavpn_download_available = bool(
+        revision
+        and not amneziavpn_artifact_missing
+    )
+
+    amneziavpn_download_extension = (
+        "vpn"
+        if has_amneziavpn_artifact
+        else "conf"
+    )
+
     qr_base64_amneziavpn = ""
     qr_base64_amneziawg = ""
     qr_unavailable_message = ""
 
-    def build_qr_for_target(target: str) -> str:
+    def build_qr_for_target(
+        target: str,
+    ) -> str:
         nonlocal qr_unavailable_message
 
         if not revision:
             return ""
 
-        try:
-            return VPNClientService.portal_qr_png_base64_for_target(
-                client,
-                target,
+        if (
+            target == "amneziavpn"
+            and amneziavpn_artifact_missing
+        ):
+            qr_unavailable_message = (
+                "Для AmneziaVPN 3.1 отсутствует "
+                "профиль vpn://. Переиздайте "
+                "конфигурацию клиента."
             )
+
+            return ""
+
+        try:
+            return (
+                VPNClientService
+                .portal_qr_png_base64_for_target(
+                    client,
+                    target,
+                )
+            )
+
+        except RuntimeError as exc:
+            if target == "amneziavpn":
+                qr_unavailable_message = str(
+                    exc
+                )
+
+            return ""
+
         except ValueError as exc:
-            if "Invalid version" not in str(exc):
+            if "Invalid version" not in str(
+                exc
+            ):
                 raise
 
             qr_unavailable_message = (
-                "QR-код недоступен: конфигурация слишком большая. "
-                "Скачайте файл .conf и импортируйте его в приложение."
+                "QR-код недоступен: "
+                "конфигурация слишком большая. "
+                "Скачайте файл и импортируйте "
+                "его в приложение."
             )
+
             return ""
 
-    qr_base64_amneziavpn = build_qr_for_target("amneziavpn")
-    qr_base64_amneziawg = build_qr_for_target("amneziawg")
+    qr_base64_amneziavpn = (
+        build_qr_for_target(
+            "amneziavpn"
+        )
+    )
+
+    qr_base64_amneziawg = (
+        build_qr_for_target(
+            "amneziawg"
+        )
+    )
 
     protocol = client.server.protocols.filter(protocol_type=client.protocol_type).first()
     missing_endpoint = False
@@ -445,9 +518,23 @@ def clients_detail_view(request, pk: int):
     elif client.traffic_sync_error:
         warning_items.append("Телеметрия трафика недоступна.")
     if not revision:
-        warning_items.append("Для клиента отсутствует выпущенная ревизия конфига.")
+        warning_items.append(
+            "Для клиента отсутствует "
+            "выпущенная ревизия конфига."
+        )
+
+    if amneziavpn_artifact_missing:
+        warning_items.append(
+            "Текущая ревизия создана до "
+            "поддержки AmneziaVPN 3.1. "
+            "Для получения файла .vpn "
+            "переиздайте конфигурацию."
+        )
+
     if qr_unavailable_message:
-        warning_items.append(qr_unavailable_message)
+        warning_items.append(
+            qr_unavailable_message
+        )
 
     recent_audit_logs = AuditLog.objects.select_related("actor").filter(entity_type="VPNClient", entity_id=str(client.id)).order_by("-created_at")[:5]
     latest_operator_action = recent_audit_logs[0] if recent_audit_logs else None
@@ -491,6 +578,13 @@ def clients_detail_view(request, pk: int):
             "revision_count": revision_count,
             "qr_base64_amneziavpn": qr_base64_amneziavpn,
             "qr_base64_amneziawg": qr_base64_amneziawg,
+            "qr_unavailable_message": qr_unavailable_message,
+            "amneziavpn_download_available": (
+                amneziavpn_download_available
+            ),
+            "amneziavpn_download_extension": (
+                amneziavpn_download_extension
+            ),
             "missing_endpoint": missing_endpoint,
             "missing_awg2_metadata": missing_awg2_metadata,
             "expires_display": timezone.localtime(client.expires_at).strftime("%d.%m.%Y %H:%M") if client.expires_at else "Не задано",
@@ -527,12 +621,46 @@ def clients_detail_view(request, pk: int):
 def client_qr_modal_view(request, pk: int):
     client = get_object_or_404(VPNClient, pk=pk)
     revision = client.revisions.first()
-    qr_base64_amneziavpn = (
-        VPNClientService.portal_qr_png_base64_for_target(client, "amneziavpn") if revision else ""
-    )
-    qr_base64_amneziawg = (
-        VPNClientService.portal_qr_png_base64_for_target(client, "amneziawg") if revision else ""
-    )
+    qr_base64_amneziavpn = ""
+    qr_base64_amneziawg = ""
+    qr_unavailable_message = ""
+
+    if revision:
+        try:
+            qr_base64_amneziavpn = (
+                VPNClientService
+                .portal_qr_png_base64_for_target(
+                    client,
+                    "amneziavpn",
+                )
+            )
+
+        except RuntimeError as exc:
+            qr_unavailable_message = str(
+                exc
+            )
+
+        except ValueError:
+            qr_unavailable_message = (
+                "QR-код AmneziaVPN "
+                "недоступен."
+            )
+
+        try:
+            qr_base64_amneziawg = (
+                VPNClientService
+                .portal_qr_png_base64_for_target(
+                    client,
+                    "amneziawg",
+                )
+            )
+
+        except (
+            RuntimeError,
+            ValueError,
+        ):
+            qr_base64_amneziawg = ""
+
     return render(
         request,
         "vpn/partials/client_qr_modal_body.html",
@@ -541,6 +669,9 @@ def client_qr_modal_view(request, pk: int):
             "revision": revision,
             "qr_base64_amneziavpn": qr_base64_amneziavpn,
             "qr_base64_amneziawg": qr_base64_amneziawg,
+            "qr_unavailable_message": (
+                qr_unavailable_message
+            ),
         },
     )
 
@@ -952,11 +1083,55 @@ def clients_bulk_action_view(request):
 
 @login_required
 @user_passes_test(_admin_required)
-def client_download_config_view(request, pk: int):
-    client = get_object_or_404(VPNClient, pk=pk)
-    config = VPNClientService.portal_export_config(client)
-    response = HttpResponse(config, content_type="text/plain; charset=utf-8")
-    response["Content-Disposition"] = f'attachment; filename="{client.name}-{client.protocol_type}-amneziavpn.conf"'
+def client_download_config_view(
+    request,
+    pk: int,
+):
+    client = get_object_or_404(
+        VPNClient,
+        pk=pk,
+    )
+
+    try:
+        config = (
+            VPNClientService
+            .portal_export_config_for_target(
+                client,
+                "amneziavpn",
+            )
+        )
+
+    except RuntimeError as exc:
+        messages.warning(
+            request,
+            str(exc),
+        )
+
+        return redirect(
+            "clients-detail",
+            pk=client.id,
+        )
+
+    extension = (
+        "vpn"
+        if config.startswith("vpn://")
+        else "conf"
+    )
+
+    response = HttpResponse(
+        config,
+        content_type=(
+            "text/plain; charset=utf-8"
+        ),
+    )
+
+    response["Content-Disposition"] = (
+        f'attachment; filename="'
+        f'{client.name}-'
+        f'{client.protocol_type}-'
+        f'amneziavpn.{extension}"'
+    )
+
     return response
 
 

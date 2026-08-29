@@ -11,7 +11,7 @@
       {% if qr_base64 %}
       <img src="data:image/png;base64,{{ qr_base64 }}" alt="QR" class="img-fluid img-thumbnail" style="max-width: 320px;">
       {% else %}
-      <div class="alert alert-secondary mb-0">Конфигурация ещё не выпущена оператором.</div>
+      <div class="alert alert-secondary mb-0">{{ qr_unavailable_message|default:"QR-код недоступен." }}</div>
       {% endif %}
     </div>
   </div>

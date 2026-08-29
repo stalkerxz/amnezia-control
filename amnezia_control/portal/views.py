@@ -234,11 +234,47 @@ def portal_download_config_view(request, token: str):
     if target not in PORTAL_TARGETS:
         target = PORTAL_TARGET_AMNEZIAWG
 
-    config = VPNClientService.portal_export_config_for_target(client, target)
-    response = HttpResponse(config, content_type="text/plain; charset=utf-8")
-    response["Content-Disposition"] = (
-        f'attachment; filename="{client.name}-{client.protocol_type}-{PORTAL_TARGETS[target]["suffix"]}.conf"'
+    try:
+        config = (
+            VPNClientService
+            .portal_export_config_for_target(
+                client,
+                target,
+            )
+        )
+
+    except RuntimeError as exc:
+        messages.warning(
+            request,
+            str(exc),
+        )
+
+        return redirect(
+            "portal-home",
+            token=token,
+        )
+
+    extension = (
+        "vpn"
+        if config.startswith("vpn://")
+        else "conf"
     )
+
+    response = HttpResponse(
+        config,
+        content_type=(
+            "text/plain; charset=utf-8"
+        ),
+    )
+
+    response["Content-Disposition"] = (
+        f'attachment; filename="'
+        f'{client.name}-'
+        f'{client.protocol_type}-'
+        f'{PORTAL_TARGETS[target]["suffix"]}.'
+        f'{extension}"'
+    )
+
     return response
 
 
@@ -252,7 +288,38 @@ def portal_qr_view(request, token: str):
     target = request.GET.get("target", PORTAL_TARGET_AMNEZIAWG).strip().lower()
     if target not in PORTAL_TARGETS:
         target = PORTAL_TARGET_AMNEZIAWG
-    qr_base64 = VPNClientService.portal_qr_png_base64_for_target(client, target) if client.revisions.exists() else ""
+    qr_base64 = ""
+    qr_unavailable_message = ""
+
+    if not client.revisions.exists():
+        qr_unavailable_message = (
+            "Конфигурация ещё не выпущена "
+            "оператором."
+        )
+
+    else:
+        try:
+            qr_base64 = (
+                VPNClientService
+                .portal_qr_png_base64_for_target(
+                    client,
+                    target,
+                )
+            )
+
+        except RuntimeError as exc:
+            qr_unavailable_message = str(
+                exc
+            )
+
+        except ValueError:
+            qr_unavailable_message = (
+                "QR-код для этой "
+                "конфигурации недоступен. "
+                "Скачайте файл и "
+                "импортируйте его вручную."
+            )
+
     return render(
         request,
         "portal/qr.html",
@@ -260,9 +327,16 @@ def portal_qr_view(request, token: str):
             "token": token,
             "client": client,
             "qr_base64": qr_base64,
+            "qr_unavailable_message": (
+                qr_unavailable_message
+            ),
             "access": access,
             "target": target,
-            "target_label": PORTAL_TARGETS[target]["label"],
+            "target_label": (
+                PORTAL_TARGETS[target][
+                    "label"
+                ]
+            ),
         },
     )
 

@@ -1721,50 +1721,150 @@ class VPNClientAdminExportParityTest(TestCase):
         legacy_portal_qr_mock.assert_not_called()
         legacy_qr_mock.assert_not_called()
 
-    def test_admin_download_uses_portal_export_config(self):
+    def test_admin_download_uses_target_specific_amneziavpn_export(self):
         from unittest.mock import patch
 
-        with patch("vpn.views.VPNClientService.portal_export_config", return_value="portal-export") as portal_export_mock:
-            with patch("vpn.views.VPNClientService.latest_config") as latest_config_mock:
-                response = self.client.get(f"/clients/{self.vpn_client.id}/download/")
+        with patch(
+            "vpn.views.VPNClientService."
+            "portal_export_config_for_target",
+            return_value="vpn://portal-export",
+        ) as export_mock:
+            response = self.client.get(
+                f"/clients/"
+                f"{self.vpn_client.id}/"
+                "download/"
+            )
 
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "portal-export")
-        portal_export_mock.assert_called_once_with(self.vpn_client)
-        latest_config_mock.assert_not_called()
+        self.assertEqual(
+            response.status_code,
+            200,
+        )
+
+        self.assertContains(
+            response,
+            "vpn://portal-export",
+        )
+
+        self.assertIn(
+            "amneziavpn.vpn",
+            response[
+                "Content-Disposition"
+            ],
+        )
+
+        export_mock.assert_called_once_with(
+            self.vpn_client,
+            "amneziavpn",
+        )
 
     def test_admin_and_portal_export_payloads_match(self):
         from unittest.mock import patch
 
-        portal_access, token = PortalAccessService.issue_for_client(self.vpn_client)
+        portal_access, token = (
+            PortalAccessService
+            .issue_for_client(
+                self.vpn_client
+            )
+        )
 
-        with patch("vpn.views.VPNClientService.portal_export_config", return_value="shared-export"):
-            admin_response = self.client.get(f"/clients/{self.vpn_client.id}/download/")
+        with patch(
+            "vpn.views.VPNClientService."
+            "portal_export_config_for_target",
+            return_value="vpn://shared-export",
+        ):
+            admin_response = self.client.get(
+                f"/clients/"
+                f"{self.vpn_client.id}/"
+                "download/"
+            )
 
-        with patch("portal.views.VPNClientService.portal_export_config_for_target", return_value="shared-export"):
-            portal_response = self.client.get(f"/portal/{token}/config/")
+        with patch(
+            "portal.views.VPNClientService."
+            "portal_export_config_for_target",
+            return_value="vpn://shared-export",
+        ):
+            portal_response = self.client.get(
+                f"/portal/{token}/config/",
+                {
+                    "target":
+                        "amneziavpn",
+                },
+            )
 
-        self.assertEqual(admin_response.status_code, 200)
-        self.assertEqual(portal_response.status_code, 200)
-        self.assertEqual(admin_response.content, portal_response.content)
-        self.assertEqual(portal_access.client_id, self.vpn_client.id)
+        self.assertEqual(
+            admin_response.status_code,
+            200,
+        )
+
+        self.assertEqual(
+            portal_response.status_code,
+            200,
+        )
+
+        self.assertEqual(
+            admin_response.content,
+            portal_response.content,
+        )
+
+        self.assertIn(
+            "amneziavpn.vpn",
+            admin_response[
+                "Content-Disposition"
+            ],
+        )
+
+        self.assertIn(
+            "amneziavpn.vpn",
+            portal_response[
+                "Content-Disposition"
+            ],
+        )
+
+        self.assertEqual(
+            portal_access.client_id,
+            self.vpn_client.id,
+        )
 
     def test_target_specific_export_uses_different_generators(self):
         from unittest.mock import patch
 
-        with patch("vpn.services.VPNClientService.portal_export_config", return_value="wg-config") as wg_mock:
-            with patch("vpn.services.VPNClientService.latest_config", return_value="vpn-config") as vpn_mock:
+        with patch(
+            "vpn.services.VPNClientService."
+            "portal_export_config",
+            return_value="wg-config",
+        ) as wg_mock:
+            with patch(
+                "vpn.services.VPNClientService."
+                "latest_amneziavpn_config",
+                return_value=(
+                    "vpn://vpn-config"
+                ),
+            ) as vpn_mock:
                 self.assertEqual(
-                    VPNClientService.portal_export_config_for_target(self.vpn_client, "amneziawg"),
+                    VPNClientService
+                    .portal_export_config_for_target(
+                        self.vpn_client,
+                        "amneziawg",
+                    ),
                     "wg-config",
                 )
+
                 self.assertEqual(
-                    VPNClientService.portal_export_config_for_target(self.vpn_client, "amneziavpn"),
-                    "vpn-config",
+                    VPNClientService
+                    .portal_export_config_for_target(
+                        self.vpn_client,
+                        "amneziavpn",
+                    ),
+                    "vpn://vpn-config",
                 )
 
-        wg_mock.assert_called_once_with(self.vpn_client)
-        vpn_mock.assert_called_once_with(self.vpn_client)
+        wg_mock.assert_called_once_with(
+            self.vpn_client
+        )
+
+        vpn_mock.assert_called_once_with(
+            self.vpn_client
+        )
 
 
 @override_settings(CONFIG_ENCRYPTION_KEY=Fernet.generate_key().decode())
