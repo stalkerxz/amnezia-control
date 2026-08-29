@@ -1144,17 +1144,45 @@ class VPNClientService:
         return "\n".join(lines)
 
     @staticmethod
-    def _store_revision(client: VPNClient, config: str):
-        hash_value = hashlib.sha256(config.encode()).hexdigest()
-        next_rev = (client.revisions.first().revision_number + 1) if client.revisions.exists() else 1
-        encrypted = ConfigCryptoService.encrypt(config)
+    def _store_revision(
+        client: VPNClient,
+        config: str,
+        *,
+        amneziavpn_config: str = "",
+    ):
+        hash_value = hashlib.sha256(
+            config.encode()
+        ).hexdigest()
+
+        next_rev = (
+            client.revisions.first().revision_number + 1
+            if client.revisions.exists()
+            else 1
+        )
+
+        encrypted = ConfigCryptoService.encrypt(
+            config
+        )
+
+        amneziavpn_encrypted = (
+            ConfigCryptoService.encrypt(
+                amneziavpn_config
+            )
+            if amneziavpn_config
+            else ""
+        )
+
         ClientConfigRevision.objects.create(
             client=client,
             revision_number=next_rev,
             protocol_type=client.protocol_type,
             config_blob_encrypted=encrypted,
+            amneziavpn_blob_encrypted=(
+                amneziavpn_encrypted
+            ),
             config_hash=hash_value,
         )
+
         return next_rev
 
     @staticmethod
@@ -1389,7 +1417,58 @@ class VPNClientService:
     @staticmethod
     def latest_config(client: VPNClient) -> str:
         rev = client.revisions.first()
-        return ConfigCryptoService.decrypt(rev.config_blob_encrypted)
+
+        return ConfigCryptoService.decrypt(
+            rev.config_blob_encrypted
+        )
+
+    @staticmethod
+    def latest_amneziavpn_config(
+        client: VPNClient,
+    ) -> str:
+        rev = client.revisions.first()
+
+        if not rev:
+            raise RuntimeError(
+                "Client has no configuration revision."
+            )
+
+        encrypted = (
+            rev.amneziavpn_blob_encrypted
+            or ""
+        ).strip()
+
+        if encrypted:
+            payload = ConfigCryptoService.decrypt(
+                encrypted
+            )
+
+            if not payload.startswith(
+                "vpn://"
+            ):
+                raise RuntimeError(
+                    "Stored AmneziaVPN artifact "
+                    "has invalid format."
+                )
+
+            return payload
+
+        if (
+            client.server.runtime_backend
+            == Server.RuntimeBackend.AWG_AGENT
+            and client.protocol_type
+            == VPNClient.ProtocolType.AWG2
+        ):
+            raise RuntimeError(
+                "Для этой ревизии отсутствует "
+                "профиль AmneziaVPN 3.1. "
+                "Переиздайте конфигурацию."
+            )
+
+        # Preserve historical Docker behavior.
+        return VPNClientService.latest_config(
+            client
+        )
 
     @staticmethod
     def _qr_png_bytes_from_payload(payload: str) -> bytes:
@@ -1419,10 +1498,24 @@ class VPNClientService:
         return VPNClientService._qr_png_base64_from_payload(VPNClientService.portal_export_config(client))
 
     @staticmethod
-    def portal_export_config_for_target(client: VPNClient, target: str) -> str:
+    def portal_export_config_for_target(
+        client: VPNClient,
+        target: str,
+    ) -> str:
         if target == "amneziavpn":
-            return VPNClientService.latest_config(client)
-        return VPNClientService.portal_export_config(client)
+            return (
+                VPNClientService
+                .latest_amneziavpn_config(
+                    client
+                )
+            )
+
+        return (
+            VPNClientService
+            .portal_export_config(
+                client
+            )
+        )
 
     @staticmethod
     def qr_payload_supported(payload: str) -> bool:

@@ -110,6 +110,10 @@ class ClientConfigRevision(models.Model):
     revision_number = models.PositiveIntegerField()
     protocol_type = models.CharField(max_length=16, choices=VPNClient.ProtocolType.choices)
     config_blob_encrypted = models.TextField()
+    amneziavpn_blob_encrypted = models.TextField(
+        blank=True,
+        default="",
+    )
     config_hash = models.CharField(max_length=128)
     created_at = models.DateTimeField(auto_now_add=True)
 

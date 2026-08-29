@@ -157,7 +157,10 @@ class RemoteAWG2AgentAdapter:
             client_id=str(uuid.uuid4()),
             client_name="central-awg2",
             mode="full",
-            allowed_ips=["0.0.0.0/0"],
+            allowed_ips=[
+                "0.0.0.0/0",
+                "::/0",
+            ],
         )
         sections = _parse_config_sections(result.get("conf", ""))
         interface = sections.get("Interface", {})
