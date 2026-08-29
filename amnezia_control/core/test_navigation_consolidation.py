@@ -25,7 +25,7 @@ class OperatorNavigationConsolidationTest(
         )
 
     @staticmethod
-    def _primary_navigation(
+    def _sidebar(
         response,
     ):
         html = response.content.decode(
@@ -33,11 +33,11 @@ class OperatorNavigationConsolidationTest(
         )
 
         start_marker = (
-            '<nav class="nav flex-column" '
-            'aria-label="Разделы приложения">'
+            '<aside class="sidebar" '
+            'id="appSidebar"'
         )
 
-        end_marker = "</nav>"
+        end_marker = "</aside>"
 
         start = html.index(
             start_marker
@@ -52,36 +52,56 @@ class OperatorNavigationConsolidationTest(
             start:end
         ]
 
-    @staticmethod
-    def _technical_navigation(
+    @classmethod
+    def _primary_navigation(
+        cls,
         response,
     ):
-        html = response.content.decode(
-            "utf-8"
+        sidebar = cls._sidebar(
+            response
+        )
+
+        technical_start = (
+            '<details class="sidebar-system"'
+        )
+
+        end = sidebar.index(
+            technical_start
+        )
+
+        return sidebar[:end]
+
+    @classmethod
+    def _technical_navigation(
+        cls,
+        response,
+    ):
+        sidebar = cls._sidebar(
+            response
         )
 
         start_marker = (
             '<nav class="nav flex-column '
-            'sidebar-nav-aux" '
+            'sidebar-system-menu" '
             'aria-label="Технические разделы">'
         )
 
         end_marker = "</nav>"
 
-        start = html.index(
+        start = sidebar.index(
             start_marker
         )
 
-        end = html.index(
+        end = sidebar.index(
             end_marker,
             start,
         )
 
-        return html[
+        return sidebar[
             start:end
         ]
 
-    def test_primary_navigation_uses_accounts_only(
+    def test_primary_navigation_uses_customer_workspace(
         self,
     ):
         response = self.client.get(
@@ -102,14 +122,13 @@ class OperatorNavigationConsolidationTest(
         )
 
         self.assertIn(
-            ">Аккаунты<",
-            primary.replace(
-                "\n",
-                "",
-            ).replace(
-                " ",
-                "",
-            ),
+            'href="/customers/"',
+            primary,
+        )
+
+        self.assertIn(
+            "Все клиенты",
+            primary,
         )
 
         self.assertNotIn(
@@ -158,7 +177,12 @@ class OperatorNavigationConsolidationTest(
         )
 
         self.assertIn(
-            "Legacy · XHTTP CDN",
+            "Legacy · XHTTP",
+            technical,
+        )
+
+        self.assertIn(
+            'href="/admin/"',
             technical,
         )
 
@@ -183,10 +207,7 @@ class OperatorNavigationConsolidationTest(
 
         self.assertContains(
             response,
-            (
-                "Технический резервный "
-                "интерфейс VPN-конфигураций"
-            ),
+            "Технический резервный интерфейс",
         )
 
     def test_legacy_xhttp_url_remains_available(
@@ -205,13 +226,10 @@ class OperatorNavigationConsolidationTest(
 
         self.assertContains(
             response,
-            "Legacy · XHTTP CDN",
+            "Legacy · XHTTP",
         )
 
         self.assertContains(
             response,
-            (
-                "Технический резервный "
-                "интерфейс XHTTP"
-            ),
+            "Технический резервный интерфейс",
         )
