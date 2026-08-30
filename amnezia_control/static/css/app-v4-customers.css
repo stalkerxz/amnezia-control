@@ -282,3 +282,242 @@
   .v4-filter-details > summary { width: 100%; justify-content: center; }
   .v4-filter-popover { right: auto; left: 0; width: 100%; }
 }
+
+/* Mobile customer cards V1 */
+@media (max-width: 767.98px) {
+  .v4-customer-table-wrap {
+    overflow: visible;
+  }
+
+  .v4-customer-table {
+    display: block;
+
+    width: 100%;
+    min-width: 0;
+
+    table-layout: auto;
+  }
+
+  .v4-customer-table thead {
+    display: none;
+  }
+
+  .v4-customer-table tbody {
+    display: grid;
+
+    gap: 8px;
+    padding: 8px;
+  }
+
+  .v4-customer-table tbody tr.v4-customer-row {
+    display: grid;
+
+    grid-template-columns:
+      minmax(0, 1fr)
+      auto;
+
+    grid-template-areas:
+      "identity state"
+      "devices connections"
+      "access actions";
+
+    gap: 10px 12px;
+
+    margin: 0;
+    padding: 12px;
+
+    border:
+      1px solid
+      rgba(121, 149, 191, .11);
+
+    border-radius: 12px;
+
+    background:
+      linear-gradient(
+        155deg,
+        rgba(17, 27, 45, .94),
+        rgba(9, 16, 28, .94)
+      );
+
+    box-shadow:
+      inset 0 1px 0
+      rgba(255, 255, 255, .018);
+  }
+
+  .v4-customer-table tbody tr.v4-customer-row:hover {
+    background:
+      linear-gradient(
+        155deg,
+        rgba(20, 32, 53, .96),
+        rgba(10, 18, 31, .95)
+      )
+      !important;
+  }
+
+  .v4-customer-table tbody tr.v4-customer-row.is-muted {
+    opacity: .78;
+  }
+
+  .v4-customer-table tbody td {
+    display: block;
+
+    min-width: 0;
+
+    padding: 0 !important;
+
+    border: 0 !important;
+  }
+
+  .v4-customer-table tbody td:nth-child(1) {
+    grid-area: identity;
+  }
+
+  .v4-customer-table tbody td:nth-child(2) {
+    grid-area: state;
+
+    align-self: start;
+    justify-self: end;
+  }
+
+  .v4-customer-table tbody td:nth-child(3) {
+    grid-area: devices;
+  }
+
+  .v4-customer-table tbody td:nth-child(4) {
+    grid-area: connections;
+  }
+
+  .v4-customer-table tbody td:nth-child(5) {
+    grid-area: access;
+  }
+
+  .v4-customer-table tbody td:nth-child(6) {
+    grid-area: actions;
+
+    align-self: end;
+    justify-self: end;
+  }
+
+  .v4-customer-table tbody td:nth-child(3),
+  .v4-customer-table tbody td:nth-child(4),
+  .v4-customer-table tbody td:nth-child(5) {
+    padding: 8px 9px !important;
+
+    border:
+      1px solid
+      rgba(121, 149, 191, .075)
+      !important;
+
+    border-radius: 9px;
+
+    background:
+      rgba(63, 87, 124, .035);
+  }
+
+  .v4-customer-table tbody td:nth-child(3)::before,
+  .v4-customer-table tbody td:nth-child(4)::before,
+  .v4-customer-table tbody td:nth-child(5)::before {
+    display: block;
+
+    margin-bottom: 4px;
+
+    color: #53637a;
+
+    font-size: .49rem;
+    font-weight: 720;
+
+    letter-spacing: .075em;
+    line-height: 1.2;
+
+    text-transform: uppercase;
+  }
+
+  .v4-customer-table tbody td:nth-child(3)::before {
+    content: "Устройства";
+  }
+
+  .v4-customer-table tbody td:nth-child(4)::before {
+    content: "Подключения";
+  }
+
+  .v4-customer-table tbody td:nth-child(5)::before {
+    content: "Доступ";
+  }
+
+  .v4-customer-identity {
+    width: 100%;
+  }
+
+  .v4-customer-name-wrap {
+    overflow: hidden;
+  }
+
+  .v4-customer-name {
+    font-size: .78rem;
+  }
+
+  .v4-customer-email {
+    max-width: 100%;
+  }
+
+  .v4-state-cell {
+    align-items: flex-end;
+  }
+
+  .v4-state-cell small {
+    text-align: right;
+  }
+
+  .v4-number-cell strong {
+    font-size: .9rem;
+  }
+
+  .v4-access-cell strong {
+    font-size: .72rem;
+  }
+
+  .v4-more-button {
+    border-color:
+      rgba(113, 146, 199, .10);
+
+    background:
+      rgba(66, 91, 130, .065);
+  }
+
+  .v4-customer-pagination {
+    padding:
+      10px
+      12px;
+  }
+}
+
+
+@media (max-width: 379.98px) {
+  .v4-customer-table tbody tr.v4-customer-row {
+    grid-template-columns:
+      minmax(0, 1fr)
+      auto;
+
+    grid-template-areas:
+      "identity actions"
+      "state state"
+      "devices connections"
+      "access access";
+  }
+
+  .v4-customer-table tbody td:nth-child(2) {
+    justify-self: start;
+  }
+
+  .v4-state-cell {
+    align-items: flex-start;
+  }
+
+  .v4-state-cell small {
+    text-align: left;
+  }
+
+  .v4-customer-table tbody td:nth-child(6) {
+    align-self: start;
+  }
+}
