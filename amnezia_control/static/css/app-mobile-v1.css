@@ -9,13 +9,63 @@
   display: none;
 }
 
+body.app-shell .sidebar-overlay {
+  display: none;
+}
+
 @media (max-width: 991.98px) {
+  body.app-shell .app-main {
+    min-width: 0;
+    width: 100% !important;
+  }
+
   body.app-shell .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
     z-index: 1060;
+
+    width: min(292px, 86vw) !important;
+    max-width: 86vw;
+    height: 100vh;
+    height: 100dvh;
+    flex-basis: min(292px, 86vw) !important;
+
+    transform: translateX(-102%);
+    transition: transform .2s ease;
+  }
+
+  body.sidebar-open {
+    overflow: hidden;
+  }
+
+  body.sidebar-open .sidebar {
+    transform: translateX(0);
   }
 
   body.app-shell .sidebar-overlay {
+    position: fixed;
+    inset: 0;
     z-index: 1050;
+
+    display: block;
+    visibility: hidden;
+
+    padding: 0;
+    border: 0;
+
+    background: rgba(2, 8, 16, .62);
+
+    opacity: 0;
+
+    transition:
+      opacity .18s ease,
+      visibility .18s ease;
+  }
+
+  body.sidebar-open .sidebar-overlay {
+    visibility: visible;
+    opacity: 1;
   }
 }
 
