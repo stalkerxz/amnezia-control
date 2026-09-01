@@ -184,6 +184,42 @@ def portal_home_view(request, token: str):
         return error_response
 
     client = access.client
+
+    revision = client.revisions.first()
+
+    amneziavpn_download_available = False
+    amneziavpn_unavailable_message = ""
+
+    if revision:
+        try:
+            (
+                VPNClientService
+                .latest_amneziavpn_config(
+                    client
+                )
+            )
+
+        except RuntimeError as exc:
+            amneziavpn_unavailable_message = (
+                str(exc)
+            )
+
+        except Exception:
+            amneziavpn_unavailable_message = (
+                "Профиль AmneziaVPN .vpn "
+                "временно недоступен. "
+                "Обратитесь к оператору."
+            )
+
+        else:
+            amneziavpn_download_available = True
+
+    else:
+        amneziavpn_unavailable_message = (
+            "Конфигурация ещё не выпущена "
+            "оператором."
+        )
+
     limit_state = VPNClientService.get_limit_state(client)
     blocked = client.status != VPNClient.Status.ACTIVE or limit_state != VPNClient.LimitState.ACTIVE
     open_renewal_request = RenewalRequestService.get_open_for_client(client=client)
@@ -203,6 +239,15 @@ def portal_home_view(request, token: str):
             "token": token,
             "access": access,
             "client": client,
+            "config_revision_available": bool(
+                revision
+            ),
+            "amneziavpn_download_available": (
+                amneziavpn_download_available
+            ),
+            "amneziavpn_unavailable_message": (
+                amneziavpn_unavailable_message
+            ),
             "limit_state": limit_state,
             "blocked": blocked,
             "traffic_used_display": _fmt_bytes(client.traffic_used_bytes),
@@ -256,7 +301,7 @@ def portal_download_config_view(request, token: str):
 
     extension = (
         "vpn"
-        if config.startswith("vpn://")
+        if target == PORTAL_TARGET_AMNEZIAVPN
         else "conf"
     )
 

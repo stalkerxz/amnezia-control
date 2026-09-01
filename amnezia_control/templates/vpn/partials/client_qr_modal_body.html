@@ -1,29 +1,54 @@
 <div class="d-flex justify-content-between align-items-start gap-2 mb-3">
   <div>
-    <h5 class="modal-title mb-1">QR для {{ client.name }}</h5>
+    <h5 class="modal-title mb-1">QR-коды для {{ client.name }}</h5>
     <div class="text-secondary small">Клиент #{{ client.id }}</div>
   </div>
 </div>
-{% if revision and qr_base64_amneziavpn %}
-  <div class="small text-secondary mb-2">По умолчанию выбран рекомендуемый QR для AmneziaVPN. QR для AmneziaWG оставлен как альтернативный формат.</div>
+
+{% if revision %}
+  {% if qr_base64_amneziavpn and qr_base64_amneziawg %}
+  <div class="small text-secondary mb-2">Выберите приложение, в которое импортируете подключение.</div>
+
   <ul class="nav nav-pills mb-3" id="clientQrModalTabs" role="tablist">
     <li class="nav-item" role="presentation">
-      <button class="nav-link active" id="client-qr-modal-amneziavpn-tab" data-bs-toggle="pill" data-bs-target="#client-qr-modal-amneziavpn" type="button" role="tab" aria-controls="client-qr-modal-amneziavpn" aria-selected="true">QR для AmneziaVPN <span class="badge bg-success ms-1">рекомендуется</span></button>
+      <button class="nav-link active" id="client-qr-modal-amneziavpn-tab" data-bs-toggle="pill" data-bs-target="#client-qr-modal-amneziavpn" type="button" role="tab" aria-controls="client-qr-modal-amneziavpn" aria-selected="true">AmneziaVPN .vpn</button>
     </li>
     <li class="nav-item" role="presentation">
-      <button class="nav-link" id="client-qr-modal-amneziawg-tab" data-bs-toggle="pill" data-bs-target="#client-qr-modal-amneziawg" type="button" role="tab" aria-controls="client-qr-modal-amneziawg" aria-selected="false">QR для AmneziaWG <span class="badge bg-secondary ms-1">альтернатива</span></button>
+      <button class="nav-link" id="client-qr-modal-amneziawg-tab" data-bs-toggle="pill" data-bs-target="#client-qr-modal-amneziawg" type="button" role="tab" aria-controls="client-qr-modal-amneziawg" aria-selected="false">AmneziaWG .conf</button>
     </li>
   </ul>
+
   <div class="tab-content" id="clientQrModalTabsContent">
     <div class="tab-pane fade show active text-center" id="client-qr-modal-amneziavpn" role="tabpanel" aria-labelledby="client-qr-modal-amneziavpn-tab" tabindex="0">
-      <div class="small fw-semibold mb-2">QR для AmneziaVPN — рекомендуется/default</div>
-      <img src="data:image/png;base64,{{ qr_base64_amneziavpn }}" alt="QR для AmneziaVPN {{ client.name }}" class="img-thumbnail" style="max-width: 320px;">
+      <div class="small fw-semibold mb-2">QR для AmneziaVPN · vpn://</div>
+      <img src="data:image/png;base64,{{ qr_base64_amneziavpn }}" alt="QR для AmneziaVPN {{ client.name }}" class="img-thumbnail" style="max-width:320px;">
     </div>
+
     <div class="tab-pane fade text-center" id="client-qr-modal-amneziawg" role="tabpanel" aria-labelledby="client-qr-modal-amneziawg-tab" tabindex="0">
-      <div class="small fw-semibold mb-2">QR для AmneziaWG — альтернативный формат</div>
-      <img src="data:image/png;base64,{{ qr_base64_amneziawg }}" alt="QR для AmneziaWG {{ client.name }}" class="img-thumbnail" style="max-width: 320px;">
+      <div class="small fw-semibold mb-2">QR для AmneziaWG · .conf</div>
+      <img src="data:image/png;base64,{{ qr_base64_amneziawg }}" alt="QR для AmneziaWG {{ client.name }}" class="img-thumbnail" style="max-width:320px;">
     </div>
   </div>
+
+  {% elif qr_base64_amneziavpn %}
+  <div class="text-center">
+    <div class="small fw-semibold mb-2">AmneziaVPN .vpn · vpn://</div>
+    <img src="data:image/png;base64,{{ qr_base64_amneziavpn }}" alt="QR для AmneziaVPN {{ client.name }}" class="img-thumbnail" style="max-width:320px;">
+  </div>
+
+  {% elif qr_base64_amneziawg %}
+  <div class="text-center">
+    <div class="small fw-semibold mb-2">AmneziaWG .conf</div>
+    <img src="data:image/png;base64,{{ qr_base64_amneziawg }}" alt="QR для AmneziaWG {{ client.name }}" class="img-thumbnail" style="max-width:320px;">
+  </div>
+
+  {% if qr_unavailable_message %}
+  <div class="small text-secondary mt-3">AmneziaVPN: {{ qr_unavailable_message }}</div>
+  {% endif %}
+
+  {% else %}
+  <div class="empty-state mb-0">QR-коды для текущей конфигурации недоступны.</div>
+  {% endif %}
 {% else %}
-  <div class="empty-state mb-0">Конфиг ещё не выпущен. Сначала выполните «Переиздать конфиг».</div>
+  <div class="empty-state mb-0">Конфигурация ещё не выпущена. Сначала выполните «Переиздать конфиг».</div>
 {% endif %}

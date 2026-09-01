@@ -1548,13 +1548,14 @@ class VPNClientService:
         ):
             raise RuntimeError(
                 "Для этой ревизии отсутствует "
-                "профиль AmneziaVPN 3.1. "
+                "профиль AmneziaVPN .vpn. "
                 "Переиздайте конфигурацию."
             )
 
-        # Preserve historical Docker behavior.
-        return VPNClientService.latest_config(
-            client
+        raise RuntimeError(
+            "Для этой ревизии отсутствует "
+            "профиль AmneziaVPN .vpn. "
+            "Используйте AmneziaWG .conf."
         )
 
     @staticmethod

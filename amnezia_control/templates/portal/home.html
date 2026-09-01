@@ -13,25 +13,60 @@
   <section class="portal-section mt-2">
     <div class="section-body">
       <div class="section-header"><h2 class="h6 mb-0">Подключение</h2></div>
-      <p class="small text-secondary mb-1">Выберите приложение, которым вы пользуетесь: AmneziaWG или AmneziaVPN.</p>
-      <p class="small text-secondary mb-2">QR-код удобен для быстрого импорта на телефоне, файл конфигурации — для ручного импорта или сохранения.</p>
+
+      <p class="small text-secondary mb-2">
+        Выберите приложение. Для AmneziaWG используется файл <strong>.conf</strong>,
+        для AmneziaVPN — файл <strong>.vpn</strong> с ключом <code>vpn://</code>.
+      </p>
+
       <div class="row g-2">
         <div class="col-lg-6">
           <div class="border rounded-3 p-2 h-100">
-            <div class="fw-semibold mb-2">AmneziaWG</div>
-            <div class="action-cluster">
-              <a href="/portal/{{ token }}/config/?target=amneziawg" class="btn btn-primary">Скачать конфигурацию</a>
-              <a href="/portal/{{ token }}/qr/?target=amneziawg" class="btn btn-outline-secondary">Открыть QR-код</a>
+            <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+              <div>
+                <div class="fw-semibold">AmneziaWG</div>
+                <div class="small text-secondary">Нативная конфигурация .conf</div>
+              </div>
+              <span class="badge status-badge status-info">.conf</span>
             </div>
+
+            {% if config_revision_available %}
+            <div class="action-cluster">
+              <a href="/portal/{{ token }}/config/?target=amneziawg" class="btn btn-primary">Скачать .conf</a>
+              <a href="/portal/{{ token }}/qr/?target=amneziawg" class="btn btn-outline-secondary">QR AmneziaWG</a>
+            </div>
+            {% else %}
+            <div class="action-cluster">
+              <button class="btn btn-primary" disabled>Скачать .conf</button>
+              <button class="btn btn-outline-secondary" disabled>QR AmneziaWG</button>
+            </div>
+            <div class="small text-secondary mt-2">Конфигурация ещё не выпущена оператором.</div>
+            {% endif %}
           </div>
         </div>
+
         <div class="col-lg-6">
           <div class="border rounded-3 p-2 h-100">
-            <div class="fw-semibold mb-2">AmneziaVPN</div>
-            <div class="action-cluster">
-              <a href="/portal/{{ token }}/config/?target=amneziavpn" class="btn btn-primary">Скачать конфигурацию</a>
-              <a href="/portal/{{ token }}/qr/?target=amneziavpn" class="btn btn-outline-secondary">Открыть QR-код</a>
+            <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+              <div>
+                <div class="fw-semibold">AmneziaVPN</div>
+                <div class="small text-secondary">Ключ подключения vpn:// в файле .vpn</div>
+              </div>
+              <span class="badge status-badge {% if amneziavpn_download_available %}status-success{% else %}status-neutral{% endif %}">.vpn</span>
             </div>
+
+            {% if amneziavpn_download_available %}
+            <div class="action-cluster">
+              <a href="/portal/{{ token }}/config/?target=amneziavpn" class="btn btn-primary">Скачать .vpn</a>
+              <a href="/portal/{{ token }}/qr/?target=amneziavpn" class="btn btn-outline-secondary">QR AmneziaVPN</a>
+            </div>
+            {% else %}
+            <div class="action-cluster">
+              <button class="btn btn-primary" disabled>Скачать .vpn</button>
+              <button class="btn btn-outline-secondary" disabled>QR AmneziaVPN</button>
+            </div>
+            <div class="small text-secondary mt-2">{{ amneziavpn_unavailable_message }}</div>
+            {% endif %}
           </div>
         </div>
       </div>
