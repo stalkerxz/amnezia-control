@@ -656,3 +656,373 @@
     justify-self: start;
   }
 }
+
+
+/* Mobile operations and audit cards V1 */
+@media (max-width: 767.98px) {
+  /*
+   * Page-specific conversion only.
+   * Generic .v4-system-table desktop behavior is preserved.
+   */
+
+  .v4-system-table-wrap:has(.v4-operations-table),
+  .v4-system-table-wrap:has(.v4-audit-table) {
+    overflow: visible;
+  }
+
+  .v4-operations-table,
+  .v4-audit-table {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    table-layout: auto;
+  }
+
+  .v4-operations-table thead,
+  .v4-audit-table thead {
+    display: none;
+  }
+
+  .v4-operations-table tbody,
+  .v4-audit-table tbody {
+    display: grid;
+    gap: 8px;
+    padding: 8px;
+  }
+
+  .v4-operations-table tbody tr.v4-operation-row,
+  .v4-audit-table tbody tr.v4-audit-row {
+    display: grid;
+    gap: 10px 12px;
+    padding: 12px;
+    overflow: visible;
+    border: 1px solid rgba(121,149,191,.11);
+    border-radius: 12px;
+    background:
+      linear-gradient(
+        155deg,
+        rgba(17,27,45,.94),
+        rgba(9,16,28,.94)
+      );
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,.018);
+  }
+
+  .v4-operations-table tbody tr.v4-operation-row {
+    grid-template-columns: minmax(0,1fr) auto;
+    grid-template-areas:
+      "operation signal"
+      "server initiator"
+      "created action";
+  }
+
+  .v4-audit-table tbody tr.v4-audit-row {
+    grid-template-columns: minmax(0,1fr) auto;
+    grid-template-areas:
+      "audit-action detail"
+      "object object"
+      "actor time";
+  }
+
+  .v4-operations-table tbody tr.v4-operation-row::before {
+    top: 10px;
+    bottom: 10px;
+    left: 0;
+    width: 2px;
+    border-radius: 0 2px 2px 0;
+  }
+
+  .v4-operations-table tbody tr.v4-operation-row.is-warning {
+    background:
+      linear-gradient(
+        155deg,
+        rgba(39,35,28,.40),
+        rgba(10,17,29,.95)
+      );
+  }
+
+  .v4-operations-table tbody tr.v4-operation-row.is-danger {
+    background:
+      linear-gradient(
+        155deg,
+        rgba(42,26,34,.42),
+        rgba(10,17,29,.95)
+      );
+  }
+
+  .v4-audit-table tbody tr.v4-audit-row.is-system {
+    background:
+      linear-gradient(
+        155deg,
+        rgba(15,24,40,.84),
+        rgba(8,14,24,.94)
+      );
+  }
+
+  .v4-operations-table tbody tr.v4-operation-row > td,
+  .v4-audit-table tbody tr.v4-audit-row > td {
+    display: block;
+    min-width: 0;
+    padding: 0 !important;
+    border: 0 !important;
+  }
+
+  /* Jobs */
+  .v4-operations-table
+  tbody
+  tr.v4-operation-row > td:nth-child(1) {
+    grid-area: operation;
+  }
+
+  .v4-operations-table
+  tbody
+  tr.v4-operation-row > td:nth-child(2) {
+    grid-area: server;
+  }
+
+  .v4-operations-table
+  tbody
+  tr.v4-operation-row > td:nth-child(3) {
+    grid-area: initiator;
+  }
+
+  .v4-operations-table
+  tbody
+  tr.v4-operation-row > td:nth-child(4) {
+    grid-area: signal;
+    align-self: start;
+    justify-self: end;
+  }
+
+  .v4-operations-table
+  tbody
+  tr.v4-operation-row > td:nth-child(5) {
+    grid-area: created;
+  }
+
+  .v4-operations-table
+  tbody
+  tr.v4-operation-row > td:nth-child(6) {
+    grid-area: action;
+    align-self: end;
+    justify-self: end;
+  }
+
+  /* Audit */
+  .v4-audit-table
+  tbody
+  tr.v4-audit-row > td:nth-child(1) {
+    grid-area: time;
+  }
+
+  .v4-audit-table
+  tbody
+  tr.v4-audit-row > td:nth-child(2) {
+    grid-area: actor;
+  }
+
+  .v4-audit-table
+  tbody
+  tr.v4-audit-row > td:nth-child(3) {
+    grid-area: audit-action;
+  }
+
+  .v4-audit-table
+  tbody
+  tr.v4-audit-row > td:nth-child(4) {
+    grid-area: object;
+  }
+
+  .v4-audit-table
+  tbody
+  tr.v4-audit-row > td:nth-child(5) {
+    grid-area: detail;
+    align-self: start;
+    justify-self: end;
+  }
+
+  /* Secondary value cards */
+  .v4-operations-table
+  tbody
+  tr.v4-operation-row > td:nth-child(2),
+  .v4-operations-table
+  tbody
+  tr.v4-operation-row > td:nth-child(3),
+  .v4-operations-table
+  tbody
+  tr.v4-operation-row > td:nth-child(5),
+  .v4-audit-table
+  tbody
+  tr.v4-audit-row > td:nth-child(1),
+  .v4-audit-table
+  tbody
+  tr.v4-audit-row > td:nth-child(2),
+  .v4-audit-table
+  tbody
+  tr.v4-audit-row > td:nth-child(4) {
+    padding: 8px 9px !important;
+    border:
+      1px solid rgba(121,149,191,.075)
+      !important;
+    border-radius: 9px;
+    background: rgba(63,87,124,.035);
+  }
+
+  .v4-operations-table
+  tbody
+  tr.v4-operation-row > td:nth-child(2)::before,
+  .v4-operations-table
+  tbody
+  tr.v4-operation-row > td:nth-child(3)::before,
+  .v4-operations-table
+  tbody
+  tr.v4-operation-row > td:nth-child(5)::before,
+  .v4-audit-table
+  tbody
+  tr.v4-audit-row > td:nth-child(1)::before,
+  .v4-audit-table
+  tbody
+  tr.v4-audit-row > td:nth-child(2)::before,
+  .v4-audit-table
+  tbody
+  tr.v4-audit-row > td:nth-child(4)::before {
+    display: block;
+    margin-bottom: 4px;
+    color: #53637a;
+    font-size: .49rem;
+    font-weight: 720;
+    letter-spacing: .075em;
+    line-height: 1.2;
+    text-transform: uppercase;
+  }
+
+  .v4-operations-table
+  tbody
+  tr.v4-operation-row > td:nth-child(2)::before {
+    content: "Сервер";
+  }
+
+  .v4-operations-table
+  tbody
+  tr.v4-operation-row > td:nth-child(3)::before {
+    content: "Инициатор";
+  }
+
+  .v4-operations-table
+  tbody
+  tr.v4-operation-row > td:nth-child(5)::before {
+    content: "Создано";
+  }
+
+  .v4-audit-table
+  tbody
+  tr.v4-audit-row > td:nth-child(1)::before {
+    content: "Время";
+  }
+
+  .v4-audit-table
+  tbody
+  tr.v4-audit-row > td:nth-child(2)::before {
+    content: "Инициатор";
+  }
+
+  .v4-audit-table
+  tbody
+  tr.v4-audit-row > td:nth-child(4)::before {
+    content: "Объект";
+  }
+
+  .v4-operations-table .v4-system-primary {
+    font-size: .78rem;
+  }
+
+  .v4-operations-table .v4-system-meta code,
+  .v4-audit-table .v4-system-mono {
+    overflow-wrap: anywhere;
+    white-space: normal;
+    word-break: break-word;
+  }
+
+  /* Expandable technical details */
+  .v4-operations-table tbody tr.v4-detail-row,
+  .v4-audit-table tbody tr.v4-detail-row {
+    display: block;
+    margin-top: -4px;
+    overflow: hidden;
+    border: 1px solid rgba(121,149,191,.08);
+    border-radius: 11px;
+    background: rgba(7,13,23,.36);
+  }
+
+  .v4-operations-table
+  tbody
+  tr.v4-detail-row > td,
+  .v4-audit-table
+  tbody
+  tr.v4-detail-row > td {
+    display: block;
+    width: 100%;
+    padding: 0 !important;
+    border: 0 !important;
+  }
+
+  .v4-operations-table
+  .v4-detail-row
+  .v4-collapse-body,
+  .v4-audit-table
+  .v4-detail-row
+  .v4-collapse-body {
+    padding: 10px;
+    border-top: 0;
+  }
+}
+
+
+@media (max-width: 479.98px) {
+  .v4-operations-table tbody tr.v4-operation-row {
+    grid-template-areas:
+      "operation signal"
+      "server server"
+      "initiator created"
+      "action action";
+  }
+}
+
+
+@media (max-width: 359.98px) {
+  .v4-operations-table tbody tr.v4-operation-row {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "operation"
+      "signal"
+      "server"
+      "initiator"
+      "created"
+      "action";
+  }
+
+  .v4-operations-table
+  tbody
+  tr.v4-operation-row > td:nth-child(4),
+  .v4-operations-table
+  tbody
+  tr.v4-operation-row > td:nth-child(6) {
+    justify-self: start;
+  }
+
+  .v4-audit-table tbody tr.v4-audit-row {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "audit-action"
+      "detail"
+      "object"
+      "actor"
+      "time";
+  }
+
+  .v4-audit-table
+  tbody
+  tr.v4-audit-row > td:nth-child(5) {
+    justify-self: start;
+  }
+}
