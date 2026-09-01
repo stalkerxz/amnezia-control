@@ -149,3 +149,26 @@ class AmneziaVPNArtifactTest(TestCase):
                     "amneziavpn",
                 )
             )
+
+    def test_old_docker_revision_fails_closed(self):
+        self.server.runtime_backend = (
+            Server.RuntimeBackend.DOCKER
+        )
+        self.server.save(
+            update_fields=["runtime_backend"]
+        )
+
+        VPNClientService._store_revision(
+            self.client_obj,
+            "[Interface]\n"
+            "PrivateKey = old-docker",
+        )
+
+        with self.assertRaisesRegex(
+            RuntimeError,
+            "AmneziaVPN .vpn",
+        ):
+            VPNClientService.portal_export_config_for_target(
+                self.client_obj,
+                "amneziavpn",
+            )

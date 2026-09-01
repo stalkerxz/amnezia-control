@@ -135,6 +135,16 @@ AllowedIPs = 0.0.0.0/0, ::/0
             "требуется переиздание",
         )
 
+        self.assertEqual(
+            sum(
+                "AmneziaVPN" in item
+                for item in response.context[
+                    "warning_items"
+                ]
+            ),
+            1,
+        )
+
         response = self.client.get(
             reverse(
                 "clients-download",
@@ -199,6 +209,88 @@ AllowedIPs = 0.0.0.0/0, ::/0
             response,
             "Переиздайте конфигурацию",
         )
+
+    def test_native_qr_remains_visible_without_vpn_artifact(self):
+        from unittest.mock import patch
+
+        VPNClientService._store_revision(
+            self.vpn_client,
+            self.conf,
+        )
+
+        def qr_for_target(
+            client,
+            target,
+        ):
+            if target == "amneziavpn":
+                raise RuntimeError(
+                    "Для этой ревизии отсутствует "
+                    "профиль AmneziaVPN .vpn."
+                )
+
+            if target == "amneziawg":
+                return "NATIVE-WG-QR"
+
+            raise AssertionError(target)
+
+        with patch(
+            "vpn.views."
+            "VPNClientService."
+            "portal_qr_png_base64_for_target",
+            side_effect=qr_for_target,
+        ):
+            response = self.client.get(
+                reverse(
+                    "clients-qr-modal",
+                    args=[
+                        self.vpn_client.pk,
+                    ],
+                )
+            )
+
+            self.assertEqual(
+                response.status_code,
+                200,
+            )
+
+            self.assertContains(
+                response,
+                "AmneziaWG .conf",
+            )
+
+            self.assertContains(
+                response,
+                "NATIVE-WG-QR",
+            )
+
+            self.assertNotContains(
+                response,
+                "Конфиг ещё не выпущен",
+            )
+
+            response = self.client.get(
+                reverse(
+                    "clients-detail",
+                    args=[
+                        self.vpn_client.pk,
+                    ],
+                )
+            )
+
+            self.assertEqual(
+                response.status_code,
+                200,
+            )
+
+            self.assertContains(
+                response,
+                "AmneziaWG .conf",
+            )
+
+            self.assertContains(
+                response,
+                "NATIVE-WG-QR",
+            )
 
     def test_new_artifact_downloads_as_vpn(self):
         artifact = (

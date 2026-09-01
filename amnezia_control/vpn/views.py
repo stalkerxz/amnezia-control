@@ -391,20 +391,20 @@ def clients_detail_view(request, pk: int):
 
     amneziavpn_artifact_missing = bool(
         revision
-        and is_agent_awg2
         and not has_amneziavpn_artifact
+    )
+
+    amneziavpn_reissue_supported = bool(
+        amneziavpn_artifact_missing
+        and is_agent_awg2
     )
 
     amneziavpn_download_available = bool(
         revision
-        and not amneziavpn_artifact_missing
+        and has_amneziavpn_artifact
     )
 
-    amneziavpn_download_extension = (
-        "vpn"
-        if has_amneziavpn_artifact
-        else "conf"
-    )
+    amneziavpn_download_extension = "vpn"
 
     qr_base64_amneziavpn = ""
     qr_base64_amneziawg = ""
@@ -423,9 +423,17 @@ def clients_detail_view(request, pk: int):
             and amneziavpn_artifact_missing
         ):
             qr_unavailable_message = (
-                "Для AmneziaVPN 3.1 отсутствует "
-                "профиль vpn://. Переиздайте "
-                "конфигурацию клиента."
+                (
+                    "Для AmneziaVPN отсутствует "
+                    "профиль .vpn. Переиздайте "
+                    "конфигурацию клиента."
+                )
+                if amneziavpn_reissue_supported
+                else (
+                    "Для AmneziaVPN отсутствует "
+                    "профиль .vpn. Используйте "
+                    "AmneziaWG .conf."
+                )
             )
 
             return ""
@@ -524,14 +532,24 @@ def clients_detail_view(request, pk: int):
         )
 
     if amneziavpn_artifact_missing:
-        warning_items.append(
-            "Текущая ревизия создана до "
-            "поддержки AmneziaVPN 3.1. "
-            "Для получения файла .vpn "
-            "переиздайте конфигурацию."
-        )
+        if amneziavpn_reissue_supported:
+            warning_items.append(
+                "Текущая ревизия создана до "
+                "поддержки AmneziaVPN 3.1. "
+                "Для получения файла .vpn "
+                "переиздайте конфигурацию."
+            )
+        else:
+            warning_items.append(
+                "Для текущей ревизии не выпущен "
+                "профиль AmneziaVPN .vpn. "
+                "Используйте AmneziaWG .conf."
+            )
 
-    if qr_unavailable_message:
+    if (
+        qr_unavailable_message
+        and not amneziavpn_artifact_missing
+    ):
         warning_items.append(
             qr_unavailable_message
         )
@@ -581,6 +599,9 @@ def clients_detail_view(request, pk: int):
             "qr_unavailable_message": qr_unavailable_message,
             "amneziavpn_download_available": (
                 amneziavpn_download_available
+            ),
+            "amneziavpn_reissue_supported": (
+                amneziavpn_reissue_supported
             ),
             "amneziavpn_download_extension": (
                 amneziavpn_download_extension
@@ -1112,11 +1133,7 @@ def client_download_config_view(
             pk=client.id,
         )
 
-    extension = (
-        "vpn"
-        if config.startswith("vpn://")
-        else "conf"
-    )
+    extension = "vpn"
 
     response = HttpResponse(
         config,
