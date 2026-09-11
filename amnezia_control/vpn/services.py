@@ -284,6 +284,75 @@ class RuntimeCommandService:
         return result
 
 
+    @staticmethod
+    def run_untracked(
+        server: Server,
+        action: str,
+        command: str,
+    ):
+        """
+        Execute high-frequency read-only runtime telemetry
+        without creating Job / JobEvent rows.
+
+        Mutating and operator-triggered commands continue to use
+        run() and therefore retain the normal audit/job history.
+        """
+        result = (
+            RuntimeCommandService
+            .executor_for_server(server)
+            .run(command)
+        )
+
+        if result.exit_code != 0:
+            raise RuntimeError(
+                result.stderr
+                or f"command failed: {action}"
+            )
+
+        return result
+
+    @classmethod
+    def run_with_expected_failure_untracked(
+        cls,
+        server: Server,
+        action: str,
+        command: str,
+        *,
+        expected_error_patterns: tuple[str, ...],
+    ):
+        """
+        Untracked equivalent of run_with_expected_failure()
+        for periodic read-only telemetry.
+        """
+        result = (
+            cls.executor_for_server(server)
+            .run(command)
+        )
+
+        stderr_text = result.stderr or ""
+
+        matched_expected_error = (
+            result.exit_code != 0
+            and any(
+                pattern.lower()
+                in stderr_text.lower()
+                for pattern
+                in expected_error_patterns
+            )
+        )
+
+        if matched_expected_error:
+            return None
+
+        if result.exit_code != 0:
+            raise RuntimeError(
+                result.stderr
+                or f"command failed: {action}"
+            )
+
+        return result
+
+
 class BaseProtocolAdapter:
     protocol_type = ""
     command_bin = "wg"
@@ -485,28 +554,73 @@ class BaseProtocolAdapter:
 
         return peers
 
-    def _awg2_runtime_peers(self, actor):
-        runtime_result = RuntimeCommandService.run_with_expected_failure(
-            self.server,
-            actor,
+    def _awg2_runtime_peers(
+        self,
+        actor,
+        *,
+        record_job: bool = True,
+    ):
+        def run_dump(
+            action: str,
+            command: str,
+            *,
+            warn_on_expected_failure: bool,
+        ):
+            if record_job:
+                return (
+                    RuntimeCommandService
+                    .run_with_expected_failure(
+                        self.server,
+                        actor,
+                        action,
+                        command,
+                        expected_error_patterns=(
+                            RuntimeCommandService
+                            .AWG2_EXPECTED_RUNTIME_DUMP_ERRORS
+                        ),
+                        fallback_message=(
+                            "AWG2 runtime telemetry unavailable: "
+                            "using config fallback "
+                            "(degraded mode)."
+                        ),
+                        warn_on_expected_failure=(
+                            warn_on_expected_failure
+                        ),
+                    )
+                )
+
+            return (
+                RuntimeCommandService
+                .run_with_expected_failure_untracked(
+                    self.server,
+                    action,
+                    command,
+                    expected_error_patterns=(
+                        RuntimeCommandService
+                        .AWG2_EXPECTED_RUNTIME_DUMP_ERRORS
+                    ),
+                )
+            )
+
+        runtime_result = run_dump(
             f"{self.protocol_type}.list_all",
             self._wg_cmd("show all dump"),
-            expected_error_patterns=RuntimeCommandService.AWG2_EXPECTED_RUNTIME_DUMP_ERRORS,
-            fallback_message="AWG2 runtime telemetry unavailable: using config fallback (degraded mode).",
             warn_on_expected_failure=False,
         )
+
         if runtime_result is None:
-            runtime_result = RuntimeCommandService.run_with_expected_failure(
-                self.server,
-                actor,
+            runtime_result = run_dump(
                 f"{self.protocol_type}.list",
                 self._wg_cmd("show dump"),
-                expected_error_patterns=RuntimeCommandService.AWG2_EXPECTED_RUNTIME_DUMP_ERRORS,
-                fallback_message="AWG2 runtime telemetry unavailable: using config fallback (degraded mode).",
+                warn_on_expected_failure=True,
             )
+
         if runtime_result is None:
             return None
-        return self._parse_runtime_dump_peers(runtime_result.stdout)
+
+        return self._parse_runtime_dump_peers(
+            runtime_result.stdout
+        )
 
     def discover_peers(self, actor):
         try:
@@ -575,11 +689,22 @@ class BaseProtocolAdapter:
     def peer_transfer_map(self, actor) -> dict[str, int] | None:
         try:
             if self.protocol_type == VPNClient.ProtocolType.AWG2:
-                peers = self._awg2_runtime_peers(actor)
+                peers = self._awg2_runtime_peers(
+                    actor,
+                    record_job=False,
+                )
                 if peers is None:
                     return None
             else:
-                out = self._run(actor, f"{self.protocol_type}.list", self._wg_cmd("show dump")).stdout
+                out = (
+                    RuntimeCommandService
+                    .run_untracked(
+                        self.server,
+                        f"{self.protocol_type}.list",
+                        self._wg_cmd("show dump"),
+                    )
+                    .stdout
+                )
                 peers = self._parse_runtime_dump_peers(out)
         except Exception:
             return None

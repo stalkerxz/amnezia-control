@@ -56,6 +56,7 @@ def _agent_call(
     operation: str,
     *,
     sensitive_output: bool = False,
+    record_job: bool = True,
     **payload,
 ) -> dict:
     if agent not in {"awg3", "awg4"}:
@@ -63,13 +64,25 @@ def _agent_call(
 
     token = _encode_payload(operation, **payload)
     command = f"{BRIDGE_PATH} {agent} {token}"
-    result = RuntimeCommandService.run(
-        server,
-        actor,
-        f"agent.{agent}.{operation}",
-        command,
-        sensitive_output=sensitive_output,
-    )
+    action = f"agent.{agent}.{operation}"
+
+    if record_job:
+        result = RuntimeCommandService.run(
+            server,
+            actor,
+            action,
+            command,
+            sensitive_output=sensitive_output,
+        )
+    else:
+        result = (
+            RuntimeCommandService
+            .run_untracked(
+                server,
+                action,
+                command,
+            )
+        )
     try:
         parsed = json.loads(result.stdout)
     except json.JSONDecodeError as exc:
@@ -138,6 +151,7 @@ class RemoteAWG2AgentAdapter:
         operation: str,
         *,
         sensitive_output: bool = False,
+        record_job: bool = True,
         **payload,
     ) -> dict:
         return _agent_call(
@@ -146,6 +160,7 @@ class RemoteAWG2AgentAdapter:
             "awg4",
             operation,
             sensitive_output=sensitive_output,
+            record_job=record_job,
             **payload,
         )
 
@@ -230,7 +245,11 @@ class RemoteAWG2AgentAdapter:
 
     def peer_transfer_map(self, actor) -> dict[str, int] | None:
         try:
-            result = self._call(actor, "peer_statuses")
+            result = self._call(
+                actor,
+                "peer_statuses",
+                record_job=False,
+            )
         except Exception:
             return None
         peers = result.get("peers", {})
