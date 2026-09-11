@@ -4,9 +4,10 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from audit.models import AuditLog
 from core.models import SystemSettings
+from customers.models import CustomerAccount
 from jobs.models import Job, JobEvent
+from portal.models import ClientRenewalRequest
 from servers.models import ProtocolProfile, Server, ServerProtocol
 from vpn.models import VPNClient
 
@@ -41,34 +42,144 @@ class DashboardViewTest(TestCase):
         return VPNClient.objects.create(**defaults)
 
     def test_dashboard_shows_operational_overview_cards(self):
-        self._make_client(name="active", status=VPNClient.Status.ACTIVE, limit_state=VPNClient.LimitState.ACTIVE)
-        self._make_client(name="disabled", status=VPNClient.Status.DISABLED, limit_state=VPNClient.LimitState.ACTIVE)
-        self._make_client(name="expired", status=VPNClient.Status.ACTIVE, limit_state=VPNClient.LimitState.EXPIRED)
-        self._make_client(name="traffic", status=VPNClient.Status.ACTIVE, limit_state=VPNClient.LimitState.TRAFFIC_EXCEEDED)
-        self._make_client(name="deleted", status=VPNClient.Status.DELETED, limit_state=VPNClient.LimitState.ACTIVE)
+        CustomerAccount.objects.create(
+            display_name="Active Customer",
+            status=CustomerAccount.Status.ACTIVE,
+            created_by=self.user,
+        )
+        CustomerAccount.objects.create(
+            display_name="Disabled Customer",
+            status=CustomerAccount.Status.DISABLED,
+            created_by=self.user,
+        )
 
-        response = self.client.get(reverse("dashboard"))
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Клиентов всего")
-        self.assertContains(response, "Отключённые")
-        self.assertContains(response, "Истёк срок")
-        self.assertContains(response, "Трафик превышен")
-        self.assertContains(response, "Fallback-телеметрия")
-        self.assertContains(response, "Требует внимания")
-        self.assertContains(response, "/servers/?health=degraded")
-        self.assertContains(response, "/clients/?quick=expired")
-        self.assertContains(response, "Текущие ограничения")
-        self.assertContains(response, ">5<", html=False)
-        self.assertContains(response, ">1<", html=False)
+        self._make_client(
+            name="active",
+            status=VPNClient.Status.ACTIVE,
+            limit_state=VPNClient.LimitState.ACTIVE,
+        )
+        self._make_client(
+            name="disabled",
+            status=VPNClient.Status.DISABLED,
+            limit_state=VPNClient.LimitState.ACTIVE,
+        )
+        self._make_client(
+            name="expired",
+            status=VPNClient.Status.ACTIVE,
+            limit_state=VPNClient.LimitState.EXPIRED,
+        )
+        self._make_client(
+            name="traffic",
+            status=VPNClient.Status.ACTIVE,
+            limit_state=VPNClient.LimitState.TRAFFIC_EXCEEDED,
+        )
+        self._make_client(
+            name="deleted",
+            status=VPNClient.Status.DELETED,
+            limit_state=VPNClient.LimitState.ACTIVE,
+        )
+
+        response = self.client.get(
+            reverse("dashboard")
+        )
+
+        self.assertEqual(
+            response.status_code,
+            200,
+        )
+
+        self.assertContains(
+            response,
+            "Клиенты",
+        )
+        self.assertContains(
+            response,
+            "активны сейчас",
+        )
+        self.assertContains(
+            response,
+            "Клиенты: срок действия истёк",
+        )
+        self.assertContains(
+            response,
+            "Клиенты: превышен лимит трафика",
+        )
+        self.assertContains(
+            response,
+            "AWG2 работает в резервном режиме",
+        )
+        self.assertContains(
+            response,
+            "Требует внимания",
+        )
+        self.assertContains(
+            response,
+            "/servers/?health=degraded",
+        )
+        self.assertContains(
+            response,
+            "/clients/?quick=expired",
+        )
+        self.assertContains(
+            response,
+            "Текущие ограничения",
+        )
+
+        self.assertEqual(
+            response.context["clients_total_count"],
+            2,
+        )
+        self.assertEqual(
+            response.context["active_clients_count"],
+            1,
+        )
+        self.assertEqual(
+            response.context["customer_attention_count"],
+            1,
+        )
+        self.assertEqual(
+            response.context["disabled_clients_count"],
+            1,
+        )
+        self.assertEqual(
+            response.context["expired_clients_count"],
+            1,
+        )
+        self.assertEqual(
+            response.context[
+                "traffic_exceeded_clients_count"
+            ],
+            1,
+        )
+        self.assertEqual(
+            response.context["degraded_clients_count"],
+            4,
+        )
 
     def test_dashboard_marks_success_with_warning(self):
         job = Job.objects.create(server=self.server, actor=self.user, action="server.sync_runtime", status=Job.Status.SUCCESS)
-        JobEvent.objects.create(job=job, level="warning", message="AWG2 fallback")
+        JobEvent.objects.create(
+            job=job,
+            level="warning",
+            message="Нужно проверить результат",
+        )
 
         response = self.client.get(reverse("dashboard"))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Успех с предупреждением")
-        self.assertContains(response, "Синхронизация состояния сервера")
+        self.assertContains(
+            response,
+            "Предупреждение",
+        )
+        self.assertContains(
+            response,
+            "Синхронизация состояния сервера",
+        )
+        self.assertEqual(
+            response.context[
+                "jobs_recent_rows"
+            ][0]["job_signal"],
+            "warning",
+        )
 
     def test_dashboard_job_counters_split_failed_warning_and_degraded(self):
         failed_job = Job.objects.create(server=self.server, actor=self.user, action="server.sync_runtime", status=Job.Status.FAILED)
@@ -87,42 +198,130 @@ class DashboardViewTest(TestCase):
 
         response = self.client.get(reverse("dashboard"))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Ошибки задач (24ч)")
-        self.assertContains(response, "Предупреждения задач (24ч)")
-        self.assertContains(response, "Успех с деградацией (24ч)")
-        self.assertContains(response, "/jobs/?signal=failed")
-        self.assertContains(response, "/jobs/?signal=warning")
-        self.assertContains(response, "/jobs/?signal=degraded_success")
+        self.assertContains(
+            response,
+            "Ошибки задач за последние 24 часа",
+        )
+        self.assertContains(
+            response,
+            "/jobs/?status=failed&amp;created_from=",
+            html=False,
+        )
 
-        self.assertEqual(response.context["failed_jobs_recent_count"], 1)
-        self.assertEqual(response.context["warning_jobs_recent_count"], 1)
-        self.assertEqual(response.context["degraded_jobs_recent_count"], 1)
+        self.assertEqual(
+            response.context[
+                "failed_jobs_recent_count"
+            ],
+            1,
+        )
+        self.assertEqual(
+            response.context[
+                "warning_jobs_recent_count"
+            ],
+            1,
+        )
+        self.assertEqual(
+            response.context[
+                "degraded_jobs_recent_count"
+            ],
+            1,
+        )
+
+        signals = {
+            row["job_signal"]
+            for row in response.context[
+                "jobs_recent_rows"
+            ]
+        }
+
+        self.assertIn(
+            "failed",
+            signals,
+        )
+        self.assertIn(
+            "warning",
+            signals,
+        )
+        self.assertIn(
+            "degraded_success",
+            signals,
+        )
 
     def test_dashboard_shows_portal_renewal_request_counters(self):
-        client = self._make_client(name="renewal-client")
-        recent_log = AuditLog.objects.create(
-            action="portal.renewal.request",
-            entity_type="VPNClient",
-            entity_id=str(client.id),
-            details={},
+        client = self._make_client(
+            name="renewal-client"
         )
-        old_log = AuditLog.objects.create(
-            action="portal.renewal.request",
-            entity_type="VPNClient",
-            entity_id=str(client.id),
-            details={},
+
+        ClientRenewalRequest.objects.create(
+            client=client,
+            status=(
+                ClientRenewalRequest.Status.NEW
+            ),
         )
-        AuditLog.objects.filter(id=old_log.id).update(created_at=timezone.now() - timezone.timedelta(days=8))
 
-        response = self.client.get(reverse("dashboard"))
+        old_request = (
+            ClientRenewalRequest.objects.create(
+                client=client,
+                status=(
+                    ClientRenewalRequest.Status.DONE
+                ),
+            )
+        )
 
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Запросы продления из кабинета")
-        self.assertContains(response, "За 24 часа")
-        self.assertContains(response, "За 7 дней")
-        self.assertContains(response, f"/clients/{recent_log.entity_id}/")
-        self.assertEqual(response.context["renewal_requests_last_24h"], 1)
-        self.assertEqual(response.context["renewal_requests_last_7d"], 1)
+        ClientRenewalRequest.objects.filter(
+            id=old_request.id
+        ).update(
+            created_at=(
+                timezone.now()
+                - timezone.timedelta(days=8)
+            )
+        )
+
+        response = self.client.get(
+            reverse("dashboard")
+        )
+
+        self.assertEqual(
+            response.status_code,
+            200,
+        )
+
+        self.assertContains(
+            response,
+            "Продления",
+        )
+        self.assertContains(
+            response,
+            "новых за 24 часа",
+        )
+        self.assertContains(
+            response,
+            "Продления за 7 дней",
+        )
+        self.assertContains(
+            response,
+            "/customers/?renewal=open",
+        )
+
+        self.assertEqual(
+            response.context[
+                "renewal_requests_last_24h"
+            ],
+            1,
+        )
+        self.assertEqual(
+            response.context[
+                "renewal_requests_last_7d"
+            ],
+            1,
+        )
+        self.assertEqual(
+            response.context[
+                "renewal_open_count"
+            ],
+            1,
+        )
+
 
 
 class LoginTemplateViewTest(TestCase):
@@ -131,7 +330,14 @@ class LoginTemplateViewTest(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "amnezia-control")
-        self.assertContains(response, "Безопасное управление клиентами")
+        self.assertContains(
+            response,
+            "Операционный центр управления сервисами",
+        )
+        self.assertContains(
+            response,
+            "Безопасный вход",
+        )
         self.assertContains(response, "id=\"togglePasswordBtn\"", html=False)
 
 
@@ -158,18 +364,49 @@ class SettingsViewTest(TestCase):
         self.assertEqual(settings_obj.portal_renewal_cooldown_hours, 12)
         self.assertContains(response, "Настройки сохранены")
 
-    def test_settings_page_language_switch_persists_in_session(self):
-        self.client.force_login(self.staff_user)
+    def test_settings_page_language_switch_sets_language_cookie(self):
+        self.client.force_login(
+            self.staff_user
+        )
 
         response = self.client.post(
             reverse("set_language"),
-            {"language": "en", "next": reverse("settings")},
-            follow=True,
+            {
+                "language": "en",
+                "next": reverse("settings"),
+            },
+            follow=False,
         )
 
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(self.client.session.get("django_language"), "en")
-        self.assertEqual(response.cookies[settings.LANGUAGE_COOKIE_NAME].value, "en")
+        self.assertEqual(
+            response.status_code,
+            302,
+        )
+        self.assertEqual(
+            response.url,
+            reverse("settings"),
+        )
+
+        cookie_name = (
+            settings.LANGUAGE_COOKIE_NAME
+        )
+
+        self.assertIn(
+            cookie_name,
+            response.cookies,
+        )
+        self.assertEqual(
+            response.cookies[
+                cookie_name
+            ].value,
+            "en",
+        )
+        self.assertEqual(
+            self.client.cookies[
+                cookie_name
+            ].value,
+            "en",
+        )
 
     def test_settings_page_handles_duplicate_system_settings_rows(self):
         self.client.force_login(self.staff_user)
