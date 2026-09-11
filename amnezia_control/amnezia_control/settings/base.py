@@ -13,6 +13,9 @@ def _csv_env(name, default=""):
     return [item.strip() for item in os.getenv(name, default).split(",") if item.strip()]
 
 
+CSRF_TRUSTED_ORIGINS = _csv_env("DJANGO_CSRF_TRUSTED_ORIGINS")
+
+
 def _bool_env(name, default="1"):
     return os.getenv(name, default).lower() in {"1", "true", "yes", "on"}
 
