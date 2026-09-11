@@ -21,21 +21,15 @@
     <div class="v4-form-layout">
       <div class="v4-form-main">
         <section class="v4-form-card">
-          <div class="v4-form-card-head"><div><h2>{{ device.name }}</h2><p>Имя, платформа и служебная заметка.</p></div></div>
+          <div class="v4-form-card-head"><div><h2>{{ device.name }}</h2><p>Имя и служебная заметка.</p></div></div>
 
           {% if form.non_field_errors %}<div class="alert alert-danger mb-3">{{ form.non_field_errors }}</div>{% endif %}
 
           <div class="v4-field-grid">
-            <div class="v4-field">
+            <div class="v4-field is-wide">
               <label class="form-label" for="{{ form.name.id_for_label }}">{{ form.name.label }}</label>
               {{ form.name }}
               {% for error in form.name.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
-            </div>
-
-            <div class="v4-field">
-              <label class="form-label" for="{{ form.platform.id_for_label }}">{{ form.platform.label }}</label>
-              {{ form.platform }}
-              {% for error in form.platform.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
             </div>
 
             <div class="v4-field is-wide">

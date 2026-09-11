@@ -185,12 +185,10 @@ class ClientDeviceEditForm(forms.ModelForm):
         model = ClientDevice
         fields = (
             "name",
-            "platform",
             "notes",
         )
         labels = {
             "name": "Название устройства",
-            "platform": "Платформа",
             "notes": "Заметка",
         }
         widgets = {
@@ -198,11 +196,6 @@ class ClientDeviceEditForm(forms.ModelForm):
                 attrs={
                     "class": "form-control",
                     "autofocus": True,
-                }
-            ),
-            "platform": forms.Select(
-                attrs={
-                    "class": "form-select",
                 }
             ),
             "notes": forms.Textarea(

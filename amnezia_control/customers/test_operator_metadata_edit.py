@@ -264,6 +264,35 @@ class OperatorMetadataEditTest(
                 after[key],
             )
 
+    def test_device_edit_page_hides_platform(
+        self,
+    ):
+        self.client.force_login(
+            self.operator
+        )
+
+        response = self.client.get(
+            reverse(
+                "customers-device-edit",
+                args=[self.device.pk],
+            )
+        )
+
+        self.assertEqual(
+            response.status_code,
+            200,
+        )
+
+        self.assertNotIn(
+            "platform",
+            response.context["form"].fields,
+        )
+
+        self.assertNotContains(
+            response,
+            'name="platform"',
+        )
+
     def test_operator_can_edit_device_metadata_without_vpn_mutation(
         self,
     ):
@@ -301,9 +330,11 @@ class OperatorMetadataEditTest(
             "MacBook Pro",
         )
 
+        # A forged/legacy POST value must not
+        # change stored platform metadata.
         self.assertEqual(
             self.device.platform,
-            ClientDevice.Platform.MACOS,
+            ClientDevice.Platform.IOS,
         )
 
         self.assertEqual(

@@ -319,11 +319,11 @@ def customer_device_edit_view(
                                 "name"
                             ]
                         ),
-                        platform=(
-                            form.cleaned_data[
-                                "platform"
-                            ]
-                        ),
+                        # Platform is legacy metadata.
+                        # Editing the device must preserve
+                        # the stored value rather than accept
+                        # it from operator input.
+                        platform=device.platform,
                         notes=(
                             form.cleaned_data[
                                 "notes"
