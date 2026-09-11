@@ -16,7 +16,6 @@
       </div>
 
       <div class="v4-device-meta">
-        {% if row.device.platform != 'unknown' %}<span>{{ row.device.get_platform_display }}</span>{% endif %}
         <span>{{ row.connection_total }} подключений</span>
         <span>{% if row.effective_expires_at %}до {{ row.effective_expires_at|date:'d.m.Y' }}{% else %}без срока{% endif %}</span>
       </div>

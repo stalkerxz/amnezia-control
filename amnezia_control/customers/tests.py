@@ -89,7 +89,10 @@ class CustomerViewsTest(TestCase):
         )
         self.assertContains(response, "Test Customer")
         self.assertContains(response, "Test iPhone")
-        self.assertContains(response, "iPhone / iPad")
+        self.assertNotContains(
+            response,
+            "iPhone / iPad",
+        )
 
     def test_unknown_account_returns_404(self):
         self.client.force_login(self.operator)
