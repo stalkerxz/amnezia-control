@@ -212,7 +212,7 @@
           {% csrf_token %}
           <input type="hidden" name="renewal_request_id" value="{{ open_renewal_request.pk }}">
           <input type="hidden" name="action" value="extend">
-          <label><span>Продлить на дней</span><input type="number" min="1" max="365" name="extension_days" value="30" required class="form-control"></label>
+          <label><span>Продлить на дней</span><input type="number" min="1" max="365" name="extension_days" value="{{ default_renewal_extension_days }}" required class="form-control"></label>
           <label class="is-wide"><span>Комментарий</span><input type="text" name="operator_note" class="form-control" maxlength="1000" placeholder="Необязательно"></label>
           <button type="submit" class="btn btn-primary">Продлить и закрыть</button>
         </form>

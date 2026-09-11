@@ -355,13 +355,32 @@ class SettingsViewTest(TestCase):
         self.client.force_login(self.staff_user)
         response = self.client.post(
             reverse("settings"),
-            {"portal_link_lifetime_days": 45, "portal_renewal_cooldown_hours": 12},
+            {
+                "default_account_lifetime_days": 60,
+                "default_renewal_extension_days": 45,
+                "portal_link_lifetime_days": 45,
+                "portal_renewal_cooldown_hours": 12,
+            },
             follow=True,
         )
         self.assertEqual(response.status_code, 200)
         settings_obj = SystemSettings.get_solo()
-        self.assertEqual(settings_obj.portal_link_lifetime_days, 45)
-        self.assertEqual(settings_obj.portal_renewal_cooldown_hours, 12)
+        self.assertEqual(
+            settings_obj.default_account_lifetime_days,
+            60,
+        )
+        self.assertEqual(
+            settings_obj.default_renewal_extension_days,
+            45,
+        )
+        self.assertEqual(
+            settings_obj.portal_link_lifetime_days,
+            45,
+        )
+        self.assertEqual(
+            settings_obj.portal_renewal_cooldown_hours,
+            12,
+        )
         self.assertContains(response, "Настройки сохранены")
 
     def test_settings_page_language_switch_sets_language_cookie(self):

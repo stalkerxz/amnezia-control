@@ -6,6 +6,7 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
+from core.models import SystemSettings
 from portal.models import ClientRenewalRequest
 from portal.services import RenewalRequestService
 from servers.models import (
@@ -23,6 +24,7 @@ from .models import (
     CustomerAccount,
 )
 from .subscription_services import (
+    CustomerRenewalError,
     extend_account_from_renewal,
     set_account_renewal_status,
 )
@@ -389,6 +391,116 @@ class AccountRenewalFlowTest(TestCase):
             revision_count_before,
         )
 
+    def test_extend_zero_days_is_rejected_not_defaulted(
+        self,
+    ):
+        request_obj = self._new_request()
+
+        with self.assertRaisesMessage(
+            CustomerRenewalError,
+            (
+                "Продление должно быть "
+                "от 1 до 365 дней."
+            ),
+        ):
+            extend_account_from_renewal(
+                account_id=self.account.pk,
+                renewal_request_id=request_obj.pk,
+                extension_days=0,
+                operator_note="",
+                actor=self.operator,
+            )
+
+    def test_extend_uses_configured_default_when_days_blank(
+        self,
+    ):
+        settings_obj = (
+            SystemSettings.get_solo()
+        )
+
+        settings_obj.default_renewal_extension_days = 45
+        settings_obj.save(
+            update_fields=[
+                "default_renewal_extension_days",
+                "updated_at",
+            ]
+        )
+
+        request_obj = self._new_request()
+
+        old_expires_at = (
+            self.account.expires_at
+        )
+
+        account, request_obj = (
+            extend_account_from_renewal(
+                account_id=self.account.pk,
+                renewal_request_id=request_obj.pk,
+                extension_days="",
+                operator_note=(
+                    "Продление по настройке"
+                ),
+                actor=self.operator,
+            )
+        )
+
+        self.assertEqual(
+            account.expires_at,
+            old_expires_at
+            + timedelta(days=45),
+        )
+
+        self.assertEqual(
+            request_obj.status,
+            ClientRenewalRequest.Status.DONE,
+        )
+
+    def test_customer_detail_uses_configured_renewal_default(
+        self,
+    ):
+        settings_obj = (
+            SystemSettings.get_solo()
+        )
+
+        settings_obj.default_renewal_extension_days = 45
+        settings_obj.save(
+            update_fields=[
+                "default_renewal_extension_days",
+                "updated_at",
+            ]
+        )
+
+        self._new_request()
+
+        self.client.force_login(
+            self.operator
+        )
+
+        response = self.client.get(
+            reverse(
+                "customers-detail",
+                args=[self.account.pk],
+            )
+        )
+
+        self.assertEqual(
+            response.status_code,
+            200,
+        )
+
+        self.assertEqual(
+            response.context[
+                "default_renewal_extension_days"
+            ],
+            45,
+        )
+
+        self.assertContains(
+            response,
+            'name="extension_days" value="45"',
+            html=False,
+        )
+
     def test_operator_can_dismiss_account_request(
         self,
     ):
@@ -459,17 +571,18 @@ class AccountRenewalFlowTest(TestCase):
             200,
         )
 
-        self.assertContains(
-            response,
-            self.account.display_name,
+        self.assertEqual(
+            response.context[
+                "renewal_open_count"
+            ],
+            1,
         )
 
-        self.assertContains(
-            response,
-            reverse(
-                "customers-detail",
-                args=[self.account.pk],
-            ),
+        self.assertEqual(
+            response.context[
+                "renewal_requests_last_24h"
+            ],
+            1,
         )
 
         self.assertContains(

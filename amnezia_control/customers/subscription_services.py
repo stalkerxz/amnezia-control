@@ -4,6 +4,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from audit.services import AuditService
+from core.models import SystemSettings
 from portal.models import ClientRenewalRequest
 from vpn.models import VPNClient
 from vpn.services import VPNClientService
@@ -160,9 +161,22 @@ def extend_account_from_renewal(
             "Продлить можно только открытую заявку."
         )
 
+    raw_extension_days = (
+        ""
+        if extension_days is None
+        else str(extension_days).strip()
+    )
+
+    if not raw_extension_days:
+        raw_extension_days = str(
+            SystemSettings
+            .get_solo()
+            .default_renewal_extension_days
+        )
+
     try:
         extension_days = int(
-            extension_days
+            raw_extension_days
         )
     except (TypeError, ValueError):
         raise CustomerRenewalError(

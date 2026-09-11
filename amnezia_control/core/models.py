@@ -1,7 +1,27 @@
+from django.core.validators import (
+    MaxValueValidator,
+    MinValueValidator,
+)
 from django.db import models
 
 
 class SystemSettings(models.Model):
+    default_account_lifetime_days = models.PositiveIntegerField(
+        default=30,
+        validators=[
+            MinValueValidator(1),
+            MaxValueValidator(365),
+        ],
+    )
+
+    default_renewal_extension_days = models.PositiveIntegerField(
+        default=30,
+        validators=[
+            MinValueValidator(1),
+            MaxValueValidator(365),
+        ],
+    )
+
     portal_link_lifetime_days = models.PositiveIntegerField(default=30)
     portal_renewal_cooldown_hours = models.PositiveIntegerField(default=24)
     created_at = models.DateTimeField(auto_now_add=True)

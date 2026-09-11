@@ -19,10 +19,12 @@
   <div class="v4-settings-grid">
     <div class="v4-settings-stack">
       <section class="v4-system-panel mb-0 v4-settings-primary">
-        <div class="v4-system-panel-head"><div><span class="v4-panel-eyebrow">Клиентский доступ</span><h2>{% trans "Личный кабинет" %}</h2><p>{% trans "Параметры ссылок и повторных запросов на продление." %}</p></div><span class="v4-settings-badge">Изменяемо</span></div>
+        <div class="v4-system-panel-head"><div><span class="v4-panel-eyebrow">Клиентский доступ</span><h2>{% trans "Клиенты и продления" %}</h2><p>{% trans "Значения по умолчанию для новых аккаунтов, продлений и личного кабинета." %}</p></div><span class="v4-settings-badge">Изменяемо</span></div>
         <div class="v4-system-panel-body">
           <form method="post" class="row g-3">
             {% csrf_token %}
+            <div class="col-md-6"><label class="form-label" for="id_default_account_lifetime_days">{{ form.default_account_lifetime_days.label }}</label>{{ form.default_account_lifetime_days }}</div>
+            <div class="col-md-6"><label class="form-label" for="id_default_renewal_extension_days">{{ form.default_renewal_extension_days.label }}</label>{{ form.default_renewal_extension_days }}</div>
             <div class="col-md-6"><label class="form-label" for="id_portal_link_lifetime_days">{{ form.portal_link_lifetime_days.label }}</label>{{ form.portal_link_lifetime_days }}</div>
             <div class="col-md-6"><label class="form-label" for="id_portal_renewal_cooldown_hours">{{ form.portal_renewal_cooldown_hours.label }}</label>{{ form.portal_renewal_cooldown_hours }}</div>
             <div class="col-12 d-flex justify-content-end"><button type="submit" class="btn btn-primary">{% trans "Сохранить изменения" %}</button></div>

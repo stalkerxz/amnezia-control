@@ -26,6 +26,7 @@ from django.views.decorators.http import (
     require_http_methods,
 )
 
+from core.models import SystemSettings
 from portal.models import ClientRenewalRequest
 from servers.models import Server
 from vpn.forms import VPNClientCreateForm
@@ -1653,6 +1654,10 @@ def customer_detail_view(request, pk):
 
     workspace = build_customer_workspace(account)
 
+    system_settings = (
+        SystemSettings.get_solo()
+    )
+
     for row in workspace["devices"]:
         row["access_form"] = (
             DeviceAccessUpdateForm(
@@ -1675,6 +1680,10 @@ def customer_detail_view(request, pk):
             ),
             "latest_renewal_request": (
                 latest_renewal_request
+            ),
+            "default_renewal_extension_days": (
+                system_settings
+                .default_renewal_extension_days
             ),
         },
     )

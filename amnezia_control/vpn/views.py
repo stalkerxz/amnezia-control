@@ -13,6 +13,7 @@ import ipaddress
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from audit.models import AuditLog
+from core.models import SystemSettings
 from jobs.models import Job
 from portal.models import ClientPortalAccess, ClientRenewalRequest
 from portal.services import PortalAccessService
@@ -27,9 +28,6 @@ from .forms import (
 )
 from .models import VPNClient
 from .services import VPNClientPolicyService, VPNClientService
-
-DEFAULT_RENEWAL_EXTENSION_DAYS = 30
-
 
 def _admin_required(user):
     return user.is_authenticated and user.is_staff
@@ -788,7 +786,11 @@ def client_action_view(request, pk: int, action: str):
                         return redirect(renewal_next_url)
                     extension_days = int(extension_days_raw)
                 else:
-                    extension_days = DEFAULT_RENEWAL_EXTENSION_DAYS
+                    extension_days = (
+                        SystemSettings
+                        .get_solo()
+                        .default_renewal_extension_days
+                    )
 
                 if extension_days < 1 or extension_days > 365:
                     messages.error(request, "Число дней продления должно быть в диапазоне от 1 до 365.")
@@ -949,6 +951,11 @@ def renewal_requests_list_view(request):
         "vpn/renewal_requests_list.html",
         {
             "request_rows": requests_qs[:200],
+            "default_renewal_extension_days": (
+                SystemSettings
+                .get_solo()
+                .default_renewal_extension_days
+            ),
             "status_filter": status_filter,
             "status_choices": [
                 ("open", "Открытые"),

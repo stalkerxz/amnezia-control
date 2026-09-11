@@ -1,3 +1,4 @@
+from datetime import timedelta
 from unittest.mock import patch
 
 from django.contrib.auth import (
@@ -5,9 +6,16 @@ from django.contrib.auth import (
 )
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
+
+from core.models import SystemSettings
 
 from .access_services import (
     CustomerAccessError,
+)
+from .forms import (
+    CustomerAccountCreateForm,
+    CustomerOnboardingForm,
 )
 from .models import (
     ClientDevice,
@@ -108,14 +116,12 @@ class CustomerOnboardingTest(TestCase):
         self.assertContains(
             response,
             (
-                "Подключения на этом этапе "
-                "не создаются и не изменяются."
+                "VPN-подключения выпускаются "
+                "после создания клиента."
             ),
         )
 
         for technical_marker in (
-            "FULL",
-            "SELECTIVE",
             "VLESS/XHTTP",
             "AWG2",
             "runtime",
@@ -153,6 +159,56 @@ class CustomerOnboardingTest(TestCase):
             reverse(
                 "customers-create"
             ),
+        )
+
+    def test_new_account_forms_use_configured_default_expiry(
+        self,
+    ):
+        settings_obj = (
+            SystemSettings.get_solo()
+        )
+
+        settings_obj.default_account_lifetime_days = 45
+        settings_obj.save(
+            update_fields=[
+                "default_account_lifetime_days",
+                "updated_at",
+            ]
+        )
+
+        fixed_now = timezone.now()
+
+        expected = timezone.localtime(
+            fixed_now
+            + timedelta(days=45)
+        ).strftime(
+            "%Y-%m-%dT%H:%M"
+        )
+
+        with patch(
+            "customers.forms.timezone.now",
+            return_value=fixed_now,
+        ):
+            create_form = (
+                CustomerAccountCreateForm()
+            )
+
+            onboarding_form = (
+                CustomerOnboardingForm()
+            )
+
+        self.assertEqual(
+            create_form.initial[
+                "expires_at"
+            ],
+            expected,
+        )
+
+        self.assertEqual(
+            onboarding_form.initial[
+                "expires_at"
+            ],
+            expected,
         )
 
     @patch(

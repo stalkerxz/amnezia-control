@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from django import forms
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import (
@@ -6,10 +8,32 @@ from django.contrib.auth.password_validation import (
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 
+from core.models import SystemSettings
+
 from .models import ClientDevice, CustomerAccount
 
 
 User = get_user_model()
+
+
+def _default_account_expiry_initial():
+    settings_obj = SystemSettings.get_solo()
+
+    expires_at = (
+        timezone.now()
+        + timedelta(
+            days=(
+                settings_obj
+                .default_account_lifetime_days
+            )
+        )
+    )
+
+    return timezone.localtime(
+        expires_at
+    ).strftime(
+        "%Y-%m-%dT%H:%M"
+    )
 
 
 class CustomerAccountCreateForm(forms.ModelForm):
@@ -55,6 +79,18 @@ class CustomerAccountCreateForm(forms.ModelForm):
         self.fields["expires_at"].input_formats = [
             "%Y-%m-%dT%H:%M",
         ]
+
+        if (
+            not self.is_bound
+            and not self.initial.get(
+                "expires_at"
+            )
+        ):
+            self.initial[
+                "expires_at"
+            ] = (
+                _default_account_expiry_initial()
+            )
 
     def clean_display_name(self):
         value = (self.cleaned_data.get("display_name") or "").strip()
@@ -599,6 +635,28 @@ class CustomerOnboardingForm(forms.Form):
             }
         ),
     )
+
+    def __init__(
+        self,
+        *args,
+        **kwargs,
+    ):
+        super().__init__(
+            *args,
+            **kwargs,
+        )
+
+        if (
+            not self.is_bound
+            and not self.initial.get(
+                "expires_at"
+            )
+        ):
+            self.initial[
+                "expires_at"
+            ] = (
+                _default_account_expiry_initial()
+            )
 
     def clean_display_name(self):
         value = (

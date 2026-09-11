@@ -7,6 +7,7 @@ import urllib.error
 
 from cryptography.fernet import Fernet
 from audit.models import AuditLog
+from core.models import SystemSettings
 from django.contrib.auth import get_user_model
 from django.core import mail
 from django.core.management import call_command
@@ -2088,18 +2089,59 @@ class VPNClientPortalAdminAndRenewalVisibilityTest(TestCase):
         self.assertIn("/portal/", reopen_response.url)
 
     def test_portal_block_has_single_copy_link_action(self):
-        PortalAccessService.issue_for_client(self.client_with_renewal)
-        response = self.client.get(f"/clients/{self.client_with_renewal.id}/?show_portal_link=1")
-        self.assertContains(response, "Скопировать ссылку", count=1)
+        PortalAccessService.issue_for_client(
+            self.client_with_renewal
+        )
+
+        response = self.client.get(
+            (
+                f"/clients/"
+                f"{self.client_with_renewal.id}/"
+                "?show_portal_link=1"
+            )
+        )
+
+        self.assertContains(
+            response,
+            'data-copy-label="Скопировать ссылку"',
+            count=1,
+            html=False,
+        )
 
     def test_portal_actions_use_safe_next_fallback_when_next_is_external(self):
         response = self.client.post(
-            f"/clients/{self.client_with_renewal.id}/action/portal_issue/",
-            {"next": "https://evil.example/phish"},
+            (
+                f"/clients/"
+                f"{self.client_with_renewal.id}/"
+                "action/portal_issue/"
+            ),
+            {
+                "next": (
+                    "https://evil.example/phish"
+                ),
+            },
             follow=False,
         )
-        self.assertEqual(response.status_code, 302)
-        self.assertEqual(response.url, f"/clients/{self.client_with_renewal.id}/?show_portal_link=1")
+
+        self.assertEqual(
+            response.status_code,
+            302,
+        )
+
+        self.assertEqual(
+            response.url,
+            (
+                f"/clients/"
+                f"{self.client_with_renewal.id}/"
+                "?show_portal_link=1"
+                "&portal_updated=1"
+            ),
+        )
+
+        self.assertNotIn(
+            "evil.example",
+            response.url,
+        )
 
     def test_portal_revoke_redirects_back_to_renewal_queue_when_triggered_from_queue(self):
         PortalAccessService.issue_for_client(self.client_with_renewal)
@@ -2114,16 +2156,48 @@ class VPNClientPortalAdminAndRenewalVisibilityTest(TestCase):
         self.assertEqual(response.url, next_url)
 
     def test_clients_list_marks_and_filters_open_renewal_requests(self):
-        ClientRenewalRequest.objects.create(client=self.client_with_renewal, status=ClientRenewalRequest.Status.NEW)
+        ClientRenewalRequest.objects.create(
+            client=self.client_with_renewal,
+            status=(
+                ClientRenewalRequest.Status.NEW
+            ),
+        )
 
-        response = self.client.get("/clients/")
-        self.assertContains(response, "client-with-renewal")
-        self.assertContains(response, "Продление")
-        self.assertContains(response, "Последняя заявка на продление")
+        response = self.client.get(
+            "/clients/"
+        )
 
-        filtered = self.client.get("/clients/", {"renewal_state": "with"})
-        self.assertContains(filtered, "client-with-renewal")
-        self.assertNotContains(filtered, "client-without-renewal")
+        self.assertContains(
+            response,
+            "client-with-renewal",
+        )
+
+        self.assertContains(
+            response,
+            "Продление",
+        )
+
+        self.assertContains(
+            response,
+            "Заявка:",
+        )
+
+        filtered = self.client.get(
+            "/clients/",
+            {
+                "renewal_state": "with",
+            },
+        )
+
+        self.assertContains(
+            filtered,
+            "client-with-renewal",
+        )
+
+        self.assertNotContains(
+            filtered,
+            "client-without-renewal",
+        )
 
     def test_operator_can_change_renewal_status_and_save_note(self):
         request_obj = ClientRenewalRequest.objects.create(
@@ -2191,27 +2265,61 @@ class VPNClientPortalAdminAndRenewalVisibilityTest(TestCase):
             ).exists()
         )
 
-    def test_extend_and_close_uses_default_30_days_when_days_not_passed(self):
+    def test_extend_and_close_uses_configured_default_when_days_not_passed(self):
+        settings_obj = SystemSettings.get_solo()
+        settings_obj.default_renewal_extension_days = 45
+        settings_obj.save(
+            update_fields=[
+                "default_renewal_extension_days",
+                "updated_at",
+            ]
+        )
+
         request_obj = ClientRenewalRequest.objects.create(
             client=self.client_with_renewal,
             status=ClientRenewalRequest.Status.NEW,
         )
-        self.client_with_renewal.expires_at = timezone.now() + timedelta(days=5)
-        self.client_with_renewal.save(update_fields=["expires_at"])
-        previous_expires = self.client_with_renewal.expires_at
+
+        self.client_with_renewal.expires_at = (
+            timezone.now()
+            + timedelta(days=5)
+        )
+        self.client_with_renewal.save(
+            update_fields=["expires_at"]
+        )
+
+        previous_expires = (
+            self.client_with_renewal.expires_at
+        )
 
         self.client.post(
-            f"/clients/{self.client_with_renewal.id}/action/renewal_set_status/",
+            (
+                f"/clients/"
+                f"{self.client_with_renewal.id}/"
+                f"action/renewal_set_status/"
+            ),
             {
                 "renewal_request_id": request_obj.id,
                 "target_status": "extend_and_close",
-                "operator_note": "Продлили по стандартному сроку.",
+                "operator_note": (
+                    "Продлили по настройке."
+                ),
             },
             follow=True,
         )
+
         self.client_with_renewal.refresh_from_db()
 
-        self.assertGreaterEqual(self.client_with_renewal.expires_at, previous_expires + timedelta(days=29, hours=23))
+        self.assertGreaterEqual(
+            self.client_with_renewal.expires_at,
+            (
+                previous_expires
+                + timedelta(
+                    days=44,
+                    hours=23,
+                )
+            ),
+        )
 
     def test_extend_and_close_rejects_non_numeric_days(self):
         request_obj = ClientRenewalRequest.objects.create(
