@@ -1327,6 +1327,16 @@ class CustomerDeviceCreationUITest(TestCase):
             "Добавить устройство",
         )
 
+        self.assertNotIn(
+            "platform",
+            response.context["form"].fields,
+        )
+
+        self.assertNotContains(
+            response,
+            'name="platform"',
+        )
+
     def test_operator_can_add_device(self):
         self.client.force_login(self.operator)
 
@@ -1337,7 +1347,6 @@ class CustomerDeviceCreationUITest(TestCase):
             ),
             {
                 "name": "iPhone 15 Pro",
-                "platform": ClientDevice.Platform.IOS,
                 "notes": "Основной телефон",
             },
         )
@@ -1351,7 +1360,7 @@ class CustomerDeviceCreationUITest(TestCase):
 
         self.assertEqual(
             device.platform,
-            ClientDevice.Platform.IOS,
+            ClientDevice.Platform.UNKNOWN,
         )
 
         self.assertEqual(
@@ -1389,7 +1398,6 @@ class CustomerDeviceCreationUITest(TestCase):
             ),
             {
                 "name": "Forbidden Device",
-                "platform": ClientDevice.Platform.IOS,
                 "notes": "",
             },
         )
@@ -1415,7 +1423,6 @@ class CustomerDeviceCreationUITest(TestCase):
             ),
             {
                 "name": "MacBook Pro",
-                "platform": ClientDevice.Platform.MACOS,
                 "notes": "",
             },
         )

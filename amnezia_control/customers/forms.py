@@ -75,12 +75,10 @@ class ClientDeviceCreateForm(forms.ModelForm):
         model = ClientDevice
         fields = (
             "name",
-            "platform",
             "notes",
         )
         labels = {
             "name": "Название устройства",
-            "platform": "Платформа",
             "notes": "Заметка",
         }
         widgets = {
@@ -89,11 +87,6 @@ class ClientDeviceCreateForm(forms.ModelForm):
                     "class": "form-control",
                     "placeholder": "Например: iPhone 15 Pro",
                     "autofocus": True,
-                }
-            ),
-            "platform": forms.Select(
-                attrs={
-                    "class": "form-select",
                 }
             ),
             "notes": forms.Textarea(
