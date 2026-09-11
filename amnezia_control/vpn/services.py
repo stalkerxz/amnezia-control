@@ -1869,8 +1869,25 @@ class VPNClientLimitsService:
                     client.save(update_fields=["traffic_sync_error", "traffic_last_sync_at"])
                     unavailable += 1
 
-        AuditService.log(actor, "client.limit.traffic_sync", "VPNClient", "bulk", details={"synced": synced, "unavailable": unavailable})
-        return {"synced": synced, "unavailable": unavailable}
+        details = {
+            "synced": synced,
+            "unavailable": unavailable,
+        }
+
+        # Routine background telemetry runs every few minutes.
+        # A fully successful system poll is operational noise,
+        # not an audit-worthy event. Keep manual runs and
+        # degraded telemetry visible.
+        if actor is not None or unavailable:
+            AuditService.log(
+                actor,
+                "client.limit.traffic_sync",
+                "VPNClient",
+                "bulk",
+                details=details,
+            )
+
+        return details
 
     @staticmethod
     def enforce_limits(*, actor=None):
@@ -1907,6 +1924,26 @@ class VPNClientLimitsService:
                 client.limit_state = state
                 client.save(update_fields=["limit_state"])
 
-        details = {"processed": processed, "expired": expired, "traffic_exceeded": traffic_exceeded}
-        AuditService.log(actor, "client.limit.enforce", "VPNClient", "bulk", details=details)
+        details = {
+            "processed": processed,
+            "expired": expired,
+            "traffic_exceeded": traffic_exceeded,
+        }
+
+        # Do not store a new audit row for every clean periodic
+        # enforcement pass. Preserve manual runs and passes that
+        # actually changed access because of a limit.
+        if (
+            actor is not None
+            or expired
+            or traffic_exceeded
+        ):
+            AuditService.log(
+                actor,
+                "client.limit.enforce",
+                "VPNClient",
+                "bulk",
+                details=details,
+            )
+
         return details

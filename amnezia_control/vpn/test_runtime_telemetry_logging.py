@@ -1,7 +1,9 @@
+from datetime import timedelta
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, TestCase
+from django.utils import timezone
 
 from servers.agent_backend import (
     RemoteAWG2AgentAdapter,
@@ -10,6 +12,7 @@ from vpn.services import (
     AWG2Adapter,
     PeerState,
     RuntimeCommandService,
+    VPNClientLimitsService,
 )
 
 
@@ -160,4 +163,200 @@ class RuntimeTelemetryLoggingTest(
             agent_call
             .call_args
             .kwargs["record_job"]
+        )
+
+
+class BackgroundAuditNoiseTest(TestCase):
+    @patch(
+        "vpn.services.AuditService.log"
+    )
+    def test_clean_system_cycles_are_not_audited(
+        self,
+        audit_log,
+    ):
+        traffic = (
+            VPNClientLimitsService
+            .sync_traffic_usage(
+                actor=None,
+            )
+        )
+
+        limits = (
+            VPNClientLimitsService
+            .enforce_limits(
+                actor=None,
+            )
+        )
+
+        self.assertEqual(
+            traffic,
+            {
+                "synced": 0,
+                "unavailable": 0,
+            },
+        )
+
+        self.assertEqual(
+            limits,
+            {
+                "processed": 0,
+                "expired": 0,
+                "traffic_exceeded": 0,
+            },
+        )
+
+        audit_log.assert_not_called()
+
+    @patch(
+        "vpn.services.AuditService.log"
+    )
+    def test_manual_clean_cycles_remain_audited(
+        self,
+        audit_log,
+    ):
+        actor = object()
+
+        (
+            VPNClientLimitsService
+            .sync_traffic_usage(
+                actor=actor,
+            )
+        )
+
+        (
+            VPNClientLimitsService
+            .enforce_limits(
+                actor=actor,
+            )
+        )
+
+        actions = [
+            call.args[1]
+            for call
+            in audit_log.call_args_list
+        ]
+
+        self.assertEqual(
+            actions,
+            [
+                "client.limit.traffic_sync",
+                "client.limit.enforce",
+            ],
+        )
+
+    @patch(
+        "vpn.services.AuditService.log"
+    )
+    @patch(
+        "vpn.services."
+        "AdapterFactory.get_for_server",
+        side_effect=RuntimeError(
+            "runtime unavailable"
+        ),
+    )
+    @patch(
+        "vpn.services.VPNClient.objects.filter"
+    )
+    def test_system_telemetry_failure_is_audited(
+        self,
+        filter_clients,
+        _adapter_factory,
+        audit_log,
+    ):
+        client = SimpleNamespace(
+            server_id=1,
+            protocol_type="awg2",
+            server=SimpleNamespace(),
+            save=Mock(),
+        )
+
+        queryset = Mock()
+
+        (
+            filter_clients
+            .return_value
+            .exclude
+            .return_value
+            .select_related
+            .return_value
+        ) = [client]
+
+        result = (
+            VPNClientLimitsService
+            .sync_traffic_usage(
+                actor=None,
+            )
+        )
+
+        self.assertEqual(
+            result,
+            {
+                "synced": 0,
+                "unavailable": 1,
+            },
+        )
+
+        audit_log.assert_called_once()
+
+        self.assertEqual(
+            audit_log.call_args.args[1],
+            "client.limit.traffic_sync",
+        )
+
+    @patch(
+        "vpn.services.AuditService.log"
+    )
+    @patch(
+        "vpn.services."
+        "VPNClientService.set_status"
+    )
+    @patch(
+        "vpn.services."
+        "VPNClient.objects.select_related"
+    )
+    def test_system_enforcement_change_is_audited(
+        self,
+        select_related,
+        set_status,
+        audit_log,
+    ):
+        client = SimpleNamespace(
+            expires_at=(
+                timezone.now()
+                - timedelta(seconds=1)
+            ),
+            traffic_limit_bytes=None,
+            traffic_used_bytes=0,
+        )
+
+        (
+            select_related
+            .return_value
+            .filter
+            .return_value
+        ) = [client]
+
+        result = (
+            VPNClientLimitsService
+            .enforce_limits(
+                actor=None,
+            )
+        )
+
+        self.assertEqual(
+            result["expired"],
+            1,
+        )
+
+        self.assertEqual(
+            result["traffic_exceeded"],
+            0,
+        )
+
+        set_status.assert_called_once()
+        audit_log.assert_called_once()
+
+        self.assertEqual(
+            audit_log.call_args.args[1],
+            "client.limit.enforce",
         )
