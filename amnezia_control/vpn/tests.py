@@ -2462,12 +2462,28 @@ class VPNClientPortalAdminAndRenewalVisibilityTest(TestCase):
         self.client.force_login(self.user)
 
         by_operator = self.client.get("/clients/renewal-requests/", {"status": "open", "operator": str(self.user.id)})
-        self.assertContains(by_operator, f"#{request_first.id}")
-        self.assertNotContains(by_operator, f"#{request_second.id}")
+        self.assertContains(
+            by_operator,
+            f'id="renewal-actions-{request_first.id}"',
+            html=False,
+        )
+        self.assertNotContains(
+            by_operator,
+            f'id="renewal-actions-{request_second.id}"',
+            html=False,
+        )
 
         only_mine = self.client.get("/clients/renewal-requests/", {"status": "open", "only_my_actions": "1"})
-        self.assertContains(only_mine, f"#{request_first.id}")
-        self.assertNotContains(only_mine, f"#{request_second.id}")
+        self.assertContains(
+            only_mine,
+            f'id="renewal-actions-{request_first.id}"',
+            html=False,
+        )
+        self.assertNotContains(
+            only_mine,
+            f'id="renewal-actions-{request_second.id}"',
+            html=False,
+        )
 
     def test_operator_ui_shows_attachment_presence_and_can_open_it(self):
         request_obj = ClientRenewalRequest.objects.create(
@@ -2479,11 +2495,25 @@ class VPNClientPortalAdminAndRenewalVisibilityTest(TestCase):
         list_response = self.client.get("/clients/renewal-requests/")
         detail_response = self.client.get(f"/clients/{self.client_with_renewal.id}/")
 
-        self.assertContains(list_response, "Есть файл")
-        self.assertContains(list_response, "evidence.pdf")
-        self.assertContains(list_response, "Открыть файл")
-        self.assertContains(detail_response, "evidence.pdf")
-        self.assertContains(detail_response, "Вложение:")
+        self.assertContains(
+            list_response,
+            "Файл · evidence.pdf",
+        )
+        self.assertContains(
+            list_response,
+            (
+                f'/clients/renewal-requests/'
+                f'{request_obj.id}/attachment/'
+            ),
+        )
+        self.assertContains(
+            detail_response,
+            "evidence.pdf",
+        )
+        self.assertContains(
+            detail_response,
+            "Вложение:",
+        )
 
         download_response = self.client.get(f"/clients/renewal-requests/{request_obj.id}/attachment/")
         self.assertEqual(download_response.status_code, 200)

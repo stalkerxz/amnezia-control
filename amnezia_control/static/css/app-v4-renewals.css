@@ -164,3 +164,374 @@
   .v4-renewal-action-card { grid-template-columns: 1fr; }
   .v4-renewal-action-buttons { grid-column: auto; }
 }
+
+
+/* Mobile renewal request cards V1 */
+@media (max-width: 767.98px) {
+  .v4-renewal-filter-details {
+    display: block;
+  }
+
+  .v4-renewal-filter-details > summary {
+    width: 100%;
+
+    justify-content: space-between;
+  }
+
+  .v4-system-table-wrap:has(.v4-renewal-table) {
+    overflow: visible;
+  }
+
+  .v4-renewal-table {
+    display: block;
+
+    width: 100%;
+    min-width: 0;
+
+    table-layout: auto;
+  }
+
+  .v4-renewal-table thead {
+    display: none;
+  }
+
+  .v4-renewal-table tbody {
+    display: grid;
+
+    gap: 8px;
+    padding: 8px;
+  }
+
+  .v4-renewal-table
+  tbody
+  tr.v4-renewal-row {
+    display: grid;
+
+    grid-template-columns:
+      minmax(0,1fr)
+      auto;
+
+    grid-template-areas:
+      "client status"
+      "request request"
+      "server operator"
+      "file file"
+      "actions actions";
+
+    gap: 10px 12px;
+
+    padding: 12px;
+
+    border:
+      1px solid
+      rgba(121,149,191,.11);
+
+    border-radius: 12px;
+
+    background:
+      linear-gradient(
+        155deg,
+        rgba(17,27,45,.94),
+        rgba(9,16,28,.94)
+      );
+  }
+
+  .v4-renewal-table
+  tbody
+  tr.v4-renewal-row.is-open {
+    box-shadow:
+      inset 2px 0 0
+      rgba(243,185,79,.46);
+  }
+
+  .v4-renewal-table
+  tbody
+  tr.v4-renewal-row.is-open
+  td:first-child {
+    box-shadow: none;
+  }
+
+  .v4-renewal-table
+  tbody
+  tr.v4-renewal-row > td {
+    display: block;
+
+    min-width: 0;
+
+    padding: 0 !important;
+    border: 0 !important;
+  }
+
+  .v4-renewal-table
+  tbody
+  tr.v4-renewal-row > td:nth-child(1) {
+    grid-area: client;
+  }
+
+  .v4-renewal-table
+  tbody
+  tr.v4-renewal-row > td:nth-child(2) {
+    grid-area: status;
+
+    align-self: start;
+    justify-self: end;
+  }
+
+  .v4-renewal-table
+  tbody
+  tr.v4-renewal-row > td:nth-child(3) {
+    grid-area: request;
+  }
+
+  .v4-renewal-table
+  tbody
+  tr.v4-renewal-row > td:nth-child(4) {
+    grid-area: server;
+  }
+
+  .v4-renewal-table
+  tbody
+  tr.v4-renewal-row > td:nth-child(5) {
+    grid-area: operator;
+  }
+
+  .v4-renewal-table
+  tbody
+  tr.v4-renewal-row > td:nth-child(6) {
+    grid-area: file;
+  }
+
+  .v4-renewal-table
+  tbody
+  tr.v4-renewal-row > td:nth-child(7) {
+    grid-area: actions;
+  }
+
+  .v4-renewal-table
+  tbody
+  tr.v4-renewal-row > td:nth-child(3),
+  .v4-renewal-table
+  tbody
+  tr.v4-renewal-row > td:nth-child(4),
+  .v4-renewal-table
+  tbody
+  tr.v4-renewal-row > td:nth-child(5),
+  .v4-renewal-table
+  tbody
+  tr.v4-renewal-row > td:nth-child(6) {
+    padding: 8px 9px !important;
+
+    border:
+      1px solid
+      rgba(121,149,191,.075)
+      !important;
+
+    border-radius: 9px;
+
+    background:
+      rgba(63,87,124,.035);
+  }
+
+  .v4-renewal-table
+  tbody
+  tr.v4-renewal-row > td:nth-child(3)::before,
+  .v4-renewal-table
+  tbody
+  tr.v4-renewal-row > td:nth-child(4)::before,
+  .v4-renewal-table
+  tbody
+  tr.v4-renewal-row > td:nth-child(5)::before,
+  .v4-renewal-table
+  tbody
+  tr.v4-renewal-row > td:nth-child(6)::before {
+    display: block;
+
+    margin-bottom: 4px;
+
+    color: #53637a;
+
+    font-size: .49rem;
+    font-weight: 720;
+
+    letter-spacing: .075em;
+    line-height: 1.2;
+
+    text-transform: uppercase;
+  }
+
+  .v4-renewal-table
+  tbody
+  tr.v4-renewal-row > td:nth-child(3)::before {
+    content: "Заявка";
+  }
+
+  .v4-renewal-table
+  tbody
+  tr.v4-renewal-row > td:nth-child(4)::before {
+    content: "Сервер";
+  }
+
+  .v4-renewal-table
+  tbody
+  tr.v4-renewal-row > td:nth-child(5)::before {
+    content: "Оператор";
+  }
+
+  .v4-renewal-table
+  tbody
+  tr.v4-renewal-row > td:nth-child(6)::before {
+    content: "Файл";
+  }
+
+  .v4-renewal-table
+  .v4-renewal-client > a {
+    overflow: visible;
+
+    text-overflow: clip;
+
+    white-space: normal;
+  }
+
+  .v4-renewal-table
+  .v4-renewal-actions-cell
+  > .d-inline-flex {
+    display: grid !important;
+
+    width: 100%;
+
+    grid-template-columns:
+      repeat(2,minmax(0,1fr));
+  }
+
+  .v4-renewal-table
+  .v4-renewal-actions-cell
+  .btn {
+    width: 100%;
+  }
+
+  .v4-renewal-detail-row {
+    display: block;
+
+    margin-top: -4px;
+
+    overflow: hidden;
+
+    border:
+      1px solid
+      rgba(121,149,191,.08);
+
+    border-radius: 11px;
+
+    background:
+      rgba(7,13,23,.36);
+  }
+
+  .v4-renewal-detail-row > td {
+    display: block;
+
+    width: 100%;
+
+    padding: 0 !important;
+    border: 0 !important;
+  }
+
+  .v4-renewal-detail-row
+  .v4-renewal-action-wrap {
+    padding: 10px;
+
+    border-top: 0;
+  }
+
+  .v4-renewal-action-buttons {
+    display: grid;
+
+    width: 100%;
+
+    grid-template-columns:
+      repeat(2,minmax(0,1fr));
+  }
+
+  .v4-renewal-action-buttons .btn {
+    width: 100%;
+  }
+
+  .v4-renewal-action-buttons .btn:last-child {
+    grid-column: 1 / -1;
+  }
+}
+
+
+@media (max-width: 359.98px) {
+  .v4-renewal-table
+  tbody
+  tr.v4-renewal-row {
+    grid-template-columns: 1fr;
+
+    grid-template-areas:
+      "client"
+      "status"
+      "request"
+      "server"
+      "operator"
+      "file"
+      "actions";
+  }
+
+  .v4-renewal-table
+  tbody
+  tr.v4-renewal-row > td:nth-child(2) {
+    justify-self: start;
+  }
+
+  .v4-renewal-table
+  .v4-renewal-actions-cell
+  > .d-inline-flex,
+  .v4-renewal-action-buttons {
+    grid-template-columns: 1fr;
+  }
+
+  .v4-renewal-action-buttons .btn:last-child {
+    grid-column: auto;
+  }
+}
+
+
+/* Mobile renewal title count polish V1 */
+@media (max-width: 767.98px) {
+  .v4-renewals-page .v4-title-line {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .v4-renewals-page .v4-title-line h1 {
+    flex: 0 1 auto;
+  }
+
+  .v4-renewals-page .v4-total-badge {
+    display: inline-flex;
+    min-width: 30px;
+    min-height: 30px;
+    align-items: center;
+    justify-content: center;
+    padding: 4px 9px;
+
+    border:
+      1px solid
+      rgba(101,151,255,.18);
+
+    border-radius: 999px;
+
+    background:
+      rgba(72,116,210,.09);
+
+    color: #91b9ff;
+
+    font-size: .72rem;
+    font-weight: 720;
+    line-height: 1;
+
+    font-variant-numeric: tabular-nums;
+  }
+}
