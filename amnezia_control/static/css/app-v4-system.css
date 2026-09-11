@@ -1026,3 +1026,150 @@
     justify-self: start;
   }
 }
+
+
+/* Mobile settings reminder cards V1 */
+@media (max-width: 767.98px) {
+  .v4-system-table-wrap:has(.v4-settings-reminder-table) {
+    overflow: visible;
+  }
+
+  .v4-settings-reminder-table {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    table-layout: auto;
+  }
+
+  .v4-settings-reminder-table thead {
+    display: none;
+  }
+
+  .v4-settings-reminder-table tbody {
+    display: grid;
+    gap: 8px;
+    padding: 8px;
+  }
+
+  .v4-settings-reminder-table tbody tr {
+    display: grid;
+    grid-template-columns:
+      minmax(0,1fr)
+      minmax(0,1fr);
+    grid-template-areas:
+      "client client"
+      "threshold expires"
+      "sent sent";
+    gap: 9px;
+    padding: 11px;
+
+    border:
+      1px solid
+      rgba(121,149,191,.10);
+
+    border-radius: 11px;
+
+    background:
+      rgba(10,18,31,.58);
+  }
+
+  .v4-settings-reminder-table tbody td {
+    display: block;
+    min-width: 0;
+
+    padding: 0 !important;
+    border: 0 !important;
+
+    overflow-wrap: anywhere;
+  }
+
+  .v4-settings-reminder-table
+  tbody td:nth-child(1) {
+    grid-area: client;
+
+    color: #d7e0ed;
+    font-weight: 650;
+  }
+
+  .v4-settings-reminder-table
+  tbody td:nth-child(2) {
+    grid-area: threshold;
+  }
+
+  .v4-settings-reminder-table
+  tbody td:nth-child(3) {
+    grid-area: expires;
+  }
+
+  .v4-settings-reminder-table
+  tbody td:nth-child(4) {
+    grid-area: sent;
+  }
+
+  .v4-settings-reminder-table
+  tbody td:nth-child(n+2) {
+    padding: 8px 9px !important;
+
+    border:
+      1px solid
+      rgba(121,149,191,.07)
+      !important;
+
+    border-radius: 9px;
+
+    background:
+      rgba(63,87,124,.035);
+  }
+
+  .v4-settings-reminder-table
+  tbody td:nth-child(n+2)::before {
+    display: block;
+
+    margin-bottom: 4px;
+
+    color: #53637a;
+
+    font-size: .49rem;
+    font-weight: 720;
+
+    letter-spacing: .075em;
+    line-height: 1.2;
+
+    text-transform: uppercase;
+  }
+
+  .v4-settings-reminder-table
+  tbody td:nth-child(2)::before {
+    content: "Порог";
+  }
+
+  .v4-settings-reminder-table
+  tbody td:nth-child(3)::before {
+    content: "Истекает";
+  }
+
+  .v4-settings-reminder-table
+  tbody td:nth-child(4)::before {
+    content: "Отправлено";
+  }
+
+  .v4-settings-primary
+  .v4-system-panel-body
+  .col-12
+  .btn-primary {
+    width: 100%;
+  }
+}
+
+
+@media (max-width: 359.98px) {
+  .v4-settings-reminder-table tbody tr {
+    grid-template-columns: 1fr;
+
+    grid-template-areas:
+      "client"
+      "threshold"
+      "expires"
+      "sent";
+  }
+}

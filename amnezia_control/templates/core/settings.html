@@ -45,7 +45,7 @@
           {% if expiration_reminder_last_logs %}
             <div class="v4-settings-subsection-head"><span>Последние отправки</span></div>
             <div class="v4-system-table-wrap mt-2">
-              <table class="table v4-system-table align-middle">
+              <table class="table v4-system-table v4-settings-reminder-table align-middle">
                 <thead><tr><th>{% trans "Клиент" %}</th><th>{% trans "Порог" %}</th><th>{% trans "Истекает" %}</th><th>{% trans "Отправлено" %}</th></tr></thead>
                 <tbody>{% for log in expiration_reminder_last_logs %}<tr><td>#{{ log.client_id }} {{ log.client.name }}</td><td>{{ log.threshold_days }} {% trans "дн." %}</td><td>{{ log.expires_at_snapshot|date:'d.m.Y H:i' }}</td><td>{{ log.sent_at|date:'d.m.Y H:i' }}</td></tr>{% endfor %}</tbody>
               </table>
