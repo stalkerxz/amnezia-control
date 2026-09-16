@@ -1173,3 +1173,432 @@
       "sent";
   }
 }
+
+
+/* ============================================================
+   Servers V2 — compact responsive infrastructure cards
+   ============================================================ */
+
+.v4-servers-overview {
+  overflow: hidden;
+  border: 1px solid rgba(118, 151, 199, .11);
+  border-radius: 18px;
+  background:
+    linear-gradient(
+      160deg,
+      rgba(11, 19, 33, .97),
+      rgba(7, 13, 23, .98)
+    );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .025),
+    0 16px 40px rgba(0, 0, 0, .12);
+}
+
+.v4-servers-overview-head {
+  padding: 18px 20px;
+  border-bottom: 1px solid rgba(118, 151, 199, .08);
+}
+
+.v4-server-card-list {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+}
+
+.v4-server-card {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(119, 151, 201, .10);
+  border-radius: 15px;
+  background:
+    linear-gradient(
+      150deg,
+      rgba(15, 25, 42, .94),
+      rgba(9, 16, 28, .96)
+    );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .018);
+}
+
+.v4-server-card::before {
+  position: absolute;
+  top: 14px;
+  bottom: 14px;
+  left: 0;
+  width: 2px;
+  border-radius: 0 2px 2px 0;
+  background: rgba(112, 136, 170, .28);
+  content: "";
+}
+
+.v4-server-card.is-success::before {
+  background: rgba(70, 209, 151, .86);
+}
+
+.v4-server-card.is-warning::before {
+  background: rgba(229, 181, 82, .90);
+}
+
+.v4-server-card.is-danger::before {
+  background: rgba(237, 91, 111, .90);
+}
+
+.v4-server-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 18px 20px 14px;
+}
+
+.v4-server-card-identity {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.v4-server-card-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.v4-server-card-title {
+  min-width: 0;
+  color: #edf5ff;
+  font-size: 1.02rem;
+  font-weight: 780;
+  line-height: 1.25;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.v4-server-card-title:hover {
+  color: #fff;
+}
+
+.v4-server-card-addresses {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px 15px;
+  margin-top: 7px;
+  color: #74849b;
+  font-size: .69rem;
+}
+
+.v4-server-card-addresses > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.v4-server-card-address-label {
+  color: #56667c;
+  font-size: .56rem;
+  font-weight: 760;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+}
+
+.v4-server-card-addresses .v4-system-mono {
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.v4-server-card-health-note {
+  margin: 0 20px 14px;
+  padding: 9px 11px;
+  border: 1px solid rgba(111, 145, 194, .07);
+  border-radius: 9px;
+  background: rgba(63, 87, 124, .035);
+  color: #7f8ea3;
+  font-size: .68rem;
+  line-height: 1.4;
+}
+
+.v4-server-card-stats {
+  display: grid;
+  grid-template-columns:
+    minmax(150px, 1.25fr)
+    minmax(120px, .9fr)
+    minmax(110px, .75fr)
+    minmax(110px, .75fr)
+    minmax(125px, .85fr)
+    minmax(130px, .9fr);
+  gap: 8px;
+  padding: 0 20px 16px;
+}
+
+.v4-server-stat {
+  min-width: 0;
+  padding: 11px 12px;
+  border: 1px solid rgba(115, 148, 195, .075);
+  border-radius: 11px;
+  background: rgba(65, 89, 127, .035);
+}
+
+.v4-server-stat-label {
+  display: block;
+  margin-bottom: 7px;
+  color: #596a82;
+  font-size: .53rem;
+  font-weight: 760;
+  letter-spacing: .075em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.v4-server-stat-value {
+  min-height: 29px;
+  display: flex;
+  align-items: center;
+}
+
+.v4-server-stat-number {
+  color: #edf5ff;
+  font-size: 1.12rem;
+  font-weight: 790;
+  line-height: 1.05;
+}
+
+.v4-server-stat-meta {
+  margin-top: 4px;
+  color: #697a91;
+  font-size: .62rem;
+  line-height: 1.3;
+}
+
+.v4-server-admission-form {
+  margin: 0;
+}
+
+.v4-server-mode-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.v4-server-pool-value {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.v4-server-pool-value strong {
+  color: #edf5ff;
+  font-size: 1.08rem;
+  line-height: 1;
+}
+
+.v4-server-pool-value span {
+  color: #718197;
+  font-size: .69rem;
+}
+
+.v4-server-sync-value {
+  color: #dbe6f5;
+  font-size: .82rem;
+  font-weight: 700;
+}
+
+.v4-server-card-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 7px;
+  padding: 0 20px 17px;
+}
+
+.v4-server-diagnostics {
+  margin: 0 12px 12px;
+  padding: 14px;
+  border: 1px solid rgba(112, 147, 196, .09);
+  border-radius: 12px;
+  background: rgba(5, 11, 20, .42);
+}
+
+.v4-server-diagnostics-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.v4-server-diagnostics-head strong {
+  display: block;
+  margin-top: 2px;
+  color: #dce7f5;
+  font-size: .78rem;
+}
+
+.v4-server-diagnostics-close {
+  color: #72849c;
+  font-size: .63rem;
+  text-decoration: none;
+}
+
+.v4-server-diagnostics-close:hover {
+  color: #b6c8de;
+}
+
+.v4-server-diagnostic-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.v4-server-diagnostic-item {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid rgba(115, 148, 195, .065);
+  border-radius: 9px;
+  background: rgba(60, 84, 121, .03);
+}
+
+.v4-server-diagnostic-item > span {
+  display: block;
+  margin-bottom: 5px;
+  color: #596a82;
+  font-size: .51rem;
+  font-weight: 750;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.v4-server-diagnostic-item strong {
+  display: block;
+  overflow: hidden;
+  color: #dce7f4;
+  font-size: .72rem;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+}
+
+.v4-server-diagnostic-item small {
+  display: block;
+  margin-top: 4px;
+  overflow: hidden;
+  color: #65758b;
+  font-size: .58rem;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+}
+
+.v4-server-runtime-groups {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.v4-server-runtime-tokens {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+@media (max-width: 1199.98px) {
+  .v4-server-card-stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .v4-server-diagnostic-grid {
+    grid-template-columns:
+      repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 767.98px) {
+  .v4-servers-overview-head {
+    padding: 15px 14px;
+  }
+
+  .v4-server-card-list {
+    gap: 10px;
+    padding: 8px;
+  }
+
+  .v4-server-card-head {
+    padding: 15px 14px 12px;
+  }
+
+  .v4-server-card-title-row {
+    align-items: flex-start;
+    justify-content: space-between;
+  }
+
+  .v4-server-card-addresses {
+    display: grid;
+    gap: 5px;
+  }
+
+  .v4-server-card-health-note {
+    margin:
+      0
+      14px
+      12px;
+  }
+
+  .v4-server-card-stats {
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr));
+    padding:
+      0
+      14px
+      14px;
+  }
+
+  .v4-server-card-actions {
+    padding:
+      0
+      14px
+      14px;
+  }
+
+  .v4-server-diagnostics {
+    margin:
+      0
+      8px
+      8px;
+    padding: 12px;
+  }
+
+  .v4-server-diagnostic-grid {
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 479.98px) {
+  .v4-server-card-title-row {
+    display: grid;
+    gap: 8px;
+  }
+
+  .v4-server-card-title-row .v4-server-status {
+    justify-self: start;
+  }
+
+  .v4-server-card-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .v4-server-card-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .v4-server-card-actions .btn {
+    width: 100%;
+  }
+
+  .v4-server-diagnostic-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .v4-server-diagnostics-head {
+    align-items: flex-start;
+  }
+}

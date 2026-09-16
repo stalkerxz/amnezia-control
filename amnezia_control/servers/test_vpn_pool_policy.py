@@ -149,5 +149,5 @@ class VPNPoolPolicyTests(TestCase):
 
         self.assertContains(
             response,
-            "Legacy · заблокирован",
+            "Выпуск заблокирован",
         )

@@ -8,178 +8,555 @@
 <link href="{% static 'css/app-v4-system.css' %}" rel="stylesheet">
 
 <div class="v4-system-page">
+
   <header class="v4-page-hero v4-system-hero">
     <div>
       <p class="page-kicker">VPN Control · Инфраструктура</p>
       <h1>Серверы</h1>
-      <p class="v4-hero-copy">Состояние узлов, доступность runtime и протоколов. Детальная диагностика открывается только по запросу.</p>
+      <p class="v4-hero-copy">
+        Состояние VPN-узлов, доступность новых подключений и runtime.
+        Техническая диагностика открывается только по запросу.
+      </p>
     </div>
   </header>
 
-  <div class="v4-system-chips" aria-label="Фильтр состояния серверов">
+  <nav
+    class="v4-system-chips"
+    aria-label="Фильтр состояния серверов"
+  >
     {% for item in health_filters %}
-      <a href="{{ item.url }}" class="v4-system-chip {% if item.active %}active{% endif %}">{{ item.label }}</a>
+      <a
+        href="{{ item.url }}"
+        class="v4-system-chip {% if item.active %}active{% endif %}"
+      >
+        {{ item.label }}
+      </a>
     {% endfor %}
-  </div>
+  </nav>
+
 
   {% if servers %}
-    <section class="v4-system-panel">
-      <div class="v4-system-panel-head">
+
+    <section class="v4-servers-overview">
+
+      <div class="v4-system-panel-head v4-servers-overview-head">
         <div>
           <span class="v4-panel-eyebrow">Runtime</span>
           <h2>Инфраструктура</h2>
-          <p>{{ servers|length }} серверов по текущему фильтру</p>
+          <p>
+            {{ servers|length }}
+            {% if servers|length == 1 %}
+              сервер
+            {% else %}
+              серверов
+            {% endif %}
+            по текущему фильтру
+          </p>
         </div>
       </div>
 
-      <div class="v4-system-table-wrap">
-        <table class="table v4-system-table v4-servers-table align-middle">
-          <thead>
-            <tr>
-              <th>Сервер</th>
-              <th>Доступ</th>
-              <th>Состояние</th>
-              <th>Новые VPN</th>
-              <th>Режимы</th>
-              <th>VPN / XHTTP</th>
-              <th>Peers</th>
-              <th>Последняя синхронизация</th>
-              <th class="text-end"><span class="visually-hidden">Действия</span></th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for s in servers %}
-              <tr class="v4-server-row {% if s.obj.health_status == 'healthy' %}is-success{% elif s.obj.health_status == 'degraded' %}is-warning{% elif s.obj.health_status == 'unhealthy' %}is-danger{% endif %}">
-                <td>
-                  <a class="v4-system-primary" href="/servers/{{ s.obj.id }}/">{{ s.obj.name }}</a>
-                  {% if s.health_reasons %}<div class="v4-system-meta">{{ s.health_reasons.0 }}</div>{% else %}<div class="v4-system-meta">runtime-узел VPN Control</div>{% endif %}
-                </td>
-                <td>
-                  <code class="v4-system-mono">{{ s.obj.ssh_username }}@{{ s.obj.host }}</code>
-                  <div class="v4-system-meta">SSH · порт {{ s.obj.port }}</div>
-                </td>
-                <td>
-                  <span class="v4-server-status {% if s.obj.health_status == 'healthy' %}is-success{% elif s.obj.health_status == 'degraded' %}is-warning{% elif s.obj.health_status == 'unhealthy' %}is-danger{% else %}is-neutral{% endif %}">{{ s.health_label }}</span>
-                </td>
 
-                <td>
+      <div class="v4-server-card-list">
+
+        {% for s in servers %}
+
+          <article
+            class="
+              v4-server-card
+              {% if s.obj.health_status == 'healthy' %}
+                is-success
+              {% elif s.obj.health_status == 'degraded' %}
+                is-warning
+              {% elif s.obj.health_status == 'unhealthy' %}
+                is-danger
+              {% endif %}
+            "
+          >
+
+            <header class="v4-server-card-head">
+
+              <div class="v4-server-card-identity">
+
+                <div class="v4-server-card-title-row">
+                  <a
+                    class="v4-server-card-title"
+                    href="/servers/{{ s.obj.id }}/"
+                  >
+                    {{ s.obj.name }}
+                  </a>
+
+                  <span
+                    class="
+                      v4-server-status
+                      {% if s.obj.health_status == 'healthy' %}
+                        is-success
+                      {% elif s.obj.health_status == 'degraded' %}
+                        is-warning
+                      {% elif s.obj.health_status == 'unhealthy' %}
+                        is-danger
+                      {% else %}
+                        is-neutral
+                      {% endif %}
+                    "
+                  >
+                    {{ s.health_label }}
+                  </span>
+                </div>
+
+
+                <div class="v4-server-card-addresses">
+
+                  <span>
+                    <span class="v4-server-card-address-label">
+                      SSH
+                    </span>
+
+                    <code class="v4-system-mono">
+                      {{ s.obj.ssh_username }}@{{ s.obj.host }}:{{ s.obj.port }}
+                    </code>
+                  </span>
+
+
+                  {% if s.obj.public_endpoint_host %}
+
+                    <span>
+                      <span class="v4-server-card-address-label">
+                        VPN
+                      </span>
+
+                      <code class="v4-system-mono">
+                        {{ s.obj.public_endpoint_host }}{% if s.obj.public_endpoint_port %}:{{ s.obj.public_endpoint_port }}{% endif %}
+                      </code>
+                    </span>
+
+                  {% endif %}
+
+                </div>
+
+              </div>
+
+            </header>
+
+
+            {% if s.health_reasons %}
+
+              <div class="v4-server-card-health-note">
+                {{ s.health_reasons.0 }}
+              </div>
+
+            {% endif %}
+
+
+            <div class="v4-server-card-stats">
+
+
+              <section class="v4-server-stat">
+
+                <span class="v4-server-stat-label">
+                  Новые подключения
+                </span>
+
+                <div class="v4-server-stat-value">
+
                   <form
                     method="post"
                     action="{% url 'servers-toggle-vpn-pool' s.obj.id %}"
-                    class="m-0"
+                    class="v4-server-admission-form"
                   >
                     {% csrf_token %}
 
                     {% if s.obj.vpn_pool_locked %}
+
                       <span
-                        class="v4-status-pill is-neutral"
+                        class="v4-status-pill is-danger"
                         title="Эксплуатационная политика запрещает выпуск новых VPN на этом сервере"
                       >
-                        Legacy · заблокирован
+                        Выпуск заблокирован
                       </span>
+
                     {% elif s.obj.accepts_new_vpn_clients %}
-                      <input type="hidden" name="enabled" value="0">
+
+                      <input
+                        type="hidden"
+                        name="enabled"
+                        value="0"
+                      >
+
                       <button
                         type="submit"
                         class="btn btn-sm btn-success"
-                        title="Исключить сервер из автоматической выдачи"
+                        title="Запретить выпуск новых VPN на этот сервер"
                       >
-                        Принимает
+                        ● Разрешены
                       </button>
+
                     {% else %}
-                      <input type="hidden" name="enabled" value="1">
+
+                      <input
+                        type="hidden"
+                        name="enabled"
+                        value="1"
+                      >
+
                       <button
                         type="submit"
                         class="btn btn-sm btn-outline-secondary"
-                        title="Разрешить выпуск новых VPN на сервер"
+                        title="Разрешить выпуск новых VPN на этот сервер"
                       >
-                        Не принимает
+                        Запрещены
                       </button>
-                    {% endif %}
-                  </form>
-                </td>
 
-                <td>
+                    {% endif %}
+
+                  </form>
+
+                </div>
+
+              </section>
+
+
+              <section class="v4-server-stat">
+
+                <span class="v4-server-stat-label">
+                  Режимы
+                </span>
+
+                <div class="v4-server-mode-list">
+
                   {% if s.full_status.eligible %}
-                    <span class="v4-status-pill is-success">FULL</span>
+                    <span class="v4-status-pill is-success">
+                      FULL
+                    </span>
                   {% else %}
                     <span
                       class="v4-status-pill is-neutral"
                       title="{{ s.full_status.reason }}"
-                    >FULL —</span>
+                    >
+                      FULL —
+                    </span>
                   {% endif %}
 
+
                   {% if s.selective_status.eligible %}
-                    <span class="v4-status-pill is-success">SELECT</span>
+                    <span class="v4-status-pill is-success">
+                      SELECT
+                    </span>
                   {% else %}
                     <span
                       class="v4-status-pill is-neutral"
                       title="{{ s.selective_status.reason }}"
-                    >SELECT —</span>
+                    >
+                      SELECT —
+                    </span>
                   {% endif %}
-                </td>
 
-                <td>
-                  <div class="v4-system-primary">
-                    VPN {{ s.obj.active_vpn_count }}
-                  </div>
-                  <div class="v4-system-meta">
-                    disabled {{ s.obj.disabled_vpn_count }}
-                    · XHTTP {{ s.obj.active_xhttp_count }}
-                  </div>
-                </td>
+                </div>
 
-                <td>
-                  <div class="v4-system-primary">
-                    {{ s.pool_peer_count }}
-                  </div>
-                  <div class="v4-system-meta">
-                    ёмкость {{ s.pool_capacity }}
-                  </div>
-                </td>
+              </section>
 
-                <td class="text-nowrap">
-                  {% if s.obj.last_runtime_sync_at %}<span class="v4-date-primary">{{ s.obj.last_runtime_sync_at|date:'d.m.Y' }}</span><div class="v4-system-meta">{{ s.obj.last_runtime_sync_at|date:'H:i' }}</div>{% else %}<span class="v4-system-meta">Нет данных</span>{% endif %}
-                </td>
-                <td class="text-end">
-                  <a class="btn btn-sm btn-outline-primary v4-monitor-button" href="/servers/?{% if health_filter %}health={{ health_filter }}&{% endif %}monitor={{ s.obj.id }}">Проверить</a>
-                </td>
-              </tr>
 
-              {% if s.metrics %}
-                <tr class="v4-detail-row">
-                  <td colspan="9" class="p-0">
-                    {% if s.metrics.errors %}
-                      <div class="v4-runtime-warning">{{ s.metrics.errors|join:'; ' }}</div>
-                    {% endif %}
-                    <div class="v4-server-metrics">
-                      <div class="v4-server-metric"><span>Host / uptime</span><strong>{{ s.metrics.hostname|default:'—' }}</strong><div class="v4-system-meta">{{ s.metrics.uptime|default:'—' }}</div></div>
-                      <div class="v4-server-metric"><span>Load / CPU</span><strong>{{ s.metrics.load_average.1|default:'—' }}</strong><div class="v4-system-meta">{{ s.metrics.cpu_cores|default:'—' }} CPU</div></div>
-                      <div class="v4-server-metric"><span>RAM</span><strong>{{ s.metrics.memory.used_percent|default:'—' }}%</strong><div class="v4-system-meta">{{ s.metrics.memory.used|default:'—' }} / {{ s.metrics.memory.total|default:'—' }}</div></div>
-                      <div class="v4-server-metric"><span>Disk /</span><strong>{{ s.metrics.disk_root.used_percent|default:'—' }}%</strong><div class="v4-system-meta">{{ s.metrics.disk_root.used|default:'—' }} / {{ s.metrics.disk_root.total|default:'—' }}</div></div>
-                      <div class="v4-server-metric"><span>Network</span><strong>{{ s.metrics.main_interface|default:'—' }}</strong><div class="v4-system-meta">RX {{ s.metrics.network.rx_bytes|default:'—' }} · TX {{ s.metrics.network.tx_bytes|default:'—' }}</div></div>
-                      <div class="v4-server-protocols">
-                        <strong>Docker:</strong>
-                        {% if s.metrics.docker.available %}
-                          {% for c in s.metrics.docker.containers %}<span class="v4-runtime-token">{{ c.name }} · {{ c.status }}</span>{% empty %}нет активных контейнеров{% endfor %}
-                        {% else %}недоступно{% endif %}
-                        <br>
-                        <strong>Протоколы:</strong>
-                        {% for p in s.metrics.protocols %}
-                          <span class="v4-runtime-token {% if not p.available %}is-danger{% endif %}">{{ p.protocol_type|upper }}{% if p.available %} · FILE {{ p.peer_counts.file_peers }} / LIVE {{ p.peer_counts.live_peers }}{% else %} · недоступен{% endif %}</span>
-                        {% empty %}нет включённых протоколов{% endfor %}
-                      </div>
+              <section class="v4-server-stat">
+
+                <span class="v4-server-stat-label">
+                  VPN
+                </span>
+
+                <div class="v4-server-stat-number">
+                  {{ s.obj.active_vpn_count }}
+                </div>
+
+                <div class="v4-server-stat-meta">
+                  активных · {{ s.obj.disabled_vpn_count }} отключено
+                </div>
+
+              </section>
+
+
+              <section class="v4-server-stat">
+
+                <span class="v4-server-stat-label">
+                  XHTTP
+                </span>
+
+                <div class="v4-server-stat-number">
+                  {{ s.obj.active_xhttp_count }}
+                </div>
+
+                <div class="v4-server-stat-meta">
+                  активных устройств
+                </div>
+
+              </section>
+
+
+              <section class="v4-server-stat">
+
+                <span class="v4-server-stat-label">
+                  Расчёт пула
+                </span>
+
+                <div class="v4-server-pool-value">
+                  <strong>{{ s.pool_peer_count }}</strong>
+                  <span>/ {{ s.pool_capacity }}</span>
+                </div>
+
+                <div class="v4-server-stat-meta">
+                  занято / ёмкость
+                </div>
+
+              </section>
+
+
+              <section class="v4-server-stat">
+
+                <span class="v4-server-stat-label">
+                  Синхронизация
+                </span>
+
+                {% if s.obj.last_runtime_sync_at %}
+
+                  <div class="v4-server-sync-value">
+                    {{ s.obj.last_runtime_sync_at|date:'d.m.Y' }}
+                  </div>
+
+                  <div class="v4-server-stat-meta">
+                    {{ s.obj.last_runtime_sync_at|date:'H:i' }}
+                  </div>
+
+                {% else %}
+
+                  <div class="v4-server-stat-meta">
+                    Нет данных
+                  </div>
+
+                {% endif %}
+
+              </section>
+
+            </div>
+
+
+            <footer class="v4-server-card-actions">
+
+              <a
+                class="btn btn-sm btn-outline-secondary"
+                href="/servers/{{ s.obj.id }}/"
+              >
+                Подробнее
+              </a>
+
+              <a
+                class="btn btn-sm btn-outline-primary"
+                href="/servers/?{% if health_filter %}health={{ health_filter }}&{% endif %}monitor={{ s.obj.id }}"
+              >
+                {% if s.metrics %}
+                  Обновить диагностику
+                {% else %}
+                  Диагностика
+                {% endif %}
+              </a>
+
+            </footer>
+
+
+            {% if s.metrics %}
+
+              <section
+                class="v4-server-diagnostics"
+                aria-label="Диагностика сервера {{ s.obj.name }}"
+              >
+
+                <div class="v4-server-diagnostics-head">
+                  <div>
+                    <span class="v4-panel-eyebrow">
+                      Диагностика
+                    </span>
+                    <strong>
+                      Runtime сервера
+                    </strong>
+                  </div>
+
+                  <a
+                    href="/servers/{% if health_filter %}?health={{ health_filter }}{% endif %}"
+                    class="v4-server-diagnostics-close"
+                    aria-label="Закрыть диагностику"
+                  >
+                    Закрыть
+                  </a>
+                </div>
+
+
+                {% if s.metrics.errors %}
+
+                  <div class="v4-runtime-warning">
+                    {{ s.metrics.errors|join:'; ' }}
+                  </div>
+
+                {% endif %}
+
+
+                <div class="v4-server-diagnostic-grid">
+
+                  <div class="v4-server-diagnostic-item">
+                    <span>Host / uptime</span>
+                    <strong>
+                      {{ s.metrics.hostname|default:'—' }}
+                    </strong>
+                    <small>
+                      {{ s.metrics.uptime|default:'—' }}
+                    </small>
+                  </div>
+
+
+                  <div class="v4-server-diagnostic-item">
+                    <span>Load / CPU</span>
+                    <strong>
+                      {{ s.metrics.load_average.1|default:'—' }}
+                    </strong>
+                    <small>
+                      {{ s.metrics.cpu_cores|default:'—' }} CPU
+                    </small>
+                  </div>
+
+
+                  <div class="v4-server-diagnostic-item">
+                    <span>RAM</span>
+                    <strong>
+                      {{ s.metrics.memory.used_percent|default:'—' }}%
+                    </strong>
+                    <small>
+                      {{ s.metrics.memory.used|default:'—' }}
+                      /
+                      {{ s.metrics.memory.total|default:'—' }}
+                    </small>
+                  </div>
+
+
+                  <div class="v4-server-diagnostic-item">
+                    <span>Disk /</span>
+                    <strong>
+                      {{ s.metrics.disk_root.used_percent|default:'—' }}%
+                    </strong>
+                    <small>
+                      {{ s.metrics.disk_root.used|default:'—' }}
+                      /
+                      {{ s.metrics.disk_root.total|default:'—' }}
+                    </small>
+                  </div>
+
+
+                  <div class="v4-server-diagnostic-item">
+                    <span>Network</span>
+                    <strong>
+                      {{ s.metrics.main_interface|default:'—' }}
+                    </strong>
+                    <small>
+                      RX {{ s.metrics.network.rx_bytes|default:'—' }}
+                      ·
+                      TX {{ s.metrics.network.tx_bytes|default:'—' }}
+                    </small>
+                  </div>
+
+                </div>
+
+
+                <div class="v4-server-runtime-groups">
+
+                  <div>
+                    <span class="v4-server-stat-label">
+                      Docker
+                    </span>
+
+                    <div class="v4-server-runtime-tokens">
+
+                      {% if s.metrics.docker.available %}
+
+                        {% for c in s.metrics.docker.containers %}
+                          <span class="v4-runtime-token">
+                            {{ c.name }} · {{ c.status }}
+                          </span>
+                        {% empty %}
+                          <span class="v4-server-stat-meta">
+                            Нет активных контейнеров
+                          </span>
+                        {% endfor %}
+
+                      {% else %}
+
+                        <span class="v4-server-stat-meta">
+                          Недоступно
+                        </span>
+
+                      {% endif %}
+
                     </div>
-                  </td>
-                </tr>
-              {% endif %}
-            {% endfor %}
-          </tbody>
-        </table>
+                  </div>
+
+
+                  <div>
+                    <span class="v4-server-stat-label">
+                      Протоколы
+                    </span>
+
+                    <div class="v4-server-runtime-tokens">
+
+                      {% for p in s.metrics.protocols %}
+
+                        <span
+                          class="
+                            v4-runtime-token
+                            {% if not p.available %}is-danger{% endif %}
+                          "
+                        >
+                          {{ p.protocol_type|upper }}
+
+                          {% if p.available %}
+                            · FILE {{ p.peer_counts.file_peers }}
+                            / LIVE {{ p.peer_counts.live_peers }}
+                          {% else %}
+                            · недоступен
+                          {% endif %}
+                        </span>
+
+                      {% empty %}
+
+                        <span class="v4-server-stat-meta">
+                          Нет включённых протоколов
+                        </span>
+
+                      {% endfor %}
+
+                    </div>
+                  </div>
+
+                </div>
+
+              </section>
+
+            {% endif %}
+
+          </article>
+
+        {% endfor %}
+
+      </div>
+
+    </section>
+
+  {% else %}
+
+    <section class="v4-system-panel">
+      <div class="v4-empty-state">
+        <strong>
+          Серверы ещё не добавлены
+        </strong>
+        <span>
+          После добавления сервера здесь появится его runtime-состояние.
+        </span>
       </div>
     </section>
-  {% else %}
-    <section class="v4-system-panel"><div class="v4-empty-state"><strong>Серверы ещё не добавлены</strong><span>После добавления сервера здесь появится его runtime-состояние.</span></div></section>
+
   {% endif %}
+
 </div>
 {% endblock %}

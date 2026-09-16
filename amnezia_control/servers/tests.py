@@ -192,10 +192,10 @@ class ServerDetailViewTest(TestCase):
     def test_server_detail_renders_operator_summary(self):
         self.client.force_login(self.user)
         response = self.client.get(reverse("servers-detail", kwargs={"pk": self.server.id}))
-        self.assertContains(response, "Контур сервера")
-        self.assertContains(response, "Публичный endpoint")
-        self.assertContains(response, "Ключевые действия оператора")
-        self.assertContains(response, "Диагностика протоколов и готовности")
+        self.assertContains(response, "Готовность сервера")
+        self.assertContains(response, "Публичная точка подключения")
+        self.assertContains(response, "Синхронизировать")
+        self.assertContains(response, "Протоколы")
         self.assertContains(response, "Не проверялся")
 
 
