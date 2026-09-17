@@ -1,0 +1,1171 @@
+/*
+ * VPN Control UI V5 — compact operator system.
+ *
+ * Visual layer only. Business logic, routes and lifecycle behavior stay unchanged.
+ * The rules intentionally use body.app-shell specificity because V4 page bundles
+ * are loaded from individual templates after the global shell styles.
+ */
+
+:root {
+  --v5-bg: #090b0f;
+  --v5-sidebar: #0c0f13;
+  --v5-surface: #11151a;
+  --v5-surface-raised: #151a20;
+  --v5-surface-hover: #181e25;
+  --v5-border: #252b33;
+  --v5-border-soft: #1c2229;
+  --v5-text: #edf1f6;
+  --v5-text-2: #a3abb8;
+  --v5-muted: #717b88;
+  --v5-muted-2: #56606d;
+  --v5-accent: #2388ff;
+  --v5-accent-soft: rgba(35, 136, 255, .12);
+  --v5-success: #34c784;
+  --v5-warning: #f2b84b;
+  --v5-danger: #ff6675;
+  --v5-radius: 9px;
+  --v5-radius-sm: 7px;
+  --v5-control: 34px;
+  --v5-shadow: 0 1px 1px rgba(0, 0, 0, .18);
+}
+
+/* --------------------------------------------------------------------------
+   Shell
+   -------------------------------------------------------------------------- */
+
+body.app-shell {
+  background: var(--v5-bg) !important;
+  color: var(--v5-text) !important;
+  font-size: 14px !important;
+  line-height: 1.42 !important;
+  letter-spacing: -.005em !important;
+}
+
+body.app-shell::before { display: none !important; }
+
+body.app-shell .app-layout { min-height: 100vh !important; }
+body.app-shell .app-main { background: var(--v5-bg) !important; }
+
+body.app-shell .content {
+  width: 100% !important;
+  max-width: 1640px !important;
+  margin: 0 auto !important;
+  padding: 16px 20px 28px !important;
+}
+
+body.app-shell .sidebar {
+  flex-basis: 216px !important;
+  width: 216px !important;
+  padding: 12px 10px 10px !important;
+  background: var(--v5-sidebar) !important;
+  border-right: 1px solid var(--v5-border-soft) !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+
+body.app-shell .sidebar::after { display: none !important; }
+
+body.app-shell .brand {
+  min-height: 42px !important;
+  gap: 9px !important;
+  padding: 2px 7px 10px !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  letter-spacing: -.02em !important;
+}
+
+body.app-shell .brand-mark {
+  width: 28px !important;
+  height: 28px !important;
+  flex: 0 0 28px !important;
+  border: 1px solid #2b3746 !important;
+  border-radius: 8px !important;
+  background: #131a23 !important;
+  box-shadow: none !important;
+}
+
+body.app-shell .brand-mark::before {
+  background: none !important;
+  -webkit-background-clip: initial !important;
+  background-clip: initial !important;
+  color: #69aaff !important;
+  font-size: 14px !important;
+  font-weight: 800 !important;
+}
+
+body.app-shell .sidebar .sidebar-section {
+  margin: 16px 0 5px !important;
+  padding: 0 8px !important;
+  color: #596473 !important;
+  font-size: 9px !important;
+  font-weight: 700 !important;
+  letter-spacing: .105em !important;
+}
+
+body.app-shell .sidebar .nav { gap: 2px !important; }
+
+body.app-shell .sidebar .nav-link,
+body.app-shell .sidebar-system > summary {
+  min-height: 32px !important;
+  gap: 8px !important;
+  padding: 6px 8px !important;
+  border: 1px solid transparent !important;
+  border-radius: 7px !important;
+  background: transparent !important;
+  color: #8993a0 !important;
+  font-size: 12px !important;
+  font-weight: 520 !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+body.app-shell .sidebar .nav-link:hover,
+body.app-shell .sidebar .nav-link:focus-visible,
+body.app-shell .sidebar-system > summary:hover {
+  border-color: transparent !important;
+  background: #141920 !important;
+  color: #dbe1e9 !important;
+  transform: none !important;
+}
+
+body.app-shell .sidebar .nav-link.active {
+  border-color: #243247 !important;
+  background: #13233a !important;
+  color: #f4f7fb !important;
+  box-shadow: inset 2px 0 0 var(--v5-accent) !important;
+  font-weight: 620 !important;
+}
+
+body.app-shell .nav-icon {
+  width: 17px !important;
+  height: 17px !important;
+  color: #697583 !important;
+}
+
+body.app-shell .nav-icon svg {
+  width: 16px !important;
+  height: 16px !important;
+  stroke-width: 1.75 !important;
+}
+
+body.app-shell .sidebar .nav-link.active .nav-icon { color: #68a9ff !important; }
+
+body.app-shell .sidebar-system {
+  margin-top: 12px !important;
+  padding-top: 8px !important;
+  border-top: 1px solid var(--v5-border-soft) !important;
+}
+
+body.app-shell .sidebar-system-menu { margin-top: 3px !important; }
+body.app-shell .sidebar-system-menu .nav-link { padding-left: 33px !important; color: #65707d !important; }
+
+body.app-shell .sidebar-account {
+  margin-top: auto !important;
+  padding: 10px 6px 2px !important;
+  border-top: 1px solid var(--v5-border-soft) !important;
+}
+
+body.app-shell .sidebar-account-avatar,
+body.app-shell .topbar-user-avatar {
+  width: 28px !important;
+  height: 28px !important;
+  border: 1px solid #303843 !important;
+  border-radius: 8px !important;
+  background: #181d24 !important;
+  color: #dfe5ec !important;
+  box-shadow: none !important;
+}
+
+body.app-shell .sidebar-account-name,
+body.app-shell .topbar-user-name { color: #dfe5ec !important; font-size: 11px !important; }
+body.app-shell .sidebar-account-role,
+body.app-shell .topbar-user-role { color: #626d7a !important; font-size: 9px !important; }
+
+body.app-shell .topbar {
+  height: 48px !important;
+  min-height: 48px !important;
+  padding: 0 20px !important;
+  background: rgba(9, 11, 15, .96) !important;
+  border-color: var(--v5-border-soft) !important;
+  box-shadow: none !important;
+  backdrop-filter: blur(12px) !important;
+}
+
+body.app-shell .topbar::after { display: none !important; }
+body.app-shell .topbar-left { gap: 9px !important; }
+
+body.app-shell .topbar-title {
+  color: #e9edf3 !important;
+  font-size: 12px !important;
+  font-weight: 650 !important;
+}
+
+body.app-shell .topbar-subtitle {
+  margin-top: 1px !important;
+  color: #626d79 !important;
+  font-size: 9.5px !important;
+}
+
+body.app-shell .sidebar-toggle {
+  width: 30px !important;
+  height: 30px !important;
+  flex: 0 0 30px !important;
+  border: 1px solid var(--v5-border) !important;
+  border-radius: 7px !important;
+  background: #11151a !important;
+  color: #7d8794 !important;
+  box-shadow: none !important;
+}
+
+body.app-shell .sidebar-toggle:hover {
+  border-color: #34404e !important;
+  background: #171c22 !important;
+  color: #d8dee7 !important;
+}
+
+/* --------------------------------------------------------------------------
+   Typography and controls
+   -------------------------------------------------------------------------- */
+
+body.app-shell .page-kicker { display: none !important; }
+
+body.app-shell .v4-page-hero,
+body.app-shell .v4-form-hero {
+  gap: 16px !important;
+  align-items: center !important;
+  margin: 0 0 14px !important;
+}
+
+body.app-shell .v4-page-hero h1,
+body.app-shell .v4-form-hero h1,
+body.app-shell .v4-detail-title-line h1 {
+  color: var(--v5-text) !important;
+  font-size: 22px !important;
+  font-weight: 700 !important;
+  line-height: 1.15 !important;
+  letter-spacing: -.03em !important;
+}
+
+body.app-shell .v4-hero-copy,
+body.app-shell .v4-form-hero p:not(.page-kicker) {
+  max-width: 720px !important;
+  margin: 4px 0 0 !important;
+  color: var(--v5-muted) !important;
+  font-size: 12px !important;
+  line-height: 1.45 !important;
+}
+
+body.app-shell h2,
+body.app-shell .h2 { letter-spacing: -.015em; }
+
+body.app-shell .btn {
+  min-height: var(--v5-control) !important;
+  padding: 6px 11px !important;
+  border-radius: 7px !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  line-height: 1.1 !important;
+  box-shadow: none !important;
+}
+
+body.app-shell .btn-sm {
+  min-height: 29px !important;
+  padding: 5px 9px !important;
+  font-size: 11px !important;
+}
+
+body.app-shell .btn-primary {
+  border-color: #2a87ee !important;
+  background: #2388ff !important;
+  color: #fff !important;
+}
+
+body.app-shell .btn-primary:hover,
+body.app-shell .btn-primary:focus-visible {
+  border-color: #4598f6 !important;
+  background: #3593f8 !important;
+}
+
+body.app-shell .btn-outline-primary {
+  border-color: #2a5687 !important;
+  background: transparent !important;
+  color: #78b3ff !important;
+}
+
+body.app-shell .btn-outline-secondary {
+  border-color: #303741 !important;
+  background: #11151a !important;
+  color: #9aa4b1 !important;
+}
+
+body.app-shell .btn-success {
+  border-color: #277f59 !important;
+  background: #173c2d !important;
+  color: #6ce1aa !important;
+}
+
+body.app-shell .form-control,
+body.app-shell .form-select {
+  min-height: var(--v5-control) !important;
+  padding: 6px 9px !important;
+  border: 1px solid #2b323b !important;
+  border-radius: 7px !important;
+  background: #0d1116 !important;
+  color: #e4e9ef !important;
+  font-size: 12px !important;
+  box-shadow: none !important;
+}
+
+body.app-shell .form-control:focus,
+body.app-shell .form-select:focus {
+  border-color: #397fc9 !important;
+  box-shadow: 0 0 0 2px rgba(35,136,255,.10) !important;
+}
+
+body.app-shell .form-label {
+  margin-bottom: 5px !important;
+  color: #a0a8b4 !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+}
+
+body.app-shell .form-text {
+  margin-top: 4px !important;
+  color: #65707d !important;
+  font-size: 10.5px !important;
+}
+
+body.app-shell .dropdown-menu {
+  padding: 5px !important;
+  border: 1px solid #2a3139 !important;
+  border-radius: 8px !important;
+  background: #12161b !important;
+  box-shadow: 0 12px 32px rgba(0,0,0,.30) !important;
+}
+
+body.app-shell .dropdown-item {
+  min-height: 30px !important;
+  padding: 6px 8px !important;
+  border-radius: 6px !important;
+  color: #adb5c0 !important;
+  font-size: 11.5px !important;
+}
+
+body.app-shell .dropdown-item:hover,
+body.app-shell .dropdown-item:focus {
+  background: #1a2027 !important;
+  color: #f0f3f7 !important;
+}
+
+body.app-shell .app-alert {
+  margin-bottom: 10px !important;
+  padding: 9px 11px !important;
+  border-radius: 8px !important;
+  font-size: 12px !important;
+}
+
+/* --------------------------------------------------------------------------
+   Shared surfaces and statuses
+   -------------------------------------------------------------------------- */
+
+body.app-shell .card,
+body.app-shell .section-block,
+body.app-shell .panel,
+body.app-shell .v4-panel,
+body.app-shell .v4-system-panel,
+body.app-shell .v4-customer-toolbar,
+body.app-shell .v4-customer-table-panel,
+body.app-shell .v4-detail-panel,
+body.app-shell .v4-step-card,
+body.app-shell .v4-form-card,
+body.app-shell .v4-context-card,
+body.app-shell .v4-product-card,
+body.app-shell .v4-confirm-card {
+  border: 1px solid var(--v5-border) !important;
+  border-radius: var(--v5-radius) !important;
+  background: var(--v5-surface) !important;
+  box-shadow: var(--v5-shadow) !important;
+  backdrop-filter: none !important;
+}
+
+body.app-shell .v4-panel-head,
+body.app-shell .v4-system-panel-head,
+body.app-shell .v4-customer-table-head {
+  min-height: 46px !important;
+  padding: 10px 12px !important;
+  border-bottom: 1px solid var(--v5-border-soft) !important;
+}
+
+body.app-shell .v4-panel-head h2,
+body.app-shell .v4-system-panel-head h2,
+body.app-shell .v4-customer-table-head h2,
+body.app-shell .v4-detail-section-head h2,
+body.app-shell .v4-detail-section-title h2,
+body.app-shell .v4-step-copy h2,
+body.app-shell .v4-form-card-head h2 {
+  margin: 0 !important;
+  color: #e6ebf1 !important;
+  font-size: 13px !important;
+  font-weight: 650 !important;
+}
+
+body.app-shell .v4-panel-eyebrow { display: none !important; }
+
+body.app-shell .v4-status-pill {
+  min-height: 22px !important;
+  gap: 5px !important;
+  padding: 3px 7px !important;
+  border-radius: 6px !important;
+  background: #171d23 !important;
+  color: #8f99a6 !important;
+  font-size: 10px !important;
+  font-weight: 650 !important;
+}
+
+body.app-shell .v4-status-pill::before {
+  width: 5px !important;
+  height: 5px !important;
+}
+
+body.app-shell .v4-status-pill.is-success {
+  border-color: #285e49 !important;
+  background: #12261e !important;
+  color: #64d9a1 !important;
+}
+
+body.app-shell .v4-status-pill.is-warning {
+  border-color: #665227 !important;
+  background: #2a2314 !important;
+  color: #efc05d !important;
+}
+
+body.app-shell .v4-status-pill.is-danger {
+  border-color: #66303a !important;
+  background: #29171b !important;
+  color: #ff8390 !important;
+}
+
+body.app-shell .v4-signal-dot {
+  width: 6px !important;
+  height: 6px !important;
+  flex-basis: 6px !important;
+  box-shadow: none !important;
+}
+
+body.app-shell .v4-signal-dot.is-success { background: var(--v5-success) !important; }
+body.app-shell .v4-signal-dot.is-warning { background: var(--v5-warning) !important; }
+body.app-shell .v4-signal-dot.is-danger { background: var(--v5-danger) !important; }
+
+/* --------------------------------------------------------------------------
+   Dashboard
+   -------------------------------------------------------------------------- */
+
+body.app-shell .v4-kpi-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 8px !important;
+  margin-bottom: 10px !important;
+}
+
+body.app-shell .v4-kpi-card {
+  min-height: 92px !important;
+  padding: 12px !important;
+  border: 1px solid var(--v5-border) !important;
+  border-radius: var(--v5-radius) !important;
+  background: var(--v5-surface) !important;
+  box-shadow: var(--v5-shadow) !important;
+  transform: none !important;
+}
+
+body.app-shell .v4-kpi-card::after { display: none !important; }
+body.app-shell .v4-kpi-card:hover {
+  border-color: #35404c !important;
+  background: var(--v5-surface-hover) !important;
+  transform: none !important;
+  box-shadow: var(--v5-shadow) !important;
+}
+
+body.app-shell .v4-kpi-icon {
+  width: 25px !important;
+  height: 25px !important;
+  flex-basis: 25px !important;
+  border: 0 !important;
+  border-radius: 7px !important;
+  background: #17202b !important;
+}
+
+body.app-shell .v4-kpi-icon svg { width: 14px !important; height: 14px !important; }
+body.app-shell .v4-kpi-label { color: #8b95a2 !important; font-size: 10.5px !important; }
+body.app-shell .v4-kpi-value {
+  margin-top: 10px !important;
+  color: #f0f3f7 !important;
+  font-size: 22px !important;
+  font-weight: 700 !important;
+}
+body.app-shell .v4-kpi-meta { margin-top: 5px !important; color: #687381 !important; font-size: 10px !important; }
+body.app-shell .v4-kpi-meta strong { color: #9eabb9 !important; }
+
+body.app-shell .v4-dashboard-grid {
+  grid-template-columns: minmax(0, 1.35fr) minmax(280px, .65fr) !important;
+  gap: 10px !important;
+  margin-bottom: 10px !important;
+}
+
+body.app-shell .v4-attention-list { padding: 3px 7px 6px !important; }
+body.app-shell .v4-attention-row {
+  min-height: 48px !important;
+  gap: 9px !important;
+  padding: 7px 6px !important;
+  border-bottom-color: var(--v5-border-soft) !important;
+  transform: none !important;
+}
+body.app-shell .v4-attention-row:hover { background: #161b21 !important; transform: none !important; }
+body.app-shell .v4-attention-copy strong { color: #dce2e9 !important; font-size: 11.5px !important; }
+body.app-shell .v4-attention-copy span { margin-top: 1px !important; color: #697481 !important; font-size: 10px !important; }
+body.app-shell .v4-count-pill {
+  min-width: 24px !important;
+  padding: 2px 6px !important;
+  border-radius: 6px !important;
+  background: #171c22 !important;
+  color: #a8b1bd !important;
+  font-size: 10px !important;
+}
+
+body.app-shell .v4-infra-panel::after { display: none !important; }
+body.app-shell .v4-infra-status { gap: 12px !important; padding: 12px !important; }
+body.app-shell .v4-infra-orb {
+  width: 58px !important;
+  height: 58px !important;
+  flex-basis: 58px !important;
+  border: 1px solid #2f4439 !important;
+  background: #101b16 !important;
+  box-shadow: none !important;
+}
+body.app-shell .v4-infra-orb span { font-size: 15px !important; }
+body.app-shell .v4-infra-orb small { margin-top: 2px !important; font-size: 8px !important; }
+body.app-shell .v4-infra-copy strong { color: #dfe5ec !important; font-size: 11.5px !important; }
+body.app-shell .v4-infra-copy span { color: #6d7885 !important; font-size: 10px !important; }
+body.app-shell .v4-infra-breakdown { padding: 0 12px 7px !important; }
+body.app-shell .v4-infra-breakdown > div { min-height: 28px !important; font-size: 10px !important; }
+body.app-shell .v4-sync-note {
+  margin: 0 9px 9px !important;
+  padding: 7px 8px !important;
+  border-radius: 6px !important;
+  background: #0d1116 !important;
+  color: #697481 !important;
+  font-size: 9.5px !important;
+}
+
+body.app-shell .v4-activity-panel { margin-bottom: 9px !important; }
+body.app-shell .v4-activity-table thead th,
+body.app-shell .v4-activity-table tbody td {
+  padding: 7px 11px !important;
+  border-color: var(--v5-border-soft) !important;
+}
+body.app-shell .v4-activity-table thead th { background: #0d1116 !important; font-size: 9px !important; }
+body.app-shell .v4-activity-table tbody td { font-size: 10.5px !important; }
+body.app-shell .v4-dashboard-footer { margin-top: 8px !important; }
+
+/* --------------------------------------------------------------------------
+   Customers list
+   -------------------------------------------------------------------------- */
+
+body.app-shell .v4-customers-hero { margin-bottom: 12px !important; }
+body.app-shell .v4-total-badge {
+  min-width: 27px !important;
+  height: 20px !important;
+  padding: 0 7px !important;
+  border-radius: 6px !important;
+  background: #171c22 !important;
+  color: #98a3af !important;
+  font-size: 10px !important;
+}
+
+body.app-shell .v4-customer-toolbar {
+  margin-bottom: 9px !important;
+  padding: 8px !important;
+}
+
+body.app-shell .v4-search-row { gap: 6px !important; }
+body.app-shell .v4-search-box {
+  height: 34px !important;
+  gap: 7px !important;
+  padding: 0 9px !important;
+  border: 1px solid #2b323b !important;
+  border-radius: 7px !important;
+  background: #0d1116 !important;
+  box-shadow: none !important;
+}
+body.app-shell .v4-search-box:focus-within {
+  border-color: #397fc9 !important;
+  background: #0d1116 !important;
+  box-shadow: 0 0 0 2px rgba(35,136,255,.10) !important;
+}
+body.app-shell .v4-search-box input { color: #e0e6ed !important; font-size: 11.5px !important; }
+body.app-shell .v4-search-box input::placeholder { color: #59636f !important; }
+
+body.app-shell .v4-filter-details > summary {
+  min-height: 34px !important;
+  padding: 6px 9px !important;
+  border-color: #2b323b !important;
+  border-radius: 7px !important;
+  background: #11151a !important;
+  color: #8f99a5 !important;
+  font-size: 11px !important;
+}
+
+body.app-shell .v4-filter-popover {
+  gap: 8px !important;
+  padding: 10px !important;
+  border-color: #303842 !important;
+  border-radius: 8px !important;
+  background: #11161c !important;
+  box-shadow: 0 14px 36px rgba(0,0,0,.35) !important;
+  backdrop-filter: none !important;
+}
+
+body.app-shell .v4-customer-chips {
+  gap: 5px !important;
+  margin-top: 7px !important;
+}
+body.app-shell .v4-customer-chip,
+body.app-shell .v4-system-chip {
+  min-height: 25px !important;
+  padding: 3px 8px !important;
+  border: 1px solid #272e36 !important;
+  border-radius: 6px !important;
+  background: #101419 !important;
+  color: #818b98 !important;
+  font-size: 10px !important;
+  font-weight: 600 !important;
+}
+body.app-shell .v4-customer-chip.active,
+body.app-shell .v4-system-chip.active {
+  border-color: #285a91 !important;
+  background: #12233a !important;
+  color: #b7d5ff !important;
+}
+
+body.app-shell .v4-customer-table-panel { border-radius: var(--v5-radius) !important; }
+body.app-shell .v4-customer-table-head { min-height: 42px !important; }
+body.app-shell .v4-customer-table-head > span { color: #687380 !important; font-size: 10px !important; }
+
+body.app-shell .v4-customer-table { min-width: 880px !important; }
+body.app-shell .v4-customer-table thead th,
+body.app-shell .v4-system-table thead th {
+  padding: 7px 10px !important;
+  background: #0d1116 !important;
+  border-color: var(--v5-border-soft) !important;
+  color: #66717e !important;
+  font-size: 9px !important;
+  font-weight: 700 !important;
+  letter-spacing: .045em !important;
+}
+body.app-shell .v4-customer-table tbody td,
+body.app-shell .v4-system-table tbody td {
+  padding: 7px 10px !important;
+  border-color: var(--v5-border-soft) !important;
+  color: #aeb6c1 !important;
+  font-size: 11px !important;
+}
+body.app-shell .v4-customer-row:hover,
+body.app-shell .v4-system-table tbody tr:hover { background: #14191f !important; }
+
+body.app-shell .v4-customer-identity { gap: 8px !important; }
+body.app-shell .v4-customer-avatar {
+  width: 30px !important;
+  height: 30px !important;
+  flex-basis: 30px !important;
+  border-color: #303843 !important;
+  border-radius: 8px !important;
+  background: #181e25 !important;
+  color: #cfd6df !important;
+  font-size: 10px !important;
+}
+body.app-shell .v4-customer-name { color: #dfe4eb !important; font-size: 11.5px !important; }
+body.app-shell .v4-customer-email { color: #66717d !important; font-size: 9.5px !important; }
+body.app-shell .v4-cabinet-state { margin-top: 2px !important; font-size: 9px !important; }
+body.app-shell .v4-state-cell { gap: 3px !important; }
+body.app-shell .v4-state-cell small,
+body.app-shell .v4-number-cell span,
+body.app-shell .v4-access-cell > span { color: #687380 !important; font-size: 9.5px !important; }
+body.app-shell .v4-number-cell strong { color: #d6dde5 !important; font-size: 12px !important; }
+body.app-shell .v4-access-cell strong { color: #d2d9e1 !important; font-size: 11px !important; }
+body.app-shell .v4-more-button,
+body.app-shell .v4-icon-action {
+  width: 28px !important;
+  height: 28px !important;
+  border-radius: 6px !important;
+  color: #707b88 !important;
+}
+body.app-shell .v4-customer-pagination {
+  min-height: 40px !important;
+  padding: 6px 10px !important;
+  color: #66717e !important;
+  font-size: 10px !important;
+}
+body.app-shell .v4-customer-pagination nav a {
+  min-width: 26px !important;
+  height: 26px !important;
+  border-radius: 6px !important;
+  font-size: 10px !important;
+}
+
+/* --------------------------------------------------------------------------
+   Customer detail
+   -------------------------------------------------------------------------- */
+
+body.app-shell .v4-back-link {
+  margin-bottom: 8px !important;
+  color: #707b88 !important;
+  font-size: 10.5px !important;
+}
+body.app-shell .v4-detail-header {
+  gap: 16px !important;
+  margin-bottom: 10px !important;
+}
+body.app-shell .v4-detail-identity { gap: 10px !important; }
+body.app-shell .v4-detail-avatar {
+  width: 38px !important;
+  height: 38px !important;
+  flex-basis: 38px !important;
+  border-color: #303843 !important;
+  border-radius: 10px !important;
+  background: #181e25 !important;
+  box-shadow: none !important;
+  font-size: 12px !important;
+}
+body.app-shell .v4-detail-identity p { margin-top: 2px !important; color: #6c7683 !important; font-size: 10.5px !important; }
+body.app-shell .v4-detail-actions { gap: 6px !important; }
+body.app-shell .v4-detail-more {
+  width: 34px !important;
+  height: 34px !important;
+  border-color: #2b323b !important;
+  border-radius: 7px !important;
+  background: #11151a !important;
+}
+
+body.app-shell .v4-detail-metrics {
+  gap: 7px !important;
+  margin-bottom: 9px !important;
+}
+body.app-shell .v4-detail-metric {
+  min-height: 70px !important;
+  gap: 8px !important;
+  padding: 9px 10px !important;
+  border-color: var(--v5-border) !important;
+  border-radius: 8px !important;
+  background: var(--v5-surface) !important;
+  box-shadow: none !important;
+}
+body.app-shell .v4-detail-metric-icon {
+  width: 28px !important;
+  height: 28px !important;
+  flex-basis: 28px !important;
+  border: 0 !important;
+  border-radius: 7px !important;
+  background: #17202b !important;
+}
+body.app-shell .v4-detail-metric-copy small { color: #6a7480 !important; font-size: 9.5px !important; }
+body.app-shell .v4-detail-metric-copy strong { margin-top: 2px !important; font-size: 14px !important; }
+body.app-shell .v4-detail-metric-copy strong.is-date,
+body.app-shell .v4-detail-metric-copy strong.is-state { font-size: 11.5px !important; }
+body.app-shell .v4-detail-metric-copy em { margin-top: 1px !important; color: #5f6975 !important; font-size: 9px !important; }
+
+body.app-shell .v4-detail-tabs {
+  top: 48px !important;
+  gap: 2px !important;
+  margin-bottom: 9px !important;
+  padding: 3px !important;
+  border-color: var(--v5-border) !important;
+  border-radius: 8px !important;
+  background: rgba(12,15,19,.96) !important;
+  backdrop-filter: blur(8px) !important;
+}
+body.app-shell .v4-detail-tabs a {
+  min-height: 29px !important;
+  padding: 5px 9px !important;
+  border-radius: 6px !important;
+  color: #7e8996 !important;
+  font-size: 10.5px !important;
+}
+body.app-shell .v4-detail-tabs a:hover { background: #171c22 !important; color: #dbe1e8 !important; }
+
+body.app-shell .v4-detail-panel {
+  margin-bottom: 9px !important;
+  padding: 11px !important;
+  scroll-margin-top: 86px !important;
+}
+body.app-shell .v4-detail-section-head { gap: 12px !important; margin-bottom: 9px !important; }
+body.app-shell .v4-detail-section-head p { margin-top: 3px !important; color: #6a7480 !important; font-size: 10px !important; }
+body.app-shell .v4-ready-state {
+  min-height: 58px !important;
+  gap: 9px !important;
+  padding: 9px !important;
+  border-color: #244b3a !important;
+  border-radius: 7px !important;
+  background: #101c17 !important;
+}
+body.app-shell .v4-ready-icon {
+  width: 28px !important;
+  height: 28px !important;
+  flex-basis: 28px !important;
+  border-radius: 7px !important;
+}
+body.app-shell .v4-ready-state strong { font-size: 11px !important; }
+body.app-shell .v4-ready-state span:not(.v4-ready-icon) { font-size: 9.5px !important; }
+
+body.app-shell .v4-setup-progress { gap: 6px !important; }
+body.app-shell .v4-setup-step {
+  min-height: 72px !important;
+  gap: 7px !important;
+  padding: 8px !important;
+  border-radius: 7px !important;
+  background: #0e1217 !important;
+}
+body.app-shell .v4-setup-step > span {
+  width: 22px !important;
+  height: 22px !important;
+  border-radius: 6px !important;
+  font-size: 9.5px !important;
+}
+body.app-shell .v4-setup-step strong { font-size: 10.5px !important; }
+body.app-shell .v4-setup-step small,
+body.app-shell .v4-setup-step > a { font-size: 9px !important; }
+body.app-shell .v4-detail-anchor-section { margin-bottom: 9px !important; scroll-margin-top: 86px !important; }
+body.app-shell .v4-detail-section-title { margin: 0 1px 7px !important; }
+
+body.app-shell .operator-workspace-v4 > section.section-block {
+  margin-bottom: 7px !important;
+  border-color: var(--v5-border) !important;
+  border-radius: 8px !important;
+  background: var(--v5-surface) !important;
+}
+body.app-shell .operator-workspace-v4 > section.section-block .section-body { padding: 9px !important; }
+body.app-shell .operator-workspace-v4 > section.section-block h2.h5 { font-size: 11.5px !important; }
+body.app-shell .operator-workspace-v4 > section.section-block .small.text-secondary { font-size: 9.5px !important; }
+body.app-shell .operator-workspace-v4 .table { font-size: 10px !important; }
+
+/* --------------------------------------------------------------------------
+   Forms / onboarding
+   -------------------------------------------------------------------------- */
+
+body.app-shell .v4-form-page { max-width: 1080px !important; }
+body.app-shell .v4-form-hero { margin-bottom: 12px !important; }
+body.app-shell .v4-workflow-steps {
+  gap: 5px !important;
+  margin-bottom: 9px !important;
+}
+body.app-shell .v4-workflow-step {
+  min-height: 34px !important;
+  gap: 7px !important;
+  padding: 6px 8px !important;
+  border-color: var(--v5-border-soft) !important;
+  border-radius: 7px !important;
+  background: #0e1217 !important;
+  color: #707b88 !important;
+  font-size: 10px !important;
+}
+body.app-shell .v4-workflow-step b {
+  width: 18px !important;
+  height: 18px !important;
+  border-radius: 5px !important;
+  background: #172234 !important;
+  color: #76aff9 !important;
+  font-size: 9px !important;
+}
+body.app-shell .v4-workflow-step.is-current {
+  border-color: #29496e !important;
+  background: #111a26 !important;
+  color: #c6d0dc !important;
+}
+
+body.app-shell .v4-form-layout {
+  grid-template-columns: minmax(0, 1fr) minmax(230px, 270px) !important;
+  gap: 9px !important;
+}
+body.app-shell .v4-form-main,
+body.app-shell .v4-form-aside { gap: 8px !important; }
+body.app-shell .v4-step-head {
+  gap: 9px !important;
+  padding: 10px 11px 8px !important;
+  border-bottom-color: var(--v5-border-soft) !important;
+}
+body.app-shell .v4-step-number {
+  width: 24px !important;
+  height: 24px !important;
+  flex-basis: 24px !important;
+  border-color: #29496e !important;
+  border-radius: 6px !important;
+  background: #142033 !important;
+  color: #7cb2fa !important;
+  font-size: 9.5px !important;
+}
+body.app-shell .v4-step-copy p,
+body.app-shell .v4-form-card-head p { margin-top: 2px !important; color: #6d7783 !important; font-size: 10px !important; }
+body.app-shell .v4-step-body { padding: 10px 11px 11px !important; }
+body.app-shell .v4-field-grid { gap: 9px !important; }
+body.app-shell .v4-field .form-label { margin-bottom: 4px !important; font-size: 10.5px !important; }
+body.app-shell .v4-field .form-text { margin-top: 4px !important; font-size: 9.5px !important; }
+body.app-shell .v4-form-page .form-control,
+body.app-shell .v4-form-page .form-select { min-height: 34px !important; font-size: 11.5px !important; }
+body.app-shell .v4-form-page textarea.form-control { min-height: 72px !important; }
+body.app-shell .v4-check-card {
+  gap: 8px !important;
+  padding: 8px 9px !important;
+  border-radius: 7px !important;
+  background: #0e1217 !important;
+}
+body.app-shell .v4-check-card .form-check-label { font-size: 11px !important; }
+body.app-shell .v4-check-copy { font-size: 9.5px !important; }
+body.app-shell .v4-form-actions { gap: 6px !important; }
+body.app-shell .v4-form-actions .btn-primary { min-width: 128px !important; }
+body.app-shell .v4-context-card { padding: 10px !important; }
+body.app-shell .v4-context-card h3 { margin-bottom: 7px !important; font-size: 11.5px !important; }
+body.app-shell .v4-context-list { gap: 6px !important; }
+body.app-shell .v4-context-row { gap: 8px !important; padding-bottom: 6px !important; }
+body.app-shell .v4-context-row span { font-size: 9.5px !important; }
+body.app-shell .v4-context-row strong { font-size: 10.5px !important; }
+body.app-shell .v4-context-note {
+  gap: 7px !important;
+  padding: 8px 9px !important;
+  border-radius: 7px !important;
+  background: #0f151d !important;
+  color: #6c7784 !important;
+  font-size: 9.5px !important;
+}
+
+/* --------------------------------------------------------------------------
+   System / servers / settings
+   -------------------------------------------------------------------------- */
+
+body.app-shell .v4-system-hero { margin-bottom: 12px !important; }
+body.app-shell .v4-system-toolbar {
+  gap: 6px !important;
+  margin-bottom: 9px !important;
+  padding: 8px !important;
+  border-color: var(--v5-border) !important;
+  border-radius: 8px !important;
+  background: var(--v5-surface) !important;
+  box-shadow: none !important;
+}
+body.app-shell .v4-system-chips { gap: 5px !important; margin-bottom: 9px !important; }
+body.app-shell .v4-system-panel { margin-bottom: 9px !important; }
+body.app-shell .v4-system-panel-head p { margin-top: 2px !important; color: #697481 !important; font-size: 10px !important; }
+body.app-shell .v4-system-panel-body { padding: 10px 11px !important; }
+
+body.app-shell .v4-server-status {
+  gap: 5px !important;
+  color: #909aa6 !important;
+  font-size: 10px !important;
+  font-weight: 620 !important;
+}
+body.app-shell .v4-server-status::before {
+  width: 5px !important;
+  height: 5px !important;
+  box-shadow: none !important;
+}
+body.app-shell .v4-server-status.is-success { color: #63d9a2 !important; }
+body.app-shell .v4-server-status.is-warning { color: #efc05c !important; }
+body.app-shell .v4-server-status.is-danger { color: #ff8290 !important; }
+
+body.app-shell .v4-system-summary-grid { gap: 7px !important; margin-bottom: 9px !important; }
+body.app-shell .v4-system-summary {
+  min-height: 68px !important;
+  padding: 9px 10px !important;
+  border-color: var(--v5-border) !important;
+  border-radius: 8px !important;
+  background: var(--v5-surface) !important;
+}
+body.app-shell .v4-system-summary span { color: #6b7581 !important; font-size: 9.5px !important; }
+body.app-shell .v4-system-summary strong { margin-top: 3px !important; font-size: 13px !important; }
+body.app-shell .v4-system-summary small { margin-top: 2px !important; font-size: 9px !important; }
+
+body.app-shell .v4-server-metrics {
+  gap: 6px !important;
+  padding: 8px 9px 9px !important;
+  background: #0e1217 !important;
+  border-top-color: var(--v5-border-soft) !important;
+}
+body.app-shell .v4-server-metric {
+  min-height: 54px !important;
+  padding: 7px 8px !important;
+  border-color: var(--v5-border-soft) !important;
+  border-radius: 7px !important;
+  background: #11161b !important;
+}
+body.app-shell .v4-server-metric span { font-size: 8.5px !important; }
+body.app-shell .v4-server-metric strong { margin-top: 3px !important; font-size: 11px !important; }
+body.app-shell .v4-log {
+  max-height: 320px !important;
+  padding: 8px 9px !important;
+  border-radius: 7px !important;
+  background: #090c10 !important;
+  color: #9eabb9 !important;
+  font-size: 10px !important;
+}
+
+body.app-shell .v4-settings-grid {
+  grid-template-columns: minmax(0,1.5fr) minmax(250px,.5fr) !important;
+  gap: 9px !important;
+}
+body.app-shell .v4-settings-stack { gap: 9px !important; }
+body.app-shell .v4-settings-badge {
+  min-height: 21px !important;
+  padding: 2px 6px !important;
+  border-radius: 6px !important;
+  background: #12213a !important;
+  color: #8eb9f4 !important;
+  font-size: 9px !important;
+}
+body.app-shell .v4-settings-kv { gap: 6px !important; }
+body.app-shell .v4-settings-kv > div {
+  min-height: 50px !important;
+  padding: 7px 8px !important;
+  border-color: var(--v5-border-soft) !important;
+  border-radius: 7px !important;
+  background: #0e1217 !important;
+}
+body.app-shell .v4-settings-kv span { color: #6d7783 !important; font-size: 9px !important; }
+body.app-shell .v4-settings-kv strong { margin-top: 2px !important; color: #d0d7df !important; font-size: 10.5px !important; }
+
+/* Server card presentation used by the current server list. */
+body.app-shell .v4-servers-overview,
+body.app-shell .v4-server-card {
+  border-color: var(--v5-border) !important;
+  border-radius: var(--v5-radius) !important;
+  background: var(--v5-surface) !important;
+  box-shadow: none !important;
+}
+body.app-shell .v4-server-card-list { gap: 7px !important; }
+body.app-shell .v4-server-card { margin-bottom: 7px !important; }
+body.app-shell .v4-server-card-head { padding: 10px 11px !important; }
+body.app-shell .v4-server-card-title { color: #e3e8ee !important; font-size: 12px !important; font-weight: 650 !important; }
+body.app-shell .v4-server-card-addresses,
+body.app-shell .v4-server-card-health-note { color: #707b88 !important; font-size: 9.5px !important; }
+body.app-shell .v4-server-card-stats { gap: 6px !important; padding: 8px 10px 10px !important; }
+body.app-shell .v4-server-stat { padding: 7px 8px !important; border-radius: 7px !important; background: #0e1217 !important; }
+body.app-shell .v4-server-stat-label { color: #66717e !important; font-size: 9px !important; }
+
+/* --------------------------------------------------------------------------
+   Focus, motion and responsive density
+   -------------------------------------------------------------------------- */
+
+body.app-shell a:focus-visible,
+body.app-shell button:focus-visible,
+body.app-shell summary:focus-visible,
+body.app-shell input:focus-visible,
+body.app-shell select:focus-visible,
+body.app-shell textarea:focus-visible {
+  outline: 2px solid rgba(72, 151, 255, .72) !important;
+  outline-offset: 2px !important;
+}
+
+@media (max-width: 1199.98px) {
+  body.app-shell .v4-kpi-grid { grid-template-columns: repeat(2, minmax(0,1fr)) !important; }
+  body.app-shell .v4-dashboard-grid { grid-template-columns: 1fr !important; }
+  body.app-shell .v4-detail-metrics { grid-template-columns: repeat(2, minmax(0,1fr)) !important; }
+  body.app-shell .v4-setup-progress { grid-template-columns: repeat(2, minmax(0,1fr)) !important; }
+  body.app-shell .v4-settings-grid { grid-template-columns: 1fr !important; }
+}
+
+@media (max-width: 991.98px) {
+  body.app-shell .sidebar {
+    width: min(260px, 86vw) !important;
+    max-width: 86vw !important;
+    flex-basis: min(260px, 86vw) !important;
+  }
+  body.app-shell .content { padding: 14px 14px 24px !important; }
+  body.app-shell .v4-form-layout { grid-template-columns: 1fr !important; }
+  body.app-shell .v4-form-aside { grid-template-columns: repeat(2, minmax(0,1fr)) !important; }
+}
+
+@media (max-width: 767.98px) {
+  :root { --mobile-nav-height: 58px; }
+
+  body.app-shell .topbar {
+    min-height: calc(48px + env(safe-area-inset-top)) !important;
+    height: auto !important;
+    padding: env(safe-area-inset-top) 10px 0 !important;
+    background: rgba(9,11,15,.97) !important;
+  }
+  body.app-shell .sidebar-toggle {
+    width: 36px !important;
+    height: 36px !important;
+    flex-basis: 36px !important;
+    border-radius: 8px !important;
+  }
+  body.app-shell .topbar-title { max-width: calc(100vw - 82px) !important; font-size: 12px !important; }
+  body.app-shell .content {
+    padding: 10px 9px calc(var(--mobile-nav-height) + env(safe-area-inset-bottom) + 16px) !important;
+  }
+  body.app-shell .v4-page-hero,
+  body.app-shell .v4-form-hero {
+    gap: 9px !important;
+    align-items: flex-start !important;
+    margin-bottom: 10px !important;
+  }
+  body.app-shell .v4-page-hero h1,
+  body.app-shell .v4-form-hero h1,
+  body.app-shell .v4-detail-title-line h1 { font-size: 19px !important; }
+  body.app-shell .v4-hero-copy,
+  body.app-shell .v4-form-hero p:not(.page-kicker) { font-size: 11px !important; }
+  body.app-shell .v4-kpi-grid { gap: 6px !important; }
+  body.app-shell .v4-kpi-card { min-height: 82px !important; padding: 9px !important; }
+  body.app-shell .v4-kpi-value { margin-top: 7px !important; font-size: 18px !important; }
+  body.app-shell .v4-detail-header { align-items: flex-start !important; flex-direction: column !important; }
+  body.app-shell .v4-detail-actions { width: 100% !important; }
+  body.app-shell .v4-detail-actions .btn-primary { flex: 1 1 auto !important; }
+  body.app-shell .v4-detail-metrics { grid-template-columns: repeat(2, minmax(0,1fr)) !important; gap: 5px !important; }
+  body.app-shell .v4-detail-metric { min-height: 62px !important; padding: 8px !important; }
+  body.app-shell .v4-setup-progress { grid-template-columns: 1fr !important; }
+  body.app-shell .v4-form-aside { grid-template-columns: 1fr !important; }
+  body.app-shell .v4-workflow-steps { grid-template-columns: 1fr !important; }
+  body.app-shell .v4-workflow-step { min-height: 31px !important; }
+  body.app-shell .mobile-bottom-nav {
+    min-height: calc(var(--mobile-nav-height) + env(safe-area-inset-bottom)) !important;
+    padding: 4px max(7px, env(safe-area-inset-right)) calc(4px + env(safe-area-inset-bottom)) max(7px, env(safe-area-inset-left)) !important;
+    border-top-color: var(--v5-border-soft) !important;
+    background: rgba(10,12,16,.97) !important;
+    box-shadow: 0 -8px 24px rgba(0,0,0,.24) !important;
+  }
+  body.app-shell .mobile-nav-item {
+    min-height: 46px !important;
+    border-radius: 8px !important;
+    color: #687482 !important;
+  }
+  body.app-shell .mobile-nav-item.active { color: #79aff7 !important; }
+  body.app-shell .mobile-nav-item.active::after { width: 14px !important; height: 2px !important; background: var(--v5-accent) !important; }
+  body.app-shell .mobile-nav-icon { width: 20px !important; height: 20px !important; }
+  body.app-shell .mobile-nav-icon svg { width: 18px !important; height: 18px !important; }
+  body.app-shell .mobile-nav-label { font-size: 9px !important; }
+  body.app-shell .mobile-nav-create .mobile-nav-icon {
+    width: 36px !important;
+    height: 36px !important;
+    margin-top: -10px !important;
+    border-color: #2d6fb7 !important;
+    border-radius: 10px !important;
+    background: #2388ff !important;
+    box-shadow: 0 6px 16px rgba(35,136,255,.22) !important;
+  }
+}
+
+@media (max-width: 479.98px) {
+  body.app-shell .v4-kpi-grid { grid-template-columns: 1fr 1fr !important; }
+  body.app-shell .v4-kpi-card { min-width: 0 !important; }
+  body.app-shell .v4-detail-metrics { grid-template-columns: 1fr 1fr !important; }
+  body.app-shell .v4-field-grid { grid-template-columns: 1fr !important; }
+  body.app-shell .v4-field.is-wide { grid-column: auto !important; }
+  body.app-shell .v4-customer-toolbar { padding: 7px !important; }
+  body.app-shell .v4-customer-chips { flex-wrap: nowrap !important; overflow-x: auto !important; padding-bottom: 2px !important; }
+  body.app-shell .v4-customer-chip { white-space: nowrap !important; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.app-shell *,
+  body.app-shell *::before,
+  body.app-shell *::after {
+    scroll-behavior: auto !important;
+    transition-duration: .01ms !important;
+    animation-duration: .01ms !important;
+  }
+}
