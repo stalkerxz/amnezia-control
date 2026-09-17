@@ -1269,6 +1269,529 @@ class VPNClientService:
         return "\n".join(lines)
 
     @staticmethod
+    def _encode_amneziavpn_profile(
+        profile: dict,
+    ) -> str:
+        """
+        Encode AmneziaVPN's vpn:// envelope.
+
+        Qt qCompress-compatible representation:
+        four-byte big-endian uncompressed length
+        followed by a standard zlib stream.
+        """
+        import base64
+        import json
+        import struct
+        import zlib
+
+        payload = json.dumps(
+            profile,
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ).encode("utf-8")
+
+        compressed = zlib.compress(
+            payload,
+            8,
+        )
+
+        raw = (
+            struct.pack(
+                ">I",
+                len(payload),
+            )
+            + compressed
+        )
+
+        encoded = (
+            base64
+            .urlsafe_b64encode(raw)
+            .decode("ascii")
+            .rstrip("=")
+        )
+
+        return f"vpn://{encoded}"
+
+
+    @staticmethod
+    def _split_vpn_endpoint(
+        endpoint: str,
+    ) -> tuple[str, int]:
+        endpoint = (
+            endpoint
+            or ""
+        ).strip()
+
+        if endpoint.startswith("["):
+            marker = endpoint.rfind(
+                "]:"
+            )
+
+            if marker < 0:
+                raise RuntimeError(
+                    "Invalid IPv6 VPN endpoint."
+                )
+
+            host = endpoint[
+                1:marker
+            ]
+
+            port_raw = endpoint[
+                marker + 2:
+            ]
+
+        else:
+            if ":" not in endpoint:
+                raise RuntimeError(
+                    "Invalid VPN endpoint."
+                )
+
+            host, port_raw = (
+                endpoint.rsplit(
+                    ":",
+                    1,
+                )
+            )
+
+        try:
+            port = int(
+                port_raw
+            )
+
+        except (
+            TypeError,
+            ValueError,
+        ) as exc:
+            raise RuntimeError(
+                "Invalid VPN endpoint port."
+            ) from exc
+
+        if (
+            not host
+            or port < 1
+            or port > 65535
+        ):
+            raise RuntimeError(
+                "Invalid VPN endpoint."
+            )
+
+        return host, port
+
+
+    @classmethod
+    def build_amneziavpn_awg31_artifact(
+        cls,
+        *,
+        client: VPNClient,
+        config: str,
+        client_public_key: str,
+        protocol,
+    ) -> str:
+        """
+        Build an AmneziaVPN .vpn artifact directly
+        from the current AWG 3.1 client config and
+        this server's runtime metadata.
+
+        No data from another server or another
+        client is reused.
+        """
+        import ipaddress
+        import json
+
+        if (
+            client.protocol_type
+            != VPNClient.ProtocolType.AWG2
+        ):
+            raise RuntimeError(
+                "AmneziaVPN AWG 3.1 export "
+                "requires an AWG2 client."
+            )
+
+        if (
+            protocol.server_id
+            != client.server_id
+        ):
+            raise RuntimeError(
+                "Protocol/server mismatch."
+            )
+
+        client_public_key = (
+            client_public_key
+            or ""
+        ).strip()
+
+        if not client_public_key:
+            raise RuntimeError(
+                "Client public key is missing."
+            )
+
+        sections = (
+            cls._parse_config_sections(
+                config
+            )
+        )
+
+        interface = (
+            sections.get(
+                "Interface",
+                {},
+            )
+        )
+
+        peer = (
+            sections.get(
+                "Peer",
+                {},
+            )
+        )
+
+        private_key = str(
+            interface.get(
+                "PrivateKey",
+                "",
+            )
+        ).strip()
+
+        address = str(
+            interface.get(
+                "Address",
+                "",
+            )
+        ).split(
+            ",",
+            1,
+        )[0].strip()
+
+        server_public_key = str(
+            peer.get(
+                "PublicKey",
+                "",
+            )
+        ).strip()
+
+        preshared_key = str(
+            peer.get(
+                "PresharedKey",
+                "",
+            )
+        ).strip()
+
+        endpoint = str(
+            peer.get(
+                "Endpoint",
+                "",
+            )
+        ).strip()
+
+        allowed_ips = [
+            item.strip()
+            for item
+            in str(
+                peer.get(
+                    "AllowedIPs",
+                    "",
+                )
+            ).split(",")
+            if item.strip()
+        ]
+
+        if not (
+            private_key
+            and address
+            and server_public_key
+            and endpoint
+            and allowed_ips
+        ):
+            raise RuntimeError(
+                "Native AWG2 config is incomplete."
+            )
+
+        client_ip = address.split(
+            "/",
+            1,
+        )[0].strip()
+
+        expected_endpoint = (
+            cls.resolve_endpoint(
+                client.server,
+                protocol,
+            )
+        )
+
+        if endpoint != expected_endpoint:
+            raise RuntimeError(
+                "Native AWG2 endpoint does not "
+                "match server public endpoint."
+            )
+
+        host, port = (
+            cls._split_vpn_endpoint(
+                endpoint
+            )
+        )
+
+        runtime_metadata = (
+            protocol.runtime_metadata
+            or {}
+        )
+
+        awg_metadata = (
+            runtime_metadata.get(
+                "awg2_metadata",
+                {},
+            )
+            or {}
+        )
+
+        required_tuning_keys = (
+            "Jc",
+            "Jmin",
+            "Jmax",
+            "S1",
+            "S2",
+            "S3",
+            "S4",
+            "H1",
+            "H2",
+            "H3",
+            "H4",
+            "HeaderProtectionKey",
+            "ContentPaddingAddition",
+            "RekeyAfterTime",
+            "RekeyTimeout",
+            "RejectAfterTime",
+            "KeepaliveTimeout",
+            "MaxHandshakeAttempts",
+            "RandomTrailers",
+            "DisableCookies",
+        )
+
+        optional_i_keys = (
+            "I1",
+            "I2",
+            "I3",
+            "I4",
+            "I5",
+        )
+
+        def resolve_tuning(
+            key: str,
+            *,
+            required: bool,
+        ) -> str:
+            for source in (
+                interface,
+                awg_metadata,
+            ):
+                if key not in source:
+                    continue
+
+                value = str(
+                    source.get(key)
+                    or ""
+                ).strip()
+
+                if value:
+                    return value
+
+            if required:
+                raise RuntimeError(
+                    "AWG 3.1 metadata is "
+                    f"missing {key}."
+                )
+
+            return ""
+
+        tuning = {
+            key: resolve_tuning(
+                key,
+                required=True,
+            )
+            for key
+            in required_tuning_keys
+        }
+
+        optional_i = {
+            key: resolve_tuning(
+                key,
+                required=False,
+            )
+            for key
+            in optional_i_keys
+        }
+
+        subnet_raw = str(
+            runtime_metadata.get(
+                "subnet",
+                "",
+            )
+            or ""
+        ).strip()
+
+        if not subnet_raw:
+            raise RuntimeError(
+                "AWG2 runtime subnet is missing."
+            )
+
+        try:
+            subnet = ipaddress.ip_network(
+                subnet_raw,
+                strict=False,
+            )
+
+            client_address = (
+                ipaddress.ip_address(
+                    client_ip
+                )
+            )
+
+        except ValueError as exc:
+            raise RuntimeError(
+                "Invalid AWG2 subnet/address."
+            ) from exc
+
+        if (
+            client_address.version
+            != subnet.version
+            or client_address
+            not in subnet
+        ):
+            raise RuntimeError(
+                "Client address is outside "
+                "the AWG2 runtime subnet."
+            )
+
+        dns_values = [
+            item.strip()
+            for item
+            in str(
+                interface.get(
+                    "DNS",
+                    "",
+                )
+                or ""
+            ).replace(
+                ";",
+                ",",
+            ).split(",")
+            if item.strip()
+        ]
+
+        keepalive = str(
+            peer.get(
+                "PersistentKeepalive",
+                "",
+            )
+            or cls
+            .AWG31_PERSISTENT_KEEPALIVE
+        ).strip()
+
+        mtu = str(
+            interface.get(
+                "MTU",
+                "",
+            )
+            or "1280"
+        ).strip()
+
+        last_config = {
+            **tuning,
+            "allowed_ips":
+                allowed_ips,
+            "clientId":
+                client_public_key,
+            "client_ip":
+                client_ip,
+            "client_priv_key":
+                private_key,
+            "client_pub_key":
+                client_public_key,
+            "config":
+                config,
+            "hostName":
+                host,
+            "mtu":
+                mtu,
+            "persistent_keep_alive":
+                keepalive,
+            "port":
+                port,
+            "psk_key":
+                preshared_key,
+            "server_pub_key":
+                server_public_key,
+        }
+
+        awg_payload = {
+            **tuning,
+            **optional_i,
+            "last_config":
+                json.dumps(
+                    last_config,
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                ),
+            "port":
+                str(port),
+            "protocol_version":
+                "3.1",
+            "subnet_address":
+                str(
+                    subnet.network_address
+                ),
+            "subnet_cidr":
+                str(
+                    subnet.prefixlen
+                ),
+            "transport_proto":
+                "udp",
+        }
+
+        profile = {
+            "containers": [
+                {
+                    "awg":
+                        awg_payload,
+                    "container":
+                        "amnezia-awg2",
+                }
+            ],
+            "defaultContainer":
+                "amnezia-awg2",
+            "description":
+                client.name,
+            "hostName":
+                host,
+        }
+
+        if dns_values:
+            profile["dns1"] = (
+                dns_values[0]
+            )
+
+        if len(dns_values) > 1:
+            profile["dns2"] = (
+                dns_values[1]
+            )
+
+        artifact = (
+            cls._encode_amneziavpn_profile(
+                profile
+            )
+        )
+
+        if not artifact.startswith(
+            "vpn://"
+        ):
+            raise RuntimeError(
+                "AmneziaVPN artifact "
+                "encoding failed."
+            )
+
+        return artifact
+
+
+    @staticmethod
     def _store_revision(
         client: VPNClient,
         config: str,
@@ -1542,7 +2065,65 @@ class VPNClientService:
                 allowed_ips=allowed_ips,
             )
 
-        rev = VPNClientService._store_revision(client, config)
+        amneziavpn_config = ""
+
+        if (
+            client.protocol_type
+            == VPNClient.ProtocolType.AWG2
+            and client.server.runtime_backend
+            == Server.RuntimeBackend.DOCKER
+            and bool(
+                (
+                    adapter.protocol.runtime_metadata
+                    or {}
+                ).get(
+                    "awg31_metadata_ready"
+                )
+            )
+        ):
+            try:
+                amneziavpn_config = (
+                    VPNClientService
+                    .build_amneziavpn_awg31_artifact(
+                        client=client,
+                        config=config,
+                        client_public_key=(
+                            generated[
+                                "public_key"
+                            ]
+                        ),
+                        protocol=(
+                            adapter.protocol
+                        ),
+                    )
+                )
+
+            except Exception:
+                # Native .conf remains the
+                # authoritative/fail-safe export.
+                # Do not invalidate a successfully
+                # created peer only because the
+                # secondary AmneziaVPN artifact
+                # could not be serialized.
+                import logging
+
+                logging.getLogger(
+                    __name__
+                ).exception(
+                    "Failed to build AmneziaVPN "
+                    "artifact for Docker AWG2 "
+                    "client_id=%s server_id=%s",
+                    client.pk,
+                    client.server_id,
+                )
+
+        rev = VPNClientService._store_revision(
+            client,
+            config,
+            amneziavpn_config=(
+                amneziavpn_config
+            ),
+        )
         client.runtime_peer_public_key = generated["public_key"]
         client.runtime_address = generated["address"]
         client.last_runtime_sync_at = timezone.now()
