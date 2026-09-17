@@ -1,0 +1,529 @@
+/*
+ * VPN Control UI V5.2 — precision pass.
+ *
+ * Page-specific refinements on top of V5. Keeps backend, routes and lifecycle
+ * contracts unchanged while reducing visual nesting and wasted vertical space.
+ */
+
+/* --------------------------------------------------------------------------
+   Dashboard — compact command center on desktop
+   -------------------------------------------------------------------------- */
+
+@media (min-width: 992px) {
+  body.app-shell .v4-kpi-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+    margin-bottom: 8px !important;
+  }
+
+  body.app-shell .v4-kpi-card {
+    min-height: 68px !important;
+    padding: 9px 10px !important;
+  }
+
+  body.app-shell .v4-kpi-icon {
+    width: 22px !important;
+    height: 22px !important;
+    flex-basis: 22px !important;
+  }
+
+  body.app-shell .v4-kpi-value {
+    margin-top: 5px !important;
+    font-size: 18px !important;
+    line-height: 1 !important;
+  }
+
+  body.app-shell .v4-kpi-meta {
+    margin-top: 3px !important;
+    font-size: 9px !important;
+  }
+
+  body.app-shell .v4-dashboard-grid {
+    grid-template-columns: minmax(0, 1.28fr) minmax(320px, .72fr) !important;
+    gap: 8px !important;
+    margin-bottom: 8px !important;
+  }
+
+  body.app-shell .v4-panel-head {
+    min-height: 44px !important;
+    padding: 8px 10px !important;
+  }
+
+  body.app-shell .v4-attention-row {
+    min-height: 40px !important;
+    padding: 5px 4px !important;
+  }
+
+  body.app-shell .v4-infra-status {
+    padding: 9px 10px !important;
+  }
+
+  body.app-shell .v4-infra-orb {
+    width: 44px !important;
+    height: 44px !important;
+    flex-basis: 44px !important;
+  }
+
+  body.app-shell .v4-infra-breakdown {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 0 10px !important;
+    padding: 0 10px 6px !important;
+  }
+
+  body.app-shell .v4-infra-breakdown > div {
+    min-height: 25px !important;
+  }
+
+  body.app-shell .v4-sync-note {
+    margin: 0 8px 8px !important;
+    padding: 6px 8px !important;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Customer detail — devices first, no empty product boxes
+   -------------------------------------------------------------------------- */
+
+body.app-shell #customer-overview:has(.v4-ready-state) {
+  display: none !important;
+}
+
+body.app-shell:has(#customer-overview .v4-ready-state) .v4-detail-tabs a[href="#customer-overview"] {
+  display: none !important;
+}
+
+body.app-shell .v4-detail-anchor-section {
+  margin-bottom: 8px !important;
+}
+
+body.app-shell .v4-device-card {
+  overflow: hidden !important;
+  margin-bottom: 8px !important;
+  border: 1px solid var(--v5-border) !important;
+  border-radius: 8px !important;
+  background: #0f141a !important;
+  box-shadow: none !important;
+}
+
+body.app-shell .v4-device-head {
+  min-height: 54px !important;
+  gap: 10px !important;
+  padding: 8px 10px !important;
+  border-bottom: 1px solid var(--v5-border-soft) !important;
+  background: #111820 !important;
+}
+
+body.app-shell .v4-device-title-line {
+  gap: 6px !important;
+}
+
+body.app-shell .v4-device-title-line h3 {
+  margin: 0 !important;
+  color: #e8edf2 !important;
+  font-size: 12px !important;
+  font-weight: 680 !important;
+}
+
+body.app-shell .v4-device-meta {
+  gap: 8px !important;
+  margin-top: 2px !important;
+  color: #687481 !important;
+  font-size: 9px !important;
+}
+
+body.app-shell .v4-device-products {
+  gap: 4px !important;
+  margin-top: 5px !important;
+}
+
+body.app-shell .v4-device-product-pill {
+  min-height: 20px !important;
+  padding: 2px 6px !important;
+  border-radius: 5px !important;
+  font-size: 8px !important;
+}
+
+body.app-shell .v4-device-actions {
+  gap: 5px !important;
+}
+
+body.app-shell .v4-device-more {
+  width: 29px !important;
+  height: 29px !important;
+  border-radius: 6px !important;
+  box-shadow: none !important;
+}
+
+body.app-shell .v4-connection-grid {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)) !important;
+  gap: 7px !important;
+  padding: 8px !important;
+}
+
+body.app-shell .v4-connection-card.is-empty {
+  display: none !important;
+}
+
+body.app-shell .v4-connection-card {
+  min-width: 0 !important;
+  padding: 8px !important;
+  border: 1px solid #202a35 !important;
+  border-radius: 7px !important;
+  background: #0c1218 !important;
+  box-shadow: none !important;
+}
+
+body.app-shell .v4-connection-card-head {
+  gap: 7px !important;
+  margin-bottom: 7px !important;
+}
+
+body.app-shell .v4-connection-card-head h4 {
+  margin: 1px 0 0 !important;
+  color: #dbe2e9 !important;
+  font-size: 10px !important;
+  font-weight: 660 !important;
+}
+
+body.app-shell .v4-connection-card-head p,
+body.app-shell .v4-connection-card-head span,
+body.app-shell .v4-connection-item small {
+  color: #65717e !important;
+  font-size: 8px !important;
+}
+
+body.app-shell .v4-connection-item {
+  padding: 7px !important;
+  border: 0 !important;
+  border-top: 1px solid #19222c !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+}
+
+body.app-shell .v4-connection-item:first-of-type {
+  border-top: 0 !important;
+}
+
+body.app-shell .v4-connection-item-head strong {
+  color: #dce2e8 !important;
+  font-size: 9px !important;
+  font-weight: 640 !important;
+}
+
+body.app-shell .v4-connection-actions {
+  gap: 4px !important;
+  margin-top: 6px !important;
+}
+
+body.app-shell .v4-connection-actions .btn,
+body.app-shell .v4-connection-actions .form-select {
+  min-height: 27px !important;
+  padding: 4px 7px !important;
+  font-size: 9px !important;
+}
+
+body.app-shell .v4-connection-error {
+  max-height: 34px !important;
+  overflow: auto !important;
+  margin-top: 5px !important;
+  padding: 5px 6px !important;
+  border: 1px solid rgba(239, 95, 108, .18) !important;
+  border-radius: 5px !important;
+  background: rgba(239, 95, 108, .045) !important;
+  color: #c67b83 !important;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+  font-size: 8px !important;
+  line-height: 1.35 !important;
+  white-space: nowrap !important;
+  text-overflow: ellipsis !important;
+}
+
+body.app-shell .v4-device-settings {
+  padding: 8px !important;
+}
+
+/* --------------------------------------------------------------------------
+   Servers — one dense operational row per server
+   -------------------------------------------------------------------------- */
+
+body.app-shell .v4-server-card-list {
+  gap: 6px !important;
+  padding: 7px !important;
+}
+
+body.app-shell .v4-server-card {
+  position: relative !important;
+  overflow: hidden !important;
+  padding: 0 !important;
+  border-radius: 7px !important;
+}
+
+body.app-shell .v4-server-card.is-success::before,
+body.app-shell .v4-server-card.is-warning::before,
+body.app-shell .v4-server-card.is-danger::before {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 2px;
+  content: "";
+}
+
+body.app-shell .v4-server-card.is-success::before { background: var(--v5-green); }
+body.app-shell .v4-server-card.is-warning::before { background: var(--v5-amber); }
+body.app-shell .v4-server-card.is-danger::before { background: var(--v5-red); }
+
+body.app-shell .v4-server-card-head {
+  padding: 9px 11px 6px !important;
+}
+
+body.app-shell .v4-server-card-title-row {
+  gap: 7px !important;
+}
+
+body.app-shell .v4-server-card-addresses {
+  gap: 8px 14px !important;
+  margin-top: 4px !important;
+  flex-wrap: wrap !important;
+}
+
+body.app-shell .v4-server-card-health-note {
+  margin: 0 11px 6px !important;
+  padding: 5px 7px !important;
+  border-radius: 5px !important;
+  font-size: 9px !important;
+}
+
+body.app-shell .v4-server-card-stats {
+  display: grid !important;
+  grid-template-columns: 1.25fr 1fr .68fr .68fr .78fr .88fr !important;
+  gap: 0 !important;
+  margin: 0 11px !important;
+  border-top: 1px solid var(--v5-border-soft) !important;
+  border-bottom: 1px solid var(--v5-border-soft) !important;
+}
+
+body.app-shell .v4-server-stat {
+  min-width: 0 !important;
+  min-height: 52px !important;
+  padding: 7px 9px !important;
+  border: 0 !important;
+  border-right: 1px solid var(--v5-border-soft) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+body.app-shell .v4-server-stat:last-child {
+  border-right: 0 !important;
+}
+
+body.app-shell .v4-server-stat-label {
+  display: block !important;
+  margin-bottom: 4px !important;
+  font-size: 8px !important;
+  letter-spacing: .05em !important;
+  text-transform: uppercase !important;
+}
+
+body.app-shell .v4-server-stat-number,
+body.app-shell .v4-server-pool-value strong,
+body.app-shell .v4-server-sync-value {
+  color: #e4e9ee !important;
+  font-size: 13px !important;
+  font-weight: 690 !important;
+  line-height: 1.1 !important;
+}
+
+body.app-shell .v4-server-stat-meta,
+body.app-shell .v4-server-pool-value span {
+  margin-top: 2px !important;
+  color: #65717e !important;
+  font-size: 8px !important;
+  line-height: 1.2 !important;
+}
+
+body.app-shell .v4-server-mode-list {
+  gap: 4px !important;
+}
+
+body.app-shell .v4-server-card-actions {
+  gap: 5px !important;
+  padding: 7px 11px 9px !important;
+}
+
+body.app-shell .v4-server-card-actions .btn {
+  min-height: 28px !important;
+  padding: 4px 8px !important;
+  font-size: 9px !important;
+}
+
+body.app-shell .v4-server-diagnostics {
+  margin: 0 11px 10px !important;
+  border-radius: 7px !important;
+}
+
+@media (max-width: 1180px) {
+  body.app-shell .v4-server-card-stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+
+  body.app-shell .v4-server-stat:nth-child(3) {
+    border-right: 0 !important;
+  }
+
+  body.app-shell .v4-server-stat:nth-child(-n+3) {
+    border-bottom: 1px solid var(--v5-border-soft) !important;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Onboarding — single form, optional cabinet fields
+   -------------------------------------------------------------------------- */
+
+body.app-shell .v4-workflow-steps {
+  display: none !important;
+}
+
+body.app-shell .v4-form-page {
+  max-width: 1080px !important;
+}
+
+body.app-shell .v4-step-card {
+  overflow: hidden !important;
+}
+
+body.app-shell .v4-step-head {
+  min-height: 44px !important;
+  padding: 8px 10px !important;
+}
+
+body.app-shell .v4-step-body {
+  padding: 10px !important;
+}
+
+body.app-shell .v4-login-fields[hidden] {
+  display: none !important;
+}
+
+body.app-shell .v4-login-toggle {
+  margin-bottom: 0 !important;
+}
+
+body.app-shell .v4-login-fields:not([hidden]) {
+  margin-top: 9px !important;
+  padding-top: 9px !important;
+  border-top: 1px solid var(--v5-border-soft) !important;
+}
+
+/* --------------------------------------------------------------------------
+   Settings — one logical section at a time
+   -------------------------------------------------------------------------- */
+
+body.app-shell .v5-settings-tabs {
+  display: flex;
+  gap: 4px;
+  margin: 0 0 9px !important;
+  padding: 3px;
+  border: 1px solid var(--v5-border) !important;
+  border-radius: 7px;
+  background: #0f141a;
+}
+
+body.app-shell .v5-settings-tab {
+  min-height: 30px;
+  padding: 5px 10px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: #7f8a96;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 620;
+  cursor: pointer;
+}
+
+body.app-shell .v5-settings-tab:hover,
+body.app-shell .v5-settings-tab:focus-visible {
+  background: #171e26;
+  color: #dce2e8;
+}
+
+body.app-shell .v5-settings-tab[aria-selected="true"] {
+  background: #102b49;
+  color: #ddecff;
+}
+
+body.app-shell .v5-settings-page .v4-settings-grid {
+  display: block !important;
+}
+
+body.app-shell .v5-settings-page .v4-settings-stack {
+  display: contents !important;
+}
+
+body.app-shell .v5-settings-panel {
+  width: 100% !important;
+  max-width: 1040px !important;
+  margin: 0 !important;
+}
+
+body.app-shell .v5-settings-panel[hidden] {
+  display: none !important;
+}
+
+body.app-shell .v5-settings-page .v4-system-panel-body {
+  padding: 10px !important;
+}
+
+body.app-shell .v5-settings-page .v4-settings-kv {
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 6px !important;
+}
+
+body.app-shell .v5-settings-page .v4-settings-kv > div {
+  min-height: 50px !important;
+  padding: 8px 9px !important;
+}
+
+@media (max-width: 900px) {
+  body.app-shell .v5-settings-page .v4-settings-kv {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 767.98px) {
+  body.app-shell .v5-settings-tabs {
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  body.app-shell .v5-settings-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  body.app-shell .v5-settings-tab {
+    flex: 0 0 auto;
+  }
+
+  body.app-shell .v4-connection-grid {
+    grid-template-columns: 1fr !important;
+    padding: 6px !important;
+  }
+
+  body.app-shell .v4-server-card-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  body.app-shell .v4-server-stat:nth-child(odd) {
+    border-right: 1px solid var(--v5-border-soft) !important;
+  }
+
+  body.app-shell .v4-server-stat:nth-child(even) {
+    border-right: 0 !important;
+  }
+
+  body.app-shell .v4-server-stat:nth-child(-n+4) {
+    border-bottom: 1px solid var(--v5-border-soft) !important;
+  }
+}
