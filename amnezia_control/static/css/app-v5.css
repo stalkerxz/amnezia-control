@@ -1,0 +1,1476 @@
+/*
+ * VPN Control UI V5 — compact operator interface.
+ *
+ * This layer intentionally overrides the older V4 presentation on modern
+ * operator pages only. It does not change routes, form behavior or business
+ * logic. Legacy /clients/, /xhttp/ and Django admin keep their legacy bundle.
+ */
+
+:root {
+  --v5-bg: #0b0e12;
+  --v5-sidebar: #0d1116;
+  --v5-topbar: rgba(11, 14, 18, .96);
+  --v5-surface: #11161c;
+  --v5-surface-2: #151b22;
+  --v5-surface-3: #1a212a;
+  --v5-border: #242c35;
+  --v5-border-soft: #1b222b;
+  --v5-text: #f3f6f9;
+  --v5-text-2: #c2c9d2;
+  --v5-muted: #87919e;
+  --v5-muted-2: #626d7a;
+  --v5-blue: #2585ff;
+  --v5-blue-hover: #3d94ff;
+  --v5-green: #38c985;
+  --v5-amber: #e9aa3c;
+  --v5-red: #ef5f6c;
+  --v5-radius: 8px;
+  --v5-radius-sm: 6px;
+  --v5-control: 34px;
+  --v5-sidebar-width: 190px;
+  --v5-shadow: 0 8px 28px rgba(0, 0, 0, .14);
+}
+
+html[data-bs-theme="dark"] {
+  color-scheme: dark;
+}
+
+body.app-shell {
+  background: var(--v5-bg) !important;
+  color: var(--v5-text) !important;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+  font-size: 13px !important;
+  line-height: 1.42 !important;
+  letter-spacing: -.006em !important;
+}
+
+body.app-shell::before,
+body.customer-portal-shell::before {
+  display: none !important;
+}
+
+body.app-shell a {
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+/* --------------------------------------------------------------------------
+   Shell
+   -------------------------------------------------------------------------- */
+
+body.app-shell .app-layout {
+  min-height: 100vh;
+  background: var(--v5-bg) !important;
+}
+
+body.app-shell .app-main {
+  min-width: 0;
+  background: var(--v5-bg) !important;
+}
+
+body.app-shell .sidebar {
+  flex-basis: var(--v5-sidebar-width) !important;
+  width: var(--v5-sidebar-width) !important;
+  padding: 12px 9px 10px !important;
+  background: var(--v5-sidebar) !important;
+  border-right: 1px solid var(--v5-border-soft) !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+
+body.app-shell .sidebar::after {
+  display: none !important;
+}
+
+body.app-shell .brand {
+  min-height: 42px !important;
+  gap: 8px !important;
+  padding: 2px 8px 10px !important;
+  font-size: 13px !important;
+  font-weight: 690 !important;
+  letter-spacing: -.02em !important;
+}
+
+body.app-shell .brand-mark {
+  width: 26px !important;
+  height: 26px !important;
+  flex: 0 0 26px !important;
+  border: 1px solid #274a73 !important;
+  border-radius: 7px !important;
+  background: #10243a !important;
+  box-shadow: none !important;
+}
+
+body.app-shell .brand-mark::before {
+  color: #62aaff !important;
+  background: none !important;
+  -webkit-text-fill-color: currentColor !important;
+  font-size: 14px !important;
+  font-weight: 800 !important;
+}
+
+body.app-shell .brand-label {
+  color: #f0f4f8 !important;
+}
+
+body.app-shell .sidebar .sidebar-section {
+  margin: 15px 0 4px !important;
+  padding: 0 9px !important;
+  color: #596471 !important;
+  font-size: 9px !important;
+  font-weight: 720 !important;
+  letter-spacing: .085em !important;
+}
+
+body.app-shell .sidebar .nav {
+  gap: 2px !important;
+}
+
+body.app-shell .sidebar .nav-link,
+body.app-shell .sidebar-system > summary {
+  min-height: 34px !important;
+  gap: 8px !important;
+  padding: 6px 8px !important;
+  border: 1px solid transparent !important;
+  border-radius: 6px !important;
+  background: transparent !important;
+  color: #86909c !important;
+  font-size: 12px !important;
+  font-weight: 540 !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+body.app-shell .sidebar .nav-link:hover,
+body.app-shell .sidebar .nav-link:focus-visible,
+body.app-shell .sidebar-system > summary:hover {
+  background: #141b23 !important;
+  border-color: #1f2934 !important;
+  color: #dce2e9 !important;
+  transform: none !important;
+}
+
+body.app-shell .sidebar .nav-link.active {
+  background: #102b49 !important;
+  border-color: #173c64 !important;
+  color: #edf6ff !important;
+  box-shadow: none !important;
+  font-weight: 640 !important;
+}
+
+body.app-shell .nav-icon {
+  width: 16px !important;
+  height: 16px !important;
+  color: #687482 !important;
+}
+
+body.app-shell .nav-icon svg {
+  width: 15px !important;
+  height: 15px !important;
+  stroke-width: 1.8 !important;
+}
+
+body.app-shell .sidebar .nav-link.active .nav-icon {
+  color: #6eafff !important;
+}
+
+body.app-shell .sidebar-system {
+  margin-top: 10px !important;
+}
+
+body.app-shell .sidebar-system-menu {
+  margin-top: 3px !important;
+  padding-left: 22px !important;
+}
+
+body.app-shell .sidebar-system-menu .nav-link {
+  min-height: 29px !important;
+  font-size: 11px !important;
+  color: #687380 !important;
+}
+
+body.app-shell .sidebar-account {
+  min-height: 48px !important;
+  gap: 7px !important;
+  margin-top: auto !important;
+  padding: 9px 6px 0 !important;
+  border-top: 1px solid var(--v5-border-soft) !important;
+}
+
+body.app-shell .sidebar-account-avatar,
+body.app-shell .topbar-user-avatar {
+  width: 27px !important;
+  height: 27px !important;
+  flex: 0 0 27px !important;
+  border: 1px solid #29323d !important;
+  background: #171e26 !important;
+  color: #cbd3dc !important;
+  font-size: 10px !important;
+  box-shadow: none !important;
+}
+
+body.app-shell .sidebar-account-name,
+body.app-shell .topbar-user-name {
+  color: #dce2e8 !important;
+  font-size: 11px !important;
+  font-weight: 620 !important;
+}
+
+body.app-shell .sidebar-account-role,
+body.app-shell .topbar-user-role {
+  color: #687380 !important;
+  font-size: 9px !important;
+}
+
+body.app-shell .topbar {
+  height: 50px !important;
+  min-height: 50px !important;
+  padding: 0 22px !important;
+  background: var(--v5-topbar) !important;
+  border-color: var(--v5-border-soft) !important;
+  box-shadow: none !important;
+  backdrop-filter: blur(12px) !important;
+}
+
+body.app-shell .topbar::after {
+  display: none !important;
+}
+
+body.app-shell .topbar-left {
+  gap: 8px !important;
+}
+
+body.app-shell .sidebar-toggle {
+  width: 30px !important;
+  height: 30px !important;
+  flex: 0 0 30px !important;
+  border: 1px solid var(--v5-border) !important;
+  border-radius: 6px !important;
+  background: #11171d !important;
+  color: #8a95a2 !important;
+}
+
+body.app-shell .sidebar-toggle:hover {
+  background: #17202a !important;
+  border-color: #334151 !important;
+  color: #eef2f6 !important;
+}
+
+body.app-shell .topbar-title {
+  color: #eef2f6 !important;
+  font-size: 12px !important;
+  font-weight: 650 !important;
+}
+
+body.app-shell .topbar-subtitle {
+  color: #626e7a !important;
+  font-size: 10px !important;
+}
+
+body.app-shell .topbar-user {
+  gap: 7px !important;
+}
+
+body.app-shell .content {
+  width: 100% !important;
+  max-width: 1600px !important;
+  margin: 0 auto !important;
+  padding: 18px 22px 30px !important;
+}
+
+body.app-shell .app-alert {
+  margin-bottom: 12px !important;
+  padding: 9px 11px !important;
+  border-radius: 7px !important;
+  font-size: 12px !important;
+}
+
+/* --------------------------------------------------------------------------
+   Shared type and controls
+   -------------------------------------------------------------------------- */
+
+body.app-shell .page-kicker {
+  display: none !important;
+}
+
+body.app-shell .v4-page-hero,
+body.app-shell .v4-form-hero,
+body.app-shell .v4-detail-header {
+  margin-top: 0 !important;
+}
+
+body.app-shell .v4-page-hero,
+body.app-shell .v4-form-hero {
+  gap: 16px !important;
+  align-items: center !important;
+  margin-bottom: 14px !important;
+}
+
+body.app-shell .v4-page-hero h1,
+body.app-shell .v4-form-hero h1,
+body.app-shell .v4-detail-header h1 {
+  margin: 0 !important;
+  color: var(--v5-text) !important;
+  font-size: 24px !important;
+  line-height: 1.15 !important;
+  font-weight: 720 !important;
+  letter-spacing: -.035em !important;
+}
+
+body.app-shell .v4-hero-copy,
+body.app-shell .v4-form-hero p,
+body.app-shell .v4-detail-header p {
+  margin-top: 4px !important;
+  color: var(--v5-muted) !important;
+  font-size: 12px !important;
+  line-height: 1.45 !important;
+}
+
+body.app-shell .btn {
+  min-height: var(--v5-control) !important;
+  padding: 6px 11px !important;
+  border-radius: 6px !important;
+  font-size: 12px !important;
+  font-weight: 620 !important;
+  line-height: 1.2 !important;
+  box-shadow: none !important;
+}
+
+body.app-shell .btn-sm {
+  min-height: 29px !important;
+  padding: 5px 9px !important;
+  font-size: 11px !important;
+}
+
+body.app-shell .btn-primary {
+  border-color: var(--v5-blue) !important;
+  background: var(--v5-blue) !important;
+  color: #fff !important;
+}
+
+body.app-shell .btn-primary:hover,
+body.app-shell .btn-primary:focus-visible {
+  border-color: var(--v5-blue-hover) !important;
+  background: var(--v5-blue-hover) !important;
+}
+
+body.app-shell .btn-outline-primary,
+body.app-shell .btn-outline-secondary {
+  border-color: #303a46 !important;
+  background: #11171d !important;
+  color: #c7ced6 !important;
+}
+
+body.app-shell .btn-outline-primary:hover,
+body.app-shell .btn-outline-secondary:hover {
+  border-color: #415062 !important;
+  background: #17202a !important;
+  color: #f1f4f7 !important;
+}
+
+body.app-shell .form-control,
+body.app-shell .form-select,
+body.app-shell input[type="text"],
+body.app-shell input[type="email"],
+body.app-shell input[type="password"],
+body.app-shell input[type="number"],
+body.app-shell input[type="search"],
+body.app-shell input[type="datetime-local"],
+body.app-shell textarea,
+body.app-shell select {
+  min-height: var(--v5-control) !important;
+  padding: 6px 9px !important;
+  border: 1px solid #2a3440 !important;
+  border-radius: 6px !important;
+  background: #0f141a !important;
+  color: #e6ebf0 !important;
+  font-size: 12px !important;
+  box-shadow: none !important;
+}
+
+body.app-shell textarea {
+  min-height: 74px !important;
+}
+
+body.app-shell .form-control:focus,
+body.app-shell .form-select:focus,
+body.app-shell input:focus,
+body.app-shell textarea:focus,
+body.app-shell select:focus {
+  border-color: #397fcc !important;
+  box-shadow: 0 0 0 2px rgba(37, 133, 255, .10) !important;
+}
+
+body.app-shell .form-label {
+  margin-bottom: 4px !important;
+  color: #9ca6b2 !important;
+  font-size: 11px !important;
+  font-weight: 620 !important;
+}
+
+body.app-shell .form-text {
+  margin-top: 4px !important;
+  color: #65717e !important;
+  font-size: 10px !important;
+}
+
+body.app-shell .form-check-input {
+  border-color: #354151 !important;
+  background-color: #121820 !important;
+  box-shadow: none !important;
+}
+
+body.app-shell .form-check-input:checked {
+  border-color: var(--v5-blue) !important;
+  background-color: var(--v5-blue) !important;
+}
+
+body.app-shell .dropdown-menu {
+  padding: 5px !important;
+  border: 1px solid #2a3440 !important;
+  border-radius: 7px !important;
+  background: #141a21 !important;
+  box-shadow: 0 14px 38px rgba(0, 0, 0, .28) !important;
+}
+
+body.app-shell .dropdown-item {
+  min-height: 31px !important;
+  padding: 6px 8px !important;
+  border-radius: 5px !important;
+  color: #c7ced6 !important;
+  font-size: 11px !important;
+}
+
+body.app-shell .dropdown-item:hover,
+body.app-shell .dropdown-item:focus {
+  background: #1b242e !important;
+  color: #fff !important;
+}
+
+body.app-shell .v4-status-pill,
+body.app-shell .v4-server-status {
+  min-height: 22px !important;
+  padding: 3px 7px !important;
+  border-radius: 999px !important;
+  font-size: 10px !important;
+  font-weight: 650 !important;
+  box-shadow: none !important;
+}
+
+body.app-shell .v4-status-pill.is-success,
+body.app-shell .v4-server-status.is-success {
+  border-color: rgba(56, 201, 133, .26) !important;
+  background: rgba(56, 201, 133, .10) !important;
+  color: #66dba0 !important;
+}
+
+body.app-shell .v4-status-pill.is-warning,
+body.app-shell .v4-server-status.is-warning {
+  border-color: rgba(233, 170, 60, .26) !important;
+  background: rgba(233, 170, 60, .10) !important;
+  color: #efbd63 !important;
+}
+
+body.app-shell .v4-status-pill.is-danger,
+body.app-shell .v4-server-status.is-danger {
+  border-color: rgba(239, 95, 108, .28) !important;
+  background: rgba(239, 95, 108, .10) !important;
+  color: #f27b86 !important;
+}
+
+body.app-shell .v4-status-pill.is-neutral,
+body.app-shell .v4-server-status.is-neutral {
+  border-color: #2a333e !important;
+  background: #151b22 !important;
+  color: #8994a1 !important;
+}
+
+body.app-shell .v4-panel-eyebrow {
+  color: #6d7885 !important;
+  font-size: 9px !important;
+  font-weight: 700 !important;
+  letter-spacing: .07em !important;
+}
+
+/* --------------------------------------------------------------------------
+   Dashboard
+   -------------------------------------------------------------------------- */
+
+body.app-shell .v4-dashboard {
+  width: 100%;
+}
+
+body.app-shell .v4-kpi-grid {
+  gap: 9px !important;
+  margin-bottom: 10px !important;
+}
+
+body.app-shell .v4-kpi-card {
+  min-height: 92px !important;
+  padding: 12px !important;
+  border: 1px solid var(--v5-border) !important;
+  border-radius: var(--v5-radius) !important;
+  background: var(--v5-surface) !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+body.app-shell .v4-kpi-card::after {
+  display: none !important;
+}
+
+body.app-shell .v4-kpi-card:hover {
+  border-color: #35414e !important;
+  background: #141a21 !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+body.app-shell .v4-kpi-topline {
+  gap: 7px !important;
+}
+
+body.app-shell .v4-kpi-icon {
+  width: 24px !important;
+  height: 24px !important;
+  flex: 0 0 24px !important;
+  border: 0 !important;
+  border-radius: 6px !important;
+  background: #17202a !important;
+}
+
+body.app-shell .v4-kpi-icon svg {
+  width: 14px !important;
+  height: 14px !important;
+}
+
+body.app-shell .v4-kpi-label {
+  color: #909aa6 !important;
+  font-size: 11px !important;
+  font-weight: 610 !important;
+}
+
+body.app-shell .v4-kpi-value {
+  margin-top: 10px !important;
+  color: #f5f7f9 !important;
+  font-size: 21px !important;
+  font-weight: 720 !important;
+  letter-spacing: -.035em !important;
+}
+
+body.app-shell .v4-kpi-meta {
+  margin-top: 5px !important;
+  color: #697582 !important;
+  font-size: 10px !important;
+}
+
+body.app-shell .v4-dashboard-grid {
+  grid-template-columns: minmax(0, 1.55fr) minmax(280px, .72fr) !important;
+  gap: 10px !important;
+  margin-bottom: 10px !important;
+}
+
+body.app-shell .v4-panel {
+  border: 1px solid var(--v5-border) !important;
+  border-radius: var(--v5-radius) !important;
+  background: var(--v5-surface) !important;
+  box-shadow: none !important;
+}
+
+body.app-shell .v4-panel-head {
+  min-height: 50px !important;
+  padding: 10px 12px !important;
+  border-bottom: 1px solid var(--v5-border-soft) !important;
+}
+
+body.app-shell .v4-panel-head h2 {
+  margin-top: 1px !important;
+  color: #e9edf1 !important;
+  font-size: 12px !important;
+  font-weight: 660 !important;
+}
+
+body.app-shell .v4-panel-head > a {
+  color: #67aaff !important;
+  font-size: 10px !important;
+}
+
+body.app-shell .v4-attention-list {
+  padding: 2px 7px 7px !important;
+}
+
+body.app-shell .v4-attention-row {
+  min-height: 47px !important;
+  gap: 8px !important;
+  padding: 7px 6px !important;
+  border-bottom-color: var(--v5-border-soft) !important;
+  transform: none !important;
+}
+
+body.app-shell .v4-attention-row:hover {
+  background: #151b22 !important;
+  transform: none !important;
+}
+
+body.app-shell .v4-attention-copy strong {
+  color: #d9dfe6 !important;
+  font-size: 11px !important;
+}
+
+body.app-shell .v4-attention-copy span,
+body.app-shell .v4-infra-copy span {
+  color: #687481 !important;
+  font-size: 10px !important;
+}
+
+body.app-shell .v4-count-pill {
+  min-width: 24px !important;
+  padding: 2px 6px !important;
+  border-color: #2a333e !important;
+  background: #151b22 !important;
+  color: #9ca6b2 !important;
+  font-size: 10px !important;
+}
+
+body.app-shell .v4-infra-panel::after {
+  display: none !important;
+}
+
+body.app-shell .v4-infra-status {
+  gap: 12px !important;
+  padding: 12px !important;
+}
+
+body.app-shell .v4-infra-orb {
+  width: 54px !important;
+  height: 54px !important;
+  flex: 0 0 54px !important;
+  border-radius: 50% !important;
+  background: #121a22 !important;
+  box-shadow: none !important;
+}
+
+body.app-shell .v4-infra-orb span {
+  font-size: 15px !important;
+}
+
+body.app-shell .v4-infra-orb small {
+  font-size: 8px !important;
+}
+
+body.app-shell .v4-infra-copy strong {
+  color: #dce2e8 !important;
+  font-size: 11px !important;
+}
+
+body.app-shell .v4-infra-breakdown {
+  padding: 0 12px 8px !important;
+}
+
+body.app-shell .v4-infra-breakdown > div {
+  min-height: 28px !important;
+  font-size: 10px !important;
+  border-bottom-color: var(--v5-border-soft) !important;
+}
+
+body.app-shell .v4-sync-note {
+  margin: 0 9px 9px !important;
+  padding: 7px 8px !important;
+  border-radius: 6px !important;
+  background: #0f141a !important;
+  color: #66717d !important;
+  font-size: 9px !important;
+}
+
+body.app-shell .v4-activity-panel {
+  margin-bottom: 9px !important;
+}
+
+body.app-shell .v4-activity-table thead th,
+body.app-shell .v4-activity-table tbody td {
+  padding: 8px 12px !important;
+  font-size: 10px !important;
+}
+
+body.app-shell .v4-dashboard-footer {
+  min-height: 38px !important;
+  padding: 8px 11px !important;
+  border: 1px solid var(--v5-border) !important;
+  border-radius: 7px !important;
+  background: #0f141a !important;
+  color: #697582 !important;
+  font-size: 10px !important;
+}
+
+/* --------------------------------------------------------------------------
+   Customers list
+   -------------------------------------------------------------------------- */
+
+body.app-shell .v4-customer-toolbar,
+body.app-shell .v4-customer-table-panel {
+  border: 1px solid var(--v5-border) !important;
+  border-radius: var(--v5-radius) !important;
+  background: var(--v5-surface) !important;
+  box-shadow: none !important;
+}
+
+body.app-shell .v4-customer-toolbar {
+  margin-bottom: 9px !important;
+  padding: 9px !important;
+}
+
+body.app-shell .v4-search-row {
+  gap: 7px !important;
+}
+
+body.app-shell .v4-search-box {
+  min-height: var(--v5-control) !important;
+  border: 1px solid #2a3440 !important;
+  border-radius: 6px !important;
+  background: #0f141a !important;
+}
+
+body.app-shell .v4-search-box input {
+  min-height: 32px !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+body.app-shell .v4-filter-details > summary {
+  min-height: var(--v5-control) !important;
+  padding: 6px 9px !important;
+  border: 1px solid #2a3440 !important;
+  border-radius: 6px !important;
+  background: #11171d !important;
+  color: #a5aeba !important;
+  font-size: 11px !important;
+}
+
+body.app-shell .v4-filter-popover {
+  border: 1px solid #2a3440 !important;
+  border-radius: 7px !important;
+  background: #141a21 !important;
+  box-shadow: 0 16px 42px rgba(0,0,0,.30) !important;
+}
+
+body.app-shell .v4-customer-chips,
+body.app-shell .v4-system-chips {
+  gap: 5px !important;
+  margin-top: 8px !important;
+}
+
+body.app-shell .v4-customer-chip,
+body.app-shell .v4-system-chip {
+  min-height: 27px !important;
+  padding: 4px 8px !important;
+  border: 1px solid #28323d !important;
+  border-radius: 6px !important;
+  background: #11171d !important;
+  color: #8e99a5 !important;
+  font-size: 10px !important;
+  font-weight: 580 !important;
+}
+
+body.app-shell .v4-customer-chip.active,
+body.app-shell .v4-system-chip.active {
+  border-color: #245a91 !important;
+  background: #102b49 !important;
+  color: #ddecff !important;
+}
+
+body.app-shell .v4-customer-table-head {
+  min-height: 49px !important;
+  padding: 9px 12px !important;
+  border-bottom: 1px solid var(--v5-border-soft) !important;
+}
+
+body.app-shell .v4-customer-table-head h2 {
+  margin: 1px 0 0 !important;
+  color: #e9edf1 !important;
+  font-size: 12px !important;
+  font-weight: 660 !important;
+}
+
+body.app-shell .v4-customer-table-head > span {
+  color: #6b7784 !important;
+  font-size: 10px !important;
+}
+
+body.app-shell .v4-customer-table {
+  min-width: 900px !important;
+}
+
+body.app-shell .v4-customer-table thead th {
+  height: 34px !important;
+  padding: 7px 10px !important;
+  border-bottom: 1px solid var(--v5-border) !important;
+  background: #0f141a !important;
+  color: #687481 !important;
+  font-size: 9px !important;
+  font-weight: 680 !important;
+  letter-spacing: .035em !important;
+  text-transform: uppercase !important;
+}
+
+body.app-shell .v4-customer-table tbody td {
+  height: 52px !important;
+  padding: 7px 10px !important;
+  border-bottom: 1px solid var(--v5-border-soft) !important;
+  background: transparent !important;
+  color: #bfc7d0 !important;
+  font-size: 11px !important;
+}
+
+body.app-shell .v4-customer-row:hover td {
+  background: #141a21 !important;
+}
+
+body.app-shell .v4-customer-avatar {
+  width: 28px !important;
+  height: 28px !important;
+  flex: 0 0 28px !important;
+  border: 1px solid #303a45 !important;
+  background: #1a222b !important;
+  color: #d2d9e1 !important;
+  font-size: 10px !important;
+}
+
+body.app-shell .v4-customer-name {
+  color: #e6ebf0 !important;
+  font-size: 11px !important;
+  font-weight: 650 !important;
+}
+
+body.app-shell .v4-customer-email,
+body.app-shell .v4-cabinet-state,
+body.app-shell .v4-state-cell small,
+body.app-shell .v4-number-cell span,
+body.app-shell .v4-access-cell span {
+  color: #66727f !important;
+  font-size: 9px !important;
+}
+
+body.app-shell .v4-number-cell strong,
+body.app-shell .v4-access-cell strong {
+  color: #d7dde4 !important;
+  font-size: 11px !important;
+}
+
+body.app-shell .v4-more-button,
+body.app-shell .v4-detail-more {
+  width: 30px !important;
+  height: 30px !important;
+  border: 1px solid #2b3540 !important;
+  border-radius: 6px !important;
+  background: #11171d !important;
+  color: #8b96a2 !important;
+  box-shadow: none !important;
+}
+
+body.app-shell .v4-customer-pagination {
+  min-height: 43px !important;
+  padding: 8px 11px !important;
+  color: #687481 !important;
+  font-size: 10px !important;
+}
+
+body.app-shell .v4-customer-pagination nav a {
+  min-width: 27px !important;
+  height: 27px !important;
+  border-radius: 5px !important;
+  font-size: 10px !important;
+}
+
+/* --------------------------------------------------------------------------
+   Customer detail
+   -------------------------------------------------------------------------- */
+
+body.app-shell .v4-back-link {
+  margin-bottom: 8px !important;
+  color: #74808d !important;
+  font-size: 10px !important;
+}
+
+body.app-shell .v4-detail-header {
+  gap: 14px !important;
+  margin-bottom: 10px !important;
+  padding-bottom: 10px !important;
+  border-bottom: 1px solid var(--v5-border-soft) !important;
+}
+
+body.app-shell .v4-detail-avatar {
+  width: 42px !important;
+  height: 42px !important;
+  flex: 0 0 42px !important;
+  border: 1px solid #303a45 !important;
+  border-radius: 50% !important;
+  background: #1a222b !important;
+  color: #d7dee6 !important;
+  font-size: 15px !important;
+  box-shadow: none !important;
+}
+
+body.app-shell .v4-detail-title-line {
+  gap: 7px !important;
+}
+
+body.app-shell .v4-detail-vpn-state {
+  color: #63d69d !important;
+  font-size: 10px !important;
+}
+
+body.app-shell .v4-detail-metrics {
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 8px !important;
+  margin-bottom: 9px !important;
+}
+
+body.app-shell .v4-detail-metric {
+  min-height: 72px !important;
+  gap: 9px !important;
+  padding: 10px !important;
+  border: 1px solid var(--v5-border) !important;
+  border-radius: 7px !important;
+  background: var(--v5-surface) !important;
+  box-shadow: none !important;
+}
+
+body.app-shell .v4-detail-metric-icon {
+  width: 27px !important;
+  height: 27px !important;
+  flex: 0 0 27px !important;
+  border-radius: 6px !important;
+  background: #17202a !important;
+  border: 0 !important;
+}
+
+body.app-shell .v4-detail-metric-copy small {
+  color: #707c89 !important;
+  font-size: 9px !important;
+}
+
+body.app-shell .v4-detail-metric-copy strong {
+  color: #e6ebf0 !important;
+  font-size: 13px !important;
+  font-weight: 680 !important;
+}
+
+body.app-shell .v4-detail-metric-copy em {
+  color: #687481 !important;
+  font-size: 9px !important;
+}
+
+body.app-shell .v4-detail-tabs {
+  min-height: 38px !important;
+  gap: 2px !important;
+  margin: 0 0 9px !important;
+  padding: 3px !important;
+  border: 1px solid var(--v5-border) !important;
+  border-radius: 7px !important;
+  background: #0f141a !important;
+}
+
+body.app-shell .v4-detail-tabs a {
+  min-height: 30px !important;
+  padding: 6px 10px !important;
+  border-radius: 5px !important;
+  color: #7f8a96 !important;
+  font-size: 10px !important;
+}
+
+body.app-shell .v4-detail-tabs a:hover {
+  background: #171e26 !important;
+  color: #e4e9ee !important;
+}
+
+body.app-shell .v4-detail-panel,
+body.app-shell .v4-detail-anchor-section {
+  margin-bottom: 9px !important;
+  border: 1px solid var(--v5-border) !important;
+  border-radius: var(--v5-radius) !important;
+  background: var(--v5-surface) !important;
+  box-shadow: none !important;
+}
+
+body.app-shell .v4-detail-section-head,
+body.app-shell .v4-detail-section-title {
+  min-height: 49px !important;
+  padding: 9px 11px !important;
+  border-bottom: 1px solid var(--v5-border-soft) !important;
+}
+
+body.app-shell .v4-detail-section-head h2,
+body.app-shell .v4-detail-section-title h2 {
+  margin: 1px 0 0 !important;
+  color: #e9edf1 !important;
+  font-size: 12px !important;
+  font-weight: 660 !important;
+}
+
+body.app-shell .v4-detail-section-head p {
+  margin: 3px 0 0 !important;
+  color: #687481 !important;
+  font-size: 10px !important;
+}
+
+body.app-shell .v4-ready-state,
+body.app-shell .v4-setup-progress,
+body.app-shell .v4-detail-alert,
+body.app-shell .v4-renewal-request-card,
+body.app-shell .v4-renewal-extend-form {
+  margin: 10px !important;
+  border-radius: 7px !important;
+  box-shadow: none !important;
+}
+
+body.app-shell .v4-setup-step {
+  min-height: 46px !important;
+  padding: 7px 8px !important;
+}
+
+body.app-shell .v4-setup-step strong {
+  font-size: 10px !important;
+}
+
+body.app-shell .v4-setup-step small {
+  font-size: 9px !important;
+}
+
+/* --------------------------------------------------------------------------
+   New customer / forms
+   -------------------------------------------------------------------------- */
+
+body.app-shell .v4-form-page {
+  max-width: 1180px !important;
+}
+
+body.app-shell .v4-workflow-steps {
+  gap: 4px !important;
+  margin-bottom: 10px !important;
+}
+
+body.app-shell .v4-workflow-step {
+  min-height: 32px !important;
+  padding: 5px 8px !important;
+  border: 1px solid var(--v5-border) !important;
+  border-radius: 6px !important;
+  background: #0f141a !important;
+  color: #6d7885 !important;
+  font-size: 10px !important;
+}
+
+body.app-shell .v4-workflow-step.is-current {
+  border-color: #245a91 !important;
+  background: #10243a !important;
+  color: #cfe6ff !important;
+}
+
+body.app-shell .v4-workflow-step b {
+  width: 19px !important;
+  height: 19px !important;
+  font-size: 9px !important;
+}
+
+body.app-shell .v4-form-layout {
+  grid-template-columns: minmax(0, 1.7fr) minmax(230px, .62fr) !important;
+  gap: 10px !important;
+}
+
+body.app-shell .v4-form-main,
+body.app-shell .v4-form-aside {
+  gap: 9px !important;
+}
+
+body.app-shell .v4-step-card,
+body.app-shell .v4-context-card {
+  border: 1px solid var(--v5-border) !important;
+  border-radius: var(--v5-radius) !important;
+  background: var(--v5-surface) !important;
+  box-shadow: none !important;
+}
+
+body.app-shell .v4-step-head {
+  min-height: 50px !important;
+  gap: 9px !important;
+  padding: 9px 11px !important;
+  border-bottom: 1px solid var(--v5-border-soft) !important;
+}
+
+body.app-shell .v4-step-number {
+  width: 24px !important;
+  height: 24px !important;
+  flex: 0 0 24px !important;
+  border-radius: 6px !important;
+  background: #102b49 !important;
+  color: #83bcff !important;
+  font-size: 10px !important;
+}
+
+body.app-shell .v4-step-copy h2 {
+  color: #e8edf2 !important;
+  font-size: 12px !important;
+  font-weight: 660 !important;
+}
+
+body.app-shell .v4-step-copy p {
+  margin-top: 2px !important;
+  color: #687481 !important;
+  font-size: 10px !important;
+}
+
+body.app-shell .v4-step-body {
+  padding: 11px !important;
+}
+
+body.app-shell .v4-field-grid {
+  gap: 10px !important;
+}
+
+body.app-shell .v4-login-toggle,
+body.app-shell .v4-check-card {
+  padding: 9px !important;
+  border: 1px solid var(--v5-border) !important;
+  border-radius: 7px !important;
+  background: #0f141a !important;
+}
+
+body.app-shell .v4-form-actions {
+  gap: 7px !important;
+  padding-top: 0 !important;
+}
+
+body.app-shell .v4-context-card {
+  padding: 11px !important;
+}
+
+body.app-shell .v4-context-card h3 {
+  margin-bottom: 8px !important;
+  color: #dce2e8 !important;
+  font-size: 11px !important;
+}
+
+body.app-shell .v4-context-row {
+  min-height: 30px !important;
+  font-size: 10px !important;
+  border-bottom-color: var(--v5-border-soft) !important;
+}
+
+body.app-shell .v4-context-note {
+  padding: 9px !important;
+  border: 1px solid #2a333e !important;
+  border-radius: 7px !important;
+  background: #0f141a !important;
+  color: #6c7784 !important;
+  font-size: 9px !important;
+}
+
+/* --------------------------------------------------------------------------
+   System / servers / settings
+   -------------------------------------------------------------------------- */
+
+body.app-shell .v4-system-panel,
+body.app-shell .v4-servers-overview,
+body.app-shell .v4-server-card {
+  border: 1px solid var(--v5-border) !important;
+  border-radius: var(--v5-radius) !important;
+  background: var(--v5-surface) !important;
+  box-shadow: none !important;
+}
+
+body.app-shell .v4-system-panel-head,
+body.app-shell .v4-servers-overview-head {
+  min-height: 50px !important;
+  padding: 9px 11px !important;
+  border-bottom: 1px solid var(--v5-border-soft) !important;
+}
+
+body.app-shell .v4-system-panel-body {
+  padding: 11px !important;
+}
+
+body.app-shell .v4-server-card-list {
+  gap: 8px !important;
+  padding: 9px !important;
+}
+
+body.app-shell .v4-server-card {
+  padding: 10px !important;
+}
+
+body.app-shell .v4-server-card-title {
+  color: #e7ecf1 !important;
+  font-size: 12px !important;
+  font-weight: 670 !important;
+}
+
+body.app-shell .v4-server-card-addresses,
+body.app-shell .v4-server-stat-label,
+body.app-shell .v4-settings-kv span {
+  color: #6d7885 !important;
+  font-size: 9px !important;
+}
+
+body.app-shell .v4-system-mono {
+  color: #aeb7c1 !important;
+  font-size: 10px !important;
+}
+
+body.app-shell .v4-settings-grid {
+  gap: 10px !important;
+}
+
+body.app-shell .v4-settings-stack {
+  gap: 9px !important;
+}
+
+body.app-shell .v4-settings-kv > div {
+  min-height: 31px !important;
+  border-bottom-color: var(--v5-border-soft) !important;
+}
+
+/* --------------------------------------------------------------------------
+   Tables / empty states
+   -------------------------------------------------------------------------- */
+
+body.app-shell .table {
+  --bs-table-bg: transparent;
+  --bs-table-color: #bfc7d0;
+  --bs-table-border-color: var(--v5-border-soft);
+  margin-bottom: 0 !important;
+}
+
+body.app-shell .table > :not(caption) > * > * {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+body.app-shell .v4-empty-state {
+  min-height: 110px !important;
+  gap: 4px !important;
+  color: #697582 !important;
+}
+
+body.app-shell .v4-empty-state strong {
+  color: #9ca6b2 !important;
+  font-size: 11px !important;
+}
+
+body.app-shell .v4-empty-state span {
+  font-size: 10px !important;
+}
+
+body.app-shell .v4-empty-icon {
+  width: 28px !important;
+  height: 28px !important;
+  margin-bottom: 2px !important;
+  background: #13231d !important;
+  color: #55cf93 !important;
+}
+
+/* --------------------------------------------------------------------------
+   Focus / reduced motion
+   -------------------------------------------------------------------------- */
+
+body.app-shell :focus-visible {
+  outline: 2px solid rgba(69, 150, 255, .72) !important;
+  outline-offset: 2px !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.app-shell *,
+  body.app-shell *::before,
+  body.app-shell *::after {
+    scroll-behavior: auto !important;
+    transition-duration: .01ms !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Responsive
+   -------------------------------------------------------------------------- */
+
+@media (max-width: 1199.98px) {
+  body.app-shell .content {
+    padding-right: 16px !important;
+    padding-left: 16px !important;
+  }
+
+  body.app-shell .v4-dashboard-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  body.app-shell .v4-detail-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 991.98px) {
+  body.app-shell .sidebar {
+    width: min(252px, 84vw) !important;
+    max-width: 84vw !important;
+    flex-basis: min(252px, 84vw) !important;
+  }
+
+  body.app-shell .v4-form-layout {
+    grid-template-columns: 1fr !important;
+  }
+
+  body.app-shell .v4-form-aside {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 767.98px) {
+  :root {
+    --mobile-nav-height: 58px;
+  }
+
+  body.app-shell {
+    font-size: 13px !important;
+  }
+
+  body.app-shell .topbar {
+    min-height: calc(48px + env(safe-area-inset-top)) !important;
+    height: auto !important;
+    padding: env(safe-area-inset-top) 10px 0 !important;
+    background: rgba(11, 14, 18, .97) !important;
+  }
+
+  body.app-shell .sidebar-toggle {
+    width: 36px !important;
+    height: 36px !important;
+    flex: 0 0 36px !important;
+  }
+
+  body.app-shell .topbar-title {
+    font-size: 12px !important;
+  }
+
+  body.app-shell .content {
+    padding: 11px 10px calc(var(--mobile-nav-height) + env(safe-area-inset-bottom) + 16px) !important;
+  }
+
+  body.app-shell .mobile-bottom-nav {
+    min-height: calc(var(--mobile-nav-height) + env(safe-area-inset-bottom)) !important;
+    padding: 4px max(7px, env(safe-area-inset-right)) calc(4px + env(safe-area-inset-bottom)) max(7px, env(safe-area-inset-left)) !important;
+    border-top: 1px solid var(--v5-border-soft) !important;
+    background: rgba(11, 14, 18, .97) !important;
+    box-shadow: 0 -8px 24px rgba(0,0,0,.20) !important;
+  }
+
+  body.app-shell .mobile-nav-item {
+    min-height: 46px !important;
+    gap: 2px !important;
+    padding: 3px 2px !important;
+    border-radius: 7px !important;
+    color: #6f7b88 !important;
+  }
+
+  body.app-shell .mobile-nav-item.active {
+    background: #10243a !important;
+    color: #76b6ff !important;
+  }
+
+  body.app-shell .mobile-nav-label {
+    font-size: 9px !important;
+  }
+
+  body.app-shell .v4-page-hero,
+  body.app-shell .v4-form-hero {
+    gap: 10px !important;
+    align-items: flex-start !important;
+    margin-bottom: 10px !important;
+  }
+
+  body.app-shell .v4-page-hero h1,
+  body.app-shell .v4-form-hero h1,
+  body.app-shell .v4-detail-header h1 {
+    font-size: 21px !important;
+  }
+
+  body.app-shell .v4-hero-actions {
+    width: auto !important;
+  }
+
+  body.app-shell .v4-hero-actions .btn {
+    min-height: 32px !important;
+  }
+
+  body.app-shell .v4-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 7px !important;
+  }
+
+  body.app-shell .v4-kpi-card {
+    min-height: 84px !important;
+    padding: 10px !important;
+  }
+
+  body.app-shell .v4-kpi-value {
+    font-size: 19px !important;
+  }
+
+  body.app-shell .v4-detail-header {
+    align-items: flex-start !important;
+  }
+
+  body.app-shell .v4-detail-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 6px !important;
+  }
+
+  body.app-shell .v4-detail-metric {
+    min-height: 64px !important;
+    padding: 8px !important;
+  }
+
+  body.app-shell .v4-detail-tabs {
+    overflow-x: auto !important;
+    scrollbar-width: none;
+  }
+
+  body.app-shell .v4-detail-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  body.app-shell .v4-detail-tabs a {
+    flex: 0 0 auto !important;
+    white-space: nowrap !important;
+  }
+
+  body.app-shell .v4-form-aside {
+    display: flex !important;
+  }
+
+  body.app-shell .v4-customer-toolbar {
+    padding: 7px !important;
+  }
+
+  body.app-shell .v4-customer-table-panel {
+    overflow: hidden !important;
+  }
+}
+
+@media (max-width: 479.98px) {
+  body.app-shell .v4-page-hero,
+  body.app-shell .v4-form-hero {
+    flex-direction: column !important;
+  }
+
+  body.app-shell .v4-hero-actions {
+    width: 100% !important;
+  }
+
+  body.app-shell .v4-hero-actions .btn-primary {
+    flex: 1 1 auto !important;
+  }
+
+  body.app-shell .v4-detail-metrics,
+  body.app-shell .v4-kpi-grid {
+    grid-template-columns: 1fr 1fr !important;
+  }
+}
