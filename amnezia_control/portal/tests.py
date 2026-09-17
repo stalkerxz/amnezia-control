@@ -145,7 +145,7 @@ class PortalFlowTests(TestCase):
         response = self.client.get(reverse("portal-home", kwargs={"token": token}))
 
         self.assertEqual(response.status_code, 404)
-        self.assertContains(response, "Ссылка отозвана")
+        self.assertContains(response, "Ссылка отозвана", status_code=404)
 
     def test_expired_token_is_denied(self):
         token = self._issue_token()
@@ -156,7 +156,7 @@ class PortalFlowTests(TestCase):
         response = self.client.get(reverse("portal-home", kwargs={"token": token}))
 
         self.assertEqual(response.status_code, 404)
-        self.assertContains(response, "Срок действия ссылки истёк")
+        self.assertContains(response, "Срок действия ссылки истёк", status_code=404)
 
     def test_config_download_works_when_revision_exists(self):
         from unittest.mock import patch
@@ -483,6 +483,13 @@ class PortalFlowTests(TestCase):
             entity_id=str(self.client_obj.id),
             details={"renewal_request_id": done_request.id},
         )
+        AuditLog.objects.create(
+            actor=self.user,
+            action="portal.config.reissue",
+            entity_type="VPNClient",
+            entity_id=str(self.client_obj.id),
+            details={},
+        )
 
         response = self.client.get(reverse("portal-home", kwargs={"token": token}))
 
@@ -552,9 +559,8 @@ class PortalFlowTests(TestCase):
 
         response = self.client.get(reverse("portal-home", kwargs={"token": token}))
 
-        self.assertContains(response, "Обзор доступа")
-        self.assertContains(response, "Состояние доступа")
-        self.assertContains(response, "Доступ до")
+        self.assertContains(response, "Статус подключения")
+        self.assertContains(response, "Срок доступа")
         self.assertContains(response, "Трафик")
         self.assertContains(response, "1.00 КБ / 1.00 МБ")
 
@@ -630,7 +636,7 @@ class PortalFlowTests(TestCase):
             )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "новая конфигурация выпущена")
+        self.assertContains(response, "Новая конфигурация уже выпущена")
         self.assertTrue(
             AuditLog.objects.filter(action="portal.config.reissue", entity_type="VPNClient", entity_id=str(self.client_obj.id)).exists()
         )

@@ -17,31 +17,62 @@
   </header>
 
   <div class="v4-settings-grid">
-    <div class="v4-settings-stack">
+    <form method="post" class="v4-settings-stack">
+      {% csrf_token %}
       <section class="v4-system-panel mb-0 v4-settings-primary">
         <div class="v4-system-panel-head"><div><span class="v4-panel-eyebrow">Клиентский доступ</span><h2>{% trans "Клиенты и продления" %}</h2><p>{% trans "Значения по умолчанию для новых аккаунтов, продлений и личного кабинета." %}</p></div><span class="v4-settings-badge">Изменяемо</span></div>
         <div class="v4-system-panel-body">
-          <form method="post" class="row g-3">
-            {% csrf_token %}
+          <div class="row g-3">
             <div class="col-md-6"><label class="form-label" for="id_default_account_lifetime_days">{{ form.default_account_lifetime_days.label }}</label>{{ form.default_account_lifetime_days }}</div>
             <div class="col-md-6"><label class="form-label" for="id_default_renewal_extension_days">{{ form.default_renewal_extension_days.label }}</label>{{ form.default_renewal_extension_days }}</div>
             <div class="col-md-6"><label class="form-label" for="id_portal_link_lifetime_days">{{ form.portal_link_lifetime_days.label }}</label>{{ form.portal_link_lifetime_days }}</div>
             <div class="col-md-6"><label class="form-label" for="id_portal_renewal_cooldown_hours">{{ form.portal_renewal_cooldown_hours.label }}</label>{{ form.portal_renewal_cooldown_hours }}</div>
             <div class="col-12 d-flex justify-content-end"><button type="submit" class="btn btn-primary">{% trans "Сохранить изменения" %}</button></div>
-          </form>
+          </div>
         </div>
       </section>
 
       <section class="v4-system-panel mb-0">
-        <div class="v4-system-panel-head"><div><span class="v4-panel-eyebrow">Автоматизация</span><h2>{% trans "Напоминания об истечении" %}</h2><p>{% trans "Текущее состояние каналов, получателей и периодичности." %}</p></div></div>
+        <div class="v4-system-panel-head"><div><span class="v4-panel-eyebrow">Автоматизация</span><h2>{% trans "Уведомления" %}</h2><p>{% trans "Напоминания об истечении и события заявок на продление." %}</p></div><span class="v4-settings-badge">Изменяемо</span></div>
         <div class="v4-system-panel-body">
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <div class="form-check">
+                {{ form.expiration_reminders_enabled }}
+                <label class="form-check-label" for="id_expiration_reminders_enabled">{{ form.expiration_reminders_enabled.label }}</label>
+              </div>
+              <div class="form-text">{% trans "Отправлять предупреждения до окончания срока клиента." %}</div>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label" for="id_expiration_reminder_days">{{ form.expiration_reminder_days.label }}</label>
+              {{ form.expiration_reminder_days }}
+              {% if form.expiration_reminder_days.errors %}<div class="text-danger small mt-1">{{ form.expiration_reminder_days.errors|join:", " }}</div>{% endif %}
+              <div class="form-text">{% trans "Например: 7,3,1." %}</div>
+            </div>
+
+            <div class="col-12">
+              <div class="form-check">
+                {{ form.notify_new_renewal_requests }}
+                <label class="form-check-label" for="id_notify_new_renewal_requests">{{ form.notify_new_renewal_requests.label }}</label>
+              </div>
+              <div class="form-text">{% trans "Операторские Email/Telegram уведомления о новой заявке клиента." %}</div>
+            </div>
+          </div>
+
           <div class="v4-settings-kv">
             <div><span>{% trans "Статус" %}</span><strong>{% if expiration_reminder_enabled %}<span class="v4-server-status is-success">{% trans "Включено" %}</span>{% else %}<span class="v4-server-status is-neutral">{% trans "Выключено" %}</span>{% endif %}</strong></div>
-            <div><span>{% trans "Каналы" %}</span><strong>{% if expiration_reminder_channels %}{{ expiration_reminder_channels|join:", " }}{% else %}{% trans "Не настроены" %}{% endif %}</strong></div>
+            <div><span>{% trans "Каналы напоминаний" %}</span><strong>{% if expiration_reminder_channels %}{{ expiration_reminder_channels|join:", " }}{% else %}{% trans "Не настроены" %}{% endif %}</strong></div>
+            <div><span>{% trans "Каналы событий" %}</span><strong>{% if event_notification_channels %}{{ event_notification_channels|join:", " }}{% else %}{% trans "Не настроены" %}{% endif %}</strong></div>
             <div><span>{% trans "Email получатели" %}</span><strong>{% if expiration_reminder_recipients %}{{ expiration_reminder_recipients|join:", " }}{% else %}{% trans "Не настроены" %}{% endif %}</strong></div>
-            <div><span>{% trans "Telegram" %}</span><strong>{{ expiration_reminder_telegram_chat_count }} {% trans "чатов" %}</strong></div>
+            <div><span>{% trans "Telegram напоминаний" %}</span><strong>{{ expiration_reminder_telegram_chat_count }} {% trans "чатов" %}</strong></div>
+            <div><span>{% trans "Telegram событий" %}</span><strong>{{ event_notification_telegram_chat_count }} {% trans "чатов" %}</strong></div>
             <div><span>{% trans "Пороги" %}</span><strong>{% if expiration_reminder_thresholds %}{{ expiration_reminder_thresholds|join:", " }} {% trans "дн." %}{% else %}—{% endif %}</strong></div>
             <div><span>{% trans "Проверка лимитов" %}</span><strong>{{ limits_enforce_every_minutes }} {% trans "мин" %}</strong></div>
+          </div>
+
+          <div class="d-flex justify-content-end mt-3">
+            <button type="submit" class="btn btn-primary">{% trans "Сохранить уведомления" %}</button>
           </div>
 
           {% if expiration_reminder_last_logs %}
@@ -55,7 +86,7 @@
           {% endif %}
         </div>
       </section>
-    </div>
+    </form>
 
     <div class="v4-settings-stack">
       <section class="v4-system-panel mb-0">

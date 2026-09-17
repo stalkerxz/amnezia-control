@@ -358,6 +358,9 @@ class SettingsViewTest(TestCase):
             {
                 "default_account_lifetime_days": 60,
                 "default_renewal_extension_days": 45,
+                "expiration_reminders_enabled": "on",
+                "expiration_reminder_days": "14, 7, 3, 3, 1",
+                "notify_new_renewal_requests": "on",
                 "portal_link_lifetime_days": 45,
                 "portal_renewal_cooldown_hours": 12,
             },
@@ -373,6 +376,16 @@ class SettingsViewTest(TestCase):
             settings_obj.default_renewal_extension_days,
             45,
         )
+        self.assertTrue(
+            settings_obj.expiration_reminders_enabled
+        )
+        self.assertEqual(
+            settings_obj.expiration_reminder_days,
+            "14,7,3,1",
+        )
+        self.assertTrue(
+            settings_obj.notify_new_renewal_requests
+        )
         self.assertEqual(
             settings_obj.portal_link_lifetime_days,
             45,
@@ -382,6 +395,40 @@ class SettingsViewTest(TestCase):
             12,
         )
         self.assertContains(response, "Настройки сохранены")
+
+    def test_settings_rejects_invalid_reminder_thresholds(
+        self,
+    ):
+        self.client.force_login(
+            self.staff_user
+        )
+
+        response = self.client.post(
+            reverse("settings"),
+            {
+                "default_account_lifetime_days": 30,
+                "default_renewal_extension_days": 30,
+                "expiration_reminders_enabled": "on",
+                "expiration_reminder_days": "7,0,366",
+                "notify_new_renewal_requests": "on",
+                "portal_link_lifetime_days": 30,
+                "portal_renewal_cooldown_hours": 24,
+            },
+        )
+
+        self.assertEqual(
+            response.status_code,
+            200,
+        )
+
+        self.assertFormError(
+            response.context["form"],
+            "expiration_reminder_days",
+            (
+                "Каждый порог должен быть "
+                "от 1 до 365 дней."
+            ),
+        )
 
     def test_settings_page_language_switch_sets_language_cookie(self):
         self.client.force_login(

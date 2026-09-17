@@ -1,5 +1,4 @@
 import logging
-import math
 from dataclasses import dataclass
 
 from django.conf import settings
@@ -9,6 +8,7 @@ from django.core.mail import send_mail
 from django.urls import reverse
 from django.utils import timezone
 
+from core.models import SystemSettings
 from portal.models import ClientRenewalRequest
 from vpn.models import VPNClient
 
@@ -77,6 +77,13 @@ class NotificationService:
     @classmethod
     def _build_messages(cls, *, event_type: str, payload: dict) -> list[NotificationMessage]:
         if event_type == NotificationEventType.RENEWAL_REQUEST_CREATED:
+            if not (
+                SystemSettings
+                .get_solo()
+                .notify_new_renewal_requests
+            ):
+                return []
+
             return cls._build_renewal_created_messages(payload=payload)
         if event_type == NotificationEventType.RENEWAL_REQUEST_STATUS_CHANGED:
             return cls._build_renewal_status_messages(payload=payload)
@@ -286,33 +293,54 @@ class NotificationService:
 
     @classmethod
     def emit_client_access_limits_notifications(cls) -> dict:
-        threshold_days = int(getattr(settings, "NOTIFICATIONS_EXPIRING_DAYS", 3))
+        """
+        Emit only already-expired access events.
+
+        Upcoming expiration reminders are handled by
+        ClientExpirationReminderService. Keeping the
+        responsibilities separate prevents duplicate
+        pre-expiration notifications.
+        """
         now = timezone.now()
-        expiring = 0
         expired = 0
-        clients = VPNClient.objects.exclude(status=VPNClient.Status.DELETED).exclude(expires_at__isnull=True)
+
+        clients = (
+            VPNClient.objects
+            .exclude(
+                status=VPNClient.Status.DELETED
+            )
+            .filter(
+                expires_at__isnull=False,
+                expires_at__lte=now,
+            )
+        )
+
         for client in clients:
-            if client.expires_at <= now:
-                # Expired state is absolute and does not depend on day rounding.
-                # We dedupe per UTC date to avoid repeated alerts within the day.
-                if cls._mark_limit_event_once(client_id=client.id, event_type=NotificationEventType.CLIENT_ACCESS_EXPIRED, marker=now.date().isoformat(), ttl=60 * 60 * 24):
-                    cls.emit_event(
-                        event_type=NotificationEventType.CLIENT_ACCESS_EXPIRED,
-                        payload={"client_id": client.id, "client_name": client.name},
-                    )
-                    expired += 1
-                continue
-            # Use explicit ceil-based day semantics to avoid timedelta.days floor behavior.
-            # Example: 2 days + 1 hour left => 3 days remaining for notification text.
-            days_left = max(1, math.ceil((client.expires_at - now).total_seconds() / 86400))
-            if days_left <= threshold_days:
-                if cls._mark_limit_event_once(client_id=client.id, event_type=NotificationEventType.CLIENT_ACCESS_EXPIRING, marker=str(days_left), ttl=60 * 60 * 24):
-                    cls.emit_event(
-                        event_type=NotificationEventType.CLIENT_ACCESS_EXPIRING,
-                        payload={"client_id": client.id, "client_name": client.name, "days_left": days_left},
-                    )
-                    expiring += 1
-        return {"expiring": expiring, "expired": expired}
+            if cls._mark_limit_event_once(
+                client_id=client.id,
+                event_type=(
+                    NotificationEventType
+                    .CLIENT_ACCESS_EXPIRED
+                ),
+                marker=now.date().isoformat(),
+                ttl=60 * 60 * 24,
+            ):
+                cls.emit_event(
+                    event_type=(
+                        NotificationEventType
+                        .CLIENT_ACCESS_EXPIRED
+                    ),
+                    payload={
+                        "client_id": client.id,
+                        "client_name": client.name,
+                    },
+                )
+                expired += 1
+
+        return {
+            "expiring": 0,
+            "expired": expired,
+        }
 
     @staticmethod
     def _mark_limit_event_once(*, client_id: int, event_type: str, marker: str, ttl: int) -> bool:

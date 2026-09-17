@@ -425,6 +425,23 @@ def settings_view(request):
     reminder_recipients = ClientExpirationReminderService.get_recipients()
     reminder_channels = ClientExpirationReminderService.get_channels()
     telegram_chat_ids = ClientExpirationReminderService.get_telegram_chat_ids()
+
+    event_notification_channels = list(
+        getattr(
+            settings,
+            "NOTIFICATIONS_CHANNELS",
+            [],
+        )
+    )
+
+    event_telegram_chat_ids = list(
+        getattr(
+            settings,
+            "NOTIFICATIONS_TELEGRAM_ADMIN_CHAT_IDS",
+            [],
+        )
+    )
+
     context = {
         "form": form,
         "limits_enforce_every_minutes": getattr(settings, "LIMITS_ENFORCE_EVERY_MINUTES", "—"),
@@ -432,11 +449,18 @@ def settings_view(request):
         "debug_enabled": bool(getattr(settings, "DEBUG", False)),
         "app_version": app_version,
         "python_version": os.sys.version.split(" ")[0],
-        "expiration_reminder_enabled": bool(getattr(settings, "EXPIRATION_REMINDER_ENABLED", True)),
+        "expiration_reminder_enabled": (
+            system_settings
+            .expiration_reminders_enabled
+        ),
         "expiration_reminder_channels": reminder_channels,
         "expiration_reminder_recipients": reminder_recipients,
         "expiration_reminder_telegram_chat_count": len(telegram_chat_ids),
         "expiration_reminder_thresholds": ClientExpirationReminderService.get_threshold_days(),
+        "event_notification_channels": event_notification_channels,
+        "event_notification_telegram_chat_count": len(
+            event_telegram_chat_ids
+        ),
         "expiration_reminder_last_logs": ClientExpirationReminderLog.objects.select_related("client").order_by("-sent_at")[:5],
     }
     return render(request, "core/settings.html", context)

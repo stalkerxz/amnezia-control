@@ -1195,7 +1195,7 @@ class CustomerAccountOperatorUITest(TestCase):
 
         self.assertContains(
             response,
-            "Автоматическое объединение запрещено",
+            "Объединение запрещено",
         )
 
         self.assertNotContains(
@@ -1473,6 +1473,8 @@ class CustomerDeviceVPNCreationTest(TestCase):
         self.server = Server.objects.create(
             name="Phase 3 VPN Server",
             is_enabled=True,
+            accepts_new_vpn_clients=True,
+            health_status="healthy",
         )
 
         self.protocol = ServerProtocol.objects.create(
@@ -1481,6 +1483,14 @@ class CustomerDeviceVPNCreationTest(TestCase):
             enabled=True,
             container_name="amnezia-awg2",
             container_status="running",
+            runtime_metadata={
+                "awg31_metadata_ready": True,
+                "subnet_ready": True,
+                "endpoint_host_ready": True,
+                "endpoint_port_ready": True,
+                "subnet": "10.8.1.0/24",
+                "peer_count": 0,
+            },
         )
 
         self.full_profile = ProtocolProfile.objects.create(
@@ -1910,7 +1920,7 @@ class CustomerXHTTPIntegrationTest(_Phase4TestCase):
 
         self.assertContains(
             response,
-            "Альтернативное подключение",
+            "VLESS/XHTTP через Yandex CDN",
         )
 
         self.assertContains(

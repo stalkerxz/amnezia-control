@@ -729,7 +729,10 @@ class VPNClientLimitsTest(TestCase):
             VPNClient.ProtocolType.AWG,
         )
 
-        with patch.object(adapter, "_run", return_value=R()):
+        with patch(
+            "vpn.services.RuntimeCommandService.run_untracked",
+            return_value=R(),
+        ):
             transfer_map = adapter.peer_transfer_map(actor=self.user)
 
         self.assertEqual(transfer_map, {"p1": 0})
@@ -986,9 +989,28 @@ class VPNClientLimitsTest(TestCase):
         self.assertEqual(client.revisions.count(), 1)
 
 
-class VPNClientCreateFormTest(SimpleTestCase):
+class VPNClientCreateFormTest(TestCase):
+    def setUp(self):
+        self.server = Server.objects.create(
+            name="form-test-server",
+        )
+
+        self.protocol = ServerProtocol.objects.create(
+            server=self.server,
+            protocol_type=ServerProtocol.ProtocolType.AWG,
+            enabled=True,
+        )
+
+        self.profile = ProtocolProfile.objects.create(
+            server_protocol=self.protocol,
+            name="form-test-awg",
+            protocol_type=ServerProtocol.ProtocolType.AWG,
+            config_template="[Interface]",
+        )
+
     def test_expiration_preset_builds_expires_at(self):
         form = VPNClientCreateForm(
+            server=self.server,
             data={
                 "name": "preset-exp",
                 "protocol_type": VPNClient.ProtocolType.AWG,
@@ -1004,6 +1026,7 @@ class VPNClientCreateFormTest(SimpleTestCase):
 
     def test_custom_expiration_requires_datetime(self):
         form = VPNClientCreateForm(
+            server=self.server,
             data={
                 "name": "custom-exp",
                 "protocol_type": VPNClient.ProtocolType.AWG,
@@ -1017,6 +1040,7 @@ class VPNClientCreateFormTest(SimpleTestCase):
 
     def test_traffic_custom_mb_converted_to_bytes(self):
         form = VPNClientCreateForm(
+            server=self.server,
             data={
                 "name": "traffic-custom",
                 "protocol_type": VPNClient.ProtocolType.AWG,
@@ -1032,6 +1056,7 @@ class VPNClientCreateFormTest(SimpleTestCase):
 
     def test_contact_email_is_optional_and_preserved(self):
         form = VPNClientCreateForm(
+            server=self.server,
             data={
                 "name": "contact-email",
                 "contact_email": "client@example.com",
@@ -1046,6 +1071,7 @@ class VPNClientCreateFormTest(SimpleTestCase):
 
     def test_traffic_preset_converted_to_bytes(self):
         form = VPNClientCreateForm(
+            server=self.server,
             data={
                 "name": "traffic-preset",
                 "protocol_type": VPNClient.ProtocolType.AWG,
@@ -1597,12 +1623,30 @@ class VPNClientDetailDiagnosticsViewTest(TestCase):
 
         response = self.client.get(f"/clients/{vpn_client.id}/")
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Диагностика клиента")
-        self.assertContains(response, "Требуется внимание оператора")
-        self.assertContains(response, "Недавняя активность")
-        self.assertContains(response, "Последние действия в аудите по клиенту")
-        self.assertContains(response, "Последние jobs по серверу/клиенту")
-        self.assertContains(response, "Опасные действия")
+        self.assertContains(
+            response,
+            "Требует внимания",
+        )
+        self.assertContains(
+            response,
+            "Телеметрия трафика недоступна",
+        )
+        self.assertContains(
+            response,
+            "Недавняя активность",
+        )
+        self.assertContains(
+            response,
+            "client.disabled",
+        )
+        self.assertContains(
+            response,
+            "vpn.client.sync",
+        )
+        self.assertContains(
+            response,
+            "Опасные действия",
+        )
 
     def test_detail_page_shows_no_revision_warning(self):
         vpn_client = VPNClient.objects.create(
@@ -1664,7 +1708,11 @@ class VPNClientAdminExportParityTest(TestCase):
             profile=self.profile,
             created_by=self.user,
         )
-        VPNClientService._store_revision(self.vpn_client, "[Interface]\nPrivateKey = test")
+        VPNClientService._store_revision(
+            self.vpn_client,
+            "[Interface]\nPrivateKey = test",
+            amneziavpn_config="vpn://test",
+        )
 
     def test_admin_client_detail_uses_target_specific_qrs(self):
         from unittest.mock import call, patch
@@ -1681,7 +1729,10 @@ class VPNClientAdminExportParityTest(TestCase):
         self.assertContains(response, "amneziavpn-qr")
         self.assertContains(response, "amneziawg-qr")
         self.assertContains(response, "QR для AmneziaVPN")
-        self.assertContains(response, "рекомендуется")
+        self.assertContains(
+            response,
+            "Используйте QR того приложения",
+        )
         self.assertEqual(response.context["qr_base64_amneziavpn"], "amneziavpn-qr")
         self.assertEqual(response.context["qr_base64_amneziawg"], "amneziawg-qr")
         target_qr_mock.assert_has_calls(
@@ -1709,7 +1760,10 @@ class VPNClientAdminExportParityTest(TestCase):
         self.assertContains(response, "amneziavpn-qr")
         self.assertContains(response, "amneziawg-qr")
         self.assertContains(response, "QR для AmneziaVPN")
-        self.assertContains(response, "рекомендуется")
+        self.assertContains(
+            response,
+            "Выберите приложение",
+        )
         self.assertEqual(response.context["qr_base64_amneziavpn"], "amneziavpn-qr")
         self.assertEqual(response.context["qr_base64_amneziawg"], "amneziawg-qr")
         target_qr_mock.assert_has_calls(
@@ -1898,13 +1952,33 @@ class VPNClientDegradedTelemetryWordingTest(TestCase):
         )
 
         detail_response = self.client.get(f"/clients/{vpn_client.id}/")
-        self.assertContains(detail_response, "Runtime-опрос недоступен")
-        self.assertContains(detail_response, "Используется fallback. Peers читаются из конфигурации")
-        self.assertNotContains(detail_response, "проверьте синхронизацию runtime")
+        self.assertContains(
+            detail_response,
+            "Опрос сервера недоступен",
+        )
+        self.assertContains(
+            detail_response,
+            "Используется резервный режим",
+        )
+        self.assertContains(
+            detail_response,
+            "онлайн-статистика трафика сейчас недоступна",
+        )
+        self.assertNotContains(
+            detail_response,
+            "проверьте синхронизацию runtime",
+        )
 
         list_response = self.client.get("/clients/")
-        self.assertContains(list_response, "Fallback-режим")
-        self.assertContains(list_response, "live-счётчики трафика сейчас недоступны")
+
+        self.assertContains(
+            list_response,
+            "Резервный режим",
+        )
+        self.assertContains(
+            list_response,
+            "онлайн-статистика трафика сейчас недоступна",
+        )
 
 
 @override_settings(CONFIG_ENCRYPTION_KEY=Fernet.generate_key().decode())
@@ -1954,15 +2028,59 @@ class VPNClientOperatorVisibilityTest(TestCase):
 
     def test_clients_list_shows_creator_and_last_operator_action(self):
         response = self.client.get("/clients/")
-        self.assertContains(response, "Создал:")
-        self.assertContains(response, "Последнее действие:")
-        self.assertContains(response, "vpn.client.disable")
+
+        self.assertContains(
+            response,
+            "Оператор",
+        )
+        self.assertContains(
+            response,
+            "me-admin",
+        )
+
+        row = next(
+            row
+            for row in response.context["client_rows"]
+            if row["client"].id == self.my_client.id
+        )
+
+        self.assertIsNotNone(
+            row["latest_audit_log"]
+        )
+        self.assertEqual(
+            row["latest_audit_log"].action,
+            "vpn.client.disable",
+        )
+        self.assertEqual(
+            row["latest_audit_log"].actor,
+            self.other,
+        )
 
     def test_client_detail_shows_operator_summary(self):
-        response = self.client.get(f"/clients/{self.my_client.id}/")
-        self.assertContains(response, "Оператор")
-        self.assertContains(response, "Создал")
-        self.assertContains(response, "Последнее действие")
+        response = self.client.get(
+            f"/clients/{self.my_client.id}/"
+        )
+
+        self.assertContains(
+            response,
+            "Оператор",
+        )
+        self.assertContains(
+            response,
+            "me-admin",
+        )
+        self.assertContains(
+            response,
+            "Недавняя активность",
+        )
+        self.assertContains(
+            response,
+            "vpn.client.disable",
+        )
+        self.assertContains(
+            response,
+            "other-admin",
+        )
 
 
 @override_settings(CONFIG_ENCRYPTION_KEY=Fernet.generate_key().decode())
@@ -2809,6 +2927,56 @@ class ClientExpirationReminderTest(TestCase):
         self.assertEqual(result["emails_sent"], 0)
         self.assertEqual(len(mail.outbox), 0)
 
+    def test_database_settings_control_reminders(
+        self,
+    ):
+        settings_obj = (
+            SystemSettings.get_solo()
+        )
+
+        settings_obj.expiration_reminder_days = "9,4,1"
+        settings_obj.expiration_reminders_enabled = False
+        settings_obj.save(
+            update_fields=[
+                "expiration_reminder_days",
+                "expiration_reminders_enabled",
+                "updated_at",
+            ]
+        )
+
+        self.assertEqual(
+            ClientExpirationReminderService
+            .get_threshold_days(),
+            [9, 4, 1],
+        )
+
+        self._make_client(
+            name="disabled-reminder",
+            expires_at=(
+                timezone.now()
+                + timezone.timedelta(days=1)
+            ),
+        )
+
+        result = (
+            ClientExpirationReminderService
+            .send_reminders()
+        )
+
+        self.assertFalse(
+            result["enabled"]
+        )
+
+        self.assertEqual(
+            result["emails_sent"],
+            0,
+        )
+
+        self.assertEqual(
+            len(mail.outbox),
+            0,
+        )
+
     def test_management_command_returns_success(self):
         self._make_client(name="command-client", expires_at=timezone.now() + timezone.timedelta(days=1))
         out = StringIO()
@@ -3035,8 +3203,14 @@ class ClientExpirationReminderTest(TestCase):
 
         self.assertEqual(response.status_code, 200)
         content = response.content.decode("utf-8")
-        self.assertIn("Telegram chat ids", content)
-        self.assertIn("2", content)
+        self.assertIn(
+            "Telegram напоминаний",
+            content,
+        )
+        self.assertIn(
+            "2 чатов",
+            content,
+        )
         self.assertNotIn("super-secret-bot-token", content)
         self.assertNotIn("123456789", content)
         self.assertNotIn("-1001234567890", content)

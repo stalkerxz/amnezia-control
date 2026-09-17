@@ -153,15 +153,16 @@
     </header>
 
     <main class="content" id="mainContent" tabindex="-1">
+{% else %}
+  <main class="container py-4" id="mainContent" tabindex="-1">
+{% endif %}
+
       {% for message in messages %}
         <div class="alert {% if message.tags == 'error' %}alert-danger{% elif message.tags %}alert-{{ message.tags }}{% else %}alert-info{% endif %} alert-dismissible fade show app-alert" role="alert">
           <div>{{ message }}</div>
           <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Закрыть"></button>
         </div>
       {% endfor %}
-{% else %}
-  <main class="container py-4" id="mainContent" tabindex="-1">
-{% endif %}
 
       {% block content %}{% endblock %}
   </main>

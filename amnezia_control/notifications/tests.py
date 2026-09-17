@@ -8,6 +8,7 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
+from core.models import SystemSettings
 from portal.services import PortalAccessService
 from servers.models import ProtocolProfile, Server, ServerProtocol
 from vpn.models import VPNClient
@@ -20,6 +21,15 @@ from .services import NotificationEventType, NotificationService
     NOTIFICATIONS_ENABLED=True,
     NOTIFICATIONS_CHANNELS=["email"],
     NOTIFICATIONS_EMAIL_FROM="noreply@example.com",
+    CACHES={
+        "default": {
+            "BACKEND": (
+                "django.core.cache.backends."
+                "locmem.LocMemCache"
+            ),
+            "LOCATION": "notification-flow-tests",
+        },
+    },
 )
 class NotificationFlowTests(TestCase):
     def setUp(self):
@@ -61,6 +71,41 @@ class NotificationFlowTests(TestCase):
         self.assertEqual(send_mail_mock.call_count, 1)
         self.assertIn("Новая заявка на продление", send_mail_mock.call_args.kwargs["subject"])
         self.assertIn("Новая заявка на продление от клиента", send_mail_mock.call_args.kwargs["message"])
+
+    def test_new_renewal_admin_notification_can_be_disabled(
+        self,
+    ):
+        settings_obj = (
+            SystemSettings.get_solo()
+        )
+
+        settings_obj.notify_new_renewal_requests = False
+        settings_obj.save(
+            update_fields=[
+                "notify_new_renewal_requests",
+                "updated_at",
+            ]
+        )
+
+        with patch(
+            "notifications.services.send_mail"
+        ) as send_mail_mock:
+            NotificationService.deliver(
+                event_type=(
+                    NotificationEventType
+                    .RENEWAL_REQUEST_CREATED
+                ),
+                payload={
+                    "client_id":
+                        self.client_obj.id,
+                    "client_name":
+                        self.client_obj.name,
+                    "renewal_request_id": 11,
+                    "has_attachment": False,
+                },
+            )
+
+        send_mail_mock.assert_not_called()
 
     def test_admin_notification_mentions_attachment(self):
         with patch("notifications.services.send_mail") as send_mail_mock:
@@ -113,18 +158,90 @@ class NotificationFlowTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Заявка на продление отправлена")
 
-    def test_expiring_and_expired_dedup(self):
-        self.client_obj.expires_at = timezone.now() + timedelta(days=2, hours=1)
-        self.client_obj.save(update_fields=["expires_at"])
-        with patch.object(NotificationService, "emit_event") as emit_mock:
-            first = NotificationService.emit_client_access_limits_notifications()
-            second = NotificationService.emit_client_access_limits_notifications()
+    def test_upcoming_expiration_is_left_to_reminder_service(
+        self,
+    ):
+        self.client_obj.expires_at = (
+            timezone.now()
+            + timedelta(
+                days=2,
+                hours=1,
+            )
+        )
 
-        self.assertEqual(first["expiring"], 1)
-        self.assertEqual(second["expiring"], 0)
-        self.assertEqual(emit_mock.call_count, 1)
-        event_payload = emit_mock.call_args.kwargs["payload"]
-        self.assertEqual(event_payload["days_left"], 3)
+        self.client_obj.save(
+            update_fields=["expires_at"]
+        )
+
+        with patch.object(
+            NotificationService,
+            "emit_event",
+        ) as emit_mock:
+            result = (
+                NotificationService
+                .emit_client_access_limits_notifications()
+            )
+
+        self.assertEqual(
+            result["expiring"],
+            0,
+        )
+        self.assertEqual(
+            result["expired"],
+            0,
+        )
+
+        emit_mock.assert_not_called()
+
+    def test_expired_access_notification_is_deduplicated(
+        self,
+    ):
+        self.client_obj.expires_at = (
+            timezone.now()
+            - timedelta(minutes=1)
+        )
+
+        self.client_obj.save(
+            update_fields=["expires_at"]
+        )
+
+        with patch.object(
+            NotificationService,
+            "emit_event",
+        ) as emit_mock:
+            first = (
+                NotificationService
+                .emit_client_access_limits_notifications()
+            )
+
+            second = (
+                NotificationService
+                .emit_client_access_limits_notifications()
+            )
+
+        self.assertEqual(
+            first["expired"],
+            1,
+        )
+        self.assertEqual(
+            second["expired"],
+            0,
+        )
+
+        self.assertEqual(
+            emit_mock.call_count,
+            1,
+        )
+
+        self.assertEqual(
+            emit_mock.call_args.kwargs[
+                "event_type"
+            ],
+            (
+                NotificationEventType
+                .CLIENT_ACCESS_EXPIRED
+            ),
+        )
 
     @override_settings(
         NOTIFICATIONS_CHANNELS=["telegram"],
@@ -133,22 +250,66 @@ class NotificationFlowTests(TestCase):
         NOTIFICATIONS_BASE_URL="https://panel.example.com",
     )
     def test_telegram_delivery_attempted_when_enabled(self):
-        with patch("notifications.telegram.send_telegram_message") as telegram_mock:
+        settings_obj = (
+            SystemSettings.get_solo()
+        )
+
+        settings_obj.notify_new_renewal_requests = True
+        settings_obj.save(
+            update_fields=[
+                "notify_new_renewal_requests",
+                "updated_at",
+            ]
+        )
+
+        with patch(
+            "notifications.telegram."
+            "send_telegram_message"
+        ) as telegram_mock:
             NotificationService.deliver(
-                event_type=NotificationEventType.RENEWAL_REQUEST_CREATED,
+                event_type=(
+                    NotificationEventType
+                    .RENEWAL_REQUEST_CREATED
+                ),
                 payload={
-                    "client_id": self.client_obj.id,
-                    "client_name": self.client_obj.name,
+                    "client_id":
+                        self.client_obj.id,
+                    "client_name":
+                        self.client_obj.name,
                     "renewal_request_id": 11,
                     "has_attachment": True,
                 },
             )
 
-        self.assertEqual(telegram_mock.call_count, 2)
-        first_text = telegram_mock.call_args_list[0].kwargs["text"]
-        self.assertTrue(first_text.startswith("[Продление] "))
-        self.assertIn("с вложением", first_text)
-        self.assertIn("https://panel.example.com/clients/renewal-requests/", first_text)
+        self.assertEqual(
+            telegram_mock.call_count,
+            2,
+        )
+
+        first_text = (
+            telegram_mock
+            .call_args_list[0]
+            .kwargs["text"]
+        )
+
+        self.assertTrue(
+            first_text.startswith(
+                "[Продление] "
+            )
+        )
+
+        self.assertIn(
+            "с вложением",
+            first_text,
+        )
+
+        self.assertIn(
+            (
+                "https://panel.example.com/"
+                "clients/renewal-requests/"
+            ),
+            first_text,
+        )
 
     @override_settings(
         NOTIFICATIONS_CHANNELS=["telegram"],

@@ -13,6 +13,8 @@ from django.db import IntegrityError
 from django.urls import reverse
 from django.utils import timezone
 
+from core.models import SystemSettings
+
 from .models import ClientExpirationReminderLog, VPNClient
 
 logger = logging.getLogger(__name__)
@@ -39,8 +41,15 @@ class ClientExpirationReminderService:
     def send_reminders(cls) -> dict:
         channels = cls.get_channels()
         channel_status = cls.build_channel_status(channels)
+        system_settings = (
+            SystemSettings.get_solo()
+        )
+
         base_result = {
-            "enabled": bool(getattr(settings, "EXPIRATION_REMINDER_ENABLED", True)),
+            "enabled": (
+                system_settings
+                .expiration_reminders_enabled
+            ),
             "emails_sent": 0,
             "clients": 0,
             "items": 0,
@@ -127,20 +136,36 @@ class ClientExpirationReminderService:
 
     @staticmethod
     def get_threshold_days() -> list[int]:
-        raw_value = getattr(settings, "EXPIRATION_REMINDER_DAYS", [7, 3, 1])
-        if isinstance(raw_value, str):
-            parts = raw_value.split(",")
-        else:
-            parts = raw_value
+        raw_value = (
+            SystemSettings
+            .get_solo()
+            .expiration_reminder_days
+        )
+
+        parts = str(
+            raw_value or ""
+        ).split(",")
+
         thresholds = []
+
         for value in parts:
             try:
-                days = int(str(value).strip())
+                days = int(
+                    str(value).strip()
+                )
             except (TypeError, ValueError):
                 continue
-            if days > 0 and days not in thresholds:
+
+            if (
+                1 <= days <= 365
+                and days not in thresholds
+            ):
                 thresholds.append(days)
-        return sorted(thresholds, reverse=True)
+
+        return sorted(
+            thresholds,
+            reverse=True,
+        )
 
     @staticmethod
     def get_recipients() -> list[str]:
