@@ -5,6 +5,7 @@
 
 {% block content %}
 <link href="{% static 'css/app-v4-forms.css' %}" rel="stylesheet">
+<link href="{% static 'css/app-v5-2.css' %}?v=5.2.1" rel="stylesheet">
 
 <div class="v4-form-page">
   <header class="v4-form-hero">
@@ -16,11 +17,6 @@
     </div>
   </header>
 
-  <div class="v4-workflow-steps" aria-label="Этапы создания клиента">
-    <div class="v4-workflow-step is-current"><b>1</b><span>Аккаунт</span></div>
-    <div class="v4-workflow-step is-current"><b>2</b><span>Устройство</span></div>
-    <div class="v4-workflow-step"><b>3</b><span>Подключения после создания</span></div>
-  </div>
 
   <form method="post" novalidate>
     {% csrf_token %}
@@ -158,4 +154,32 @@
     </div>
   </form>
 </div>
+
+<script>
+(() => {
+  const toggle = document.getElementById('{{ form.create_login.id_for_label }}');
+  const fields = document.querySelector('.v4-login-fields');
+  if (!toggle || !fields) return;
+
+  const controls = Array.from(fields.querySelectorAll('input, select, textarea, button'));
+  const sync = () => {
+    const open = toggle.checked;
+    fields.hidden = !open;
+    fields.setAttribute('aria-hidden', open ? 'false' : 'true');
+    toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    controls.forEach((control) => {
+      if (!open) {
+        if (!control.disabled) control.dataset.v52Enabled = '1';
+        control.disabled = true;
+      } else if (control.dataset.v52Enabled === '1') {
+        control.disabled = false;
+        delete control.dataset.v52Enabled;
+      }
+    });
+  };
+
+  toggle.addEventListener('change', sync);
+  sync();
+})();
+</script>
 {% endblock %}
