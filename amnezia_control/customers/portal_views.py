@@ -2,12 +2,15 @@ import base64
 
 from django.contrib import messages
 from django.contrib.auth import (
+    update_session_auth_hash,
     views as auth_views,
 )
+from django.contrib.auth.forms import PasswordChangeForm
 from django.contrib.auth.decorators import (
     login_required,
 )
 from django.core.exceptions import PermissionDenied
+from django.db import transaction
 from django.db.models import Prefetch
 from django.http import HttpResponse, HttpResponseForbidden
 from django.shortcuts import (
@@ -20,6 +23,7 @@ from django.utils import timezone
 from django.utils.text import slugify
 from django.views.decorators.http import (
     require_GET,
+    require_http_methods,
     require_POST,
 )
 
@@ -93,6 +97,80 @@ class CustomerLoginView(auth_views.LoginView):
 class CustomerLogoutView(auth_views.LogoutView):
     next_page = reverse_lazy(
         "customer-portal-login"
+    )
+
+
+@login_required(
+    login_url="/cabinet/login/",
+)
+@require_http_methods(["GET", "POST"])
+def customer_password_change_view(request):
+    account = _customer_account_for_user(
+        request.user
+    )
+
+    if (
+        account is None
+        or account.status
+        == CustomerAccount.Status.DELETED
+    ):
+        raise PermissionDenied(
+            "Клиентский аккаунт недоступен."
+        )
+
+    if request.method == "POST":
+        form = PasswordChangeForm(
+            user=request.user,
+            data=request.POST,
+        )
+
+        if form.is_valid():
+            with transaction.atomic():
+                user = form.save()
+
+                AuditService.log(
+                    user,
+                    "customer.login.password_change",
+                    "CustomerAccount",
+                    account.pk,
+                    {
+                        "user_id": user.pk,
+                        "username": user.username,
+                    },
+                )
+
+            update_session_auth_hash(
+                request,
+                user,
+            )
+
+            messages.success(
+                request,
+                "Пароль личного кабинета изменён.",
+            )
+
+            return redirect(
+                "customer-portal-home"
+            )
+
+    else:
+        form = PasswordChangeForm(
+            user=request.user,
+        )
+
+    for field in form.fields.values():
+        field.widget.attrs.setdefault(
+            "class",
+            "form-control",
+        )
+
+    return render(
+        request,
+        "customer_portal/password_change.html",
+        {
+            "account": account,
+            "form": form,
+        },
     )
 
 
