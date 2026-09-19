@@ -7,6 +7,7 @@ from .portal_selfservice import (
 from .portal_views import (
     CustomerLoginView,
     CustomerLogoutView,
+    customer_password_change_view,
     customer_portal_home_view,
     customer_renewal_request_view,
     customer_vpn_download_view,
@@ -25,6 +26,11 @@ urlpatterns = [
         "logout/",
         CustomerLogoutView.as_view(),
         name="customer-portal-logout",
+    ),
+    path(
+        "security/password/",
+        customer_password_change_view,
+        name="customer-portal-password-change",
     ),
     path(
         "renewal/request/",
