@@ -119,9 +119,9 @@
                 <div class="v4-server-diagnostic-grid">
                   <div class="v4-server-diagnostic-item"><span>Host / uptime</span><strong>{{ s.metrics.hostname|default:'—' }}</strong><small>{{ s.metrics.uptime|default:'—' }}</small></div>
                   <div class="v4-server-diagnostic-item"><span>Load / CPU</span><strong>{{ s.metrics.load_average.1|default:'—' }}</strong><small>{{ s.metrics.cpu_cores|default:'—' }} CPU</small></div>
-                  <div class="v4-server-diagnostic-item"><span>RAM</span><strong>{{ s.metrics.memory.used_percent|default:'—' }}%</strong><small>{{ s.metrics.memory.used|default:'—' }} / {{ s.metrics.memory.total|default:'—' }}</small></div>
-                  <div class="v4-server-diagnostic-item"><span>Disk /</span><strong>{{ s.metrics.disk_root.used_percent|default:'—' }}%</strong><small>{{ s.metrics.disk_root.used|default:'—' }} / {{ s.metrics.disk_root.total|default:'—' }}</small></div>
-                  <div class="v4-server-diagnostic-item"><span>Network</span><strong>{{ s.metrics.main_interface|default:'—' }}</strong><small>RX {{ s.metrics.network.rx_bytes|default:'—' }} · TX {{ s.metrics.network.tx_bytes|default:'—' }}</small></div>
+                  <div class="v4-server-diagnostic-item"><span>RAM</span><strong>{{ s.metrics.memory.used_percent|default:'—' }}%</strong><small>{{ s.metrics.memory.used|filesizeformat }} / {{ s.metrics.memory.total|filesizeformat }}</small></div>
+                  <div class="v4-server-diagnostic-item"><span>Disk /</span><strong>{{ s.metrics.disk_root.used_percent|default:'—' }}%</strong><small>{{ s.metrics.disk_root.used|filesizeformat }} / {{ s.metrics.disk_root.total|filesizeformat }}</small></div>
+                  <div class="v4-server-diagnostic-item"><span>Network</span><strong>{{ s.metrics.main_interface|default:'—' }}</strong><small>RX {{ s.metrics.network.rx_bytes|filesizeformat }} · TX {{ s.metrics.network.tx_bytes|filesizeformat }}</small></div>
                 </div>
 
                 <div class="v4-server-runtime-groups">
