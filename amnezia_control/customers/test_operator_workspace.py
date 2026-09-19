@@ -409,6 +409,11 @@ class CustomerOperatorWorkspaceTest(
 
         self.assertContains(
             response,
+            "v5-device-settings-toggle",
+        )
+
+        self.assertContains(
+            response,
             (
                 'data-bs-target="'
                 f'#device-workspace-{self.device.pk}"'
