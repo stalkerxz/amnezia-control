@@ -1640,6 +1640,9 @@ def customer_device_connection_create_view(
             "xhttp_form": xhttp_form,
             "vpn_form": vpn_form,
             "creation_error": creation_error,
+            "can_create_any": bool(
+                selectable_products
+            ),
         },
     )
 
