@@ -68,7 +68,7 @@
           </div>
         </label>
 
-        <label class="v4-product-card v4-product-card is-selective v5-product-choice {% if selected_product == 'selective' %}is-selected{% endif %} {% if has_selective or not selective_available %}is-disabled{% endif %}">
+        <label class="v4-product-card is-selective v5-product-choice {% if selected_product == 'selective' %}is-selected{% endif %} {% if has_selective or not selective_available %}is-disabled{% endif %}">
           <input
             class="v5-product-radio"
             type="radio"
@@ -220,7 +220,7 @@
         </section>
 
         <div class="v4-form-actions">
-          <button type="submit" class="btn btn-primary" id="connection-submit">Создать подключение</button>
+          <button type="submit" class="btn btn-primary" id="connection-submit" {% if not can_create_any %}disabled{% endif %}>Создать подключение</button>
           <a href="{% url 'customers-detail' account.pk %}" class="btn btn-outline-secondary">Отмена</a>
         </div>
       </div>
