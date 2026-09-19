@@ -28,6 +28,7 @@
             <strong>{{ user.username }}</strong>
             <span>Личный кабинет</span>
           </div>
+          <a href="{% url 'customer-portal-password-change' %}" class="btn btn-sm btn-outline-secondary">Пароль</a>
           <form method="post" action="{% url 'customer-portal-logout' %}" class="m-0">
             {% csrf_token %}
             <button type="submit" class="btn btn-sm btn-outline-secondary">Выйти</button>
