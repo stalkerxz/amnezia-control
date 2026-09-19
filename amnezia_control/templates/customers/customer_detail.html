@@ -6,6 +6,7 @@
 {% block content %}
 <link href="{% static 'css/app-v4-layout.css' %}" rel="stylesheet">
 <link href="{% static 'css/app-v4-detail.css' %}" rel="stylesheet">
+<link href="{% static 'css/app-v5-2.css' %}?v=5.2.1" rel="stylesheet">
 
 <div class="v4-customer-detail">
   <a class="v4-back-link" href="{% url 'customers-list' %}">← Все клиенты</a>
@@ -101,12 +102,13 @@
   </section>
 
   <nav class="v4-detail-tabs" aria-label="Разделы клиента">
-    <a href="#customer-overview">Обзор</a>
+    {% if not workspace.account_ready or workspace.active_device_total == 0 or workspace.active_connection_total == 0 %}<a href="#customer-overview">Обзор</a>{% endif %}
     <a href="#customer-connections">Устройства и VPN</a>
     <a href="#customer-access">Доступ и продление</a>
     <a href="#customer-management">Управление</a>
   </nav>
 
+  {% if not workspace.account_ready or workspace.active_device_total == 0 or workspace.active_connection_total == 0 %}
   <section class="v4-detail-panel" id="customer-overview">
     <div class="v4-detail-section-head">
       <div>
@@ -166,6 +168,7 @@
       </div>
     {% endif %}
   </section>
+  {% endif %}
 
   <section id="customer-connections" class="v4-detail-anchor-section">
     <div class="v4-detail-section-title">
