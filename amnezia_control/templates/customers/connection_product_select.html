@@ -5,75 +5,302 @@
 
 {% block content %}
 <link href="{% static 'css/app-v4-forms.css' %}" rel="stylesheet">
+<link href="{% static 'css/app-v5-2.css' %}?v=5.3.0" rel="stylesheet">
 
-<div class="v4-form-page">
+<div class="v4-form-page v5-connection-create">
   <header class="v4-form-hero">
     <div class="v4-form-hero-copy">
       <a class="v4-back-link" href="{% url 'customers-detail' account.pk %}">← {{ account.display_name }}</a>
       <p class="page-kicker">VPN Control · Подключение</p>
       <h1>Добавить подключение</h1>
-      <p>Выберите, как должен работать VPN на устройстве {{ device.name }}. Технические параметры будут подставлены автоматически.</p>
+      <p>Тип, размещение и лимиты задаются здесь. Подключение создаётся только после нажатия «Создать подключение».</p>
     </div>
   </header>
 
   <div class="v4-inline-summary">
     <div class="v4-inline-summary-item"><span>Клиент</span><strong>{{ account.display_name }}</strong></div>
     <div class="v4-inline-summary-item"><span>Устройство</span><strong>{{ device.name }}</strong></div>
-    <div class="v4-inline-summary-item"><span>Платформа</span><strong>{{ device.get_platform_display }}</strong></div>
-    <div class="v4-inline-summary-item"><span>Создано</span><strong>{% if has_full %}FULL {% endif %}{% if has_selective %}SELECT {% endif %}{% if xhttp_total %}ALT {{ xhttp_total }}{% endif %}{% if not has_full and not has_selective and not xhttp_total %}Нет подключений{% endif %}</strong></div>
+    <div class="v4-inline-summary-item"><span>Срок</span><strong>{% if device.effective_expires_at %}до {{ device.effective_expires_at|date:'d.m.Y H:i' }}{% else %}Без срока{% endif %}</strong></div>
+    <div class="v4-inline-summary-item"><span>VPN-лимит устройства</span><strong>{% if device.vpn_traffic_limit_bytes %}Настроен{% else %}Без лимита{% endif %}</strong></div>
   </div>
 
-  <section class="v4-form-card">
-    <div class="v4-form-card-head">
-      <div><h2>Что должно работать через VPN?</h2><p>Один тип не отключает другой. На устройстве могут одновременно существовать FULL, SELECT и альтернативные подключения.</p></div>
+  <form method="post" novalidate id="connection-create-form">
+    {% csrf_token %}
+
+    {% if creation_error %}
+      <div class="alert alert-danger mb-3">{{ creation_error }}</div>
+    {% endif %}
+
+    {% if access_form.non_field_errors %}
+      <div class="alert alert-danger mb-3">{{ access_form.non_field_errors }}</div>
+    {% endif %}
+
+    <section class="v4-form-card mb-3">
+      <div class="v4-form-card-head">
+        <div>
+          <h2>1. Тип подключения</h2>
+          <p>На одном устройстве могут одновременно существовать FULL, SELECT и альтернативные подключения.</p>
+        </div>
+      </div>
+
+      <div class="v4-product-grid v5-product-choice-grid">
+        <label class="v4-product-card v5-product-choice {% if selected_product == 'full' %}is-selected{% endif %} {% if has_full or not full_available %}is-disabled{% endif %}">
+          <input
+            class="v5-product-radio"
+            type="radio"
+            name="product_type"
+            value="full"
+            {% if selected_product == 'full' %}checked{% endif %}
+            {% if has_full or not full_available %}disabled{% endif %}
+          >
+          <div class="v4-product-icon">F</div>
+          <div class="v4-product-eyebrow">Основной режим</div>
+          <h2>Весь интернет через VPN</h2>
+          <p>Весь трафик устройства идёт через VPN.</p>
+          <div class="v5-product-choice-state">
+            {% if has_full %}
+              <span class="v4-status-pill is-success">Уже создано</span>
+            {% elif not full_available %}
+              <span class="v4-status-pill is-warning">Нет сервера</span>
+            {% else %}
+              <span>FULL</span>
+            {% endif %}
+          </div>
+        </label>
+
+        <label class="v4-product-card v4-product-card is-selective v5-product-choice {% if selected_product == 'selective' %}is-selected{% endif %} {% if has_selective or not selective_available %}is-disabled{% endif %}">
+          <input
+            class="v5-product-radio"
+            type="radio"
+            name="product_type"
+            value="selective"
+            {% if selected_product == 'selective' %}checked{% endif %}
+            {% if has_selective or not selective_available %}disabled{% endif %}
+          >
+          <div class="v4-product-icon">S</div>
+          <div class="v4-product-eyebrow">Выборочный режим</div>
+          <h2>Только выбранные сервисы</h2>
+          <p>Через VPN идут только настроенные маршруты.</p>
+          <div class="v5-product-choice-state">
+            {% if has_selective %}
+              <span class="v4-status-pill is-success">Уже создано</span>
+            {% elif not selective_available %}
+              <span class="v4-status-pill is-warning">Нет SELECT-сервера</span>
+            {% else %}
+              <span>SELECT</span>
+            {% endif %}
+          </div>
+        </label>
+
+        <label class="v4-product-card is-alt v5-product-choice {% if selected_product == 'alt' %}is-selected{% endif %} {% if not alt_available %}is-disabled{% endif %}">
+          <input
+            class="v5-product-radio"
+            type="radio"
+            name="product_type"
+            value="alt"
+            {% if selected_product == 'alt' %}checked{% endif %}
+            {% if not alt_available %}disabled{% endif %}
+          >
+          <div class="v4-product-icon">A</div>
+          <div class="v4-product-eyebrow">Дополнительный способ</div>
+          <h2>Альтернативное подключение</h2>
+          <p>VLESS/XHTTP через Yandex CDN. FULL и SELECT не изменяются.</p>
+          <div class="v5-product-choice-state">
+            {% if alt_available %}
+              <span>ALT{% if xhttp_total %} · уже {{ xhttp_total }}{% endif %}</span>
+            {% else %}
+              <span class="v4-status-pill is-warning">Нет сервера</span>
+            {% endif %}
+          </div>
+        </label>
+      </div>
+    </section>
+
+    <div class="v5-connection-create-grid">
+      <div class="v5-connection-create-main">
+        <section class="v4-form-card v5-product-config" data-product-config="full">
+          <div class="v4-form-card-head">
+            <div><h2>2. Размещение FULL</h2><p>Оставьте автоматический выбор или укажите сервер вручную.</p></div>
+          </div>
+          <div class="v4-form-field">
+            <label for="full_server_choice">Сервер</label>
+            <select class="form-select" id="full_server_choice" name="full_server_choice">
+              <option value="auto" {% if full_server_choice == 'auto' %}selected{% endif %}>Автоматически{% if full_pool.0 %} — {{ full_pool.0.server.name }}{% endif %}</option>
+              {% for row in full_pool %}
+                <option value="{{ row.server.id }}" {% if full_server_choice == row.server.id|stringformat:'s' %}selected{% endif %}>{{ row.server.name }} · peers {{ row.peer_count }}/{{ row.capacity }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </section>
+
+        <section class="v4-form-card v5-product-config" data-product-config="selective">
+          <div class="v4-form-card-head">
+            <div><h2>2. Размещение SELECT</h2><p>Выберите сервер с активным SELECT-профилем.</p></div>
+          </div>
+          <div class="v4-form-field">
+            <label for="selective_server_choice">Сервер</label>
+            <select class="form-select" id="selective_server_choice" name="selective_server_choice">
+              <option value="auto" {% if selective_server_choice == 'auto' %}selected{% endif %}>Автоматически{% if selective_pool.0 %} — {{ selective_pool.0.server.name }}{% endif %}</option>
+              {% for row in selective_pool %}
+                <option value="{{ row.server.id }}" {% if selective_server_choice == row.server.id|stringformat:'s' %}selected{% endif %}>{{ row.server.name }} · peers {{ row.peer_count }}/{{ row.capacity }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </section>
+
+        <section class="v4-form-card v5-product-config" data-product-config="alt">
+          <div class="v4-form-card-head">
+            <div><h2>2. Параметры ALT</h2><p>Название, сервер и профиль производительности XHTTP.</p></div>
+          </div>
+          {% if xhttp_form.non_field_errors %}<div class="alert alert-danger mb-3">{{ xhttp_form.non_field_errors }}</div>{% endif %}
+          <div class="v4-field-grid">
+            <div class="v4-field">
+              <label class="form-label" for="{{ xhttp_form.name.id_for_label }}">Название</label>
+              {{ xhttp_form.name }}
+              {% for error in xhttp_form.name.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+            </div>
+            <div class="v4-field">
+              <label class="form-label" for="{{ xhttp_form.server.id_for_label }}">Сервер</label>
+              {{ xhttp_form.server }}
+              {% for error in xhttp_form.server.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+            </div>
+            <div class="v4-field is-wide">
+              <label class="form-label" for="{{ xhttp_form.performance_profile.id_for_label }}">Профиль</label>
+              {{ xhttp_form.performance_profile }}
+              <div class="form-text">Standard — стабильный базовый режим. Turbo — ускоренный профиль 4096 / 5 ms / 3500.</div>
+              {% for error in xhttp_form.performance_profile.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+            </div>
+            {% for error in xhttp_form.device.errors %}<div class="v4-field is-wide"><div class="alert alert-danger">{{ error }}</div></div>{% endfor %}
+          </div>
+        </section>
+
+        <section class="v4-form-card v5-connection-limits">
+          <div class="v4-form-card-head">
+            <div>
+              <h2>3. Срок и лимиты</h2>
+              <p>Это политика устройства. Она применяется ко всем его FULL/SELECT-подключениям и к новым VPN-подключениям.</p>
+            </div>
+          </div>
+
+          <div class="v4-field-grid">
+            <div class="v4-field">
+              <label class="form-label" for="{{ access_form.expires_at.id_for_label }}">Срок устройства</label>
+              {{ access_form.expires_at }}
+              <div class="form-text">Пусто — наследовать срок аккаунта{% if account.expires_at %} ({{ account.expires_at|date:'d.m.Y H:i' }}){% endif %}.</div>
+              {% for error in access_form.expires_at.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+            </div>
+
+            <div class="v4-field">
+              <label class="form-label" for="{{ access_form.apply_traffic.id_for_label }}">VPN-лимит трафика</label>
+              {{ access_form.apply_traffic }}
+              <div class="form-text">FULL и SELECT учитывают лимит отдельно для каждого подключения.</div>
+              {% for error in access_form.apply_traffic.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+            </div>
+
+            <div class="v4-field v5-traffic-limit-field" data-traffic-limit-field>
+              <label class="form-label" for="{{ access_form.traffic_limit_preset.id_for_label }}">Размер лимита</label>
+              {{ access_form.traffic_limit_preset }}
+              {% for error in access_form.traffic_limit_preset.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+            </div>
+
+            <div class="v4-field v5-traffic-custom-field" data-traffic-custom-field>
+              <label class="form-label" for="{{ access_form.traffic_custom_value.id_for_label }}">Свой объём</label>
+              <div class="v5-inline-fields">
+                {{ access_form.traffic_custom_value }}
+                {{ access_form.traffic_custom_unit }}
+              </div>
+              {% for error in access_form.traffic_custom_value.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+              {% for error in access_form.traffic_custom_unit.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+            </div>
+          </div>
+
+          <div class="v4-context-note mt-3">
+            ALT/XHTTP трафик этим лимитом не измеряется. Если выбран ALT, заданный VPN-лимит сохраняется как политика устройства для существующих и будущих FULL/SELECT.
+          </div>
+        </section>
+
+        <div class="v4-form-actions">
+          <button type="submit" class="btn btn-primary" id="connection-submit">Создать подключение</button>
+          <a href="{% url 'customers-detail' account.pk %}" class="btn btn-outline-secondary">Отмена</a>
+        </div>
+      </div>
+
+      <aside class="v4-form-aside v5-connection-create-aside">
+        <section class="v4-context-card">
+          <h3>Что произойдёт</h3>
+          <div class="v4-context-list">
+            <div class="v4-context-row"><span>Создание</span><strong>Только после подтверждения</strong></div>
+            <div class="v4-context-row"><span>FULL</span><strong>{% if has_full %}Уже есть{% else %}Доступен{% endif %}</strong></div>
+            <div class="v4-context-row"><span>SELECT</span><strong>{% if has_selective %}Уже есть{% else %}Доступен{% endif %}</strong></div>
+            <div class="v4-context-row"><span>ALT</span><strong>{{ xhttp_total }} создано</strong></div>
+            <div class="v4-context-row"><span>Существующие конфиги</span><strong>Не перевыпускаются</strong></div>
+          </div>
+        </section>
+
+        <div class="v4-context-note">
+          Изменение срока или VPN-лимита устройства не меняет ключи, IP-адреса и сохранённые конфигурации.
+        </div>
+      </aside>
     </div>
-
-    <div class="v4-product-grid">
-      <article class="v4-product-card">
-        <div class="v4-product-icon">F</div>
-        <div class="v4-product-eyebrow">Основной режим</div>
-        <h2>Весь интернет через VPN</h2>
-        <p>Весь интернет-трафик устройства направляется через VPN. Подходит как основное подключение.</p>
-        <div class="v4-product-action">
-          {% if has_full %}
-            <span class="v4-status-pill is-success">Уже создано</span>
-          {% elif full_available %}
-            <a class="btn btn-primary" href="{% url 'customers-device-vpn-create' device.pk %}?routing_mode=full">Продолжить</a>
-          {% else %}
-            <span class="v4-status-pill is-warning">Нет доступного сервера</span>
-          {% endif %}
-        </div>
-      </article>
-
-      <article class="v4-product-card is-selective">
-        <div class="v4-product-icon">S</div>
-        <div class="v4-product-eyebrow">Выборочный режим</div>
-        <h2>Только выбранные сервисы</h2>
-        <p>Через VPN идут только настроенные сервисы и маршруты. Остальной интернет остаётся прямым.</p>
-        <div class="v4-product-action">
-          {% if has_selective %}
-            <span class="v4-status-pill is-success">Уже создано</span>
-          {% elif selective_available %}
-            <a class="btn btn-outline-primary" href="{% url 'customers-device-vpn-create' device.pk %}?routing_mode=selective">Продолжить</a>
-          {% else %}
-            <span class="v4-status-pill is-warning">Нет доступного SELECT-сервера</span>
-          {% endif %}
-        </div>
-      </article>
-
-      <article class="v4-product-card is-alt">
-        <div class="v4-product-icon">A</div>
-        <div class="v4-product-eyebrow">Дополнительный способ</div>
-        <h2>Альтернативное подключение</h2>
-        <p>Отдельное альтернативное подключение. Существующие FULL и SELECT останутся без изменений.</p>
-        {% if xhttp_total %}<div class="v4-product-meta">Уже создано: {{ xhttp_total }}</div>{% endif %}
-        <div class="v4-product-action">
-          <a class="btn btn-outline-primary" href="{% url 'customers-device-xhttp-create' device.pk %}">Продолжить</a>
-        </div>
-      </article>
-    </div>
-  </section>
-
-  <div class="v4-context-note mt-3">На этом экране ничего не создаётся. Реальное подключение появится только после подтверждения на следующем шаге.</div>
+  </form>
 </div>
+
+<script>
+(() => {
+  const form = document.getElementById('connection-create-form');
+  if (!form) return;
+
+  const radios = Array.from(form.querySelectorAll('input[name="product_type"]'));
+  const configs = Array.from(form.querySelectorAll('[data-product-config]'));
+  const cards = Array.from(form.querySelectorAll('.v5-product-choice'));
+  const submit = document.getElementById('connection-submit');
+
+  const applyTraffic = document.getElementById('{{ access_form.apply_traffic.id_for_label }}');
+  const preset = document.getElementById('{{ access_form.traffic_limit_preset.id_for_label }}');
+  const limitField = form.querySelector('[data-traffic-limit-field]');
+  const customField = form.querySelector('[data-traffic-custom-field]');
+
+  const syncProduct = () => {
+    const selected = radios.find((radio) => radio.checked)?.value || '';
+
+    cards.forEach((card) => {
+      const radio = card.querySelector('.v5-product-radio');
+      card.classList.toggle('is-selected', Boolean(radio?.checked));
+    });
+
+    configs.forEach((panel) => {
+      const active = panel.dataset.productConfig === selected;
+      panel.hidden = !active;
+      panel.setAttribute('aria-hidden', active ? 'false' : 'true');
+      panel.querySelectorAll('input, select, textarea, button').forEach((control) => {
+        control.disabled = !active;
+      });
+    });
+
+    if (submit) {
+      const labels = {
+        full: 'Создать FULL',
+        selective: 'Создать SELECT',
+        alt: 'Создать ALT',
+      };
+      submit.textContent = labels[selected] || 'Создать подключение';
+    }
+  };
+
+  const syncTraffic = () => {
+    const setting = applyTraffic?.value === 'set';
+    if (limitField) limitField.hidden = !setting;
+
+    const custom = setting && preset?.value === 'custom';
+    if (customField) customField.hidden = !custom;
+  };
+
+  radios.forEach((radio) => radio.addEventListener('change', syncProduct));
+  applyTraffic?.addEventListener('change', syncTraffic);
+  preset?.addEventListener('change', syncTraffic);
+
+  syncProduct();
+  syncTraffic();
+})();
+</script>
 {% endblock %}
