@@ -60,6 +60,8 @@ class CustomerOperatorWorkspaceTest(
             public_endpoint_host=(
                 "vpn.example.com"
             ),
+            accepts_new_vpn_clients=True,
+            health_status="healthy",
         )
 
         self.protocol = (
@@ -71,10 +73,16 @@ class CustomerOperatorWorkspaceTest(
                     .AWG2
                 ),
                 container_name="amnezia-awg2",
+                container_status="running",
                 enabled=True,
                 runtime_metadata={
                     "udp_port": 51830,
                     "subnet": "10.77.0.0/24",
+                    "peer_count": 2,
+                    "awg31_metadata_ready": True,
+                    "subnet_ready": True,
+                    "endpoint_host_ready": True,
+                    "endpoint_port_ready": True,
                 },
             )
         )
@@ -332,22 +340,27 @@ class CustomerOperatorWorkspaceTest(
 
         self.assertContains(
             response,
-            "Рабочая область клиента",
+            "Подключения",
         )
 
         self.assertContains(
             response,
-            "Весь интернет через VPN",
+            "MacBook",
         )
 
         self.assertContains(
             response,
-            "Только выбранные сервисы",
+            "FULL",
         )
 
         self.assertContains(
             response,
-            "Альтернативное подключение",
+            "SELECT",
+        )
+
+        self.assertContains(
+            response,
+            "ALT",
         )
 
         for technical_marker in (
@@ -440,7 +453,7 @@ class CustomerOperatorWorkspaceTest(
 
         self.assertContains(
             response,
-            "Дополнительные действия",
+            "Срок и VPN-лимит",
         )
 
         self.assertContains(
@@ -562,5 +575,5 @@ class CustomerOperatorWorkspaceTest(
 
         self.assertContains(
             response,
-            "Подключений: 3",
+            "3 подключений",
         )
