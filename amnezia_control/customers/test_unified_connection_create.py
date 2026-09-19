@@ -143,6 +143,22 @@ class UnifiedConnectionCreateTests(TestCase):
         )
         self.assertContains(
             response,
+            "Политика всего устройства",
+        )
+        self.assertContains(
+            response,
+            (
+                "Если вы измените срок или VPN-лимит, "
+                "новое значение применится и к существующим "
+                "FULL/SELECT-подключениям."
+            ),
+        )
+        self.assertContains(
+            response,
+            "Не создано",
+        )
+        self.assertContains(
+            response,
             "Создать подключение",
         )
 
