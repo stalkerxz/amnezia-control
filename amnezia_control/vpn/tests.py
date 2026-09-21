@@ -45,6 +45,9 @@ class VPNClientFlowTest(TestCase):
             runtime_metadata={
                 "udp_port": 51830,
                 "subnet": "10.77.0.0/24",
+                "awg_export_compatible": True,
+                "awg_generation": "2.x",
+                "awg_capabilities": ["legacy_obfuscation"],
                 "awg2_metadata": {"I1": "11", "I2": "12", "I3": "13", "I4": "14", "I5": "15", "S1": "1", "S2": "2", "S3": "3", "S4": "4", "Jc": "7", "Jmin": "8", "Jmax": "9", "H1": "3", "H2": "4", "H3": "5", "H4": "6"},
             },
         )
