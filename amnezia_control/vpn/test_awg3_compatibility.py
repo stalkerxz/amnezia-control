@@ -6,10 +6,11 @@ from django.test import TestCase, override_settings
 from django.utils import timezone
 
 from jobs.executors import SafeSSHExecutor
+from jobs.models import Job
 from servers.models import ProtocolProfile, Server, ServerProtocol
 from servers.services import ServerService
 from vpn.models import VPNClient
-from vpn.services import AdapterFactory, VPNClientService
+from vpn.services import AdapterFactory, RuntimeCommandService, VPNClientService
 
 
 @override_settings(CONFIG_ENCRYPTION_KEY=Fernet.generate_key().decode())
@@ -158,6 +159,7 @@ class AWG3CompatibilityTest(TestCase):
             raise AssertionError(f"Unexpected runtime command: {command}")
 
         def expected_side_effect(server, actor, action, command, **kwargs):
+            self.assertTrue(kwargs.get("sensitive_output"))
             if " wg show " in command:
                 return None
             if command == "docker exec amnezia-awg2 awg show all dump":
@@ -328,6 +330,38 @@ class AWG3CompatibilityTest(TestCase):
 
         self.assertEqual(result["status"], ServerService.HEALTH_UNHEALTHY)
         self.assertTrue(any("listen-port" in reason for reason in result["reasons"]))
+
+    def test_sensitive_runtime_output_is_redacted_from_job_log(self):
+        class Result:
+            stdout = "private-key-and-runtime-secret"
+            stderr = ""
+            exit_code = 0
+
+        class FakeExecutor:
+            @staticmethod
+            def run(command):
+                return Result()
+
+        with patch.object(
+            RuntimeCommandService,
+            "executor_for_server",
+            return_value=FakeExecutor(),
+        ):
+            result = RuntimeCommandService.run(
+                self.server,
+                self.user,
+                "test.sensitive.runtime",
+                "docker inspect amnezia-awg2",
+                sensitive_output=True,
+            )
+
+        self.assertEqual(result.stdout, "private-key-and-runtime-secret")
+        job = Job.objects.get(action="test.sensitive.runtime")
+        self.assertEqual(job.payload["command"], "[REDACTED]")
+        event = job.events.get()
+        self.assertEqual(event.stdout, "")
+        self.assertEqual(event.stderr, "")
+        self.assertNotIn("private-key-and-runtime-secret", str(job.payload))
 
     def test_safe_executor_accepts_only_expected_readiness_probes(self):
         executor = SafeSSHExecutor(host="127.0.0.1", username="u")
