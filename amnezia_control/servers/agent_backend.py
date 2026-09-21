@@ -9,7 +9,7 @@ from django.utils import timezone
 from audit.services import AuditService
 from jobs.executors import SafeSSHExecutor
 from servers.models import Server, ServerProtocol
-from vpn.services import AdapterFactory, PeerState, RuntimeCommandService
+from vpn.services import AdapterFactory, ConfigCryptoService, PeerState, RuntimeCommandService
 
 
 BRIDGE_PATH = "/usr/local/sbin/amnezia-control-agent-call"
@@ -333,8 +333,20 @@ def _protocol_metadata(server: Server, info: dict, *, agent: str) -> dict:
 def _sync_agent_runtime(server: Server, actor):
     from servers.services import ServerService
 
-    awg3_info = _agent_call(server, actor, "awg3", "runtime_info")
-    awg4_info = _agent_call(server, actor, "awg4", "runtime_info")
+    awg3_info = _agent_call(
+        server,
+        actor,
+        "awg3",
+        "runtime_info",
+        sensitive_output=True,
+    )
+    awg4_info = _agent_call(
+        server,
+        actor,
+        "awg4",
+        "runtime_info",
+        sensitive_output=True,
+    )
     now = timezone.now()
 
     legacy, _ = ServerProtocol.objects.get_or_create(
@@ -377,6 +389,17 @@ def _sync_agent_runtime(server: Server, actor):
         for key in ServerService.AWG31_REQUIRED_KEYS
         if not awg2_meta.get(key)
     ]
+    awg2_secret_metadata = {}
+    header_protection_key = awg2_meta.pop(
+        "HeaderProtectionKey",
+        "",
+    )
+    if header_protection_key:
+        awg2_secret_metadata[
+            "HeaderProtectionKey"
+        ] = ConfigCryptoService.encrypt(
+            header_protection_key
+        )
     awg2.container_name = AGENT_AWG4_SENTINEL
     awg2.container_status = (
         "running" if awg4_info.get("interface_up") else "exited"
@@ -384,7 +407,11 @@ def _sync_agent_runtime(server: Server, actor):
     awg2.runtime_metadata = {
         **_protocol_metadata(server, awg4_info, agent="awg4"),
         "awg2_metadata": awg2_meta,
-        "awg2_active_keys": sorted(awg2_meta),
+        "awg2_secret_metadata": awg2_secret_metadata,
+        "awg2_active_keys": sorted(
+            set(awg2_meta)
+            | set(awg2_secret_metadata)
+        ),
         "awg2_missing_keys": required_missing,
         "awg2_optional_missing_keys": optional_missing,
         "awg2_metadata_ready": not required_missing,
