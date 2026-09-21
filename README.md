@@ -45,9 +45,10 @@ docker compose exec web python manage.py createsuperuser
 ### AWG vs AWG2/AWG 3.x export
 - AWG legacy: отдельный билдер конфига.
 - Семейство `awg2` в панели означает современный AmneziaWG runtime и не используется как признак конкретной версии протокола.
-- Runtime sync определяет поколение по фактически найденным параметрам: `2.x`, `3.x` или `3.1`.
-- Для AWG 2.x требуются `S1-S4`, `Jc`, `Jmin`, `Jmax`, `H1-H4`; `I1-I5` остаются дополнительными.
+- Runtime sync определяет поколение по фактически найденным параметрам: `2.x`, `3.x` или `3.1`, а также рабочий CLI (`awg` с fallback на `wg`).
+- Для AWG 2.x требуются `S1-S4`, `Jc`, `Jmin`, `Jmax`, `H1-H4`; `I1-I5` остаются дополнительными и экспортируются только если реально активны в конфигурации, а не закомментированы.
 - Для AWG 3.x/3.1 дополнительно сохраняются и экспортируются `HeaderProtectionKey`, `ContentPaddingAddition`, `RekeyAfterTime`, `RekeyTimeout`, `RejectAfterTime`, `KeepaliveTimeout`, `MaxHandshakeAttempts`, `RandomTrailers`, `DisableCookies`.
+- `HeaderProtectionKey` хранится encrypted-at-rest отдельно от обычного runtime metadata; чтение server config выполняется как sensitive operation без записи содержимого в job stdout.
 - AWG-параметры экспортируются в секции `[Interface]`, как в upstream-шаблоне Amnezia; для AWG 3.x используется диапазон `PersistentKeepalive = 25-35`.
 - Если runtime содержит неизвестный параметр секции `[Interface]`, reissue блокируется **до изменения peer**. Это fail-closed защита от потери параметров после будущего обновления AWG.
 - `config_mtu` и наличие live-интерфейса сохраняются в runtime metadata; отсутствие интерфейса делает health-check unhealthy.
