@@ -70,6 +70,7 @@ jobs:
         run: >-
           python manage.py test
           vpn.test_awg3_compatibility
+          jobs.test_sensitive_runtime_scrub
           servers.tests.RuntimeDetectionTest
           jobs.tests.SSHExecutorTest
       - name: Capture head regression failures
