@@ -1,3 +1,5 @@
+import re
+
 from django.utils import timezone
 from .models import Job, JobEvent
 
@@ -8,6 +10,42 @@ DEGRADED_MARKERS = (
     "runtime telemetry unavailable",
     "config file fallback",
 )
+
+
+SENSITIVE_OUTPUT_PATTERNS = (
+    re.compile(
+        r"(?im)\\b(?:PrivateKey|PresharedKey|HeaderProtectionKey)"
+        r"\\s*=\\s*[^\\r\\n]+"
+    ),
+    re.compile(
+        r'(?i)"(?:PrivateKey|PresharedKey|HeaderProtectionKey)"'
+        r'\\s*:\\s*"[^"]+"'
+    ),
+    re.compile(
+        r"(?i)\\b[A-Z0-9_]*(?:PRIVATE_KEY|PRESHARED(?:_KEY)?|PSK|"
+        r"PASSWORD|TOKEN|SECRET|HEADER_PROTECTION_KEY)[A-Z0-9_]*="
+        r'[^,\\s"\\]]+'
+    ),
+)
+
+SENSITIVE_OUTPUT_PLACEHOLDER = (
+    "[REDACTED: sensitive runtime output]"
+)
+
+
+def contains_sensitive_output(text: str) -> bool:
+    value = text or ""
+    return any(
+        pattern.search(value)
+        for pattern in SENSITIVE_OUTPUT_PATTERNS
+    )
+
+
+def protect_job_output(text: str) -> str:
+    value = text or ""
+    if contains_sensitive_output(value):
+        return SENSITIVE_OUTPUT_PLACEHOLDER
+    return value
 
 
 def _contains_degraded_marker(text: str) -> bool:
@@ -58,4 +96,13 @@ class JobService:
 
     @staticmethod
     def event(job: Job, message: str, level: str = "info", stdout: str = "", stderr: str = "", exit_code: int | None = None):
-        return JobEvent.objects.create(job=job, level=level, message=message, stdout=stdout[:4000], stderr=stderr[:4000], exit_code=exit_code)
+        protected_stdout = protect_job_output(stdout)
+        protected_stderr = protect_job_output(stderr)
+        return JobEvent.objects.create(
+            job=job,
+            level=level,
+            message=message,
+            stdout=protected_stdout[:4000],
+            stderr=protected_stderr[:4000],
+            exit_code=exit_code,
+        )
