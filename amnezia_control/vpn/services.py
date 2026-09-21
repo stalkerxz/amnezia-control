@@ -790,6 +790,23 @@ class VPNClientService:
         return ", ".join(str(network) for network in collapsed)
 
     @classmethod
+    def resolved_awg_runtime_metadata(cls, protocol: ServerProtocol) -> dict:
+        runtime_metadata = protocol.runtime_metadata or {}
+        resolved = dict(runtime_metadata.get("awg2_metadata", {}) or {})
+        encrypted = runtime_metadata.get("awg_sensitive_metadata_encrypted", {}) or {}
+        for key, value in encrypted.items():
+            if not value:
+                continue
+            try:
+                resolved[key] = ConfigCryptoService.decrypt(value)
+            except (InvalidToken, ValueError) as exc:
+                raise RuntimeError(
+                    f"Cannot decrypt sensitive AWG runtime metadata: {key}. "
+                    "Reissue/export is blocked."
+                ) from exc
+        return resolved
+
+    @classmethod
     def assert_awg_runtime_export_supported(cls, protocol: ServerProtocol):
         if protocol.protocol_type != ServerProtocol.ProtocolType.AWG2:
             return
@@ -801,7 +818,7 @@ class VPNClientService:
                 "AWG runtime contains parameters that this exporter does not support: "
                 f"{details}. Reissue/export is blocked to avoid losing runtime settings."
             )
-        awg_metadata = metadata.get("awg2_metadata", {})
+        awg_metadata = cls.resolved_awg_runtime_metadata(protocol)
         required = ("Jc", "Jmin", "Jmax", "S1", "S2", "S3", "S4", "H1", "H2", "H3", "H4")
         missing = [key for key in required if not awg_metadata.get(key)]
         if missing:
@@ -888,7 +905,7 @@ class VPNClientService:
         protocol = ServerProtocol.objects.filter(server=client.server, protocol_type=client.protocol_type).first()
         if protocol and client.protocol_type == VPNClient.ProtocolType.AWG2:
             cls.assert_awg_runtime_export_supported(protocol)
-        metadata = (protocol.runtime_metadata or {}).get("awg2_metadata", {}) if protocol else {}
+        metadata = cls.resolved_awg_runtime_metadata(protocol) if protocol else {}
         extra_values: dict[str, str] = {}
         for key in cls.AWG_INTERFACE_EXTRA_KEYS:
             value = interface.get(key) or peer.get(key) or metadata.get(key)
@@ -1073,7 +1090,7 @@ class VPNClientService:
                 address=generated["address"],
                 endpoint=endpoint,
                 server_public_key=generated["server_public_key"],
-                awg2_metadata=adapter.protocol.runtime_metadata.get("awg2_metadata", {}),
+                awg2_metadata=VPNClientService.resolved_awg_runtime_metadata(adapter.protocol),
                 preshared_key=generated.get("preshared_key", ""),
                 allowed_ips=allowed_ips,
             )
