@@ -19,6 +19,30 @@ class ServerService:
     }
     AWG2_REQUIRED_KEYS = ["Jc", "Jmin", "Jmax", "S1", "S2", "S3", "S4", "H1", "H2", "H3", "H4"]
     AWG2_OPTIONAL_KEYS = ["I1", "I2", "I3", "I4", "I5"]
+    AWG3_INTERFACE_KEYS = [
+        "HeaderProtectionKey",
+        "ContentPaddingAddition",
+        "RekeyAfterTime",
+        "RekeyTimeout",
+        "RejectAfterTime",
+        "KeepaliveTimeout",
+        "MaxHandshakeAttempts",
+    ]
+    AWG31_INTERFACE_KEYS = ["RandomTrailers", "DisableCookies"]
+    AWG_BASE_INTERFACE_KEYS = {
+        "privatekey",
+        "address",
+        "listenport",
+        "mtu",
+        "table",
+        "saveconfig",
+        "preup",
+        "postup",
+        "predown",
+        "postdown",
+        "dns",
+        "fwmark",
+    }
     HEALTH_NOT_CHECKED = "not_checked"
     HEALTH_HEALTHY = "healthy"
     HEALTH_DEGRADED = "degraded"
@@ -246,16 +270,32 @@ class ServerService:
             metadata = protocol.runtime_metadata or {}
             status = (protocol.container_status or "").lower().strip()
             running = status == "running"
+            interface_ready = bool(
+                metadata.get(
+                    "interface_ready",
+                    bool(metadata.get("interface")),
+                )
+            )
             subnet_ready = bool(metadata.get("subnet_ready"))
             endpoint_host_ready = bool(metadata.get("endpoint_host_ready"))
             endpoint_port_ready = bool(metadata.get("endpoint_port_ready"))
-            protocol_ready = running and subnet_ready and endpoint_host_ready and endpoint_port_ready
+            protocol_ready = (
+                running
+                and interface_ready
+                and subnet_ready
+                and endpoint_host_ready
+                and endpoint_port_ready
+            )
 
             if status == "missing":
                 blocking_issues.append(f"{protocol_type.upper()}: контейнер {container_name} отсутствует")
                 continue
             if not running:
                 blocking_issues.append(f"{protocol_type.upper()}: контейнер не запущен (статус: {status or 'unknown'})")
+            if not interface_ready:
+                blocking_issues.append(
+                    f"{protocol_type.upper()}: runtime-интерфейс не обнаружен"
+                )
             if not subnet_ready:
                 blocking_issues.append(f"{protocol_type.upper()}: не определена подсеть")
             if not endpoint_host_ready:
@@ -268,6 +308,20 @@ class ServerService:
                 if not awg2_metadata_ready:
                     missing = ", ".join(metadata.get("awg2_missing_keys", [])) or "обязательные параметры"
                     blocking_issues.append(f"AWG2: отсутствуют обязательные параметры ({missing})")
+
+                if metadata.get("awg_export_compatible") is False:
+                    unknown_keys = ", ".join(
+                        metadata.get("awg_unknown_interface_keys", [])
+                    )
+                    details = (
+                        f": {unknown_keys}"
+                        if unknown_keys
+                        else ""
+                    )
+                    degraded_issues.append(
+                        "AWG: runtime содержит неподдерживаемую "
+                        f"схему экспорта{details}"
+                    )
 
                 peer_source = (metadata.get("peer_source", "") or "").lower()
                 if "degraded telemetry" in peer_source or "fallback" in peer_source:
@@ -325,9 +379,16 @@ class ServerService:
     def _parse_interface_metadata(raw_conf: str):
         subnet = ""
         listen_port = None
+        mtu = None
+        section = ""
         for line in raw_conf.splitlines():
             text = line.strip()
             if not text or text.startswith("#"):
+                continue
+            if text.startswith("[") and text.endswith("]"):
+                section = text.lower()
+                continue
+            if section and section != "[interface]":
                 continue
             if text.lower().startswith("address") and "=" in text:
                 value = text.split("=", 1)[1].strip().split(",")[0].strip()
@@ -340,7 +401,12 @@ class ServerService:
                     listen_port = int(text.split("=", 1)[1].strip())
                 except ValueError:
                     listen_port = None
-        return subnet, listen_port
+            if text.lower().startswith("mtu") and "=" in text:
+                try:
+                    mtu = int(text.split("=", 1)[1].strip())
+                except ValueError:
+                    mtu = None
+        return subnet, listen_port, mtu
 
     @staticmethod
     def _is_public_host(value: str) -> bool:
@@ -356,39 +422,135 @@ class ServerService:
 
     @classmethod
     def _normalize_awg2_key(cls, key: str) -> str:
-        compact = re.sub(r"[^A-Za-z0-9]", "", key).upper().replace("AWG2", "")
-        mapping = {"JC": "Jc", "JMIN": "Jmin", "JMAX": "Jmax"}
+        compact = (
+            re.sub(r"[^A-Za-z0-9]", "", key)
+            .upper()
+            .replace("AWG2", "")
+            .replace("AWG", "")
+        )
+        mapping = {
+            "JC": "Jc",
+            "JMIN": "Jmin",
+            "JMAX": "Jmax",
+            "HEADERPROTECTIONKEY": "HeaderProtectionKey",
+            "CONTENTPADDINGADDITION": "ContentPaddingAddition",
+            "REKEYAFTERTIME": "RekeyAfterTime",
+            "REKEYTIMEOUT": "RekeyTimeout",
+            "REJECTAFTERTIME": "RejectAfterTime",
+            "KEEPALIVETIMEOUT": "KeepaliveTimeout",
+            "MAXHANDSHAKEATTEMPTS": "MaxHandshakeAttempts",
+            "RANDOMTRAILERS": "RandomTrailers",
+            "DISABLECOOKIES": "DisableCookies",
+        }
         if compact in mapping:
             return mapping[compact]
-        if compact and compact[0] in {"I", "S", "H"}:
+        if re.fullmatch(r"[ISH][1-5]", compact):
             return compact
         return ""
 
     @classmethod
     def _parse_awg2_metadata(cls, env_list, conf_text: str):
         discovered = {}
-        allowed = set(cls.AWG2_REQUIRED_KEYS + cls.AWG2_OPTIONAL_KEYS)
+        allowed = set(
+            cls.AWG2_REQUIRED_KEYS
+            + cls.AWG2_OPTIONAL_KEYS
+            + cls.AWG3_INTERFACE_KEYS
+            + cls.AWG31_INTERFACE_KEYS
+        )
 
         for item in env_list:
             if "=" not in item:
                 continue
             k, v = item.split("=", 1)
             norm = cls._normalize_awg2_key(k)
-            if norm in allowed:
+            if norm in allowed and v.strip():
                 discovered[norm] = v.strip()
 
         for line in conf_text.splitlines():
             text = line.strip()
-            if not text or text.startswith("#") or "=" not in text:
+            if not text or "=" not in text:
                 continue
+            if text.startswith("#"):
+                text = text[1:].strip()
+                if not re.match(r"^I[1-5]\s*=", text, flags=re.IGNORECASE):
+                    continue
             k, v = text.split("=", 1)
             norm = cls._normalize_awg2_key(k)
-            if norm in allowed:
+            if norm in allowed and v.strip():
                 discovered[norm] = v.strip()
 
         required_missing = [k for k in cls.AWG2_REQUIRED_KEYS if not discovered.get(k)]
         optional_missing = [k for k in cls.AWG2_OPTIONAL_KEYS if not discovered.get(k)]
         return discovered, required_missing, optional_missing
+
+    @classmethod
+    def _classify_awg_runtime(cls, conf_text: str, metadata: dict) -> dict:
+        raw_interface_keys = []
+        section = ""
+        for line in conf_text.splitlines():
+            text = line.strip()
+            if not text or text.startswith("#"):
+                continue
+            if text.startswith("[") and text.endswith("]"):
+                section = text.lower()
+                continue
+            if section != "[interface]" or "=" not in text:
+                continue
+            key = text.split("=", 1)[0].strip()
+            raw_interface_keys.append(key)
+
+        unknown_keys = []
+        for key in raw_interface_keys:
+            if key.lower() in cls.AWG_BASE_INTERFACE_KEYS:
+                continue
+            if cls._normalize_awg2_key(key):
+                continue
+            unknown_keys.append(key)
+
+        if any(metadata.get(key) for key in cls.AWG31_INTERFACE_KEYS):
+            generation = "3.1"
+        elif any(metadata.get(key) for key in cls.AWG3_INTERFACE_KEYS):
+            generation = "3.x"
+        elif all(metadata.get(key) for key in cls.AWG2_REQUIRED_KEYS):
+            generation = "2.x"
+        else:
+            generation = "unknown"
+
+        capabilities = ["legacy_obfuscation"]
+        if metadata.get("HeaderProtectionKey"):
+            capabilities.append("header_protection")
+        if metadata.get("ContentPaddingAddition"):
+            capabilities.append("content_padding")
+        if any(
+            metadata.get(key)
+            for key in (
+                "RekeyAfterTime",
+                "RekeyTimeout",
+                "RejectAfterTime",
+                "KeepaliveTimeout",
+                "MaxHandshakeAttempts",
+            )
+        ):
+            capabilities.append("custom_timings")
+        if metadata.get("RandomTrailers"):
+            capabilities.append("random_trailers")
+        if metadata.get("DisableCookies"):
+            capabilities.append("disable_cookies")
+
+        missing_required = [
+            key
+            for key in cls.AWG2_REQUIRED_KEYS
+            if not metadata.get(key)
+        ]
+        return {
+            "generation": generation,
+            "capabilities": capabilities,
+            "unknown_interface_keys": sorted(set(unknown_keys)),
+            "export_compatible": (
+                not missing_required
+                and not unknown_keys
+            ),
+        }
 
     @staticmethod
     def _candidate_config_paths(iface: str):
@@ -499,10 +661,33 @@ class ServerService:
                             peer_count = len(cls._parse_peers_from_config_text(raw_iface_conf))
                             peer_source = "config file fallback (degraded telemetry)"
 
-                subnet, listen_port = cls._parse_interface_metadata(raw_iface_conf)
-                awg2_meta, awg2_required_missing, awg2_optional_missing = ({}, [], [])
+                subnet, listen_port, config_mtu = cls._parse_interface_metadata(
+                    raw_iface_conf
+                )
+                awg2_meta, awg2_required_missing, awg2_optional_missing = (
+                    {},
+                    [],
+                    [],
+                )
+                awg_runtime = {
+                    "generation": "",
+                    "capabilities": [],
+                    "unknown_interface_keys": [],
+                    "export_compatible": True,
+                }
                 if protocol_type == ServerProtocol.ProtocolType.AWG2:
-                    awg2_meta, awg2_required_missing, awg2_optional_missing = cls._parse_awg2_metadata(config_env, raw_iface_conf)
+                    (
+                        awg2_meta,
+                        awg2_required_missing,
+                        awg2_optional_missing,
+                    ) = cls._parse_awg2_metadata(
+                        config_env,
+                        raw_iface_conf,
+                    )
+                    awg_runtime = cls._classify_awg_runtime(
+                        raw_iface_conf,
+                        awg2_meta,
+                    )
 
                 udp_port = cls._parse_udp_port(inspect_data) or listen_port
                 discovered_public_host = cls._parse_public_host(inspect_data)
@@ -519,6 +704,8 @@ class ServerService:
                     "mounts": [m.get("Destination", "") for m in inspect_data[0].get("Mounts", [])],
                     "env": config_env,
                     "interface": iface,
+                    "interface_ready": bool(iface),
+                    "config_mtu": config_mtu,
                     "peer_count": peer_count,
                     "peer_source": peer_source,
                     "subnet": subnet,
@@ -530,6 +717,10 @@ class ServerService:
                     "awg2_missing_keys": awg2_required_missing,
                     "awg2_optional_missing_keys": awg2_optional_missing,
                     "awg2_metadata_ready": not awg2_required_missing if protocol_type == ServerProtocol.ProtocolType.AWG2 else True,
+                    "awg_generation": awg_runtime["generation"],
+                    "awg_capabilities": awg_runtime["capabilities"],
+                    "awg_unknown_interface_keys": awg_runtime["unknown_interface_keys"],
+                    "awg_export_compatible": awg_runtime["export_compatible"],
                 }
             else:
                 protocol.container_status = "missing"
