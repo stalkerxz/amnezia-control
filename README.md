@@ -64,6 +64,16 @@ docker compose exec web python manage.py createsuperuser
 - конфиги клиента хранятся encrypted-at-rest;
 - QR генерируется в памяти на лету.
 
+После первого deploy этой версии очистите исторические runtime-логи, созданные до введения redaction. Сначала выполните dry-run после проверенного backup, затем саму очистку:
+
+```bash
+./scripts/backup_all.sh
+docker compose exec web python manage.py scrub_sensitive_runtime_logs --dry-run
+docker compose exec web python manage.py scrub_sensitive_runtime_logs
+```
+
+Команда не удаляет Job/Audit-записи и не меняет их статус: она очищает только `stdout/stderr` у известных runtime-actions, где ранее могли сохраняться private key, PSK, Docker env или AWG secret.
+
 ## Проверка, что клиент реально создан
 1. Синхронизируйте runtime на `/servers/<id>/`.
 2. Убедитесь, что для протокола заполнены Endpoint/Subnet (и AWG2 metadata ready для AWG2).
