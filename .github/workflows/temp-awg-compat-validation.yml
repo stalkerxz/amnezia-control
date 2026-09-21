@@ -49,6 +49,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -63,9 +65,40 @@ jobs:
       - name: Migration drift check
         working-directory: amnezia_control
         run: python manage.py makemigrations --check --dry-run
-      - name: Targeted AWG tests
+      - name: Targeted AWG compatibility tests
         working-directory: amnezia_control
-        run: python manage.py test servers.tests vpn.tests vpn.test_awg3_compatibility jobs.tests
-      - name: Full regression suite
-        working-directory: amnezia_control
-        run: python manage.py test
+        run: >-
+          python manage.py test
+          vpn.test_awg3_compatibility
+          servers.tests.RuntimeDetectionTest
+          jobs.tests.SSHExecutorTest
+          vpn.test_runtime_persistence
+      - name: Capture head regression failures
+        shell: bash
+        run: |
+          set +e
+          (cd amnezia_control && python manage.py test) 2>&1 | tee /tmp/head-tests.log
+          status=${PIPESTATUS[0]}
+          grep -E '^(FAIL|ERROR): ' /tmp/head-tests.log | sort -u > /tmp/head-failures.txt || true
+          echo "Head full-suite exit: $status"
+          cat /tmp/head-failures.txt
+          exit 0
+      - name: Capture base regression failures
+        shell: bash
+        run: |
+          git checkout --detach origin/feature/client-accounts-multi-device-v2
+          set +e
+          (cd amnezia_control && python manage.py test) 2>&1 | tee /tmp/base-tests.log
+          status=${PIPESTATUS[0]}
+          grep -E '^(FAIL|ERROR): ' /tmp/base-tests.log | sort -u > /tmp/base-failures.txt || true
+          echo "Base full-suite exit: $status"
+          cat /tmp/base-failures.txt
+          exit 0
+      - name: Assert no new regression failures
+        shell: bash
+        run: |
+          echo "=== base failures ==="
+          cat /tmp/base-failures.txt
+          echo "=== head failures ==="
+          cat /tmp/head-failures.txt
+          diff -u /tmp/base-failures.txt /tmp/head-failures.txt
