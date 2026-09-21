@@ -618,11 +618,26 @@ class ServerService:
                 config_path = ""
                 if container_name in running_names:
                     try:
-                        command_candidates = (
-                            ("awg", "wg")
-                            if protocol_type == ServerProtocol.ProtocolType.AWG2
-                            else ("wg",)
+                        previous_command_bin = (
+                            (protocol.runtime_metadata or {}).get(
+                                "command_bin"
+                            )
                         )
+                        if protocol_type == ServerProtocol.ProtocolType.AWG2:
+                            if previous_command_bin in {"awg", "wg"}:
+                                fallback_bin = (
+                                    "wg"
+                                    if previous_command_bin == "awg"
+                                    else "awg"
+                                )
+                                command_candidates = (
+                                    previous_command_bin,
+                                    fallback_bin,
+                                )
+                            else:
+                                command_candidates = ("awg", "wg")
+                        else:
+                            command_candidates = ("wg",)
                         for candidate in command_candidates:
                             try:
                                 iface_out = RuntimeCommandService.run(
