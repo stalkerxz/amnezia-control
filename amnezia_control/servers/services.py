@@ -209,9 +209,19 @@ class ServerService:
                 metrics["protocols"].append(protocol_row)
                 continue
             try:
-                peer_cmd = "docker exec {container} sh -lc 'grep -c \"^\\[Peer\\]\" {config}; wg show {iface} peers | wc -l'".format(
+                command_bin = (
+                    (protocol.runtime_metadata or {}).get(
+                        "command_bin",
+                        "wg",
+                    )
+                    or "wg"
+                )
+                if command_bin not in {"wg", "awg"}:
+                    command_bin = "wg"
+                peer_cmd = "docker exec {container} sh -lc 'grep -c \"^\\[Peer\\]\" {config}; {command_bin} show {iface} peers | wc -l'".format(
                     container=shlex.quote(protocol_row["container_name"]),
                     config=shlex.quote(protocol_row["config_path"]),
+                    command_bin=command_bin,
                     iface=shlex.quote(protocol_row["interface"]),
                 )
                 peer_out = RuntimeCommandService.run(
@@ -605,19 +615,42 @@ class ServerService:
                 config_env = inspect_data[0].get("Config", {}).get("Env", [])
 
                 iface = ""
+                command_bin = "wg"
                 peer_count = 0
                 peer_source = "none"
                 raw_iface_conf = ""
                 config_path = ""
                 if container_name in running_names:
                     try:
-                        iface = RuntimeCommandService.run(server, actor, f"runtime.iface.{protocol_type}", f"docker exec {container_name} wg show interfaces").stdout.strip().split()[0]
+                        command_candidates = (
+                            ("awg", "wg")
+                            if protocol_type == ServerProtocol.ProtocolType.AWG2
+                            else ("wg",)
+                        )
+                        for candidate in command_candidates:
+                            try:
+                                iface_out = RuntimeCommandService.run(
+                                    server,
+                                    actor,
+                                    f"runtime.iface.{protocol_type}",
+                                    f"docker exec {container_name} {candidate} show interfaces",
+                                ).stdout.strip()
+                            except Exception:
+                                continue
+                            if iface_out:
+                                iface = iface_out.split()[0]
+                                command_bin = candidate
+                                break
+                        if not iface:
+                            raise RuntimeError(
+                                f"{protocol_type.upper()} runtime interface not detected"
+                            )
                         if protocol_type == ServerProtocol.ProtocolType.AWG2:
                             dump_result = RuntimeCommandService.run_with_expected_failure(
                                 server,
                                 actor,
                                 f"runtime.peers.{protocol_type}.all",
-                                f"docker exec {container_name} wg show all dump",
+                                f"docker exec {container_name} {command_bin} show all dump",
                                 expected_error_patterns=RuntimeCommandService.AWG2_EXPECTED_RUNTIME_DUMP_ERRORS,
                                 fallback_message="AWG2 runtime telemetry unavailable: using config fallback (degraded mode).",
                                 warn_on_expected_failure=False,
@@ -627,7 +660,7 @@ class ServerService:
                                     server,
                                     actor,
                                     f"runtime.peers.{protocol_type}",
-                                    f"docker exec {container_name} wg show dump",
+                                    f"docker exec {container_name} {command_bin} show dump",
                                     expected_error_patterns=RuntimeCommandService.AWG2_EXPECTED_RUNTIME_DUMP_ERRORS,
                                     fallback_message="AWG2 runtime telemetry unavailable: using config fallback (degraded mode).",
                                 )
@@ -705,6 +738,7 @@ class ServerService:
                     "env": config_env,
                     "interface": iface,
                     "interface_ready": bool(iface),
+                    "command_bin": command_bin,
                     "config_mtu": config_mtu,
                     "peer_count": peer_count,
                     "peer_source": peer_source,
