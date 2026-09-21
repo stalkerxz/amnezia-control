@@ -51,7 +51,10 @@ jobs:
             python manage.py test \
             vpn.test_awg_runtime_capabilities \
             vpn.test_runtime_persistence \
-            servers.tests \
+            vpn.tests.VPNClientFlowTest \
+            vpn.tests.VPNClientLimitsTest \
+            servers.tests.RuntimeDetectionTest \
+            servers.tests.ServerHealthEvaluationTest \
             jobs.tests
 
       - name: Django system check
