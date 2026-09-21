@@ -228,7 +228,6 @@ class ServerHealthEvaluationTest(TestCase):
             container_status="running",
             runtime_metadata={
                 "interface": "awg0",
-                "interface": "awg0",
                 "subnet_ready": True,
                 "endpoint_host_ready": True,
                 "endpoint_port_ready": True,
@@ -247,7 +246,12 @@ class ServerHealthEvaluationTest(TestCase):
             protocol_type=ServerProtocol.ProtocolType.AWG,
             container_name="amnezia-awg",
             container_status="running",
-            runtime_metadata={"subnet_ready": True, "endpoint_host_ready": True, "endpoint_port_ready": True},
+            runtime_metadata={
+                "interface": "awg0",
+                "subnet_ready": True,
+                "endpoint_host_ready": True,
+                "endpoint_port_ready": True,
+            },
         )
         ServerProtocol.objects.create(
             server=self.server,
@@ -255,6 +259,7 @@ class ServerHealthEvaluationTest(TestCase):
             container_name="amnezia-awg2",
             container_status="running",
             runtime_metadata={
+                "interface": "awg0",
                 "subnet_ready": True,
                 "endpoint_host_ready": True,
                 "endpoint_port_ready": True,
