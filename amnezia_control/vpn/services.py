@@ -586,6 +586,7 @@ class BaseProtocolAdapter:
                         warn_on_expected_failure=(
                             warn_on_expected_failure
                         ),
+                        sensitive_output=True,
                     )
                 )
 
@@ -683,7 +684,12 @@ class BaseProtocolAdapter:
         config_path = self.protocol.runtime_metadata.get("config_path", "")
         if not config_path:
             return []
-        raw_conf = self._run(actor, f"{self.protocol_type}.list_fallback_conf", f"docker exec {self.container} cat {config_path}").stdout
+        raw_conf = self._run(
+            actor,
+            f"{self.protocol_type}.list_fallback_conf",
+            f"docker exec {self.container} cat {config_path}",
+            sensitive_output=True,
+        ).stdout
         return self._parse_peers_from_config_text(raw_conf)
 
     def peer_transfer_map(self, actor) -> dict[str, int] | None:
