@@ -538,7 +538,7 @@ class ServerService:
             key = text.split("=", 1)[0].strip()
             if key in known or key in cls.AWG_STANDARD_INTERFACE_KEYS:
                 continue
-            if re.fullmatch(r"[A-Za-z][A-Za-z0-9]*", key):
+            if re.fullmatch(r"[A-Za-z][A-Za-z0-9_-]*", key):
                 unsupported.append(key)
         return sorted(set(unsupported))
 
