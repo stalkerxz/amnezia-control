@@ -225,6 +225,16 @@ FutureObfuscationMode = enabled
             "awg show awg0 peers | wc -l'"
         )
 
+    def test_safe_executor_accepts_runtime_mtu_read(self):
+        executor = SafeSSHExecutor(
+            host="127.0.0.1",
+            username="u",
+        )
+        executor._validate(
+            "docker exec amnezia-awg2 "
+            "cat /sys/class/net/awg0/mtu"
+        )
+
 
 class AWGCompatibilityPolicyTest(TestCase):
     def test_adapter_uses_discovered_awg_command(self):
@@ -284,6 +294,49 @@ class AWGCompatibilityPolicyTest(TestCase):
             with self.assertRaisesRegex(
                 RuntimeError,
                 "неподдерживаемую схему",
+            ):
+                VPNClientService.reissue_config(
+                    client=client,
+                    actor=None,
+                )
+
+        adapter_factory.assert_not_called()
+
+    def test_reissue_requires_runtime_sync_before_mutation(self):
+        server = Server.objects.create(
+            name="awg-unsynced-server",
+            public_endpoint_host="vpn.example.com",
+        )
+        protocol = ServerProtocol.objects.create(
+            server=server,
+            protocol_type=ServerProtocol.ProtocolType.AWG2,
+            enabled=True,
+            container_name="amnezia-awg2",
+            container_status="running",
+            runtime_metadata={
+                "awg2_metadata": _legacy_metadata(),
+            },
+        )
+        profile = ProtocolProfile.objects.create(
+            server_protocol=protocol,
+            name="full-unsynced",
+            protocol_type=ServerProtocol.ProtocolType.AWG2,
+            config_template="[Interface]",
+        )
+        client = VPNClient.objects.create(
+            server=server,
+            name="unsynced-reissue",
+            protocol_type=VPNClient.ProtocolType.AWG2,
+            profile=profile,
+            status=VPNClient.Status.ACTIVE,
+        )
+
+        with patch(
+            "vpn.services.AdapterFactory.get_for_client"
+        ) as adapter_factory:
+            with self.assertRaisesRegex(
+                RuntimeError,
+                "совместимость runtime AWG ещё не проверена",
             ):
                 VPNClientService.reissue_config(
                     client=client,
