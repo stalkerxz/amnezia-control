@@ -658,6 +658,29 @@ class VPNClientPolicyService:
                     + suffix
                 )
 
+            capabilities = set(
+                metadata.get("awg_capabilities", [])
+            )
+            if "header_protection" in capabilities:
+                encrypted_key = (
+                    metadata.get(
+                        "awg2_secret_metadata",
+                        {},
+                    ).get("HeaderProtectionKey")
+                )
+                if not encrypted_key:
+                    return (
+                        "Переиздание запрещено: отсутствует "
+                        "защищённый HeaderProtectionKey."
+                    )
+                try:
+                    ConfigCryptoService.decrypt(encrypted_key)
+                except Exception:
+                    return (
+                        "Переиздание запрещено: "
+                        "HeaderProtectionKey не расшифровывается."
+                    )
+
         return ""
 
     @classmethod
@@ -831,6 +854,28 @@ class VPNClientService:
         return ", ".join(str(network) for network in collapsed)
 
     @classmethod
+    def _runtime_awg_metadata(
+        cls,
+        protocol: ServerProtocol,
+    ) -> dict:
+        runtime = protocol.runtime_metadata or {}
+        metadata = dict(runtime.get("awg2_metadata", {}))
+        encrypted_key = (
+            runtime.get("awg2_secret_metadata", {})
+            .get("HeaderProtectionKey")
+        )
+        if encrypted_key:
+            try:
+                metadata["HeaderProtectionKey"] = (
+                    ConfigCryptoService.decrypt(encrypted_key)
+                )
+            except Exception as exc:
+                raise RuntimeError(
+                    "Cannot decrypt AWG HeaderProtectionKey."
+                ) from exc
+        return metadata
+
+    @classmethod
     def build_awg2_client_config(
         cls,
         *,
@@ -930,7 +975,11 @@ class VPNClientService:
             raise RuntimeError("Cannot build native export: latest config has no Peer.PublicKey/Endpoint.")
 
         protocol = ServerProtocol.objects.filter(server=client.server, protocol_type=client.protocol_type).first()
-        metadata = (protocol.runtime_metadata or {}).get("awg2_metadata", {}) if protocol else {}
+        metadata = (
+            cls._runtime_awg_metadata(protocol)
+            if protocol
+            else {}
+        )
         extra_values: dict[str, str] = {}
         for key in cls.AWG_INTERFACE_EXTRA_KEYS:
             value = interface.get(key) or peer.get(key) or metadata.get(key)
@@ -1125,7 +1174,9 @@ class VPNClientService:
                 address=generated["address"],
                 endpoint=endpoint,
                 server_public_key=generated["server_public_key"],
-                awg2_metadata=adapter.protocol.runtime_metadata.get("awg2_metadata", {}),
+                awg2_metadata=VPNClientService._runtime_awg_metadata(
+                    adapter.protocol
+                ),
                 preshared_key=generated.get("preshared_key", ""),
                 allowed_ips=allowed_ips,
                 mtu=adapter.protocol.runtime_metadata.get("config_mtu"),
