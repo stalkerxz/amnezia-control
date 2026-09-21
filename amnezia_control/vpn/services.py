@@ -620,10 +620,34 @@ class VPNClientPolicyService:
                 "сначала включите клиента."
             )
 
-        return cls.REISSUE_BLOCK_REASONS.get(
+        limit_reason = cls.REISSUE_BLOCK_REASONS.get(
             cls.limit_state(client),
             "",
         )
+        if limit_reason:
+            return limit_reason
+
+        if client.protocol_type == VPNClient.ProtocolType.AWG2:
+            protocol = ServerProtocol.objects.filter(
+                server=client.server,
+                protocol_type=client.protocol_type,
+            ).first()
+            metadata = protocol.runtime_metadata if protocol else {}
+            if metadata.get("awg_export_compatible") is False:
+                unknown = ", ".join(
+                    metadata.get(
+                        "awg_unknown_interface_keys",
+                        [],
+                    )
+                )
+                suffix = f" Неизвестные параметры: {unknown}." if unknown else ""
+                return (
+                    "Переиздание запрещено: runtime AWG использует "
+                    "неподдерживаемую схему конфигурации."
+                    + suffix
+                )
+
+        return ""
 
     @classmethod
     def can_reissue(cls, client: VPNClient):
@@ -637,7 +661,36 @@ class VPNClientPolicyService:
 
 
 class VPNClientService:
-    AWG_INTERFACE_EXTRA_KEYS = ("Jc", "Jmin", "Jmax", "S1", "S2", "S3", "S4", "H1", "H2", "H3", "H4", "I1", "I2", "I3", "I4", "I5")
+    AWG2_REQUIRED_KEYS = (
+        "Jc",
+        "Jmin",
+        "Jmax",
+        "S1",
+        "S2",
+        "S3",
+        "S4",
+        "H1",
+        "H2",
+        "H3",
+        "H4",
+    )
+    AWG2_OPTIONAL_KEYS = ("I1", "I2", "I3", "I4", "I5")
+    AWG3_INTERFACE_KEYS = (
+        "HeaderProtectionKey",
+        "ContentPaddingAddition",
+        "RekeyAfterTime",
+        "RekeyTimeout",
+        "RejectAfterTime",
+        "KeepaliveTimeout",
+        "MaxHandshakeAttempts",
+    )
+    AWG31_INTERFACE_KEYS = ("RandomTrailers", "DisableCookies")
+    AWG_INTERFACE_EXTRA_KEYS = (
+        AWG2_REQUIRED_KEYS
+        + AWG2_OPTIONAL_KEYS
+        + AWG3_INTERFACE_KEYS
+        + AWG31_INTERFACE_KEYS
+    )
 
     @staticmethod
     def get_limit_state(client: VPNClient, now=None):
@@ -766,8 +819,9 @@ class VPNClientService:
 
         return ", ".join(str(network) for network in collapsed)
 
-    @staticmethod
+    @classmethod
     def build_awg2_client_config(
+        cls,
         *,
         private_key: str,
         address: str,
@@ -776,12 +830,42 @@ class VPNClientService:
         awg2_metadata: dict,
         preshared_key: str = "",
         allowed_ips: str = "0.0.0.0/0, ::/0",
+        mtu=None,
     ) -> str:
-        required = ("Jc", "Jmin", "Jmax", "S1", "S2", "S3", "S4", "H1", "H2", "H3", "H4")
-        optional = ("I1", "I2", "I3", "I4", "I5")
-        missing = [k for k in required if not awg2_metadata.get(k)]
+        missing = [
+            key
+            for key in cls.AWG2_REQUIRED_KEYS
+            if not awg2_metadata.get(key)
+        ]
         if missing:
-            raise RuntimeError(f"AWG2 metadata is incomplete: missing {', '.join(missing)}. Run runtime sync and verify live AWG2 config.")
+            raise RuntimeError(
+                "AWG metadata is incomplete: missing "
+                f"{', '.join(missing)}. Run runtime sync and "
+                "verify the live AWG config."
+            )
+
+        interface_lines = [
+            "[Interface]",
+            f"PrivateKey = {private_key}",
+            f"Address = {address}/32",
+            "DNS = 1.1.1.1",
+        ]
+        if mtu:
+            interface_lines.append(f"MTU = {mtu}")
+
+        for key in cls.AWG_INTERFACE_EXTRA_KEYS:
+            value = awg2_metadata.get(key)
+            if value:
+                interface_lines.append(f"{key} = {value}")
+
+        is_awg3 = any(
+            awg2_metadata.get(key)
+            for key in (
+                cls.AWG3_INTERFACE_KEYS
+                + cls.AWG31_INTERFACE_KEYS
+            )
+        )
+        persistent_keepalive = "25-35" if is_awg3 else "25"
 
         peer_lines = [
             "[Peer]",
@@ -791,20 +875,19 @@ class VPNClientService:
             peer_lines.append(f"PresharedKey = {preshared_key}")
         peer_lines.extend(
             [
-                f"Endpoint = {endpoint}",
                 f"AllowedIPs = {allowed_ips}",
-                "PersistentKeepalive = 25",
+                f"Endpoint = {endpoint}",
+                (
+                    "PersistentKeepalive = "
+                    f"{persistent_keepalive}"
+                ),
             ]
         )
-        peer_lines.extend(f"{k} = {awg2_metadata[k]}" for k in required)
-        peer_lines.extend(f"{k} = {awg2_metadata[k]}" for k in optional if awg2_metadata.get(k))
-        return (
-            "[Interface]\n"
-            f"PrivateKey = {private_key}\n"
-            f"Address = {address}/32\n"
-            "DNS = 1.1.1.1\n\n"
-            + "\n".join(peer_lines)
-            + "\n"
+        return "\n".join(
+            interface_lines
+            + [""]
+            + peer_lines
+            + [""]
         )
 
     @staticmethod
@@ -854,6 +937,14 @@ class VPNClientService:
         ]
         if interface.get("DNS"):
             lines.append(f"DNS = {interface['DNS']}")
+        runtime_mtu = (
+            protocol.runtime_metadata.get("config_mtu")
+            if protocol
+            else None
+        )
+        mtu = interface.get("MTU") or runtime_mtu
+        if mtu:
+            lines.append(f"MTU = {mtu}")
         lines.extend(f"{k} = {extra_values[k]}" for k in cls.AWG_INTERFACE_EXTRA_KEYS if extra_values.get(k))
         lines.extend(["", "[Peer]", f"PublicKey = {peer['PublicKey']}"])
         if peer.get("PresharedKey"):
@@ -998,6 +1089,12 @@ class VPNClientService:
         VPNClientPolicyService.assert_reissue_allowed(client)
 
         adapter = AdapterFactory.get_for_client(client)
+
+        # Compatibility checks must run before any runtime mutation.
+        # If a newer AWG schema is unknown to this control plane,
+        # preserve the existing peer and fail closed.
+        VPNClientPolicyService.assert_reissue_allowed(client)
+
         if client.runtime_peer_public_key:
             adapter.remove_peer(actor, client.runtime_peer_public_key)
         generated = adapter.create_peer(actor)
@@ -1023,6 +1120,7 @@ class VPNClientService:
                 awg2_metadata=adapter.protocol.runtime_metadata.get("awg2_metadata", {}),
                 preshared_key=generated.get("preshared_key", ""),
                 allowed_ips=allowed_ips,
+                mtu=adapter.protocol.runtime_metadata.get("config_mtu"),
             )
 
         rev = VPNClientService._store_revision(client, config)
