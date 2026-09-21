@@ -51,7 +51,10 @@ docker compose exec web python manage.py createsuperuser
 - `HeaderProtectionKey` хранится encrypted-at-rest отдельно от обычного runtime metadata; чтение server config выполняется как sensitive operation без записи содержимого в job stdout.
 - AWG-параметры экспортируются в секции `[Interface]`, как в upstream-шаблоне Amnezia; для AWG 3.x используется диапазон `PersistentKeepalive = 25-35`.
 - Если runtime содержит неизвестный параметр секции `[Interface]`, reissue блокируется **до изменения peer**. Это fail-closed защита от потери параметров после будущего обновления AWG.
-- `config_mtu` и наличие live-интерфейса сохраняются в runtime metadata; отсутствие интерфейса делает health-check unhealthy.
+- `config_mtu` и фактический `runtime_mtu` сохраняются в runtime metadata; несовпадение переводит health в degraded и блокирует AWG2 reissue.
+- Наличие live-интерфейса обязательно: контейнер `running` без интерфейса не считается готовым.
+- После deploy этой версии сначала выполните runtime sync. До получения нового `awg_export_compatible` AWG2 create/reissue намеренно fail-closed, чтобы не использовать устаревшую схему metadata.
+- В операторском UI отображаются поколение AWG, фактический CLI (`awg`/`wg`), capabilities, config/runtime MTU и export compatibility.
 - Канонические имена ключей в коде/metadata/export: `Jc`, `Jmin`, `Jmax` (без `JC/JMIN/JMAX`).
 
 ## Безопасность
