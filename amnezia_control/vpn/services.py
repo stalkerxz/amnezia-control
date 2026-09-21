@@ -152,6 +152,17 @@ class BaseProtocolAdapter:
         if not self.protocol or not self.protocol.container_name:
             raise ValueError(f"Container for {self.protocol_type} not detected")
 
+        runtime_command_bin = (
+            (self.protocol.runtime_metadata or {}).get("command_bin")
+            if self.protocol
+            else None
+        )
+        if (
+            self.protocol_type == VPNClient.ProtocolType.AWG2
+            and runtime_command_bin in {"awg", "wg"}
+        ):
+            self.command_bin = runtime_command_bin
+
     @property
     def container(self):
         return self.protocol.container_name
