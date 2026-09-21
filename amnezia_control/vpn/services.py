@@ -1088,12 +1088,9 @@ class VPNClientService:
     def reissue_config(*, client: VPNClient, actor):
         VPNClientPolicyService.assert_reissue_allowed(client)
 
+        # The policy check above runs before adapter/runtime mutation.
+        # Unknown future AWG schemas therefore preserve the current peer.
         adapter = AdapterFactory.get_for_client(client)
-
-        # Compatibility checks must run before any runtime mutation.
-        # If a newer AWG schema is unknown to this control plane,
-        # preserve the existing peer and fail closed.
-        VPNClientPolicyService.assert_reissue_allowed(client)
 
         if client.runtime_peer_public_key:
             adapter.remove_peer(actor, client.runtime_peer_public_key)
