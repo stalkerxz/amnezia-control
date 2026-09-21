@@ -105,10 +105,16 @@
           {% if row.protocol.protocol_type == 'awg2' %}
             <div class="mb-1">
               <span class="badge status-badge status-info">
-                AWG {{ row.protocol.runtime_metadata.awg_generation|default:'2.x' }}
+                AWG {{ row.protocol.runtime_metadata.awg_generation|default:'не определено' }}
               </span>
               {% if row.protocol.runtime_metadata.config_mtu %}
-                <span class="badge status-badge status-neutral">MTU {{ row.protocol.runtime_metadata.config_mtu }}</span>
+                <span class="badge status-badge status-neutral">Config MTU {{ row.protocol.runtime_metadata.config_mtu }}</span>
+              {% endif %}
+              {% if row.protocol.runtime_metadata.runtime_mtu %}
+                <span class="badge status-badge status-neutral">Runtime MTU {{ row.protocol.runtime_metadata.runtime_mtu }}</span>
+              {% endif %}
+              {% if row.protocol.runtime_metadata.mtu_mismatch %}
+                <span class="badge status-badge status-warning">MTU mismatch</span>
               {% endif %}
             </div>
             {% if row.protocol.runtime_metadata.awg_export_compatible == False %}
@@ -130,7 +136,7 @@
           {% endif %}
         </td>
         <td class="text-end">
-          {% if row.protocol.runtime_metadata.interface and row.protocol.runtime_metadata.subnet_ready and row.protocol.runtime_metadata.endpoint_host_ready and row.protocol.runtime_metadata.endpoint_port_ready %}
+          {% if row.ready %}
           <span class="badge status-badge status-success">Готово</span>
           {% else %}
           <span class="badge status-badge status-warning">Требует внимания</span>
