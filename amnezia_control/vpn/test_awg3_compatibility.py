@@ -116,6 +116,16 @@ class AWG3CompatibilityTest(TestCase):
         self.assertIn("random_trailers", capabilities)
         self.assertIn("disable_cookies", capabilities)
 
+    def test_awg3_toggle_off_alone_is_not_generation_marker(self):
+        metadata = {
+            "RandomTrailers": "off",
+            "DisableCookies": "off",
+        }
+
+        self.assertFalse(ServerService._has_awg3_params(metadata))
+        self.assertFalse(VPNClientService.has_awg3_params(metadata))
+        self.assertEqual(ServerService._awg_generation(metadata), "unknown")
+
     def test_sensitive_awg_metadata_is_encrypted_at_rest(self):
         public_metadata, encrypted_metadata = ServerService._protect_awg_metadata(
             self._metadata()
@@ -206,6 +216,34 @@ class AWG3CompatibilityTest(TestCase):
         self.assertIn("RandomTrailers = on", interface_block)
         self.assertNotIn("HeaderProtectionKey", peer_block)
         self.assertIn("PersistentKeepalive = 25-35", peer_block)
+
+    def test_native_export_upgrades_keepalive_for_awg3_runtime(self):
+        client = VPNClient.objects.create(
+            server=self.server,
+            name="awg3-native",
+            protocol_type=VPNClient.ProtocolType.AWG2,
+            profile=self.profile,
+            created_by=self.user,
+            status=VPNClient.Status.ACTIVE,
+            runtime_address="10.77.0.10",
+        )
+        VPNClientService._store_revision(
+            client,
+            "[Interface]\n"
+            "PrivateKey = private\n"
+            "Address = 10.77.0.10/32\n"
+            "DNS = 1.1.1.1\n\n"
+            "[Peer]\n"
+            "PublicKey = server-public\n"
+            "Endpoint = vpn.example.com:51830\n"
+            "AllowedIPs = 0.0.0.0/0, ::/0\n"
+            "PersistentKeepalive = 25\n",
+        )
+
+        native = VPNClientService.build_native_client_config(client)
+
+        self.assertIn("HeaderProtectionKey = base64-key", native)
+        self.assertIn("PersistentKeepalive = 25-35", native)
 
     def test_reissue_blocks_before_old_peer_is_removed_for_unknown_runtime_params(self):
         metadata = dict(self.protocol.runtime_metadata)
