@@ -429,6 +429,8 @@ class AWGOperatorReadinessViewTest(TestCase):
                 "endpoint_host_ready": True,
                 "endpoint_port_ready": True,
                 "awg_generation": "2.x",
+                "awg_capabilities": ["legacy_obfuscation"],
+                "command_bin": "awg",
                 "awg_export_compatible": True,
                 "awg2_metadata_ready": True,
                 "config_mtu": 1376,
@@ -451,6 +453,8 @@ class AWGOperatorReadinessViewTest(TestCase):
         self.assertContains(response, "Config MTU 1376")
         self.assertContains(response, "Runtime MTU 1420")
         self.assertContains(response, "MTU mismatch")
+        self.assertContains(response, "CLI:")
+        self.assertContains(response, "legacy_obfuscation")
         self.assertContains(response, "Требует внимания")
         self.assertContains(response, "0 / 1")
 
