@@ -2,7 +2,9 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from cryptography.fernet import Fernet
+from django.contrib.auth import get_user_model
 from django.test import SimpleTestCase, TestCase, override_settings
+from django.urls import reverse
 
 from jobs.executors import SafeSSHExecutor
 from servers.models import ProtocolProfile, Server, ServerProtocol
@@ -344,3 +346,55 @@ class AWGCompatibilityPolicyTest(TestCase):
                 )
 
         adapter_factory.assert_not_called()
+
+class AWGOperatorReadinessViewTest(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(
+            username="awg-readiness-admin",
+            password="test",
+            is_staff=True,
+        )
+        self.server = Server.objects.create(
+            name="awg-readiness-server",
+            public_endpoint_host="vpn.example.com",
+            public_endpoint_port=51830,
+        )
+        ServerProtocol.objects.create(
+            server=self.server,
+            protocol_type=ServerProtocol.ProtocolType.AWG2,
+            enabled=True,
+            container_name="amnezia-awg2",
+            container_status="running",
+            runtime_metadata={
+                "interface": "awg0",
+                "interface_ready": True,
+                "subnet": "10.77.0.0/24",
+                "subnet_ready": True,
+                "endpoint_host_ready": True,
+                "endpoint_port_ready": True,
+                "awg_generation": "2.x",
+                "awg_export_compatible": True,
+                "awg2_metadata_ready": True,
+                "config_mtu": 1376,
+                "runtime_mtu": 1420,
+                "mtu_mismatch": True,
+            },
+        )
+
+    def test_server_detail_marks_mtu_mismatch_not_ready(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get(
+            reverse(
+                "servers-detail",
+                kwargs={"pk": self.server.id},
+            )
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Config MTU 1376")
+        self.assertContains(response, "Runtime MTU 1420")
+        self.assertContains(response, "MTU mismatch")
+        self.assertContains(response, "Требует внимания")
+        self.assertContains(response, "0 / 1")
+
