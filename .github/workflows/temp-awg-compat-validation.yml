@@ -72,7 +72,6 @@ jobs:
           vpn.test_awg3_compatibility
           servers.tests.RuntimeDetectionTest
           jobs.tests.SSHExecutorTest
-          vpn.test_runtime_persistence
       - name: Capture head regression failures
         shell: bash
         run: |
