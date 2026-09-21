@@ -14,17 +14,17 @@ DEGRADED_MARKERS = (
 
 SENSITIVE_OUTPUT_PATTERNS = (
     re.compile(
-        r"(?im)\\b(?:PrivateKey|PresharedKey|HeaderProtectionKey)"
-        r"\\s*=\\s*[^\\r\\n]+"
+        r"(?im)\b(?:PrivateKey|PresharedKey|HeaderProtectionKey)"
+        r"\s*=\s*[^\r\n]+"
     ),
     re.compile(
         r'(?i)"(?:PrivateKey|PresharedKey|HeaderProtectionKey)"'
-        r'\\s*:\\s*"[^"]+"'
+        r'\s*:\s*"[^"]+"'
     ),
     re.compile(
-        r"(?i)\\b[A-Z0-9_]*(?:PRIVATE_KEY|PRESHARED(?:_KEY)?|PSK|"
+        r"(?i)\b[A-Z0-9_]*(?:PRIVATE_KEY|PRESHARED(?:_KEY)?|PSK|"
         r"PASSWORD|TOKEN|SECRET|HEADER_PROTECTION_KEY)[A-Z0-9_]*="
-        r'[^,\\s"\\]]+'
+        r'[^,\s"\]]+'
     ),
 )
 
