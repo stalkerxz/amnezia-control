@@ -1,0 +1,104 @@
+name: Temporary AWG compatibility validation
+
+on:
+  push:
+    branches:
+      - feature/awg-runtime-capabilities-v3-safe
+
+permissions:
+  contents: read
+
+jobs:
+  django-tests:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: amnezia
+          POSTGRES_USER: amnezia
+          POSTGRES_PASSWORD: amnezia
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U amnezia -d amnezia"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    env:
+      POSTGRES_DB: amnezia
+      POSTGRES_USER: amnezia
+      POSTGRES_PASSWORD: amnezia
+      POSTGRES_HOST: 127.0.0.1
+      POSTGRES_PORT: "5432"
+      REDIS_URL: redis://127.0.0.1:6379/0
+      CELERY_BROKER_URL: redis://127.0.0.1:6379/0
+      CELERY_RESULT_BACKEND: redis://127.0.0.1:6379/0
+      DJANGO_SECRET_KEY: ci-only-secret
+      DJANGO_DEBUG: "0"
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: python -m pip install --upgrade pip && pip install -r requirements.txt
+      - name: Generate test encryption key
+        run: python -c "from cryptography.fernet import Fernet; print('CONFIG_ENCRYPTION_KEY=' + Fernet.generate_key().decode())" >> "$GITHUB_ENV"
+      - name: Django system check
+        working-directory: amnezia_control
+        run: python manage.py check
+      - name: Migration drift check
+        working-directory: amnezia_control
+        run: python manage.py makemigrations --check --dry-run
+      - name: Targeted AWG compatibility tests
+        working-directory: amnezia_control
+        run: >-
+          python manage.py test
+          vpn.test_awg3_compatibility
+          jobs.test_sensitive_runtime_scrub
+          servers.tests.RuntimeDetectionTest
+          jobs.tests.SSHExecutorTest
+      - name: Capture head regression failures
+        shell: bash
+        run: |
+          set +e
+          (cd amnezia_control && python manage.py test) 2>&1 | tee /tmp/head-tests.log
+          status=${PIPESTATUS[0]}
+          grep -E '^(FAIL|ERROR): ' /tmp/head-tests.log | sort -u > /tmp/head-failures.txt || true
+          echo "Head full-suite exit: $status"
+          cat /tmp/head-failures.txt
+          exit 0
+      - name: Capture base regression failures
+        shell: bash
+        run: |
+          git checkout --detach origin/feature/client-accounts-multi-device-v2
+          set +e
+          (cd amnezia_control && python manage.py test) 2>&1 | tee /tmp/base-tests.log
+          status=${PIPESTATUS[0]}
+          grep -E '^(FAIL|ERROR): ' /tmp/base-tests.log | sort -u > /tmp/base-failures.txt || true
+          echo "Base full-suite exit: $status"
+          cat /tmp/base-failures.txt
+          exit 0
+      - name: Assert no new regression failures
+        shell: bash
+        run: |
+          echo "=== base failures ==="
+          cat /tmp/base-failures.txt
+          echo "=== head failures ==="
+          cat /tmp/head-failures.txt
+          diff -u /tmp/base-failures.txt /tmp/head-failures.txt

@@ -78,7 +78,9 @@ class RuntimeDetectionTest(TestCase):
             Result('[{"State":{"Status":"running"},"NetworkSettings":{"Ports":{"51830/udp":[{"HostIp":"198.51.100.20","HostPort":"51830"}]}},"Config":{"Image":"awg2","Env":["AWG2_S1=6","AWG2_S2=7","AWG2_S3=8","AWG2_S4=9","AWG2_JC=10","AWG2_JMIN=11","AWG2_JMAX=12","AWG2_H1=13","AWG2_H2=14","AWG2_H3=15","AWG2_H4=16"]},"Mounts":[]}]'),
             Result("wg0\n"),
             Result("wg0\tprivate\tpub\t51830\npeer2\tpsk\tep\t10.8.1.10/32\t0\t0\t0\t25\n"),
-            Result("[Interface]\nAddress = 10.8.1.0/24\nListenPort = 49561\nJc = 10\n"),
+            Result("7: wg0: <POINTOPOINT,UP> mtu 1376 qdisc noqueue state UNKNOWN mode DEFAULT group default qlen 1000\n"),
+            Result("51830\n"),
+            Result("[Interface]\nAddress = 10.8.1.0/24\nListenPort = 49561\nMTU = 1376\nJc = 10\n"),
         ]
 
         with patch(
@@ -94,6 +96,12 @@ class RuntimeDetectionTest(TestCase):
         self.assertTrue(awg2.runtime_metadata["endpoint_host_ready"])
         self.assertTrue(awg2.runtime_metadata["subnet_ready"])
         self.assertEqual(awg2.runtime_metadata["peer_source"], "runtime wg dump")
+        self.assertEqual(awg2.runtime_metadata["command_bin"], "wg")
+        self.assertTrue(awg2.runtime_metadata["runtime_interface_ready"])
+        self.assertTrue(awg2.runtime_metadata["runtime_listener_ready"])
+        self.assertEqual(awg2.runtime_metadata["config_mtu"], 1376)
+        self.assertEqual(awg2.runtime_metadata["runtime_mtu"], 1376)
+        self.assertFalse(awg2.runtime_metadata["mtu_mismatch"])
 
     @patch("servers.services.RuntimeCommandService.run")
     def test_sync_runtime_state_awg2_uses_show_dump_when_show_all_fails(self, run_mock):
