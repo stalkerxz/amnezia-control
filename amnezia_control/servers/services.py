@@ -7,7 +7,7 @@ from django.utils import timezone
 
 from audit.services import AuditService
 from jobs.services import JobService
-from vpn.services import RuntimeCommandService
+from vpn.services import ConfigCryptoService, RuntimeCommandService
 
 from .models import Server, ServerProtocol
 
@@ -478,12 +478,8 @@ class ServerService:
 
         for line in conf_text.splitlines():
             text = line.strip()
-            if not text or "=" not in text:
+            if not text or text.startswith("#") or "=" not in text:
                 continue
-            if text.startswith("#"):
-                text = text[1:].strip()
-                if not re.match(r"^I[1-5]\s*=", text, flags=re.IGNORECASE):
-                    continue
             k, v = text.split("=", 1)
             norm = cls._normalize_awg2_key(k)
             if norm in allowed and v.strip():
@@ -683,7 +679,13 @@ class ServerService:
 
                     for path in cls._candidate_config_paths(iface or "wg0"):
                         try:
-                            raw_iface_conf = RuntimeCommandService.run(server, actor, f"runtime.conf.{protocol_type}", f"docker exec {container_name} cat {path}").stdout
+                            raw_iface_conf = RuntimeCommandService.run(
+                                server,
+                                actor,
+                                f"runtime.conf.{protocol_type}",
+                                f"docker exec {container_name} cat {path}",
+                                sensitive_output=True,
+                            ).stdout
                             if raw_iface_conf:
                                 config_path = path
                                 break
@@ -708,6 +710,7 @@ class ServerService:
                     "unknown_interface_keys": [],
                     "export_compatible": True,
                 }
+                awg2_secret_metadata = {}
                 if protocol_type == ServerProtocol.ProtocolType.AWG2:
                     (
                         awg2_meta,
@@ -721,6 +724,16 @@ class ServerService:
                         raw_iface_conf,
                         awg2_meta,
                     )
+                    header_protection_key = awg2_meta.pop(
+                        "HeaderProtectionKey",
+                        "",
+                    )
+                    if header_protection_key:
+                        awg2_secret_metadata[
+                            "HeaderProtectionKey"
+                        ] = ConfigCryptoService.encrypt(
+                            header_protection_key
+                        )
 
                 udp_port = cls._parse_udp_port(inspect_data) or listen_port
                 discovered_public_host = cls._parse_public_host(inspect_data)
@@ -747,7 +760,11 @@ class ServerService:
                     "endpoint_host_ready": endpoint_host_ready,
                     "endpoint_port_ready": endpoint_port_ready,
                     "awg2_metadata": awg2_meta,
-                    "awg2_active_keys": sorted(awg2_meta.keys()),
+                    "awg2_secret_metadata": awg2_secret_metadata,
+                    "awg2_active_keys": sorted(
+                        set(awg2_meta.keys())
+                        | set(awg2_secret_metadata.keys())
+                    ),
                     "awg2_missing_keys": awg2_required_missing,
                     "awg2_optional_missing_keys": awg2_optional_missing,
                     "awg2_metadata_ready": not awg2_required_missing if protocol_type == ServerProtocol.ProtocolType.AWG2 else True,
