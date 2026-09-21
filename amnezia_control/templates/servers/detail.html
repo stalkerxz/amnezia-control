@@ -103,7 +103,20 @@
         </td>
         <td>
           {% if row.protocol.protocol_type == 'awg2' %}
-            {% if row.protocol.runtime_metadata.awg2_missing_keys %}
+            <div class="mb-1">
+              <span class="badge status-badge status-info">
+                AWG {{ row.protocol.runtime_metadata.awg_generation|default:'2.x' }}
+              </span>
+              {% if row.protocol.runtime_metadata.config_mtu %}
+                <span class="badge status-badge status-neutral">MTU {{ row.protocol.runtime_metadata.config_mtu }}</span>
+              {% endif %}
+            </div>
+            {% if row.protocol.runtime_metadata.awg_export_compatible == False %}
+              <span class="badge status-badge status-danger mb-1">Экспорт заблокирован</span>
+              {% if row.protocol.runtime_metadata.awg_unknown_interface_keys %}
+                <div class="small text-danger"><code>{{ row.protocol.runtime_metadata.awg_unknown_interface_keys|join:', ' }}</code></div>
+              {% endif %}
+            {% elif row.protocol.runtime_metadata.awg2_missing_keys %}
               <span class="badge status-badge status-danger mb-1">Не хватает обязательных</span>
               <div><code>{{ row.protocol.runtime_metadata.awg2_missing_keys|join:', ' }}</code></div>
             {% elif row.protocol.runtime_metadata.awg2_optional_missing_keys %}
@@ -117,7 +130,7 @@
           {% endif %}
         </td>
         <td class="text-end">
-          {% if row.protocol.runtime_metadata.subnet_ready and row.protocol.runtime_metadata.endpoint_host_ready and row.protocol.runtime_metadata.endpoint_port_ready %}
+          {% if row.protocol.runtime_metadata.interface_ready and row.protocol.runtime_metadata.subnet_ready and row.protocol.runtime_metadata.endpoint_host_ready and row.protocol.runtime_metadata.endpoint_port_ready %}
           <span class="badge status-badge status-success">Готово</span>
           {% else %}
           <span class="badge status-badge status-warning">Требует внимания</span>
