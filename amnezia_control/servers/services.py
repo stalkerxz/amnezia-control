@@ -313,6 +313,13 @@ class ServerService:
             if not endpoint_port_ready:
                 blocking_issues.append(f"{protocol_type.upper()}: не готов endpoint port")
 
+            if metadata.get("mtu_mismatch"):
+                degraded_issues.append(
+                    f"{protocol_type.upper()}: MTU конфигурации "
+                    f"({metadata.get('config_mtu')}) не совпадает с "
+                    f"runtime MTU ({metadata.get('runtime_mtu')})"
+                )
+
             if protocol_type == ServerProtocol.ProtocolType.AWG2:
                 awg2_metadata_ready = metadata.get("awg2_metadata_ready", True)
                 if not awg2_metadata_ready:
@@ -643,6 +650,7 @@ class ServerService:
 
                 iface = ""
                 command_bin = "wg"
+                runtime_mtu = None
                 peer_count = 0
                 peer_source = "none"
                 raw_iface_conf = ""
@@ -687,6 +695,25 @@ class ServerService:
                             raise RuntimeError(
                                 f"{protocol_type.upper()} runtime interface not detected"
                             )
+
+                        try:
+                            runtime_mtu_raw = RuntimeCommandService.run(
+                                server,
+                                actor,
+                                f"runtime.mtu.{protocol_type}",
+                                (
+                                    f"docker exec {container_name} cat "
+                                    f"/sys/class/net/{iface}/mtu"
+                                ),
+                            ).stdout.strip()
+                            runtime_mtu = (
+                                int(runtime_mtu_raw)
+                                if runtime_mtu_raw.isdigit()
+                                else None
+                            )
+                        except Exception:
+                            runtime_mtu = None
+
                         if protocol_type == ServerProtocol.ProtocolType.AWG2:
                             dump_result = RuntimeCommandService.run_with_expected_failure(
                                 server,
@@ -745,6 +772,11 @@ class ServerService:
                 subnet, listen_port, config_mtu = cls._parse_interface_metadata(
                     raw_iface_conf
                 )
+                mtu_mismatch = bool(
+                    config_mtu
+                    and runtime_mtu
+                    and config_mtu != runtime_mtu
+                )
                 awg2_meta, awg2_required_missing, awg2_optional_missing = (
                     {},
                     [],
@@ -801,6 +833,8 @@ class ServerService:
                     "interface_ready": bool(iface),
                     "command_bin": command_bin,
                     "config_mtu": config_mtu,
+                    "runtime_mtu": runtime_mtu,
+                    "mtu_mismatch": mtu_mismatch,
                     "peer_count": peer_count,
                     "peer_source": peer_source,
                     "subnet": subnet,
