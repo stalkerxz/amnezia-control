@@ -847,11 +847,12 @@ class VPNClientService:
         ]
         if preshared_key:
             peer_lines.append(f"PresharedKey = {preshared_key}")
+        use_awg3_keepalive = any(awg2_metadata.get(key) for key in awg3)
         peer_lines.extend(
             [
                 f"Endpoint = {endpoint}",
                 f"AllowedIPs = {allowed_ips}",
-                "PersistentKeepalive = 25",
+                f"PersistentKeepalive = {'25-35' if use_awg3_keepalive else '25'}",
             ]
         )
         return "\n".join(interface_lines + [""] + peer_lines) + "\n"
