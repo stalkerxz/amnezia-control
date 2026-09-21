@@ -7,7 +7,7 @@ from django.utils import timezone
 
 from audit.services import AuditService
 from jobs.services import JobService
-from vpn.services import RuntimeCommandService
+from vpn.services import ConfigCryptoService, RuntimeCommandService
 
 from .models import Server, ServerProtocol
 
@@ -30,6 +30,7 @@ class ServerService:
         "RandomTrailers",
         "DisableCookies",
     ]
+    AWG_SENSITIVE_KEYS = {"HeaderProtectionKey"}
     AWG_STANDARD_INTERFACE_KEYS = {
         "PrivateKey", "Address", "ListenPort", "DNS", "MTU", "Table",
         "PreUp", "PostUp", "PreDown", "PostDown", "SaveConfig", "FwMark",
@@ -468,6 +469,16 @@ class ServerService:
         return discovered, required_missing, optional_missing
 
     @classmethod
+    def _protect_awg_metadata(cls, metadata: dict) -> tuple[dict, dict]:
+        public_metadata = dict(metadata)
+        encrypted_metadata = {}
+        for key in cls.AWG_SENSITIVE_KEYS:
+            value = public_metadata.pop(key, "")
+            if value:
+                encrypted_metadata[key] = ConfigCryptoService.encrypt(str(value))
+        return public_metadata, encrypted_metadata
+
+    @classmethod
     def _awg_generation(cls, metadata: dict) -> str:
         if any(str(metadata.get(key, "")).strip() for key in cls.AWG3_KEYS):
             return "3.1"
@@ -684,6 +695,8 @@ class ServerService:
 
                 subnet, listen_port, config_mtu = cls._parse_interface_metadata(raw_iface_conf)
                 awg2_meta, awg2_required_missing, awg2_optional_missing = ({}, [], [])
+                awg2_meta_for_storage = {}
+                awg_sensitive_metadata_encrypted = {}
                 awg_generation = ""
                 awg_capabilities = []
                 awg_unsupported_keys = []
@@ -692,6 +705,7 @@ class ServerService:
                     awg_generation = cls._awg_generation(awg2_meta)
                     awg_capabilities = cls._awg_capabilities(awg2_meta)
                     awg_unsupported_keys = cls._unsupported_awg_interface_keys(raw_iface_conf)
+                    awg2_meta_for_storage, awg_sensitive_metadata_encrypted = cls._protect_awg_metadata(awg2_meta)
 
                 udp_port = cls._parse_udp_port(inspect_data) or listen_port or runtime_listener_port
                 discovered_public_host = cls._parse_public_host(inspect_data)
@@ -710,7 +724,7 @@ class ServerService:
                     "public_host": discovered_public_host,
                     "image": inspect_data[0].get("Config", {}).get("Image", ""),
                     "mounts": [m.get("Destination", "") for m in inspect_data[0].get("Mounts", [])],
-                    "env": config_env,
+                    "env_keys": sorted(item.split("=", 1)[0] for item in config_env if "=" in item),
                     "interface": iface,
                     "command_bin": command_bin,
                     "quick_bin": "awg-quick" if protocol_type == ServerProtocol.ProtocolType.AWG2 else "",
@@ -730,7 +744,8 @@ class ServerService:
                     "awg_capabilities": awg_capabilities,
                     "awg_unsupported_keys": awg_unsupported_keys,
                     "awg_config_supported": not awg_unsupported_keys,
-                    "awg2_metadata": awg2_meta,
+                    "awg2_metadata": awg2_meta_for_storage,
+                    "awg_sensitive_metadata_encrypted": awg_sensitive_metadata_encrypted,
                     "awg2_active_keys": sorted(awg2_meta.keys()),
                     "awg2_missing_keys": awg2_required_missing,
                     "awg2_optional_missing_keys": awg2_optional_missing,
