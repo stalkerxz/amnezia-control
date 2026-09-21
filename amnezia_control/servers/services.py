@@ -470,7 +470,7 @@ class ServerService:
     @classmethod
     def _awg_generation(cls, metadata: dict) -> str:
         if any(str(metadata.get(key, "")).strip() for key in cls.AWG3_KEYS):
-            return "3"
+            return "3.1"
         if any(str(metadata.get(key, "")).strip() for key in cls.AWG2_REQUIRED_KEYS):
             return "2"
         if any(str(metadata.get(key, "")).strip() for key in cls.AWG2_OPTIONAL_KEYS):
