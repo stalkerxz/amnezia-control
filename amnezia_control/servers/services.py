@@ -191,6 +191,7 @@ class ServerService:
                 "container_name": protocol.container_name or "",
                 "interface": (protocol.runtime_metadata or {}).get("interface", ""),
                 "config_path": (protocol.runtime_metadata or {}).get("config_path", ""),
+                "command_bin": (protocol.runtime_metadata or {}).get("command_bin", "wg"),
                 "peer_counts": None,
                 "available": False,
                 "error": "",
@@ -200,9 +201,13 @@ class ServerService:
                 metrics["protocols"].append(protocol_row)
                 continue
             try:
-                peer_cmd = "docker exec {container} sh -lc 'grep -c \"^\\[Peer\\]\" {config}; wg show {iface} peers | wc -l'".format(
+                command_bin = str(protocol_row["command_bin"] or "wg").strip()
+                if command_bin not in {"wg", "awg"}:
+                    raise RuntimeError(f"Unsupported runtime command binary: {command_bin}")
+                peer_cmd = "docker exec {container} sh -lc 'grep -c \"^\\[Peer\\]\" {config}; {command_bin} show {iface} peers | wc -l'".format(
                     container=shlex.quote(protocol_row["container_name"]),
                     config=shlex.quote(protocol_row["config_path"]),
+                    command_bin=command_bin,
                     iface=shlex.quote(protocol_row["interface"]),
                 )
                 peer_out = RuntimeCommandService.run(
