@@ -42,11 +42,16 @@ docker compose exec web python manage.py createsuperuser
 Подсеть берется из реально найденного `Address=` в live конфиге интерфейса.
 Если подсеть не найдена — создание/переиздание клиента завершается явной ошибкой.
 
-### AWG vs AWG2 export
+### AWG vs AWG2/AWG 3.x export
 - AWG legacy: отдельный билдер конфига.
-- AWG2: отдельный билдер, который **требует полный набор** параметров: `I1-I5`, `S1-S4`, `Jc`, `Jmin`, `Jmax`, `H1-H4`.
-- Канонические имена ключей в коде/metadata/export: именно `Jc`, `Jmin`, `Jmax` (без `JC/JMIN/JMAX` в сохраненных данных и экспорте).
-- Если любой обязательный AWG2 параметр отсутствует — экспорт AWG2 блокируется явной ошибкой с перечнем недостающих ключей (без фейкового WireGuard fallback).
+- Семейство `awg2` в панели означает современный AmneziaWG runtime и не используется как признак конкретной версии протокола.
+- Runtime sync определяет поколение по фактически найденным параметрам: `2.x`, `3.x` или `3.1`.
+- Для AWG 2.x требуются `S1-S4`, `Jc`, `Jmin`, `Jmax`, `H1-H4`; `I1-I5` остаются дополнительными.
+- Для AWG 3.x/3.1 дополнительно сохраняются и экспортируются `HeaderProtectionKey`, `ContentPaddingAddition`, `RekeyAfterTime`, `RekeyTimeout`, `RejectAfterTime`, `KeepaliveTimeout`, `MaxHandshakeAttempts`, `RandomTrailers`, `DisableCookies`.
+- AWG-параметры экспортируются в секции `[Interface]`, как в upstream-шаблоне Amnezia; для AWG 3.x используется диапазон `PersistentKeepalive = 25-35`.
+- Если runtime содержит неизвестный параметр секции `[Interface]`, reissue блокируется **до изменения peer**. Это fail-closed защита от потери параметров после будущего обновления AWG.
+- `config_mtu` и наличие live-интерфейса сохраняются в runtime metadata; отсутствие интерфейса делает health-check unhealthy.
+- Канонические имена ключей в коде/metadata/export: `Jc`, `Jmin`, `Jmax` (без `JC/JMIN/JMAX`).
 
 ## Безопасность
 - строгая проверка SSH host key (`RejectPolicy` по умолчанию);
