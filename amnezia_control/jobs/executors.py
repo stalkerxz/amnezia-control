@@ -23,7 +23,7 @@ class SafeSSHExecutor:
         r"^docker ps --format '\{\{\.Names\}\}'$",
         r"^docker ps -a --format '\{\{\.Names\}\}'$",
         r"^docker ps --format '\{\{\.Names\}\}\t\{\{\.Status\}\}'$",
-        r"^docker exec [a-zA-Z0-9_.-]+ sh -lc 'grep -c \"\^\\\[Peer\\\]\" (?:/etc/amnezia/[a-zA-Z0-9_./-]+|/opt/amnezia/[a-zA-Z0-9_./-]+|/etc/wireguard/[a-zA-Z0-9_./-]+); wg show [a-zA-Z0-9_.-]+ peers \| wc -l'$",
+        r"^docker exec [a-zA-Z0-9_.-]+ sh -lc 'grep -c \"\^\\\[Peer\\\]\" (?:/etc/amnezia/[a-zA-Z0-9_./-]+|/opt/amnezia/[a-zA-Z0-9_./-]+|/etc/wireguard/[a-zA-Z0-9_./-]+); (?:wg|awg) show [a-zA-Z0-9_.-]+ peers \| wc -l'$",
         r"^docker inspect [a-zA-Z0-9_.-]+$",
         r"^docker exec [a-zA-Z0-9_.-]+ (?:wg|awg) show(?: [a-zA-Z0-9_.-]+)?(?: dump| interfaces| public-key| listen-port)?$",
         r"^docker exec [a-zA-Z0-9_.-]+ ip -o link show [a-zA-Z0-9_.-]+$",
