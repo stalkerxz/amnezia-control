@@ -58,6 +58,8 @@ docker compose exec web python manage.py createsuperuser
 - runtime bootstrap `known_hosts` перед SSH-подключением для `Server.host:Server.port` (без ручного копирования `/root/.ssh/known_hosts` после rebuild контейнеров);
 - путь runtime `known_hosts` можно переопределить через `SSH_KNOWN_HOSTS_PATH` (по умолчанию `/tmp/amnezia-control/known_hosts`);
 - allowlist команд docker/awg/wg/cat/ls;
+- raw Docker env values не сохраняются в `runtime_metadata`: для диагностики хранятся только имена переменных;
+- чувствительный `HeaderProtectionKey` хранится в `runtime_metadata` только в зашифрованном виде через существующий `CONFIG_ENCRYPTION_KEY`;
 - конфиги клиента хранятся encrypted-at-rest;
 - QR генерируется в памяти на лету.
 
