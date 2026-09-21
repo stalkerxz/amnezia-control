@@ -644,6 +644,15 @@ class VPNClientPolicyService:
                 protocol_type=client.protocol_type,
             ).first()
             metadata = protocol.runtime_metadata if protocol else {}
+            if (
+                not protocol
+                or "awg_export_compatible" not in metadata
+            ):
+                return (
+                    "Переиздание запрещено: совместимость runtime AWG "
+                    "ещё не проверена. Выполните синхронизацию runtime."
+                )
+
             if metadata.get("awg_export_compatible") is False:
                 unknown = ", ".join(
                     metadata.get(
@@ -656,6 +665,31 @@ class VPNClientPolicyService:
                     "Переиздание запрещено: runtime AWG использует "
                     "неподдерживаемую схему конфигурации."
                     + suffix
+                )
+
+            try:
+                runtime_awg_metadata = (
+                    VPNClientService._runtime_awg_metadata(
+                        protocol
+                    )
+                )
+            except RuntimeError:
+                return (
+                    "Переиздание запрещено: защищённые параметры AWG "
+                    "не могут быть прочитаны. Выполните синхронизацию runtime."
+                )
+
+            missing_required = [
+                key
+                for key in VPNClientService.AWG2_REQUIRED_KEYS
+                if not runtime_awg_metadata.get(key)
+            ]
+            if missing_required:
+                return (
+                    "Переиздание запрещено: runtime AWG не содержит "
+                    "обязательные параметры: "
+                    + ", ".join(missing_required)
+                    + ". Выполните синхронизацию runtime."
                 )
 
             capabilities = set(
