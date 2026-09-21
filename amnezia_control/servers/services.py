@@ -377,13 +377,13 @@ class ServerService:
     @staticmethod
     def _sanitize_runtime_env(env_list):
         sensitive_markers = (
-            "PRIVATE_KEY",
+            "PRIVATEKEY",
             "PRESHARED",
             "PSK",
             "PASSWORD",
             "TOKEN",
             "SECRET",
-            "HEADER_PROTECTION_KEY",
+            "HEADERPROTECTIONKEY",
         )
         sanitized = []
         for item in env_list:
@@ -391,8 +391,13 @@ class ServerService:
                 sanitized.append(item)
                 continue
             key, value = item.split("=", 1)
+            normalized_key = re.sub(
+                r"[^A-Z0-9]",
+                "",
+                key.upper(),
+            )
             if any(
-                marker in key.upper()
+                marker in normalized_key
                 for marker in sensitive_markers
             ):
                 value = "[REDACTED]"
