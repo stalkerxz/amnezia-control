@@ -219,7 +219,7 @@ class ServerHealthEvaluationTest(TestCase):
             protocol_type=ServerProtocol.ProtocolType.AWG,
             container_name="amnezia-awg",
             container_status="running",
-            runtime_metadata={"subnet_ready": True, "endpoint_host_ready": True, "endpoint_port_ready": True},
+            runtime_metadata={"interface": "awg0", "subnet_ready": True, "endpoint_host_ready": True, "endpoint_port_ready": True},
         )
         ServerProtocol.objects.create(
             server=self.server,
@@ -227,6 +227,8 @@ class ServerHealthEvaluationTest(TestCase):
             container_name="amnezia-awg2",
             container_status="running",
             runtime_metadata={
+                "interface": "awg0",
+                "interface": "awg0",
                 "subnet_ready": True,
                 "endpoint_host_ready": True,
                 "endpoint_port_ready": True,
@@ -263,6 +265,36 @@ class ServerHealthEvaluationTest(TestCase):
         result = ServerService.evaluate_health(self.server)
         self.assertEqual(result["status"], ServerService.HEALTH_DEGRADED)
         self.assertTrue(any("fallback" in reason for reason in result["reasons"]))
+
+    def test_running_container_without_interface_is_unhealthy(self):
+        self.server.last_runtime_sync_at = self.server.created_at
+        self.server.save(update_fields=["last_runtime_sync_at"])
+        ServerProtocol.objects.create(
+            server=self.server,
+            protocol_type=ServerProtocol.ProtocolType.AWG2,
+            container_name="amnezia-awg2",
+            container_status="running",
+            runtime_metadata={
+                "subnet_ready": True,
+                "endpoint_host_ready": True,
+                "endpoint_port_ready": True,
+                "awg2_metadata_ready": True,
+                "peer_source": "none",
+            },
+        )
+
+        result = ServerService.evaluate_health(self.server)
+
+        self.assertEqual(
+            result["status"],
+            ServerService.HEALTH_UNHEALTHY,
+        )
+        self.assertTrue(
+            any(
+                "runtime-интерфейс не обнаружен" in reason
+                for reason in result["reasons"]
+            )
+        )
 
     def test_unhealthy_state(self):
         self.server.last_runtime_sync_at = self.server.created_at
