@@ -1,0 +1,69 @@
+name: AWG compatibility
+
+on:
+  pull_request:
+    paths:
+      - "amnezia_control/servers/services.py"
+      - "amnezia_control/vpn/services.py"
+      - "amnezia_control/vpn/test_awg_runtime_capabilities.py"
+      - "amnezia_control/vpn/test_runtime_persistence.py"
+      - "amnezia_control/jobs/executors.py"
+      - "amnezia_control/jobs/tests.py"
+      - "amnezia_control/servers/tests.py"
+      - ".github/workflows/awg-compat.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare isolated test environment
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          cp .env.example .env
+          FERNET_KEY="$(
+            python3 -c 'import base64,os; print(base64.urlsafe_b64encode(os.urandom(32)).decode())'
+          )"
+          sed -i \
+            -e 's/^DJANGO_SECRET_KEY=.*/DJANGO_SECRET_KEY=github-actions-awg-validation/' \
+            -e "s|^CONFIG_ENCRYPTION_KEY=.*|CONFIG_ENCRYPTION_KEY=$FERNET_KEY|" \
+            -e 's/^NOTIFICATIONS_ENABLED=.*/NOTIFICATIONS_ENABLED=0/' \
+            -e 's/^ENABLE_RUNTIME_PEER_IMPORT=.*/ENABLE_RUNTIME_PEER_IMPORT=0/' \
+            .env
+
+      - name: Build test image
+        run: docker compose -p awg_compat_ci build web
+
+      - name: Run targeted tests
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          docker compose -p awg_compat_ci run --rm --entrypoint "" web \
+            python manage.py test \
+            vpn.test_awg_runtime_capabilities \
+            vpn.test_runtime_persistence \
+            servers.tests \
+            jobs.tests
+
+      - name: Django system check
+        run: |
+          docker compose -p awg_compat_ci run --rm --entrypoint "" web \
+            python manage.py check
+
+      - name: Migration drift check
+        run: |
+          docker compose -p awg_compat_ci run --rm --entrypoint "" web \
+            python manage.py makemigrations --check --dry-run
+
+      - name: Cleanup
+        if: always()
+        run: docker compose -p awg_compat_ci down -v --remove-orphans
