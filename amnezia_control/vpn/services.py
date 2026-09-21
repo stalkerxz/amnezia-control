@@ -661,6 +661,18 @@ class VPNClientService:
         "HeaderProtectionKey", "ContentPaddingAddition", "RekeyAfterTime", "RekeyTimeout",
         "RejectAfterTime", "KeepaliveTimeout", "MaxHandshakeAttempts", "RandomTrailers", "DisableCookies",
     )
+    AWG3_TOGGLE_KEYS = {"RandomTrailers", "DisableCookies"}
+
+    @classmethod
+    def has_awg3_params(cls, metadata: dict) -> bool:
+        regular_keys = [key for key in cls.AWG3_INTERFACE_KEYS if key not in cls.AWG3_TOGGLE_KEYS]
+        if any(str(metadata.get(key, "")).strip() for key in regular_keys):
+            return True
+        return any(
+            str(metadata.get(key, "")).strip()
+            and str(metadata.get(key, "")).strip().lower() != "off"
+            for key in cls.AWG3_TOGGLE_KEYS
+        )
 
     @staticmethod
     def get_limit_state(client: VPNClient, now=None):
@@ -840,10 +852,7 @@ class VPNClientService:
     ) -> str:
         required = ("Jc", "Jmin", "Jmax", "S1", "S2", "S3", "S4", "H1", "H2", "H3", "H4")
         optional = ("I1", "I2", "I3", "I4", "I5")
-        awg3 = (
-            "HeaderProtectionKey", "ContentPaddingAddition", "RekeyAfterTime", "RekeyTimeout",
-            "RejectAfterTime", "KeepaliveTimeout", "MaxHandshakeAttempts", "RandomTrailers", "DisableCookies",
-        )
+        awg3 = VPNClientService.AWG3_INTERFACE_KEYS
         missing = [k for k in required if not awg2_metadata.get(k)]
         if missing:
             raise RuntimeError(f"AWG metadata is incomplete: missing {', '.join(missing)}. Run runtime sync and verify live AWG config.")
@@ -864,7 +873,7 @@ class VPNClientService:
         ]
         if preshared_key:
             peer_lines.append(f"PresharedKey = {preshared_key}")
-        use_awg3_keepalive = any(awg2_metadata.get(key) for key in awg3)
+        use_awg3_keepalive = VPNClientService.has_awg3_params(awg2_metadata)
         peer_lines.extend(
             [
                 f"Endpoint = {endpoint}",
@@ -927,10 +936,13 @@ class VPNClientService:
         lines.extend(["", "[Peer]", f"PublicKey = {peer['PublicKey']}"])
         if peer.get("PresharedKey"):
             lines.append(f"PresharedKey = {peer['PresharedKey']}")
+        persistent_keepalive = peer.get("PersistentKeepalive", "25")
+        if cls.has_awg3_params(metadata):
+            persistent_keepalive = "25-35"
         lines.extend([
             f"Endpoint = {peer['Endpoint']}",
             f"AllowedIPs = {peer.get('AllowedIPs', '0.0.0.0/0, ::/0')}",
-            f"PersistentKeepalive = {peer.get('PersistentKeepalive', '25')}",
+            f"PersistentKeepalive = {persistent_keepalive}",
             "",
         ])
         return "\n".join(lines)
