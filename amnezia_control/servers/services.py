@@ -568,6 +568,60 @@ class ServerService:
         return peers
 
     @classmethod
+    def _discover_awg_runtime_dump(
+        cls,
+        *,
+        server: Server,
+        actor,
+        container_name: str,
+        preferred_command_bin: str,
+        preferred_iface: str,
+    ):
+        candidates = [preferred_command_bin] + [
+            item for item in ("wg", "awg") if item != preferred_command_bin
+        ]
+        for candidate in candidates:
+            iface = preferred_iface if candidate == preferred_command_bin else ""
+            if not iface:
+                try:
+                    iface_out = RuntimeCommandService.run(
+                        server,
+                        actor,
+                        "runtime.iface.awg2",
+                        f"docker exec {container_name} {candidate} show interfaces",
+                    ).stdout.strip()
+                    iface = iface_out.split()[0] if iface_out else ""
+                except Exception:
+                    continue
+            if not iface:
+                continue
+            try:
+                dump_result = RuntimeCommandService.run_with_expected_failure(
+                    server,
+                    actor,
+                    "runtime.peers.awg2.all",
+                    f"docker exec {container_name} {candidate} show all dump",
+                    expected_error_patterns=RuntimeCommandService.AWG2_EXPECTED_RUNTIME_DUMP_ERRORS,
+                    fallback_message="AWG2 runtime telemetry unavailable: trying compatible runtime command.",
+                    warn_on_expected_failure=False,
+                )
+                if dump_result is None:
+                    dump_result = RuntimeCommandService.run_with_expected_failure(
+                        server,
+                        actor,
+                        "runtime.peers.awg2",
+                        f"docker exec {container_name} {candidate} show dump",
+                        expected_error_patterns=RuntimeCommandService.AWG2_EXPECTED_RUNTIME_DUMP_ERRORS,
+                        fallback_message="AWG2 runtime telemetry unavailable: trying compatible runtime command.",
+                        warn_on_expected_failure=False,
+                    )
+            except Exception:
+                continue
+            if dump_result is not None:
+                return candidate, iface, dump_result
+        return preferred_command_bin, preferred_iface, None
+
+    @classmethod
     def sync_runtime_state(cls, *, server: Server, actor):
         all_names = RuntimeCommandService.run(server, actor, "runtime.ps_all", "docker ps -a --format '{{.Names}}'").stdout.splitlines()
         running_names = RuntimeCommandService.run(server, actor, "runtime.ps_running", "docker ps --format '{{.Names}}'").stdout.splitlines()
@@ -614,31 +668,21 @@ class ServerService:
                     if iface:
                         try:
                             if protocol_type == ServerProtocol.ProtocolType.AWG2:
-                                dump_result = RuntimeCommandService.run_with_expected_failure(
-                                    server,
-                                    actor,
-                                    f"runtime.peers.{protocol_type}.all",
-                                    f"docker exec {container_name} {command_bin} show all dump",
-                                    expected_error_patterns=RuntimeCommandService.AWG2_EXPECTED_RUNTIME_DUMP_ERRORS,
-                                    fallback_message="AWG2 runtime telemetry unavailable: using config fallback (degraded mode).",
-                                    warn_on_expected_failure=False,
+                                command_bin, iface, dump_result = cls._discover_awg_runtime_dump(
+                                    server=server,
+                                    actor=actor,
+                                    container_name=container_name,
+                                    preferred_command_bin=command_bin,
+                                    preferred_iface=iface,
                                 )
                                 if dump_result is None:
-                                    dump_result = RuntimeCommandService.run_with_expected_failure(
-                                        server,
-                                        actor,
-                                        f"runtime.peers.{protocol_type}",
-                                        f"docker exec {container_name} {command_bin} show dump",
-                                        expected_error_patterns=RuntimeCommandService.AWG2_EXPECTED_RUNTIME_DUMP_ERRORS,
-                                        fallback_message="AWG2 runtime telemetry unavailable: using config fallback (degraded mode).",
-                                    )
-                                    if dump_result is None:
-                                        peer_source = "runtime telemetry unavailable; config fallback"
-                                    else:
-                                        peer_count = sum(1 for line in dump_result.stdout.splitlines() if len(line.split("\t")) >= 8)
-                                        peer_source = "runtime wg dump"
+                                    peer_source = "runtime telemetry unavailable; config fallback"
                                 else:
-                                    peer_count = sum(1 for line in dump_result.stdout.splitlines() if len(line.split("\t")) >= 8)
+                                    peer_count = sum(
+                                        1
+                                        for line in dump_result.stdout.splitlines()
+                                        if len(line.split("\t")) >= 8
+                                    )
                                     peer_source = "runtime wg dump"
                             else:
                                 dump = RuntimeCommandService.run(
