@@ -444,7 +444,7 @@ class ServerService:
         }
         if compact in mapping:
             return mapping[compact]
-        if re.fullmatch(r"[ISH][1-5]", compact):
+        if re.fullmatch(r"I[1-5]|[SH][1-4]", compact):
             return compact
         return ""
 
