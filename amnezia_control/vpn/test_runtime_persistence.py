@@ -44,6 +44,19 @@ class AWG2RuntimePersistenceTest(TestCase):
             "awg-quick save /opt/amnezia/awg/awg0.conf"
         )
 
+    def test_allowlist_accepts_locked_awg2_save(self):
+        executor = SafeSSHExecutor(
+            host="127.0.0.1",
+            username="root",
+        )
+
+        executor._validate(
+            "flock -x -w 10 "
+            "/run/lock/amnezia-control-awg2-save.lock "
+            "docker exec amnezia-awg2 "
+            "awg-quick save /opt/amnezia/awg/awg0.conf"
+        )
+
     def test_allowlist_rejects_unsafe_save_path(self):
         executor = SafeSSHExecutor(
             host="127.0.0.1",
@@ -92,6 +105,8 @@ class AWG2RuntimePersistenceTest(TestCase):
         )
         self.assertEqual(
             calls[0]["command"],
+            "flock -x -w 10 "
+            "/run/lock/amnezia-control-awg2-save.lock "
             "docker exec amnezia-awg2 "
             "awg-quick save /opt/amnezia/awg/awg0.conf",
         )
