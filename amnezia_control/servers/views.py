@@ -34,6 +34,30 @@ def _peer_source_view(peer_source: str):
     return "Служебный источник", source
 
 
+def _protocol_operator_ready(protocol) -> bool:
+    metadata = protocol.runtime_metadata or {}
+    interface_ready = bool(
+        metadata.get(
+            "interface_ready",
+            metadata.get("interface"),
+        )
+    )
+    ready = (
+        (protocol.container_status or "").lower() == "running"
+        and interface_ready
+        and bool(metadata.get("subnet_ready"))
+        and bool(metadata.get("endpoint_host_ready"))
+        and bool(metadata.get("endpoint_port_ready"))
+        and not bool(metadata.get("mtu_mismatch"))
+    )
+    if (
+        protocol.protocol_type == VPNClient.ProtocolType.AWG2
+        and metadata.get("awg_export_compatible") is not True
+    ):
+        return False
+    return ready
+
+
 @login_required
 @user_passes_test(_admin_required)
 def server_list_view(request):
@@ -90,9 +114,7 @@ def server_detail_view(request, pk: int):
     ready_protocols = sum(
         1
         for protocol in protocols
-        if protocol.runtime_metadata.get("endpoint_host_ready")
-        and protocol.runtime_metadata.get("endpoint_port_ready")
-        and protocol.runtime_metadata.get("subnet_ready")
+        if _protocol_operator_ready(protocol)
     )
     endpoint_display = "—"
     if server.public_endpoint_host and server.public_endpoint_port:
@@ -108,6 +130,7 @@ def server_detail_view(request, pk: int):
                 "protocol": protocol,
                 "peer_source_label": peer_source_label,
                 "peer_source_hint": peer_source_hint,
+                "ready": _protocol_operator_ready(protocol),
             }
         )
 
