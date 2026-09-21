@@ -25,7 +25,7 @@ def _legacy_metadata():
 
 
 class AWGRuntimeCapabilitiesTest(SimpleTestCase):
-    def test_parser_reads_awg31_and_commented_special_junk(self):
+    def test_parser_reads_awg31_and_ignores_commented_special_junk(self):
         conf = """[Interface]
 PrivateKey = server-private
 Address = 10.77.0.1/24
@@ -62,14 +62,38 @@ DisableCookies = on
         self.assertEqual(parsed["ContentPaddingAddition"], "10-100")
         self.assertEqual(parsed["RandomTrailers"], "on")
         self.assertEqual(parsed["DisableCookies"], "on")
-        self.assertEqual(parsed["I1"], "<r 2><b 0x01>")
-        self.assertNotIn("I1", optional_missing)
+        self.assertNotIn("I1", parsed)
+        self.assertIn("I1", optional_missing)
 
         runtime = ServerService._classify_awg_runtime(conf, parsed)
         self.assertEqual(runtime["generation"], "3.1")
         self.assertTrue(runtime["export_compatible"])
         self.assertIn("header_protection", runtime["capabilities"])
         self.assertIn("random_trailers", runtime["capabilities"])
+
+    def test_parser_reads_active_i1(self):
+        metadata = _legacy_metadata()
+        conf = """[Interface]
+Jc = 6
+Jmin = 10
+Jmax = 50
+S1 = 134
+S2 = 86
+S3 = 33
+S4 = 12
+H1 = 1
+H2 = 2
+H3 = 3
+H4 = 4
+I1 = <r 2><b 0x01>
+"""
+        parsed, missing, optional_missing = ServerService._parse_awg2_metadata(
+            [],
+            conf,
+        )
+        self.assertEqual(missing, [])
+        self.assertEqual(parsed["I1"], "<r 2><b 0x01>")
+        self.assertNotIn("I1", optional_missing)
 
     def test_unknown_interface_key_makes_export_fail_closed(self):
         metadata = _legacy_metadata()
