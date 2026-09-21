@@ -1,11 +1,14 @@
+from types import SimpleNamespace
 from unittest.mock import patch
 
-from django.test import SimpleTestCase, TestCase
+from cryptography.fernet import Fernet
+from django.test import SimpleTestCase, TestCase, override_settings
 
+from jobs.executors import SafeSSHExecutor
 from servers.models import ProtocolProfile, Server, ServerProtocol
 from servers.services import ServerService
 from vpn.models import VPNClient
-from vpn.services import VPNClientService
+from vpn.services import AdapterFactory, ConfigCryptoService, VPNClientService
 
 
 def _legacy_metadata():
@@ -165,7 +168,58 @@ FutureObfuscationMode = enabled
         self.assertNotIn("PersistentKeepalive = 25-35", conf)
 
 
+    @override_settings(
+        CONFIG_ENCRYPTION_KEY=Fernet.generate_key().decode()
+    )
+    def test_runtime_header_protection_key_is_decrypted_on_export(self):
+        encrypted = ConfigCryptoService.encrypt("header-secret")
+        protocol = SimpleNamespace(
+            runtime_metadata={
+                "awg2_metadata": _legacy_metadata(),
+                "awg2_secret_metadata": {
+                    "HeaderProtectionKey": encrypted,
+                },
+            }
+        )
+        metadata = VPNClientService._runtime_awg_metadata(protocol)
+        self.assertEqual(
+            metadata["HeaderProtectionKey"],
+            "header-secret",
+        )
+
+    def test_safe_executor_accepts_awg_monitoring_command(self):
+        executor = SafeSSHExecutor(
+            host="127.0.0.1",
+            username="u",
+        )
+        executor._validate(
+            "docker exec amnezia-awg2 sh -lc "
+            "'grep -c \"^\\[Peer\\]\" "
+            "/opt/amnezia/awg/awg0.conf; "
+            "awg show awg0 peers | wc -l'"
+        )
+
+
 class AWGCompatibilityPolicyTest(TestCase):
+    def test_adapter_uses_discovered_awg_command(self):
+        server = Server.objects.create(
+            name="awg-command-server",
+            public_endpoint_host="vpn.example.com",
+        )
+        ServerProtocol.objects.create(
+            server=server,
+            protocol_type=ServerProtocol.ProtocolType.AWG2,
+            enabled=True,
+            container_name="amnezia-awg2",
+            container_status="running",
+            runtime_metadata={"command_bin": "awg"},
+        )
+        adapter = AdapterFactory.get_for_server(
+            server,
+            VPNClient.ProtocolType.AWG2,
+        )
+        self.assertEqual(adapter.command_bin, "awg")
+
     def test_reissue_is_blocked_before_runtime_mutation(self):
         server = Server.objects.create(
             name="awg-compat-server",
