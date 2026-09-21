@@ -12,6 +12,7 @@ from servers.models import (
 )
 from vpn.models import VPNClient
 from vpn.services import (
+    AWG2Adapter,
     ConfigCryptoService,
     VPNClientService,
 )
@@ -147,6 +148,63 @@ class AWGRuntimeSecretExportTest(TestCase):
 
         adapter.remove_peer.assert_not_called()
         adapter.create_peer.assert_not_called()
+
+    def test_awg2_runtime_dump_is_recorded_as_sensitive_output(self):
+        adapter = AWG2Adapter(
+            self.server
+        )
+
+        with patch(
+            "vpn.services.RuntimeCommandService.run_with_expected_failure",
+            return_value=SimpleNamespace(
+                stdout=""
+            ),
+        ) as run_mock:
+            adapter._awg2_runtime_peers(
+                self.user
+            )
+
+        self.assertTrue(
+            run_mock.call_args.kwargs[
+                "sensitive_output"
+            ]
+        )
+
+    def test_awg2_fallback_config_is_recorded_as_sensitive_output(self):
+        self.protocol.runtime_metadata = {
+            "config_path": (
+                "/opt/amnezia/awg/awg0.conf"
+            ),
+        }
+        self.protocol.save(
+            update_fields=[
+                "runtime_metadata"
+            ]
+        )
+
+        adapter = AWG2Adapter(
+            self.server
+        )
+
+        with patch.object(
+            adapter,
+            "_run",
+            return_value=SimpleNamespace(
+                stdout=(
+                    "[Interface]\n"
+                    "PrivateKey = hidden\n"
+                )
+            ),
+        ) as run_mock:
+            adapter._list_peers_from_config(
+                self.user
+            )
+
+        self.assertTrue(
+            run_mock.call_args.kwargs[
+                "sensitive_output"
+            ]
+        )
 
     def test_plaintext_metadata_remains_backward_compatible_until_scrub(self):
         metadata = _legacy_metadata()
