@@ -117,6 +117,12 @@
                 <span class="badge status-badge status-warning">MTU mismatch</span>
               {% endif %}
             </div>
+            <div class="small text-secondary mb-1">
+              CLI: <code>{{ row.protocol.runtime_metadata.command_bin|default:'—' }}</code>
+              {% if row.protocol.runtime_metadata.awg_capabilities %}
+                · Capabilities: <code>{{ row.protocol.runtime_metadata.awg_capabilities|join:', ' }}</code>
+              {% endif %}
+            </div>
             {% if row.protocol.runtime_metadata.awg_export_compatible == False %}
               <span class="badge status-badge status-danger mb-1">Экспорт заблокирован</span>
               {% if row.protocol.runtime_metadata.awg_unknown_interface_keys %}
