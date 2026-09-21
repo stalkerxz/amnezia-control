@@ -73,10 +73,12 @@ class RuntimeDetectionTest(TestCase):
             Result("amnezia-awg\namnezia-awg2\n"),
             Result('[{"State":{"Status":"running"},"NetworkSettings":{"Ports":{"51820/udp":[{"HostIp":"203.0.113.10","HostPort":"51820"}]}},"Config":{"Image":"awg","Env":["A=1"]},"Mounts":[]}]'),
             Result("awg0\n"),
+            Result("1420\n"),
             Result("awg0\tprivate\tpub\t51820\npeer1\tpsk\tep\t10.66.0.10/32\t0\t0\t0\t25\n"),
             Result("[Interface]\nAddress = 10.66.0.1/24\nListenPort = 51820\n"),
             Result('[{"State":{"Status":"running"},"NetworkSettings":{"Ports":{"51830/udp":[{"HostIp":"198.51.100.20","HostPort":"51830"}]}},"Config":{"Image":"awg2","Env":["AWG2_S1=6","AWG2_S2=7","AWG2_S3=8","AWG2_S4=9","AWG2_JC=10","AWG2_JMIN=11","AWG2_JMAX=12","AWG2_H1=13","AWG2_H2=14","AWG2_H3=15","AWG2_H4=16"]},"Mounts":[]}]'),
             Result("wg0\n"),
+            Result("1376\n"),
             Result("wg0\tprivate\tpub\t51830\npeer2\tpsk\tep\t10.8.1.10/32\t0\t0\t0\t25\n"),
             Result("[Interface]\nAddress = 10.8.1.0/24\nListenPort = 49561\nJc = 10\n"),
         ]
@@ -297,6 +299,42 @@ class ServerHealthEvaluationTest(TestCase):
         self.assertTrue(
             any(
                 "runtime-интерфейс не обнаружен" in reason
+                for reason in result["reasons"]
+            )
+        )
+
+    def test_degraded_state_mtu_mismatch(self):
+        self.server.last_runtime_sync_at = self.server.created_at
+        self.server.save(update_fields=["last_runtime_sync_at"])
+        ServerProtocol.objects.create(
+            server=self.server,
+            protocol_type=ServerProtocol.ProtocolType.AWG2,
+            container_name="amnezia-awg2",
+            container_status="running",
+            runtime_metadata={
+                "interface": "awg0",
+                "interface_ready": True,
+                "subnet_ready": True,
+                "endpoint_host_ready": True,
+                "endpoint_port_ready": True,
+                "awg2_metadata_ready": True,
+                "awg_export_compatible": True,
+                "peer_source": "runtime wg dump",
+                "config_mtu": 1376,
+                "runtime_mtu": 1420,
+                "mtu_mismatch": True,
+            },
+        )
+
+        result = ServerService.evaluate_health(self.server)
+
+        self.assertEqual(
+            result["status"],
+            ServerService.HEALTH_DEGRADED,
+        )
+        self.assertTrue(
+            any(
+                "MTU" in reason
                 for reason in result["reasons"]
             )
         )
