@@ -35,6 +35,9 @@ def _peer_source_view(peer_source: str):
 
 
 def _protocol_operator_ready(protocol) -> bool:
+    if not protocol.enabled:
+        return False
+
     metadata = protocol.runtime_metadata or {}
     interface_ready = bool(
         metadata.get(
