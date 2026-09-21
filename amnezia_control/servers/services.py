@@ -398,7 +398,7 @@ class ServerService:
 
     @staticmethod
     def _parse_runtime_mtu(ip_link_output: str):
-        match = re.search(r"\\bmtu\\s+(\\d+)\\b", ip_link_output or "")
+        match = re.search(r"\bmtu\s+(\d+)\b", ip_link_output or "")
         return int(match.group(1)) if match else None
 
     @staticmethod
@@ -619,10 +619,10 @@ class ServerService:
                                     if dump_result is None:
                                         peer_source = "runtime telemetry unavailable; config fallback"
                                     else:
-                                        peer_count = sum(1 for line in dump_result.stdout.splitlines() if len(line.split("\\t")) >= 8)
+                                        peer_count = sum(1 for line in dump_result.stdout.splitlines() if len(line.split("\t")) >= 8)
                                         peer_source = "runtime wg dump"
                                 else:
-                                    peer_count = sum(1 for line in dump_result.stdout.splitlines() if len(line.split("\\t")) >= 8)
+                                    peer_count = sum(1 for line in dump_result.stdout.splitlines() if len(line.split("\t")) >= 8)
                                     peer_source = "runtime wg dump"
                             else:
                                 dump = RuntimeCommandService.run(
@@ -631,7 +631,7 @@ class ServerService:
                                     f"runtime.peers.{protocol_type}",
                                     f"docker exec {container_name} {command_bin} show dump",
                                 ).stdout
-                                peer_count = sum(1 for line in dump.splitlines() if len(line.split("\\t")) >= 8)
+                                peer_count = sum(1 for line in dump.splitlines() if len(line.split("\t")) >= 8)
                                 peer_source = "runtime wg dump"
                         except Exception:
                             peer_count = 0
