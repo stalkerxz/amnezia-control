@@ -667,6 +667,15 @@ class VPNClientPolicyService:
                     + suffix
                 )
 
+            if metadata.get("mtu_mismatch"):
+                return (
+                    "Переиздание запрещено: MTU конфигурации AWG "
+                    f"({metadata.get('config_mtu')}) не совпадает с "
+                    f"runtime MTU ({metadata.get('runtime_mtu')}). "
+                    "Сначала устраните расхождение и выполните "
+                    "синхронизацию runtime."
+                )
+
             try:
                 runtime_awg_metadata = (
                     VPNClientService._runtime_awg_metadata(
