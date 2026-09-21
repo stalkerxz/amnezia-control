@@ -31,6 +31,7 @@ class ServerService:
         "DisableCookies",
     ]
     AWG_SENSITIVE_KEYS = {"HeaderProtectionKey"}
+    AWG3_TOGGLE_KEYS = {"RandomTrailers", "DisableCookies"}
     AWG_STANDARD_INTERFACE_KEYS = {
         "PrivateKey", "Address", "ListenPort", "DNS", "MTU", "Table",
         "PreUp", "PostUp", "PreDown", "PostDown", "SaveConfig", "FwMark",
@@ -479,8 +480,19 @@ class ServerService:
         return public_metadata, encrypted_metadata
 
     @classmethod
+    def _has_awg3_params(cls, metadata: dict) -> bool:
+        regular_keys = [key for key in cls.AWG3_KEYS if key not in cls.AWG3_TOGGLE_KEYS]
+        if any(str(metadata.get(key, "")).strip() for key in regular_keys):
+            return True
+        return any(
+            str(metadata.get(key, "")).strip()
+            and str(metadata.get(key, "")).strip().lower() != "off"
+            for key in cls.AWG3_TOGGLE_KEYS
+        )
+
+    @classmethod
     def _awg_generation(cls, metadata: dict) -> str:
-        if any(str(metadata.get(key, "")).strip() for key in cls.AWG3_KEYS):
+        if cls._has_awg3_params(metadata):
             return "3.1"
         if any(str(metadata.get(key, "")).strip() for key in cls.AWG2_REQUIRED_KEYS):
             return "2"
