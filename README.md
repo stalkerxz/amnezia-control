@@ -25,9 +25,11 @@ docker compose exec web python manage.py createsuperuser
 Кнопка **«Синхронизировать runtime»** делает:
 - `docker ps -a` + `docker ps`;
 - `docker inspect` для `amnezia-awg` и `amnezia-awg2`;
+- определяет реально доступный runtime binary (`wg` или `awg`) и использует его для последующих операций;
 - `docker exec ... awg/wg show interfaces` + `show dump`;
-- чтение live конфигов (`/etc/wireguard/<iface>.conf` / `/etc/amnezia/<iface>.conf`) для извлечения Address/ListenPort;
-- для AWG2 дополнительно парсит protocol metadata (`S1/S2/H1/H2/H3/H4/...`) из env/config.
+- проверяет наличие runtime-интерфейса, listen-port и фактический MTU;
+- читает live конфиги (`/etc/wireguard/<iface>.conf` / `/etc/amnezia/<iface>.conf`) для извлечения Address/ListenPort/MTU;
+- для семейства AWG2 определяет поколение и capabilities по фактическим параметрам конфигурации, включая AWG 3.1.
 
 ### Endpoint discovery (без placeholder)
 Экспорт endpoint выбирается строго в порядке:
@@ -42,11 +44,14 @@ docker compose exec web python manage.py createsuperuser
 Подсеть берется из реально найденного `Address=` в live конфиге интерфейса.
 Если подсеть не найдена — создание/переиздание клиента завершается явной ошибкой.
 
-### AWG vs AWG2 export
+### AWG export и совместимость поколений
 - AWG legacy: отдельный билдер конфига.
-- AWG2: отдельный билдер, который **требует полный набор** параметров: `I1-I5`, `S1-S4`, `Jc`, `Jmin`, `Jmax`, `H1-H4`.
-- Канонические имена ключей в коде/metadata/export: именно `Jc`, `Jmin`, `Jmax` (без `JC/JMIN/JMAX` в сохраненных данных и экспорте).
-- Если любой обязательный AWG2 параметр отсутствует — экспорт AWG2 блокируется явной ошибкой с перечнем недостающих ключей (без фейкового WireGuard fallback).
+- Семейство `awg2` в панели остаётся одним protocol type: реальное поколение определяется по runtime-конфигу, а не по имени контейнера.
+- Для AWG2 обязательны `S1-S4`, `Jc`, `Jmin`, `Jmax`, `H1-H4`; `I1-I5` сохраняются при наличии.
+- Для AWG 3.1 дополнительно сохраняются и экспортируются `HeaderProtectionKey`, `ContentPaddingAddition`, `RekeyAfterTime`, `RekeyTimeout`, `RejectAfterTime`, `KeepaliveTimeout`, `MaxHandshakeAttempts`, `RandomTrailers`, `DisableCookies`.
+- AWG-параметры экспортируются в секцию `[Interface]`, как в upstream Amnezia; для AWG 3.1 используется диапазон `PersistentKeepalive = 25-35`, для AWG2 — `25`.
+- Если обязательные параметры отсутствуют либо runtime содержит неизвестный interface-параметр, переиздание/нативный экспорт блокируются **до изменения peer**. Это fail-closed защита от потери параметров при будущих обновлениях upstream.
+- Runtime sync сохраняет `command_bin`, `awg_generation`, capabilities, `config_mtu`, `runtime_mtu` и readiness-флаги в существующий `ServerProtocol.runtime_metadata`; новая миграция БД не требуется.
 
 ## Безопасность
 - строгая проверка SSH host key (`RejectPolicy` по умолчанию);
