@@ -616,6 +616,7 @@ class ServerService:
                     expected_error_patterns=RuntimeCommandService.AWG2_EXPECTED_RUNTIME_DUMP_ERRORS,
                     fallback_message="AWG2 runtime telemetry unavailable: trying compatible runtime command.",
                     warn_on_expected_failure=False,
+                    sensitive_output=True,
                 )
                 if dump_result is None:
                     dump_result = RuntimeCommandService.run_with_expected_failure(
@@ -626,6 +627,7 @@ class ServerService:
                         expected_error_patterns=RuntimeCommandService.AWG2_EXPECTED_RUNTIME_DUMP_ERRORS,
                         fallback_message="AWG2 runtime telemetry unavailable: trying compatible runtime command.",
                         warn_on_expected_failure=False,
+                        sensitive_output=True,
                     )
             except Exception:
                 continue
@@ -645,7 +647,13 @@ class ServerService:
             protocol.container_name = container_name
 
             if container_name in all_names:
-                inspect_raw = RuntimeCommandService.run(server, actor, f"runtime.inspect.{protocol_type}", f"docker inspect {container_name}").stdout
+                inspect_raw = RuntimeCommandService.run(
+                    server,
+                    actor,
+                    f"runtime.inspect.{protocol_type}",
+                    f"docker inspect {container_name}",
+                    sensitive_output=True,
+                ).stdout
                 inspect_data = json.loads(inspect_raw)
                 config_env = inspect_data[0].get("Config", {}).get("Env", [])
 
@@ -702,6 +710,7 @@ class ServerService:
                                     actor,
                                     f"runtime.peers.{protocol_type}",
                                     f"docker exec {container_name} {command_bin} show dump",
+                                    sensitive_output=True,
                                 ).stdout
                                 peer_count = sum(1 for line in dump.splitlines() if len(line.split("\t")) >= 8)
                                 peer_source = "runtime wg dump"
@@ -738,6 +747,7 @@ class ServerService:
                                 actor,
                                 f"runtime.conf.{protocol_type}",
                                 f"docker exec {container_name} cat {path}",
+                                sensitive_output=True,
                             ).stdout
                             if raw_iface_conf:
                                 config_path = path
