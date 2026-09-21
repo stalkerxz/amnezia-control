@@ -7,7 +7,7 @@ from django.utils import timezone
 
 from audit.services import AuditService
 from jobs.services import JobService
-from vpn.services import RuntimeCommandService
+from vpn.services import ConfigCryptoService, RuntimeCommandService
 
 from .models import Server, ServerProtocol
 
@@ -321,6 +321,31 @@ class ServerService:
         return result
 
     @staticmethod
+    def _sanitize_runtime_env(env_list):
+        sensitive_markers = (
+            "PRIVATE_KEY",
+            "PRESHARED",
+            "PSK",
+            "PASSWORD",
+            "TOKEN",
+            "SECRET",
+            "HEADER_PROTECTION_KEY",
+        )
+        sanitized = []
+        for item in env_list:
+            if "=" not in item:
+                sanitized.append(item)
+                continue
+            key, value = item.split("=", 1)
+            if any(
+                marker in key.upper()
+                for marker in sensitive_markers
+            ):
+                value = "[REDACTED]"
+            sanitized.append(f"{key}={value}")
+        return sanitized
+
+    @staticmethod
     def _parse_udp_port(inspect_data):
         ports = inspect_data[0].get("NetworkSettings", {}).get("Ports", {}) if inspect_data else {}
         for container_port, host_bindings in ports.items():
@@ -590,7 +615,13 @@ class ServerService:
             protocol.container_name = container_name
 
             if container_name in all_names:
-                inspect_raw = RuntimeCommandService.run(server, actor, f"runtime.inspect.{protocol_type}", f"docker inspect {container_name}").stdout
+                inspect_raw = RuntimeCommandService.run(
+                    server,
+                    actor,
+                    f"runtime.inspect.{protocol_type}",
+                    f"docker inspect {container_name}",
+                    sensitive_output=True,
+                ).stdout
                 inspect_data = json.loads(inspect_raw)
                 config_env = inspect_data[0].get("Config", {}).get("Env", [])
 
@@ -646,7 +677,13 @@ class ServerService:
 
                     for path in cls._candidate_config_paths(iface or "wg0"):
                         try:
-                            raw_iface_conf = RuntimeCommandService.run(server, actor, f"runtime.conf.{protocol_type}", f"docker exec {container_name} cat {path}").stdout
+                            raw_iface_conf = RuntimeCommandService.run(
+                                server,
+                                actor,
+                                f"runtime.conf.{protocol_type}",
+                                f"docker exec {container_name} cat {path}",
+                                sensitive_output=True,
+                            ).stdout
                             if raw_iface_conf:
                                 config_path = path
                                 break
@@ -660,6 +697,7 @@ class ServerService:
                 subnet, listen_port = cls._parse_interface_metadata(raw_iface_conf)
                 awg2_meta, awg2_required_missing, awg2_optional_missing = ({}, [], [])
                 awg31_required_missing = []
+                awg2_secret_metadata = {}
 
                 if protocol_type == ServerProtocol.ProtocolType.AWG2:
                     (
@@ -677,6 +715,17 @@ class ServerService:
                         if not awg2_meta.get(key)
                     ]
 
+                    header_protection_key = awg2_meta.pop(
+                        "HeaderProtectionKey",
+                        "",
+                    )
+                    if header_protection_key:
+                        awg2_secret_metadata[
+                            "HeaderProtectionKey"
+                        ] = ConfigCryptoService.encrypt(
+                            header_protection_key
+                        )
+
                 udp_port = cls._parse_udp_port(inspect_data) or listen_port
                 discovered_public_host = cls._parse_public_host(inspect_data)
                 endpoint_host_ready = cls._is_public_host(server.public_endpoint_host) or cls._is_public_host(server.host) or cls._is_public_host(discovered_public_host)
@@ -690,7 +739,7 @@ class ServerService:
                     "public_host": discovered_public_host,
                     "image": inspect_data[0].get("Config", {}).get("Image", ""),
                     "mounts": [m.get("Destination", "") for m in inspect_data[0].get("Mounts", [])],
-                    "env": config_env,
+                    "env": cls._sanitize_runtime_env(config_env),
                     "interface": iface,
                     "peer_count": peer_count,
                     "peer_source": peer_source,
@@ -699,7 +748,11 @@ class ServerService:
                     "endpoint_host_ready": endpoint_host_ready,
                     "endpoint_port_ready": endpoint_port_ready,
                     "awg2_metadata": awg2_meta,
-                    "awg2_active_keys": sorted(awg2_meta.keys()),
+                    "awg2_secret_metadata": awg2_secret_metadata,
+                    "awg2_active_keys": sorted(
+                        set(awg2_meta.keys())
+                        | set(awg2_secret_metadata.keys())
+                    ),
                     "awg2_missing_keys": awg2_required_missing,
                     "awg2_optional_missing_keys": awg2_optional_missing,
                     "awg2_metadata_ready": (
