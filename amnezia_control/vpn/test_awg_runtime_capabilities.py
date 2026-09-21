@@ -35,6 +35,7 @@ class AWGRuntimeCapabilitiesTest(SimpleTestCase):
             [
                 "AWG2_S1=123",
                 "HEADER_PROTECTION_KEY=value-a",
+                "AWG2_HEADERPROTECTIONKEY=value-c",
                 "WIREGUARD_SERVER_PRIVATE_KEY=value-b",
                 "PUBLIC_ENDPOINT=vpn.example.com",
             ]
@@ -42,6 +43,10 @@ class AWGRuntimeCapabilitiesTest(SimpleTestCase):
         self.assertIn("AWG2_S1=123", sanitized)
         self.assertIn(
             "HEADER_PROTECTION_KEY=[REDACTED]",
+            sanitized,
+        )
+        self.assertIn(
+            "AWG2_HEADERPROTECTIONKEY=[REDACTED]",
             sanitized,
         )
         self.assertIn(
@@ -55,6 +60,7 @@ class AWGRuntimeCapabilitiesTest(SimpleTestCase):
         joined = "\n".join(sanitized)
         self.assertNotIn("value-a", joined)
         self.assertNotIn("value-b", joined)
+        self.assertNotIn("value-c", joined)
 
     def test_parser_reads_awg31_and_ignores_commented_special_junk(self):
         conf = """[Interface]
@@ -346,6 +352,56 @@ class AWGCompatibilityPolicyTest(TestCase):
                 )
 
         adapter_factory.assert_not_called()
+
+    def test_reissue_is_blocked_on_mtu_mismatch_before_mutation(self):
+        server = Server.objects.create(
+            name="awg-mtu-mismatch-server",
+            public_endpoint_host="vpn.example.com",
+        )
+        protocol = ServerProtocol.objects.create(
+            server=server,
+            protocol_type=ServerProtocol.ProtocolType.AWG2,
+            enabled=True,
+            container_name="amnezia-awg2",
+            container_status="running",
+            runtime_metadata={
+                "awg_export_compatible": True,
+                "awg_generation": "2.x",
+                "awg_capabilities": ["legacy_obfuscation"],
+                "awg2_metadata": _legacy_metadata(),
+                "config_mtu": 1376,
+                "runtime_mtu": 1420,
+                "mtu_mismatch": True,
+            },
+        )
+        profile = ProtocolProfile.objects.create(
+            server_protocol=protocol,
+            name="full-mtu-mismatch",
+            protocol_type=ServerProtocol.ProtocolType.AWG2,
+            config_template="[Interface]",
+        )
+        client = VPNClient.objects.create(
+            server=server,
+            name="mtu-mismatch-reissue",
+            protocol_type=VPNClient.ProtocolType.AWG2,
+            profile=profile,
+            status=VPNClient.Status.ACTIVE,
+        )
+
+        with patch(
+            "vpn.services.AdapterFactory.get_for_client"
+        ) as adapter_factory:
+            with self.assertRaisesRegex(
+                RuntimeError,
+                "MTU конфигурации AWG",
+            ):
+                VPNClientService.reissue_config(
+                    client=client,
+                    actor=None,
+                )
+
+        adapter_factory.assert_not_called()
+
 
 class AWGOperatorReadinessViewTest(TestCase):
     def setUp(self):
