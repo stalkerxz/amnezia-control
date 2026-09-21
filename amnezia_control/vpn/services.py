@@ -359,6 +359,7 @@ class BaseProtocolAdapter:
             expected_error_patterns=RuntimeCommandService.AWG2_EXPECTED_RUNTIME_DUMP_ERRORS,
             fallback_message="AWG2 runtime telemetry unavailable: using config fallback (degraded mode).",
             warn_on_expected_failure=False,
+            sensitive_output=True,
         )
         if runtime_result is None:
             runtime_result = RuntimeCommandService.run_with_expected_failure(
@@ -368,6 +369,7 @@ class BaseProtocolAdapter:
                 self._wg_cmd("show dump"),
                 expected_error_patterns=RuntimeCommandService.AWG2_EXPECTED_RUNTIME_DUMP_ERRORS,
                 fallback_message="AWG2 runtime telemetry unavailable: using config fallback (degraded mode).",
+                sensitive_output=True,
             )
         if runtime_result is None:
             return None
@@ -381,7 +383,7 @@ class BaseProtocolAdapter:
                     return self._list_peers_from_config(actor)
                 return peers
             else:
-                out = self._run(actor, f"{self.protocol_type}.list", self._wg_cmd("show dump")).stdout
+                out = self._run(actor, f"{self.protocol_type}.list", self._wg_cmd("show dump"), sensitive_output=True).stdout
             return self._parse_runtime_dump_peers(out)
         except RuntimeError:
             if self.protocol_type != VPNClient.ProtocolType.AWG2:
@@ -434,7 +436,12 @@ class BaseProtocolAdapter:
         config_path = self.protocol.runtime_metadata.get("config_path", "")
         if not config_path:
             return []
-        raw_conf = self._run(actor, f"{self.protocol_type}.list_fallback_conf", f"docker exec {self.container} cat {config_path}").stdout
+        raw_conf = self._run(
+            actor,
+            f"{self.protocol_type}.list_fallback_conf",
+            f"docker exec {self.container} cat {config_path}",
+            sensitive_output=True,
+        ).stdout
         return self._parse_peers_from_config_text(raw_conf)
 
     def peer_transfer_map(self, actor) -> dict[str, int] | None:
@@ -444,7 +451,7 @@ class BaseProtocolAdapter:
                 if peers is None:
                     return None
             else:
-                out = self._run(actor, f"{self.protocol_type}.list", self._wg_cmd("show dump")).stdout
+                out = self._run(actor, f"{self.protocol_type}.list", self._wg_cmd("show dump"), sensitive_output=True).stdout
                 peers = self._parse_runtime_dump_peers(out)
         except Exception:
             return None
