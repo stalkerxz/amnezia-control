@@ -107,7 +107,7 @@ class AWG3CompatibilityTest(TestCase):
         self.assertEqual(required_missing, [])
         self.assertEqual(parsed["HeaderProtectionKey"], "base64-key")
         self.assertEqual(parsed["ContentPaddingAddition"], "0-64")
-        self.assertEqual(ServerService._awg_generation(parsed), "3")
+        self.assertEqual(ServerService._awg_generation(parsed), "3.1")
         capabilities = ServerService._awg_capabilities(parsed)
         self.assertIn("header_protection", capabilities)
         self.assertIn("content_padding", capabilities)
@@ -143,7 +143,7 @@ class AWG3CompatibilityTest(TestCase):
         self.assertIn("ContentPaddingAddition = 0-64", interface_block)
         self.assertIn("RandomTrailers = on", interface_block)
         self.assertNotIn("HeaderProtectionKey", peer_block)
-        self.assertIn("PersistentKeepalive = 25", peer_block)
+        self.assertIn("PersistentKeepalive = 25-35", peer_block)
 
     def test_reissue_blocks_before_old_peer_is_removed_for_unknown_runtime_params(self):
         metadata = dict(self.protocol.runtime_metadata)
