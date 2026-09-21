@@ -1,7 +1,8 @@
 from unittest.mock import patch
 
+from cryptography.fernet import Fernet
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.utils import timezone
 
 from jobs.executors import SafeSSHExecutor
@@ -11,6 +12,7 @@ from vpn.models import VPNClient
 from vpn.services import AdapterFactory, VPNClientService
 
 
+@override_settings(CONFIG_ENCRYPTION_KEY=Fernet.generate_key().decode())
 class AWG3CompatibilityTest(TestCase):
     def setUp(self):
         self.user = get_user_model().objects.create_user(
@@ -113,6 +115,66 @@ class AWG3CompatibilityTest(TestCase):
         self.assertIn("content_padding", capabilities)
         self.assertIn("random_trailers", capabilities)
         self.assertIn("disable_cookies", capabilities)
+
+    def test_sensitive_awg_metadata_is_encrypted_at_rest(self):
+        public_metadata, encrypted_metadata = ServerService._protect_awg_metadata(
+            self._metadata()
+        )
+
+        self.assertNotIn("HeaderProtectionKey", public_metadata)
+        self.assertIn("HeaderProtectionKey", encrypted_metadata)
+        self.assertNotEqual(
+            encrypted_metadata["HeaderProtectionKey"],
+            "base64-key",
+        )
+
+        runtime_metadata = dict(self.protocol.runtime_metadata)
+        runtime_metadata["awg2_metadata"] = public_metadata
+        runtime_metadata["awg_sensitive_metadata_encrypted"] = encrypted_metadata
+        self.protocol.runtime_metadata = runtime_metadata
+        self.protocol.save(update_fields=["runtime_metadata"])
+
+        resolved = VPNClientService.resolved_awg_runtime_metadata(self.protocol)
+        self.assertEqual(resolved["HeaderProtectionKey"], "base64-key")
+
+    def test_runtime_dump_falls_back_from_wg_to_awg(self):
+        class Result:
+            def __init__(self, stdout):
+                self.stdout = stdout
+
+        def run_side_effect(server, actor, action, command, **kwargs):
+            if command == "docker exec amnezia-awg2 awg show interfaces":
+                return Result("awg0\n")
+            raise AssertionError(f"Unexpected runtime command: {command}")
+
+        def expected_side_effect(server, actor, action, command, **kwargs):
+            if " wg show " in command:
+                return None
+            if command == "docker exec amnezia-awg2 awg show all dump":
+                return Result(
+                    "awg0\tprivate\tpublic\t51830\n"
+                    "peer\tpsk\tep\t10.77.0.10/32\t0\t1\t2\t25-35\n"
+                )
+            raise AssertionError(f"Unexpected expected-failure command: {command}")
+
+        with patch(
+            "servers.services.RuntimeCommandService.run",
+            side_effect=run_side_effect,
+        ), patch(
+            "servers.services.RuntimeCommandService.run_with_expected_failure",
+            side_effect=expected_side_effect,
+        ):
+            command_bin, iface, dump = ServerService._discover_awg_runtime_dump(
+                server=self.server,
+                actor=self.user,
+                container_name="amnezia-awg2",
+                preferred_command_bin="wg",
+                preferred_iface="wg0",
+            )
+
+        self.assertEqual(command_bin, "awg")
+        self.assertEqual(iface, "awg0")
+        self.assertIn("10.77.0.10/32", dump.stdout)
 
     def test_unknown_interface_parameter_is_fail_closed_marker(self):
         conf = (
