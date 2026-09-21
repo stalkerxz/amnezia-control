@@ -156,11 +156,25 @@ class BaseProtocolAdapter:
     def container(self):
         return self.protocol.container_name
 
+    @property
+    def effective_command_bin(self) -> str:
+        candidate = str((self.protocol.runtime_metadata or {}).get("command_bin") or self.command_bin).strip()
+        if candidate not in {"wg", "awg"}:
+            raise RuntimeError(f"Unsupported runtime command binary: {candidate}")
+        return candidate
+
+    @property
+    def effective_quick_bin(self) -> str:
+        candidate = str((self.protocol.runtime_metadata or {}).get("quick_bin") or "awg-quick").strip()
+        if candidate not in {"awg-quick"}:
+            raise RuntimeError(f"Unsupported runtime quick binary: {candidate}")
+        return candidate
+
     def _run(self, actor, action, command, sensitive_output=False):
         return RuntimeCommandService.run(self.server, actor, action, command, sensitive_output=sensitive_output)
 
     def _wg_cmd(self, subcommand: str) -> str:
-        return f"docker exec {self.container} {self.command_bin} {subcommand}"
+        return f"docker exec {self.container} {self.effective_command_bin} {subcommand}"
 
     def _persist_runtime(self, actor):
         """
@@ -198,7 +212,7 @@ class BaseProtocolAdapter:
             f"-w {self.AWG2_RUNTIME_SAVE_LOCK_TIMEOUT_SECONDS} "
             f"{shlex.quote(self.AWG2_RUNTIME_SAVE_LOCK)} "
             f"docker exec {shlex.quote(self.container)} "
-            f"awg-quick save {shlex.quote(config_path)}"
+            f"{self.effective_quick_bin} save {shlex.quote(config_path)}"
         )
         self._run(
             actor,
@@ -508,7 +522,7 @@ class BaseProtocolAdapter:
     def generate_keypair(self, actor):
         private_key = self._run(actor, f"{self.protocol_type}.genkey", self._wg_cmd("genkey"), sensitive_output=True).stdout.strip()
         quoted = shlex.quote(private_key)
-        cmd = f"printf %s {quoted} | docker exec -i {self.container} {self.command_bin} pubkey"
+        cmd = f"printf %s {quoted} | docker exec -i {self.container} {self.effective_command_bin} pubkey"
         public_key = self._run(actor, f"{self.protocol_type}.pubkey", cmd, sensitive_output=True).stdout.strip()
         return private_key, public_key
 
@@ -522,7 +536,7 @@ class BaseProtocolAdapter:
         address = self._next_address(actor)
         quoted = shlex.quote(preshared_key)
         add_peer_cmd = (
-            f"printf %s {quoted} | docker exec -i {self.container} {self.command_bin} "
+            f"printf %s {quoted} | docker exec -i {self.container} {self.effective_command_bin} "
             f"set {iface} peer {public_key} preshared-key /dev/stdin allowed-ips {address}/32"
         )
         self._run(actor, f"{self.protocol_type}.add_peer", add_peer_cmd, sensitive_output=True)
@@ -541,7 +555,7 @@ class BaseProtocolAdapter:
         if preshared_key:
             quoted = shlex.quote(preshared_key)
             cmd = (
-                f"printf %s {quoted} | docker exec -i {self.container} {self.command_bin} "
+                f"printf %s {quoted} | docker exec -i {self.container} {self.effective_command_bin} "
                 f"set {iface} peer {peer_public_key} preshared-key /dev/stdin allowed-ips {allowed_ips}"
             )
             self._run(actor, f"{self.protocol_type}.add_existing_peer", cmd, sensitive_output=True)
@@ -637,7 +651,16 @@ class VPNClientPolicyService:
 
 
 class VPNClientService:
-    AWG_INTERFACE_EXTRA_KEYS = ("Jc", "Jmin", "Jmax", "S1", "S2", "S3", "S4", "H1", "H2", "H3", "H4", "I1", "I2", "I3", "I4", "I5")
+    AWG_INTERFACE_EXTRA_KEYS = (
+        "Jc", "Jmin", "Jmax", "S1", "S2", "S3", "S4", "H1", "H2", "H3", "H4",
+        "I1", "I2", "I3", "I4", "I5",
+        "HeaderProtectionKey", "ContentPaddingAddition", "RekeyAfterTime", "RekeyTimeout",
+        "RejectAfterTime", "KeepaliveTimeout", "MaxHandshakeAttempts", "RandomTrailers", "DisableCookies",
+    )
+    AWG3_INTERFACE_KEYS = (
+        "HeaderProtectionKey", "ContentPaddingAddition", "RekeyAfterTime", "RekeyTimeout",
+        "RejectAfterTime", "KeepaliveTimeout", "MaxHandshakeAttempts", "RandomTrailers", "DisableCookies",
+    )
 
     @staticmethod
     def get_limit_state(client: VPNClient, now=None):
@@ -766,6 +789,27 @@ class VPNClientService:
 
         return ", ".join(str(network) for network in collapsed)
 
+    @classmethod
+    def assert_awg_runtime_export_supported(cls, protocol: ServerProtocol):
+        if protocol.protocol_type != ServerProtocol.ProtocolType.AWG2:
+            return
+        metadata = protocol.runtime_metadata or {}
+        unsupported = metadata.get("awg_unsupported_keys", [])
+        if metadata.get("awg_config_supported") is False or unsupported:
+            details = ", ".join(unsupported) or "unknown runtime parameters"
+            raise RuntimeError(
+                "AWG runtime contains parameters that this exporter does not support: "
+                f"{details}. Reissue/export is blocked to avoid losing runtime settings."
+            )
+        awg_metadata = metadata.get("awg2_metadata", {})
+        required = ("Jc", "Jmin", "Jmax", "S1", "S2", "S3", "S4", "H1", "H2", "H3", "H4")
+        missing = [key for key in required if not awg_metadata.get(key)]
+        if missing:
+            raise RuntimeError(
+                f"AWG metadata is incomplete: missing {', '.join(missing)}. "
+                "Run runtime sync and verify the live AWG config."
+            )
+
     @staticmethod
     def build_awg2_client_config(
         *,
@@ -779,9 +823,23 @@ class VPNClientService:
     ) -> str:
         required = ("Jc", "Jmin", "Jmax", "S1", "S2", "S3", "S4", "H1", "H2", "H3", "H4")
         optional = ("I1", "I2", "I3", "I4", "I5")
+        awg3 = (
+            "HeaderProtectionKey", "ContentPaddingAddition", "RekeyAfterTime", "RekeyTimeout",
+            "RejectAfterTime", "KeepaliveTimeout", "MaxHandshakeAttempts", "RandomTrailers", "DisableCookies",
+        )
         missing = [k for k in required if not awg2_metadata.get(k)]
         if missing:
-            raise RuntimeError(f"AWG2 metadata is incomplete: missing {', '.join(missing)}. Run runtime sync and verify live AWG2 config.")
+            raise RuntimeError(f"AWG metadata is incomplete: missing {', '.join(missing)}. Run runtime sync and verify live AWG config.")
+
+        interface_lines = [
+            "[Interface]",
+            f"PrivateKey = {private_key}",
+            f"Address = {address}/32",
+            "DNS = 1.1.1.1",
+        ]
+        interface_lines.extend(f"{k} = {awg2_metadata[k]}" for k in required)
+        interface_lines.extend(f"{k} = {awg2_metadata[k]}" for k in optional if awg2_metadata.get(k))
+        interface_lines.extend(f"{k} = {awg2_metadata[k]}" for k in awg3 if awg2_metadata.get(k))
 
         peer_lines = [
             "[Peer]",
@@ -796,16 +854,7 @@ class VPNClientService:
                 "PersistentKeepalive = 25",
             ]
         )
-        peer_lines.extend(f"{k} = {awg2_metadata[k]}" for k in required)
-        peer_lines.extend(f"{k} = {awg2_metadata[k]}" for k in optional if awg2_metadata.get(k))
-        return (
-            "[Interface]\n"
-            f"PrivateKey = {private_key}\n"
-            f"Address = {address}/32\n"
-            "DNS = 1.1.1.1\n\n"
-            + "\n".join(peer_lines)
-            + "\n"
-        )
+        return "\n".join(interface_lines + [""] + peer_lines) + "\n"
 
     @staticmethod
     def _parse_config_sections(config: str) -> dict[str, dict[str, str]]:
@@ -836,6 +885,8 @@ class VPNClientService:
             raise RuntimeError("Cannot build native export: latest config has no Peer.PublicKey/Endpoint.")
 
         protocol = ServerProtocol.objects.filter(server=client.server, protocol_type=client.protocol_type).first()
+        if protocol and client.protocol_type == VPNClient.ProtocolType.AWG2:
+            cls.assert_awg_runtime_export_supported(protocol)
         metadata = (protocol.runtime_metadata or {}).get("awg2_metadata", {}) if protocol else {}
         extra_values: dict[str, str] = {}
         for key in cls.AWG_INTERFACE_EXTRA_KEYS:
@@ -998,6 +1049,7 @@ class VPNClientService:
         VPNClientPolicyService.assert_reissue_allowed(client)
 
         adapter = AdapterFactory.get_for_client(client)
+        VPNClientService.assert_awg_runtime_export_supported(adapter.protocol)
         if client.runtime_peer_public_key:
             adapter.remove_peer(actor, client.runtime_peer_public_key)
         generated = adapter.create_peer(actor)
