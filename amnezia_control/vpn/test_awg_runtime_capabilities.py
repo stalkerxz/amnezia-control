@@ -28,6 +28,32 @@ def _legacy_metadata():
 
 
 class AWGRuntimeCapabilitiesTest(SimpleTestCase):
+    def test_runtime_env_sanitizer_redacts_sensitive_values(self):
+        sanitized = ServerService._sanitize_runtime_env(
+            [
+                "AWG2_S1=123",
+                "HEADER_PROTECTION_KEY=value-a",
+                "WIREGUARD_SERVER_PRIVATE_KEY=value-b",
+                "PUBLIC_ENDPOINT=vpn.example.com",
+            ]
+        )
+        self.assertIn("AWG2_S1=123", sanitized)
+        self.assertIn(
+            "HEADER_PROTECTION_KEY=[REDACTED]",
+            sanitized,
+        )
+        self.assertIn(
+            "WIREGUARD_SERVER_PRIVATE_KEY=[REDACTED]",
+            sanitized,
+        )
+        self.assertIn(
+            "PUBLIC_ENDPOINT=vpn.example.com",
+            sanitized,
+        )
+        joined = "\n".join(sanitized)
+        self.assertNotIn("value-a", joined)
+        self.assertNotIn("value-b", joined)
+
     def test_parser_reads_awg31_and_ignores_commented_special_junk(self):
         conf = """[Interface]
 PrivateKey = server-private
