@@ -130,7 +130,7 @@
           {% endif %}
         </td>
         <td class="text-end">
-          {% if row.protocol.runtime_metadata.interface_ready and row.protocol.runtime_metadata.subnet_ready and row.protocol.runtime_metadata.endpoint_host_ready and row.protocol.runtime_metadata.endpoint_port_ready %}
+          {% if row.protocol.runtime_metadata.interface and row.protocol.runtime_metadata.subnet_ready and row.protocol.runtime_metadata.endpoint_host_ready and row.protocol.runtime_metadata.endpoint_port_ready %}
           <span class="badge status-badge status-success">Готово</span>
           {% else %}
           <span class="badge status-badge status-warning">Требует внимания</span>
