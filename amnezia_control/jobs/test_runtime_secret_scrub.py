@@ -64,6 +64,25 @@ class RuntimeSecretScrubTest(TestCase):
             event.stdout,
         )
 
+    def test_job_service_redacts_compact_env_secret_alias(self):
+        event = JobService.event(
+            self.job,
+            "runtime env",
+            stdout=(
+                "AWG2_HEADERPROTECTIONKEY="
+                "compact-header-secret"
+            ),
+        )
+
+        self.assertEqual(
+            event.stdout,
+            SENSITIVE_OUTPUT_PLACEHOLDER,
+        )
+        self.assertNotIn(
+            "compact-header-secret",
+            event.stdout,
+        )
+
     def test_scrubber_is_dry_run_by_default(self):
         JobEvent.objects.create(
             job=self.job,
