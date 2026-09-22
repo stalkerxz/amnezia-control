@@ -320,7 +320,12 @@ def _protocol_metadata(server: Server, info: dict, *, agent: str) -> dict:
         "mounts": [],
         "env": [],
         "interface": info.get("interface", ""),
-        "interface_ready": bool(info.get("interface_up")),
+        "interface_ready": bool(
+            info.get(
+                "interface_up",
+                bool(info.get("interface")),
+            )
+        ),
         "command_bin": "agent",
         "interface_addresses": info.get("interface_addresses", []),
         "config_mtu": config_mtu,
