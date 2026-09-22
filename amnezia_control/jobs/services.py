@@ -22,8 +22,8 @@ SENSITIVE_OUTPUT_PATTERNS = (
         r'\s*:\s*"[^"]+"'
     ),
     re.compile(
-        r"(?i)\b[A-Z0-9_]*(?:PRIVATE_KEY|PRESHARED(?:_KEY)?|PSK|"
-        r"PASSWORD|TOKEN|SECRET|HEADER_PROTECTION_KEY)[A-Z0-9_]*="
+        r"(?i)\b[A-Z0-9_]*(?:PRIVATE_?KEY|PRESHARED(?:_?KEY)?|PSK|"
+        r"PASSWORD|TOKEN|SECRET|HEADER_?PROTECTION_?KEY)[A-Z0-9_]*="
         r'[^,\s"\]]+'
     ),
 )
