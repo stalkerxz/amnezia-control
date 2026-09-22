@@ -62,6 +62,7 @@ def _protocol_operator_ready(protocol) -> bool:
 
     if (
         protocol.protocol_type == VPNClient.ProtocolType.AWG2
+        and metadata.get("backend") != "awg_agent"
         and metadata.get("awg_export_compatible") is not True
     ):
         return False
