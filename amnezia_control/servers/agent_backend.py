@@ -308,6 +308,8 @@ def _protocol_metadata(server: Server, info: dict, *, agent: str) -> dict:
         or server.host
     )
     udp_port = info.get("udp_port") or info.get("listen_port")
+    config_mtu = info.get("config_mtu")
+    runtime_mtu = info.get("runtime_mtu")
     metadata = {
         "backend": Server.RuntimeBackend.AWG_AGENT,
         "agent": agent,
@@ -318,7 +320,16 @@ def _protocol_metadata(server: Server, info: dict, *, agent: str) -> dict:
         "mounts": [],
         "env": [],
         "interface": info.get("interface", ""),
+        "interface_ready": bool(info.get("interface_up")),
+        "command_bin": "agent",
         "interface_addresses": info.get("interface_addresses", []),
+        "config_mtu": config_mtu,
+        "runtime_mtu": runtime_mtu,
+        "mtu_mismatch": bool(
+            config_mtu
+            and runtime_mtu
+            and str(config_mtu) != str(runtime_mtu)
+        ),
         "peer_count": int(info.get("peer_count") or 0),
         "peer_source": f"{agent} agent",
         "subnet": info.get("subnet", ""),
@@ -389,6 +400,51 @@ def _sync_agent_runtime(server: Server, actor):
         for key in ServerService.AWG31_REQUIRED_KEYS
         if not awg2_meta.get(key)
     ]
+    modern_keys_present = any(
+        awg2_meta.get(key)
+        for key in ServerService.AWG31_REQUIRED_KEYS
+    )
+    if any(
+        awg2_meta.get(key)
+        for key in ServerService.AWG31_ONLY_KEYS
+    ):
+        awg_generation = "3.1"
+    elif modern_keys_present:
+        awg_generation = "3.x"
+    elif not required_missing:
+        awg_generation = "2.x"
+    else:
+        awg_generation = "unknown"
+
+    awg_capabilities = ["legacy_obfuscation"]
+    if awg2_meta.get("HeaderProtectionKey"):
+        awg_capabilities.append("header_protection")
+    if awg2_meta.get("ContentPaddingAddition"):
+        awg_capabilities.append("content_padding")
+    if any(
+        awg2_meta.get(key)
+        for key in (
+            "RekeyAfterTime",
+            "RekeyTimeout",
+            "RejectAfterTime",
+            "KeepaliveTimeout",
+            "MaxHandshakeAttempts",
+        )
+    ):
+        awg_capabilities.append("custom_timings")
+    if awg2_meta.get("RandomTrailers"):
+        awg_capabilities.append("random_trailers")
+    if awg2_meta.get("DisableCookies"):
+        awg_capabilities.append("disable_cookies")
+
+    awg_export_compatible = (
+        not required_missing
+        and (
+            not modern_keys_present
+            or not awg31_required_missing
+        )
+    )
+
     awg2_secret_metadata = {}
     header_protection_key = awg2_meta.pop(
         "HeaderProtectionKey",
@@ -417,6 +473,11 @@ def _sync_agent_runtime(server: Server, actor):
         "awg2_metadata_ready": not required_missing,
         "awg31_metadata_ready": not awg31_required_missing,
         "awg31_missing_keys": awg31_required_missing,
+        "awg_generation": awg_generation,
+        "awg_capabilities": awg_capabilities,
+        "awg_unknown_interface_keys": [],
+        "awg_export_compatible": awg_export_compatible,
+        "awg_schema_visibility": "agent-known-keys",
         "central_protocol_supported": True,
     }
     awg2.enabled = bool(awg4_info.get("interface_up"))
