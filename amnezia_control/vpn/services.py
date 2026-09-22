@@ -912,7 +912,10 @@ class VPNClientPolicyService:
         if limit_reason:
             return limit_reason
 
-        if client.protocol_type == VPNClient.ProtocolType.AWG2:
+        if (
+            client.protocol_type == VPNClient.ProtocolType.AWG2
+            and client.server.runtime_backend == Server.RuntimeBackend.DOCKER
+        ):
             protocol = ServerProtocol.objects.filter(
                 server=client.server,
                 protocol_type=client.protocol_type,
