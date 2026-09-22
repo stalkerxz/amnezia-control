@@ -89,6 +89,7 @@ class VPNClientFlowTest(TestCase):
             "awg2.save_runtime": R(""),
             "awg2.server_pub": R("server2-public-key==\n"),
             "awg2.list": R("peer2\tpsk\tendpoint\t10.77.0.10/32\t0\t0\t0\t25\n"),
+            "awg2.list_all": R("peer2\tpsk\tendpoint\t10.77.0.10/32\t0\t0\t0\t25\n"),
         }
         return mapping[action]
 
@@ -107,7 +108,13 @@ class VPNClientFlowTest(TestCase):
     def test_config_export_for_awg_legacy(self):
         from unittest.mock import patch
 
-        with patch("vpn.services.RuntimeCommandService.run", side_effect=self._mock_run):
+        with patch(
+            "vpn.services.RuntimeCommandService.run",
+            side_effect=self._mock_run,
+        ), patch(
+            "vpn.services.RuntimeCommandService.run_with_expected_failure",
+            side_effect=self._mock_run,
+        ):
             client = VPNClientService.create_client(server=self.server, name="awg-client", protocol_type=VPNClient.ProtocolType.AWG, actor=self.user)
         conf = VPNClientService.latest_config(client)
         self.assertIn("Endpoint = vpn.example.com:51820", conf)
@@ -117,7 +124,13 @@ class VPNClientFlowTest(TestCase):
     def test_config_export_for_awg2_uses_discovered_metadata(self):
         from unittest.mock import patch
 
-        with patch("vpn.services.RuntimeCommandService.run", side_effect=self._mock_run):
+        with patch(
+            "vpn.services.RuntimeCommandService.run",
+            side_effect=self._mock_run,
+        ), patch(
+            "vpn.services.RuntimeCommandService.run_with_expected_failure",
+            side_effect=self._mock_run,
+        ):
             client = VPNClientService.create_client(server=self.server, name="awg2-client", protocol_type=VPNClient.ProtocolType.AWG2, actor=self.user)
         conf = VPNClientService.latest_config(client)
         self.assertIn("I1 = 11", conf)
@@ -137,7 +150,13 @@ class VPNClientFlowTest(TestCase):
             "H1": "3", "H2": "4", "H3": "5", "H4": "6",
         }
         self.awg2_protocol.save(update_fields=["runtime_metadata"])
-        with patch("vpn.services.RuntimeCommandService.run", side_effect=self._mock_run):
+        with patch(
+            "vpn.services.RuntimeCommandService.run",
+            side_effect=self._mock_run,
+        ), patch(
+            "vpn.services.RuntimeCommandService.run_with_expected_failure",
+            side_effect=self._mock_run,
+        ):
             client = VPNClientService.create_client(server=self.server, name="awg2-no-i", protocol_type=VPNClient.ProtocolType.AWG2, actor=self.user)
         conf = VPNClientService.latest_config(client)
         self.assertIn("Jc = 7", conf)
@@ -146,7 +165,13 @@ class VPNClientFlowTest(TestCase):
     def test_native_awg2_export_moves_amnezia_fields_to_interface(self):
         from unittest.mock import patch
 
-        with patch("vpn.services.RuntimeCommandService.run", side_effect=self._mock_run):
+        with patch(
+            "vpn.services.RuntimeCommandService.run",
+            side_effect=self._mock_run,
+        ), patch(
+            "vpn.services.RuntimeCommandService.run_with_expected_failure",
+            side_effect=self._mock_run,
+        ):
             client = VPNClientService.create_client(server=self.server, name="awg2-native", protocol_type=VPNClient.ProtocolType.AWG2, actor=self.user)
 
         native_conf = VPNClientService.build_native_client_config(client)
@@ -269,7 +294,13 @@ class VPNClientFlowTest(TestCase):
 
         self.awg2_protocol.runtime_metadata = {"udp_port": 51830, "subnet": "10.77.0.0/24", "awg2_metadata": {"S1": "1"}}
         self.awg2_protocol.save(update_fields=["runtime_metadata"])
-        with patch("vpn.services.RuntimeCommandService.run", side_effect=self._mock_run):
+        with patch(
+            "vpn.services.RuntimeCommandService.run",
+            side_effect=self._mock_run,
+        ), patch(
+            "vpn.services.RuntimeCommandService.run_with_expected_failure",
+            side_effect=self._mock_run,
+        ):
             with self.assertRaises(RuntimeError):
                 VPNClientService.create_client(server=self.server, name="awg2-broken", protocol_type=VPNClient.ProtocolType.AWG2, actor=self.user)
 
@@ -280,7 +311,13 @@ class VPNClientFlowTest(TestCase):
 
         self.awg2_protocol.runtime_metadata.pop("subnet", None)
         self.awg2_protocol.save(update_fields=["runtime_metadata"])
-        with patch("vpn.services.RuntimeCommandService.run", side_effect=self._mock_run):
+        with patch(
+            "vpn.services.RuntimeCommandService.run",
+            side_effect=self._mock_run,
+        ), patch(
+            "vpn.services.RuntimeCommandService.run_with_expected_failure",
+            side_effect=self._mock_run,
+        ):
             with self.assertRaises(RuntimeError):
                 VPNClientService.create_client(server=self.server, name="awg2-no-subnet", protocol_type=VPNClient.ProtocolType.AWG2, actor=self.user)
 
@@ -293,7 +330,13 @@ class VPNClientFlowTest(TestCase):
         self.awg_protocol.runtime_metadata["public_host"] = "vpn2.example.com"
         self.awg_protocol.save(update_fields=["runtime_metadata"])
 
-        with patch("vpn.services.RuntimeCommandService.run", side_effect=self._mock_run):
+        with patch(
+            "vpn.services.RuntimeCommandService.run",
+            side_effect=self._mock_run,
+        ), patch(
+            "vpn.services.RuntimeCommandService.run_with_expected_failure",
+            side_effect=self._mock_run,
+        ):
             client = VPNClientService.create_client(server=self.server, name="awg-client-runtime-host", protocol_type=VPNClient.ProtocolType.AWG, actor=self.user)
         conf = VPNClientService.latest_config(client)
         self.assertIn("Endpoint = vpn2.example.com:51820", conf)
@@ -314,7 +357,13 @@ class VPNClientFlowTest(TestCase):
         self.awg2_protocol.runtime_metadata["awg2_metadata"] = parsed
         self.awg2_protocol.save(update_fields=["runtime_metadata"])
 
-        with patch("vpn.services.RuntimeCommandService.run", side_effect=self._mock_run):
+        with patch(
+            "vpn.services.RuntimeCommandService.run",
+            side_effect=self._mock_run,
+        ), patch(
+            "vpn.services.RuntimeCommandService.run_with_expected_failure",
+            side_effect=self._mock_run,
+        ):
             client = VPNClientService.create_client(server=self.server, name="awg2-parser-ok", protocol_type=VPNClient.ProtocolType.AWG2, actor=self.user)
         conf = VPNClientService.latest_config(client)
         self.assertIn("Jc = 7", conf)
