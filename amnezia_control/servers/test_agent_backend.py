@@ -3,7 +3,10 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
-from servers.agent_backend import RemoteAWG2AgentAdapter
+from servers.agent_backend import (
+    RemoteAWG2AgentAdapter,
+    _protocol_metadata,
+)
 from servers.agent_vpn_hooks import _agent_routes, _validate_agent_config
 from servers.models import ProtocolProfile, Server, ServerProtocol
 from servers.services import ServerService
@@ -46,6 +49,26 @@ class AgentBackendTest(TestCase):
             password="123",
             is_staff=True,
         )
+
+    def test_agent_interface_ready_falls_back_for_old_bridge(self):
+        server = Server.objects.create(
+            name="agent-old-bridge-contract",
+            public_endpoint_host="vpn.example.com",
+            public_endpoint_port=51831,
+            runtime_backend=Server.RuntimeBackend.AWG_AGENT,
+        )
+
+        metadata = _protocol_metadata(
+            server,
+            {
+                "interface": "awg4",
+                "udp_port": 51831,
+                "subnet": "10.78.0.0/24",
+            },
+            agent="awg4",
+        )
+
+        self.assertTrue(metadata["interface_ready"])
 
     def test_server_defaults_to_docker_backend(self):
         server = Server.objects.create(name="docker-default")
