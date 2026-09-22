@@ -2262,10 +2262,58 @@ class VPNClientService:
                     "before reissue."
                 )
 
+        # Resolve all deterministic export inputs before touching
+        # the current runtime peer. A bad endpoint/profile/AWG schema
+        # must fail closed without disconnecting the working client.
+        endpoint = VPNClientService.resolve_endpoint(
+            client.server,
+            adapter.protocol,
+        )
+        allowed_ips = "0.0.0.0/0, ::/0"
+        awg_mtu = None
+
+        if (
+            client.protocol_type
+            == VPNClient.ProtocolType.AWG2
+        ):
+            allowed_ips = (
+                VPNClientService
+                .resolve_profile_allowed_ips(
+                    client.profile
+                )
+            )
+            awg_mtu = (
+                adapter.protocol.runtime_metadata.get(
+                    "config_mtu"
+                )
+                or adapter.protocol.runtime_metadata.get(
+                    "runtime_mtu"
+                )
+            )
+
+            # Reuse the production config builder as the source of
+            # truth for AWG 2.x/3.1 validation. Placeholder key
+            # material is never persisted or sent to the runtime.
+            VPNClientService.build_awg2_client_config(
+                private_key="preflight-private",
+                address="127.0.0.1",
+                endpoint=endpoint,
+                server_public_key="preflight-public",
+                awg2_metadata=(
+                    awg_runtime_metadata
+                    or {}
+                ),
+                allowed_ips=allowed_ips,
+                mtu=awg_mtu,
+            )
+
         if client.runtime_peer_public_key:
-            adapter.remove_peer(actor, client.runtime_peer_public_key)
+            adapter.remove_peer(
+                actor,
+                client.runtime_peer_public_key,
+            )
+
         generated = adapter.create_peer(actor)
-        endpoint = VPNClientService.resolve_endpoint(client.server, adapter.protocol)
 
         if client.protocol_type == VPNClient.ProtocolType.AWG:
             config = VPNClientService.build_awg_legacy_client_config(
@@ -2276,9 +2324,6 @@ class VPNClientService:
                 preshared_key=generated.get("preshared_key", ""),
             )
         else:
-            allowed_ips = VPNClientService.resolve_profile_allowed_ips(
-                client.profile
-            )
             config = VPNClientService.build_awg2_client_config(
                 private_key=generated["private_key"],
                 address=generated["address"],
@@ -2290,14 +2335,7 @@ class VPNClientService:
                 ),
                 preshared_key=generated.get("preshared_key", ""),
                 allowed_ips=allowed_ips,
-                mtu=(
-                    adapter.protocol.runtime_metadata.get(
-                        "config_mtu"
-                    )
-                    or adapter.protocol.runtime_metadata.get(
-                        "runtime_mtu"
-                    )
-                ),
+                mtu=awg_mtu,
             )
 
         amneziavpn_config = ""
