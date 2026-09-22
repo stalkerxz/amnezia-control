@@ -211,12 +211,35 @@ class VPNReissueStatusSafetyTest(
                 container_name=(
                     "amnezia-awg2"
                 ),
+                container_status="running",
                 enabled=True,
                 runtime_metadata={
+                    "config_path": (
+                        "/opt/amnezia/awg/awg0.conf"
+                    ),
                     "udp_port": 51830,
+                    "interface": "awg0",
+                    "interface_ready": True,
                     "subnet": (
                         "10.77.0.0/24"
                     ),
+                    "subnet_ready": True,
+                    "endpoint_host_ready": True,
+                    "endpoint_port_ready": True,
+                    "awg_export_compatible": True,
+                    "awg2_metadata": {
+                        "Jc": "6",
+                        "Jmin": "10",
+                        "Jmax": "50",
+                        "S1": "76",
+                        "S2": "56",
+                        "S3": "63",
+                        "S4": "12",
+                        "H1": "1",
+                        "H2": "2",
+                        "H3": "3",
+                        "H4": "4",
+                    },
                 },
             )
         )
