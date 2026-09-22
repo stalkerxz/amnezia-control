@@ -953,6 +953,34 @@ class VPNClientPolicyService:
                     + suffix
                 )
 
+            readiness_missing = []
+            if (
+                (protocol.container_status or "").lower()
+                != "running"
+            ):
+                readiness_missing.append("container")
+            if not metadata.get("config_path"):
+                readiness_missing.append("config_path")
+            if not metadata.get(
+                "interface_ready",
+                bool(metadata.get("interface")),
+            ):
+                readiness_missing.append("interface")
+            if not metadata.get("subnet_ready"):
+                readiness_missing.append("subnet")
+            if not metadata.get("endpoint_host_ready"):
+                readiness_missing.append("endpoint_host")
+            if not metadata.get("endpoint_port_ready"):
+                readiness_missing.append("endpoint_port")
+
+            if readiness_missing:
+                return (
+                    "Переиздание запрещено: runtime AWG не прошёл "
+                    "проверку готовности: "
+                    + ", ".join(readiness_missing)
+                    + ". Выполните синхронизацию runtime."
+                )
+
             if metadata.get("mtu_mismatch"):
                 return (
                     "Переиздание запрещено: MTU конфигурации AWG "
