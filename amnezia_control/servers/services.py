@@ -36,6 +36,24 @@ class ServerService:
         "RandomTrailers",
         "DisableCookies",
     ]
+    AWG31_ONLY_KEYS = [
+        "RandomTrailers",
+        "DisableCookies",
+    ]
+    AWG_BASE_INTERFACE_KEYS = {
+        "privatekey",
+        "address",
+        "listenport",
+        "mtu",
+        "table",
+        "saveconfig",
+        "preup",
+        "postup",
+        "predown",
+        "postdown",
+        "dns",
+        "fwmark",
+    }
     HEALTH_NOT_CHECKED = "not_checked"
     HEALTH_HEALTHY = "healthy"
     HEALTH_DEGRADED = "degraded"
@@ -202,9 +220,19 @@ class ServerService:
                 metrics["protocols"].append(protocol_row)
                 continue
             try:
-                peer_cmd = "docker exec {container} sh -lc 'grep -c \"^\\[Peer\\]\" {config}; wg show {iface} peers | wc -l'".format(
+                command_bin = (
+                    (protocol.runtime_metadata or {}).get(
+                        "command_bin",
+                        "wg",
+                    )
+                    or "wg"
+                )
+                if command_bin not in {"wg", "awg"}:
+                    command_bin = "wg"
+                peer_cmd = "docker exec {container} sh -lc 'grep -c \"^\\[Peer\\]\" {config}; {command_bin} show {iface} peers | wc -l'".format(
                     container=shlex.quote(protocol_row["container_name"]),
                     config=shlex.quote(protocol_row["config_path"]),
+                    command_bin=command_bin,
                     iface=shlex.quote(protocol_row["interface"]),
                 )
                 peer_out = RuntimeCommandService.run(
@@ -263,16 +291,32 @@ class ServerService:
             metadata = protocol.runtime_metadata or {}
             status = (protocol.container_status or "").lower().strip()
             running = status == "running"
+            interface_ready = bool(
+                metadata.get(
+                    "interface_ready",
+                    bool(metadata.get("interface")),
+                )
+            )
             subnet_ready = bool(metadata.get("subnet_ready"))
             endpoint_host_ready = bool(metadata.get("endpoint_host_ready"))
             endpoint_port_ready = bool(metadata.get("endpoint_port_ready"))
-            protocol_ready = running and subnet_ready and endpoint_host_ready and endpoint_port_ready
+            protocol_ready = (
+                running
+                and interface_ready
+                and subnet_ready
+                and endpoint_host_ready
+                and endpoint_port_ready
+            )
 
             if status == "missing":
                 blocking_issues.append(f"{protocol_type.upper()}: контейнер {container_name} отсутствует")
                 continue
             if not running:
                 blocking_issues.append(f"{protocol_type.upper()}: контейнер не запущен (статус: {status or 'unknown'})")
+            if not interface_ready:
+                blocking_issues.append(
+                    f"{protocol_type.upper()}: runtime-интерфейс не обнаружен"
+                )
             if not subnet_ready:
                 blocking_issues.append(f"{protocol_type.upper()}: не определена подсеть")
             if not endpoint_host_ready:
@@ -280,11 +324,28 @@ class ServerService:
             if not endpoint_port_ready:
                 blocking_issues.append(f"{protocol_type.upper()}: не готов endpoint port")
 
+            if metadata.get("mtu_mismatch"):
+                degraded_issues.append(
+                    f"{protocol_type.upper()}: MTU конфигурации "
+                    f"({metadata.get('config_mtu')}) не совпадает с "
+                    f"runtime MTU ({metadata.get('runtime_mtu')})"
+                )
+
             if protocol_type == ServerProtocol.ProtocolType.AWG2:
                 awg2_metadata_ready = metadata.get("awg2_metadata_ready", True)
                 if not awg2_metadata_ready:
                     missing = ", ".join(metadata.get("awg2_missing_keys", [])) or "обязательные параметры"
                     blocking_issues.append(f"AWG2: отсутствуют обязательные параметры ({missing})")
+
+                if metadata.get("awg_export_compatible") is False:
+                    unknown_keys = ", ".join(
+                        metadata.get("awg_unknown_interface_keys", [])
+                    )
+                    details = f": {unknown_keys}" if unknown_keys else ""
+                    degraded_issues.append(
+                        "AWG2: выпуск новых конфигураций заблокирован"
+                        f"{details}"
+                    )
 
                 peer_source = (metadata.get("peer_source", "") or "").lower()
                 if "degraded telemetry" in peer_source or "fallback" in peer_source:
@@ -323,13 +384,13 @@ class ServerService:
     @staticmethod
     def _sanitize_runtime_env(env_list):
         sensitive_markers = (
-            "PRIVATE_KEY",
+            "PRIVATEKEY",
             "PRESHARED",
             "PSK",
             "PASSWORD",
             "TOKEN",
             "SECRET",
-            "HEADER_PROTECTION_KEY",
+            "HEADERPROTECTIONKEY",
         )
         sanitized = []
         for item in env_list:
@@ -337,8 +398,13 @@ class ServerService:
                 sanitized.append(item)
                 continue
             key, value = item.split("=", 1)
+            normalized_key = re.sub(
+                r"[^A-Z0-9]",
+                "",
+                key.upper(),
+            )
             if any(
-                marker in key.upper()
+                marker in normalized_key
                 for marker in sensitive_markers
             ):
                 value = "[REDACTED]"
@@ -376,6 +442,7 @@ class ServerService:
         """
         subnet = ""
         listen_port = None
+        mtu = None
         section = ""
 
         for line in raw_conf.splitlines():
@@ -429,7 +496,18 @@ class ServerService:
                 except ValueError:
                     listen_port = None
 
-        return subnet, listen_port
+            if (
+                text.lower().startswith("mtu")
+                and "=" in text
+            ):
+                try:
+                    mtu = int(
+                        text.split("=", 1)[1].strip()
+                    )
+                except ValueError:
+                    mtu = None
+
+        return subnet, listen_port, mtu
 
     @staticmethod
     def _is_public_host(value: str) -> bool:
@@ -445,7 +523,16 @@ class ServerService:
 
     @classmethod
     def _normalize_awg2_key(cls, key: str) -> str:
-        compact = re.sub(r"[^A-Za-z0-9]", "", key).upper().replace("AWG2", "")
+        compact = re.sub(
+            r"[^A-Za-z0-9]",
+            "",
+            key,
+        ).upper()
+        compact = re.sub(
+            r"^AWG2?",
+            "",
+            compact,
+        )
         mapping = {
             "JC": "Jc",
             "JMIN": "Jmin",
@@ -462,7 +549,7 @@ class ServerService:
         }
         if compact in mapping:
             return mapping[compact]
-        if compact and compact[0] in {"I", "S", "H"}:
+        if re.fullmatch(r"I[1-5]|[SH][1-4]", compact):
             return compact
         return ""
 
@@ -495,6 +582,105 @@ class ServerService:
         required_missing = [k for k in cls.AWG2_REQUIRED_KEYS if not discovered.get(k)]
         optional_missing = [k for k in cls.AWG2_OPTIONAL_KEYS if not discovered.get(k)]
         return discovered, required_missing, optional_missing
+
+    @classmethod
+    def _classify_awg_runtime(
+        cls,
+        conf_text: str,
+        metadata: dict,
+    ) -> dict:
+        raw_interface_keys = []
+        section = ""
+
+        for line in conf_text.splitlines():
+            text = line.strip()
+            if not text or text.startswith("#"):
+                continue
+            if text.startswith("[") and text.endswith("]"):
+                section = text.lower()
+                continue
+            if section != "[interface]" or "=" not in text:
+                continue
+            raw_interface_keys.append(
+                text.split("=", 1)[0].strip()
+            )
+
+        unknown_keys = []
+        for key in raw_interface_keys:
+            if key.lower() in cls.AWG_BASE_INTERFACE_KEYS:
+                continue
+            if cls._normalize_awg2_key(key):
+                continue
+            unknown_keys.append(key)
+
+        modern_keys = [
+            key
+            for key in cls.AWG31_REQUIRED_KEYS
+            if metadata.get(key)
+        ]
+        if any(
+            metadata.get(key)
+            for key in cls.AWG31_ONLY_KEYS
+        ):
+            generation = "3.1"
+        elif modern_keys:
+            generation = "3.x"
+        elif all(
+            metadata.get(key)
+            for key in cls.AWG2_REQUIRED_KEYS
+        ):
+            generation = "2.x"
+        else:
+            generation = "unknown"
+
+        capabilities = ["legacy_obfuscation"]
+        if metadata.get("HeaderProtectionKey"):
+            capabilities.append("header_protection")
+        if metadata.get("ContentPaddingAddition"):
+            capabilities.append("content_padding")
+        if any(
+            metadata.get(key)
+            for key in (
+                "RekeyAfterTime",
+                "RekeyTimeout",
+                "RejectAfterTime",
+                "KeepaliveTimeout",
+                "MaxHandshakeAttempts",
+            )
+        ):
+            capabilities.append("custom_timings")
+        if metadata.get("RandomTrailers"):
+            capabilities.append("random_trailers")
+        if metadata.get("DisableCookies"):
+            capabilities.append("disable_cookies")
+
+        missing_base = [
+            key
+            for key in cls.AWG2_REQUIRED_KEYS
+            if not metadata.get(key)
+        ]
+        missing_modern = (
+            [
+                key
+                for key in cls.AWG31_REQUIRED_KEYS
+                if not metadata.get(key)
+            ]
+            if modern_keys
+            else []
+        )
+
+        return {
+            "generation": generation,
+            "capabilities": capabilities,
+            "unknown_interface_keys": sorted(
+                set(unknown_keys)
+            ),
+            "export_compatible": (
+                not missing_base
+                and not missing_modern
+                and not unknown_keys
+            ),
+        }
 
     @staticmethod
     def _candidate_config_paths(iface: str):
@@ -626,19 +812,80 @@ class ServerService:
                 config_env = inspect_data[0].get("Config", {}).get("Env", [])
 
                 iface = ""
+                command_bin = "wg"
+                runtime_mtu = None
                 peer_count = 0
                 peer_source = "none"
                 raw_iface_conf = ""
                 config_path = ""
                 if container_name in running_names:
                     try:
-                        iface = RuntimeCommandService.run(server, actor, f"runtime.iface.{protocol_type}", f"docker exec {container_name} wg show interfaces").stdout.strip().split()[0]
+                        previous_command_bin = (
+                            (protocol.runtime_metadata or {}).get(
+                                "command_bin"
+                            )
+                        )
+                        if protocol_type == ServerProtocol.ProtocolType.AWG2:
+                            if previous_command_bin in {"awg", "wg"}:
+                                fallback_bin = (
+                                    "wg"
+                                    if previous_command_bin == "awg"
+                                    else "awg"
+                                )
+                                command_candidates = (
+                                    previous_command_bin,
+                                    fallback_bin,
+                                )
+                            else:
+                                command_candidates = ("awg", "wg")
+                        else:
+                            command_candidates = ("wg",)
+
+                        for candidate in command_candidates:
+                            try:
+                                iface_out = RuntimeCommandService.run(
+                                    server,
+                                    actor,
+                                    f"runtime.iface.{protocol_type}",
+                                    f"docker exec {container_name} {candidate} show interfaces",
+                                ).stdout.strip()
+                            except Exception:
+                                continue
+
+                            if iface_out:
+                                iface = iface_out.split()[0]
+                                command_bin = candidate
+                                break
+
+                        if not iface:
+                            raise RuntimeError(
+                                f"{protocol_type.upper()} runtime interface not detected"
+                            )
+
+                        try:
+                            runtime_mtu_raw = RuntimeCommandService.run(
+                                server,
+                                actor,
+                                f"runtime.mtu.{protocol_type}",
+                                (
+                                    f"docker exec {container_name} cat "
+                                    f"/sys/class/net/{iface}/mtu"
+                                ),
+                            ).stdout.strip()
+                            runtime_mtu = (
+                                int(runtime_mtu_raw)
+                                if runtime_mtu_raw.isdigit()
+                                else None
+                            )
+                        except Exception:
+                            runtime_mtu = None
+
                         if protocol_type == ServerProtocol.ProtocolType.AWG2:
                             dump_result = RuntimeCommandService.run_with_expected_failure(
                                 server,
                                 actor,
                                 f"runtime.peers.{protocol_type}.all",
-                                f"docker exec {container_name} wg show all dump",
+                                f"docker exec {container_name} {command_bin} show all dump",
                                 expected_error_patterns=RuntimeCommandService.AWG2_EXPECTED_RUNTIME_DUMP_ERRORS,
                                 fallback_message="AWG2 runtime telemetry unavailable: using config fallback (degraded mode).",
                                 warn_on_expected_failure=False,
@@ -648,7 +895,7 @@ class ServerService:
                                     server,
                                     actor,
                                     f"runtime.peers.{protocol_type}",
-                                    f"docker exec {container_name} wg show dump",
+                                    f"docker exec {container_name} {command_bin} show dump",
                                     expected_error_patterns=RuntimeCommandService.AWG2_EXPECTED_RUNTIME_DUMP_ERRORS,
                                     fallback_message="AWG2 runtime telemetry unavailable: using config fallback (degraded mode).",
                                 )
@@ -694,10 +941,27 @@ class ServerService:
                             peer_count = len(cls._parse_peers_from_config_text(raw_iface_conf))
                             peer_source = "config file fallback (degraded telemetry)"
 
-                subnet, listen_port = cls._parse_interface_metadata(raw_iface_conf)
+                (
+                    subnet,
+                    listen_port,
+                    config_mtu,
+                ) = cls._parse_interface_metadata(
+                    raw_iface_conf
+                )
+                mtu_mismatch = bool(
+                    config_mtu
+                    and runtime_mtu
+                    and config_mtu != runtime_mtu
+                )
                 awg2_meta, awg2_required_missing, awg2_optional_missing = ({}, [], [])
                 awg31_required_missing = []
                 awg2_secret_metadata = {}
+                awg_runtime = {
+                    "generation": "",
+                    "capabilities": [],
+                    "unknown_interface_keys": [],
+                    "export_compatible": True,
+                }
 
                 if protocol_type == ServerProtocol.ProtocolType.AWG2:
                     (
@@ -714,6 +978,11 @@ class ServerService:
                         for key in cls.AWG31_REQUIRED_KEYS
                         if not awg2_meta.get(key)
                     ]
+
+                    awg_runtime = cls._classify_awg_runtime(
+                        raw_iface_conf,
+                        awg2_meta,
+                    )
 
                     header_protection_key = awg2_meta.pop(
                         "HeaderProtectionKey",
@@ -741,6 +1010,11 @@ class ServerService:
                     "mounts": [m.get("Destination", "") for m in inspect_data[0].get("Mounts", [])],
                     "env": cls._sanitize_runtime_env(config_env),
                     "interface": iface,
+                    "interface_ready": bool(iface),
+                    "command_bin": command_bin,
+                    "config_mtu": config_mtu,
+                    "runtime_mtu": runtime_mtu,
+                    "mtu_mismatch": mtu_mismatch,
                     "peer_count": peer_count,
                     "peer_source": peer_source,
                     "subnet": subnet,
@@ -772,6 +1046,14 @@ class ServerService:
                         if protocol_type
                         == ServerProtocol.ProtocolType.AWG2
                         else []
+                    ),
+                    "awg_generation": awg_runtime["generation"],
+                    "awg_capabilities": awg_runtime["capabilities"],
+                    "awg_unknown_interface_keys": (
+                        awg_runtime["unknown_interface_keys"]
+                    ),
+                    "awg_export_compatible": (
+                        awg_runtime["export_compatible"]
                     ),
                 }
             else:
