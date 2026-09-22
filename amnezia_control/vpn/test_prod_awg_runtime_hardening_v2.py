@@ -1,4 +1,5 @@
-from unittest.mock import patch
+from types import SimpleNamespace
+from unittest.mock import Mock, patch
 
 from django.contrib.auth import get_user_model
 from django.test import SimpleTestCase, TestCase
@@ -328,6 +329,55 @@ class ProdAWGCompatibilityPolicyTest(TestCase):
                 )
 
         adapter_factory.assert_not_called()
+
+    def test_invalid_awg31_metadata_fails_before_peer_mutation(self):
+        metadata = _awg31_metadata()
+        metadata["S4"] = "7"
+        self.protocol.runtime_metadata = {
+            "config_path": "/opt/amnezia/awg/awg0.conf",
+            "interface": "awg0",
+            "interface_ready": True,
+            "subnet": "10.77.0.0/24",
+            "subnet_ready": True,
+            "endpoint_host_ready": True,
+            "endpoint_port_ready": True,
+            "awg_export_compatible": True,
+            "awg2_metadata": metadata,
+            "awg31_metadata_ready": True,
+            "runtime_mtu": 1376,
+            "mtu_mismatch": False,
+        }
+        self.protocol.save(update_fields=["runtime_metadata"])
+        self.client_obj.runtime_peer_public_key = "old-peer"
+        self.client_obj.runtime_address = "10.77.0.20"
+        self.client_obj.save(
+            update_fields=[
+                "runtime_peer_public_key",
+                "runtime_address",
+            ]
+        )
+
+        adapter = SimpleNamespace(
+            protocol=self.protocol,
+            remove_peer=Mock(),
+            create_peer=Mock(),
+        )
+
+        with patch(
+            "vpn.services.AdapterFactory.get_for_client",
+            return_value=adapter,
+        ):
+            with self.assertRaisesRegex(
+                RuntimeError,
+                "S1-S4 >= 12",
+            ):
+                VPNClientService.reissue_config(
+                    client=self.client_obj,
+                    actor=self.user,
+                )
+
+        adapter.remove_peer.assert_not_called()
+        adapter.create_peer.assert_not_called()
 
     def test_adapter_uses_discovered_awg_cli(self):
         self.protocol.runtime_metadata = {
