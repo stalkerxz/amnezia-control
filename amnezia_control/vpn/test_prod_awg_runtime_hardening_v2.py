@@ -276,8 +276,38 @@ class ProdAWGCompatibilityPolicyTest(TestCase):
 
         adapter_factory.assert_not_called()
 
+    def test_incomplete_runtime_readiness_blocks_before_mutation(self):
+        self.protocol.runtime_metadata = {
+            "awg_export_compatible": True,
+            "awg2_metadata": _legacy_metadata(),
+            "interface": "awg0",
+            "interface_ready": True,
+        }
+        self.protocol.save(update_fields=["runtime_metadata"])
+
+        with patch(
+            "vpn.services.AdapterFactory.get_for_client"
+        ) as adapter_factory:
+            with self.assertRaisesRegex(
+                RuntimeError,
+                "проверку готовности",
+            ):
+                VPNClientService.reissue_config(
+                    client=self.client_obj,
+                    actor=self.user,
+                )
+
+        adapter_factory.assert_not_called()
+
     def test_mtu_mismatch_blocks_reissue_before_mutation(self):
         self.protocol.runtime_metadata = {
+            "config_path": "/opt/amnezia/awg/awg0.conf",
+            "interface": "awg0",
+            "interface_ready": True,
+            "subnet": "10.77.0.0/24",
+            "subnet_ready": True,
+            "endpoint_host_ready": True,
+            "endpoint_port_ready": True,
             "awg_export_compatible": True,
             "awg2_metadata": _legacy_metadata(),
             "config_mtu": 1420,
