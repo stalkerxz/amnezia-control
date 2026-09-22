@@ -370,6 +370,17 @@ class BaseProtocolAdapter:
         if not self.protocol or not self.protocol.container_name:
             raise ValueError(f"Container for {self.protocol_type} not detected")
 
+        runtime_command_bin = (
+            (self.protocol.runtime_metadata or {}).get(
+                "command_bin"
+            )
+        )
+        if (
+            self.protocol_type == VPNClient.ProtocolType.AWG2
+            and runtime_command_bin in {"awg", "wg"}
+        ):
+            self.command_bin = runtime_command_bin
+
     @property
     def container(self):
         return self.protocol.container_name
@@ -894,10 +905,102 @@ class VPNClientPolicyService:
                 "сначала включите клиента."
             )
 
-        return cls.REISSUE_BLOCK_REASONS.get(
+        limit_reason = cls.REISSUE_BLOCK_REASONS.get(
             cls.limit_state(client),
             "",
         )
+        if limit_reason:
+            return limit_reason
+
+        if client.protocol_type == VPNClient.ProtocolType.AWG2:
+            protocol = ServerProtocol.objects.filter(
+                server=client.server,
+                protocol_type=client.protocol_type,
+            ).first()
+            metadata = (
+                protocol.runtime_metadata
+                if protocol
+                else {}
+            )
+
+            if (
+                not protocol
+                or "awg_export_compatible" not in metadata
+            ):
+                return (
+                    "Переиздание запрещено: совместимость runtime AWG "
+                    "ещё не проверена. Выполните синхронизацию runtime."
+                )
+
+            if metadata.get("awg_export_compatible") is False:
+                unknown = ", ".join(
+                    metadata.get(
+                        "awg_unknown_interface_keys",
+                        [],
+                    )
+                )
+                suffix = (
+                    f" Неизвестные параметры: {unknown}."
+                    if unknown
+                    else ""
+                )
+                return (
+                    "Переиздание запрещено: runtime AWG использует "
+                    "неподдерживаемую схему конфигурации."
+                    + suffix
+                )
+
+            if metadata.get("mtu_mismatch"):
+                return (
+                    "Переиздание запрещено: MTU конфигурации AWG "
+                    f"({metadata.get('config_mtu')}) не совпадает с "
+                    f"runtime MTU ({metadata.get('runtime_mtu')}). "
+                    "Сначала устраните расхождение и выполните "
+                    "синхронизацию runtime."
+                )
+
+            try:
+                awg_metadata = (
+                    VPNClientService._runtime_awg_metadata(
+                        protocol
+                    )
+                )
+            except RuntimeError:
+                return (
+                    "Переиздание запрещено: защищённые параметры AWG "
+                    "не могут быть прочитаны. Выполните "
+                    "синхронизацию runtime."
+                )
+
+            missing = [
+                key
+                for key in (
+                    VPNClientService
+                    .AWG2_REQUIRED_METADATA_KEYS
+                )
+                if not awg_metadata.get(key)
+            ]
+            if missing:
+                return (
+                    "Переиздание запрещено: runtime AWG не содержит "
+                    "обязательные параметры: "
+                    + ", ".join(missing)
+                    + ". Выполните синхронизацию runtime."
+                )
+
+            if (
+                metadata.get("awg31_metadata_ready")
+                and not awg_metadata.get(
+                    "HeaderProtectionKey"
+                )
+            ):
+                return (
+                    "Переиздание запрещено: AWG 3.1 "
+                    "HeaderProtectionKey недоступен. "
+                    "Выполните синхронизацию runtime."
+                )
+
+        return ""
 
     @classmethod
     def can_reissue(cls, client: VPNClient):
@@ -911,6 +1014,12 @@ class VPNClientPolicyService:
 
 
 class VPNClientService:
+    AWG2_REQUIRED_METADATA_KEYS = (
+        "Jc", "Jmin", "Jmax",
+        "S1", "S2", "S3", "S4",
+        "H1", "H2", "H3", "H4",
+    )
+
     AWG_INTERFACE_EXTRA_KEYS = (
         "Jc", "Jmin", "Jmax",
         "S1", "S2", "S3", "S4",
@@ -1078,6 +1187,7 @@ class VPNClientService:
         awg2_metadata: dict,
         preshared_key: str = "",
         allowed_ips: str = "0.0.0.0/0, ::/0",
+        mtu=None,
     ) -> str:
         required = (
             "Jc", "Jmin", "Jmax",
@@ -1141,6 +1251,10 @@ class VPNClientService:
             f"Address = {address}/32",
             "DNS = 1.1.1.1",
         ]
+        if mtu:
+            interface_lines.append(
+                f"MTU = {mtu}"
+            )
 
         peer_lines = [
             "[Peer]",
@@ -1294,6 +1408,18 @@ class VPNClientService:
         ]
         if interface.get("DNS"):
             lines.append(f"DNS = {interface['DNS']}")
+        runtime = (
+            protocol.runtime_metadata
+            if protocol
+            else {}
+        )
+        mtu = (
+            interface.get("MTU")
+            or runtime.get("config_mtu")
+            or runtime.get("runtime_mtu")
+        )
+        if mtu:
+            lines.append(f"MTU = {mtu}")
         lines.extend(f"{k} = {extra_values[k]}" for k in cls.AWG_INTERFACE_EXTRA_KEYS if extra_values.get(k))
         lines.extend(["", "[Peer]", f"PublicKey = {peer['PublicKey']}"])
         if peer.get("PresharedKey"):
@@ -2133,6 +2259,14 @@ class VPNClientService:
                 ),
                 preshared_key=generated.get("preshared_key", ""),
                 allowed_ips=allowed_ips,
+                mtu=(
+                    adapter.protocol.runtime_metadata.get(
+                        "config_mtu"
+                    )
+                    or adapter.protocol.runtime_metadata.get(
+                        "runtime_mtu"
+                    )
+                ),
             )
 
         amneziavpn_config = ""
