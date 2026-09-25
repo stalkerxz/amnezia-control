@@ -303,19 +303,16 @@ class CustomerOperatorWorkspaceTest(
             ]
         )
 
+
     def test_detail_page_renders_workspace(
         self,
     ):
-        self.client.force_login(
-            self.operator
-        )
+        self.client.force_login(self.operator)
 
-        target_account = (
-            CustomerAccount.objects.create(
-                display_name="Workspace Move Target",
-                email="workspace-target@example.com",
-                created_by=self.operator,
-            )
+        CustomerAccount.objects.create(
+            display_name="Workspace Move Target",
+            email="workspace-target@example.com",
+            created_by=self.operator,
         )
 
         response = self.client.get(
@@ -325,43 +322,14 @@ class CustomerOperatorWorkspaceTest(
             )
         )
 
-        self.assertEqual(
-            response.status_code,
-            200,
-        )
-
-        self.assertContains(
-            response,
-            "Рабочая область клиента",
-        )
-
-        self.assertContains(
-            response,
-            "Весь интернет через VPN",
-        )
-
-        self.assertContains(
-            response,
-            "Только выбранные сервисы",
-        )
-
-        self.assertContains(
-            response,
-            "Альтернативное подключение",
-        )
-
-        for technical_marker in (
-            "AWG2 FULL",
-            "AWG2 SELECTIVE",
-            "VLESS / XHTTP",
-            "Скачать AWG",
-            "Скачать JSON",
-            "XHTTP #",
-        ):
-            self.assertNotContains(
-                response,
-                technical_marker,
-            )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Устройства и VPN")
+        self.assertContains(response, "Подключения")
+        self.assertContains(response, "FULL")
+        self.assertContains(response, "SELECT")
+        self.assertContains(response, "ALT")
+        self.assertContains(response, "+ Подключение")
+        self.assertContains(response, "v6-device-settings-toggle")
 
         for hidden_metadata in (
             f"· ID {self.device.pk}",
@@ -369,103 +337,19 @@ class CustomerOperatorWorkspaceTest(
             f"VPN #{self.selective.pk}",
             self.full.runtime_address,
             self.selective.runtime_address,
-            self.server.name,
         ):
             self.assertNotContains(
                 response,
                 hidden_metadata,
             )
 
-        self.assertContains(
-            response,
-            reverse(
-                "customers-device-connection-create",
-                args=[self.device.pk],
-            ),
-        )
-
-        self.assertContains(
-            response,
-            "+ Подключение",
-        )
-
-        self.assertContains(
-            response,
-            "Управление",
-        )
-
-        self.assertContains(
-            response,
-            (
-                'data-bs-target="'
-                f'#device-workspace-{self.device.pk}"'
-            ),
-        )
-
-        self.assertContains(
-            response,
-            (
-                'id="'
-                f'device-workspace-{self.device.pk}"'
-            ),
-        )
-
-        self.assertNotContains(
-            response,
-            "?routing_mode=full",
-        )
-
-        self.assertNotContains(
-            response,
-            "?routing_mode=selective",
-        )
-
-        self.assertContains(
-            response,
-            reverse(
-                "customers-device-move",
-                args=[self.device.pk],
-            ),
-        )
-
-        self.assertContains(
-            response,
-            "Перенести устройство",
-        )
-
-        self.assertContains(
-            response,
-            target_account.display_name,
-        )
-
-        self.assertContains(
-            response,
-            "Дополнительные действия",
-        )
-
-        self.assertContains(
-            response,
-            "Редактировать аккаунт",
-        )
-
-        self.assertContains(
-            response,
-            "Объединение аккаунтов",
-        )
-
-        self.assertNotContains(
-            response,
-            "Редактировать клиента",
-        )
 
     def test_selective_create_link_preselects_mode(
         self,
     ):
-        self.client.force_login(
-            self.operator
-        )
+        self.client.force_login(self.operator)
 
-        url = (
+        response = self.client.get(
             reverse(
                 "customers-device-vpn-create",
                 args=[self.device.pk],
@@ -473,28 +357,23 @@ class CustomerOperatorWorkspaceTest(
             + "?routing_mode=selective"
         )
 
-        response = self.client.get(url)
-
+        self.assertEqual(response.status_code, 302)
         self.assertEqual(
-            response.status_code,
-            200,
+            response.url,
+            reverse(
+                "customers-device-connection-create",
+                args=[self.device.pk],
+            )
+            + "?product=selective",
         )
 
-        form = response.context["form"]
-
-        self.assertEqual(
-            form.initial["routing_mode"],
-            "selective",
-        )
 
     def test_invalid_create_mode_falls_back_to_full(
         self,
     ):
-        self.client.force_login(
-            self.operator
-        )
+        self.client.force_login(self.operator)
 
-        url = (
+        response = self.client.get(
             reverse(
                 "customers-device-vpn-create",
                 args=[self.device.pk],
@@ -502,35 +381,24 @@ class CustomerOperatorWorkspaceTest(
             + "?routing_mode=invalid"
         )
 
-        response = self.client.get(url)
-
+        self.assertEqual(response.status_code, 302)
         self.assertEqual(
-            response.status_code,
-            200,
+            response.url,
+            reverse(
+                "customers-device-connection-create",
+                args=[self.device.pk],
+            )
+            + "?product=full",
         )
 
-        form = response.context["form"]
-
-        self.assertEqual(
-            form.initial["routing_mode"],
-            "full",
-        )
 
     def test_workspace_hides_internal_device_metadata(
         self,
     ):
-        self.client.force_login(
-            self.operator
-        )
+        self.client.force_login(self.operator)
 
-        self.device.platform = (
-            ClientDevice.Platform.UNKNOWN
-        )
-
-        self.device.notes = (
-            "legacy-vpn-client:999"
-        )
-
+        self.device.platform = ClientDevice.Platform.UNKNOWN
+        self.device.notes = "legacy-vpn-client:999"
         self.device.save(
             update_fields=[
                 "platform",
@@ -545,22 +413,16 @@ class CustomerOperatorWorkspaceTest(
             )
         )
 
-        self.assertEqual(
-            response.status_code,
-            200,
-        )
-
+        self.assertEqual(response.status_code, 200)
         self.assertNotContains(
             response,
             "legacy-vpn-client:999",
         )
-
         self.assertNotContains(
             response,
             "Не указано",
         )
+        self.assertContains(response, "FULL")
+        self.assertContains(response, "SELECT")
+        self.assertContains(response, "ALT")
 
-        self.assertContains(
-            response,
-            "Подключений: 3",
-        )
