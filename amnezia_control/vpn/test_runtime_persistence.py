@@ -92,6 +92,8 @@ class AWG2RuntimePersistenceTest(TestCase):
         )
         self.assertEqual(
             calls[0]["command"],
+            "flock -x -w 10 "
+            "/run/lock/amnezia-control-awg2-save.lock "
             "docker exec amnezia-awg2 "
             "awg-quick save /opt/amnezia/awg/awg0.conf",
         )

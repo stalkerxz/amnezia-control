@@ -80,7 +80,7 @@
         </thead>
         <tbody>
           {% for row in protocol_rows %}
-            <tr class="v4-protocol-row {% if row.protocol.runtime_metadata.subnet_ready and row.protocol.runtime_metadata.endpoint_host_ready and row.protocol.runtime_metadata.endpoint_port_ready %}is-success{% else %}is-warning{% endif %}">
+            <tr class="v4-protocol-row {% if row.ready %}is-success{% else %}is-warning{% endif %}">
               <td><span class="badge badge-soft {% if row.protocol.protocol_type == 'awg2' %}badge-protocol-awg2{% else %}badge-protocol-awg{% endif %}">{{ row.protocol.protocol_type|upper }}</span></td>
               <td>
                 <div class="v4-system-primary">{{ row.protocol.container_name|default:'—' }}</div>
@@ -104,7 +104,31 @@
               </td>
               <td>
                 {% if row.protocol.protocol_type == 'awg2' %}
-                  {% if row.protocol.runtime_metadata.awg2_missing_keys %}
+                  <div class="v4-system-meta mb-1">
+                    AWG {{ row.protocol.runtime_metadata.awg_generation|default:'не определено' }}
+                    · CLI <code>{{ row.protocol.runtime_metadata.command_bin|default:'—' }}</code>
+                  </div>
+                  {% if row.protocol.runtime_metadata.awg_capabilities %}
+                    <div class="v4-system-meta mb-1">
+                      <code>{{ row.protocol.runtime_metadata.awg_capabilities|join:', ' }}</code>
+                    </div>
+                  {% endif %}
+                  {% if row.protocol.runtime_metadata.config_mtu or row.protocol.runtime_metadata.runtime_mtu %}
+                    <div class="v4-system-meta mb-1">
+                      MTU:
+                      config <code>{{ row.protocol.runtime_metadata.config_mtu|default:'—' }}</code>
+                      · runtime <code>{{ row.protocol.runtime_metadata.runtime_mtu|default:'—' }}</code>
+                    </div>
+                  {% endif %}
+                  {% if row.protocol.runtime_metadata.mtu_mismatch %}
+                    <span class="v4-status-pill is-warning">MTU mismatch</span>
+                  {% endif %}
+                  {% if row.protocol.runtime_metadata.awg_export_compatible == False %}
+                    <span class="v4-status-pill is-danger">Новый экспорт заблокирован</span>
+                    {% if row.protocol.runtime_metadata.awg_unknown_interface_keys %}
+                      <div class="v4-system-meta"><code>{{ row.protocol.runtime_metadata.awg_unknown_interface_keys|join:', ' }}</code></div>
+                    {% endif %}
+                  {% elif row.protocol.runtime_metadata.awg2_missing_keys %}
                     <span class="v4-status-pill is-danger">Нет обязательных</span>
                     <div class="v4-system-meta"><code>{{ row.protocol.runtime_metadata.awg2_missing_keys|join:', ' }}</code></div>
                   {% elif row.protocol.runtime_metadata.awg2_optional_missing_keys %}
@@ -118,7 +142,7 @@
                 {% endif %}
               </td>
               <td class="text-end">
-                {% if row.protocol.runtime_metadata.subnet_ready and row.protocol.runtime_metadata.endpoint_host_ready and row.protocol.runtime_metadata.endpoint_port_ready %}
+                {% if row.ready %}
                   <span class="v4-server-status is-success">Готово</span>
                 {% else %}
                   <span class="v4-server-status is-warning">Внимание</span>

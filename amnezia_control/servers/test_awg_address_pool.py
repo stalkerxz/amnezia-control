@@ -16,7 +16,7 @@ ListenPort = 49561
 AllowedIPs = 10.8.1.2/32
 """
 
-        subnet, port = (
+        subnet, port, mtu = (
             ServerService
             ._parse_interface_metadata(raw)
         )
@@ -31,6 +31,8 @@ AllowedIPs = 10.8.1.2/32
             49561,
         )
 
+        self.assertIsNone(mtu)
+
     def test_link_local_ipv6_is_not_client_pool(self):
         raw = """
 [Interface]
@@ -39,7 +41,7 @@ Address = fe80::5678/64
 ListenPort = 49561
 """
 
-        subnet, port = (
+        subnet, port, mtu = (
             ServerService
             ._parse_interface_metadata(raw)
         )
@@ -54,6 +56,8 @@ ListenPort = 49561
             49561,
         )
 
+        self.assertIsNone(mtu)
+
     def test_comma_separated_addresses_find_ipv4(self):
         raw = """
 [Interface]
@@ -61,7 +65,7 @@ Address = fe80::1234/64, 10.8.1.0/24
 ListenPort = 49561
 """
 
-        subnet, port = (
+        subnet, port, mtu = (
             ServerService
             ._parse_interface_metadata(raw)
         )
@@ -75,3 +79,5 @@ ListenPort = 49561
             port,
             49561,
         )
+
+        self.assertIsNone(mtu)

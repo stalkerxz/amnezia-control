@@ -66,6 +66,25 @@ class RuntimeCommandService:
         "unable to access interface: protocol not supported",
         "protocol not supported",
     )
+    SENSITIVE_RUNTIME_OUTPUT_PATTERNS = (
+        re.compile(
+            r"^docker exec [a-zA-Z0-9_.-]+ "
+            r"(?:wg|awg) show(?: all| [a-zA-Z0-9_.-]+)? dump$"
+        ),
+        re.compile(
+            r"^docker exec [a-zA-Z0-9_.-]+ cat "
+            r"(?:/etc/amnezia|/opt/amnezia|/etc/wireguard)"
+            r"/[a-zA-Z0-9_./-]+$"
+        ),
+    )
+
+    @classmethod
+    def _command_output_is_sensitive(cls, command: str) -> bool:
+        value = (command or "").strip()
+        return any(
+            pattern.fullmatch(value)
+            for pattern in cls.SENSITIVE_RUNTIME_OUTPUT_PATTERNS
+        )
 
     @staticmethod
     def executor_for_server(server: Server):
@@ -78,6 +97,12 @@ class RuntimeCommandService:
 
     @staticmethod
     def run(server: Server, actor, action: str, command: str, sensitive_output: bool = False):
+        sensitive_output = (
+            sensitive_output
+            or RuntimeCommandService._command_output_is_sensitive(
+                command
+            )
+        )
         job = JobService.create_job(
             server=server,
             actor=actor,
@@ -170,6 +195,12 @@ class RuntimeCommandService:
         warn_on_expected_failure: bool = True,
         sensitive_output: bool = False,
     ):
+        sensitive_output = (
+            sensitive_output
+            or cls._command_output_is_sensitive(
+                command
+            )
+        )
         job = JobService.create_job(
             server=server,
             actor=actor,
@@ -369,6 +400,17 @@ class BaseProtocolAdapter:
         self.protocol = ServerProtocol.objects.filter(server=self.server, protocol_type=self.protocol_type).first()
         if not self.protocol or not self.protocol.container_name:
             raise ValueError(f"Container for {self.protocol_type} not detected")
+
+        runtime_command_bin = (
+            (self.protocol.runtime_metadata or {}).get(
+                "command_bin"
+            )
+        )
+        if (
+            self.protocol_type == VPNClient.ProtocolType.AWG2
+            and runtime_command_bin in {"awg", "wg"}
+        ):
+            self.command_bin = runtime_command_bin
 
     @property
     def container(self):
@@ -586,6 +628,7 @@ class BaseProtocolAdapter:
                         warn_on_expected_failure=(
                             warn_on_expected_failure
                         ),
+                        sensitive_output=True,
                     )
                 )
 
@@ -630,7 +673,12 @@ class BaseProtocolAdapter:
                     return self._list_peers_from_config(actor)
                 return peers
             else:
-                out = self._run(actor, f"{self.protocol_type}.list", self._wg_cmd("show dump")).stdout
+                out = self._run(
+                    actor,
+                    f"{self.protocol_type}.list",
+                    self._wg_cmd("show dump"),
+                    sensitive_output=True,
+                ).stdout
             return self._parse_runtime_dump_peers(out)
         except RuntimeError:
             if self.protocol_type != VPNClient.ProtocolType.AWG2:
@@ -683,7 +731,12 @@ class BaseProtocolAdapter:
         config_path = self.protocol.runtime_metadata.get("config_path", "")
         if not config_path:
             return []
-        raw_conf = self._run(actor, f"{self.protocol_type}.list_fallback_conf", f"docker exec {self.container} cat {config_path}").stdout
+        raw_conf = self._run(
+            actor,
+            f"{self.protocol_type}.list_fallback_conf",
+            f"docker exec {self.container} cat {config_path}",
+            sensitive_output=True,
+        ).stdout
         return self._parse_peers_from_config_text(raw_conf)
 
     def peer_transfer_map(self, actor) -> dict[str, int] | None:
@@ -894,10 +947,133 @@ class VPNClientPolicyService:
                 "сначала включите клиента."
             )
 
-        return cls.REISSUE_BLOCK_REASONS.get(
+        limit_reason = cls.REISSUE_BLOCK_REASONS.get(
             cls.limit_state(client),
             "",
         )
+        if limit_reason:
+            return limit_reason
+
+        if (
+            client.protocol_type == VPNClient.ProtocolType.AWG2
+            and client.server.runtime_backend == Server.RuntimeBackend.DOCKER
+        ):
+            protocol = ServerProtocol.objects.filter(
+                server=client.server,
+                protocol_type=client.protocol_type,
+            ).first()
+            metadata = (
+                protocol.runtime_metadata
+                if protocol
+                else {}
+            )
+
+            if (
+                not protocol
+                or "awg_export_compatible" not in metadata
+            ):
+                return (
+                    "Переиздание запрещено: совместимость runtime AWG "
+                    "ещё не проверена. Выполните синхронизацию runtime."
+                )
+
+            if metadata.get("awg_export_compatible") is False:
+                unknown = ", ".join(
+                    metadata.get(
+                        "awg_unknown_interface_keys",
+                        [],
+                    )
+                )
+                suffix = (
+                    f" Неизвестные параметры: {unknown}."
+                    if unknown
+                    else ""
+                )
+                return (
+                    "Переиздание запрещено: runtime AWG использует "
+                    "неподдерживаемую схему конфигурации."
+                    + suffix
+                )
+
+            readiness_missing = []
+            if (
+                (protocol.container_status or "").lower()
+                != "running"
+            ):
+                readiness_missing.append("container")
+            if not metadata.get("config_path"):
+                readiness_missing.append("config_path")
+            if not metadata.get(
+                "interface_ready",
+                bool(metadata.get("interface")),
+            ):
+                readiness_missing.append("interface")
+            if not metadata.get("subnet_ready"):
+                readiness_missing.append("subnet")
+            if not metadata.get("endpoint_host_ready"):
+                readiness_missing.append("endpoint_host")
+            if not metadata.get("endpoint_port_ready"):
+                readiness_missing.append("endpoint_port")
+
+            if readiness_missing:
+                return (
+                    "Переиздание запрещено: runtime AWG не прошёл "
+                    "проверку готовности: "
+                    + ", ".join(readiness_missing)
+                    + ". Выполните синхронизацию runtime."
+                )
+
+            if metadata.get("mtu_mismatch"):
+                return (
+                    "Переиздание запрещено: MTU конфигурации AWG "
+                    f"({metadata.get('config_mtu')}) не совпадает с "
+                    f"runtime MTU ({metadata.get('runtime_mtu')}). "
+                    "Сначала устраните расхождение и выполните "
+                    "синхронизацию runtime."
+                )
+
+            try:
+                awg_metadata = (
+                    VPNClientService._runtime_awg_metadata(
+                        protocol
+                    )
+                )
+            except RuntimeError:
+                return (
+                    "Переиздание запрещено: защищённые параметры AWG "
+                    "не могут быть прочитаны. Выполните "
+                    "синхронизацию runtime."
+                )
+
+            missing = [
+                key
+                for key in (
+                    VPNClientService
+                    .AWG2_REQUIRED_METADATA_KEYS
+                )
+                if not awg_metadata.get(key)
+            ]
+            if missing:
+                return (
+                    "Переиздание запрещено: runtime AWG не содержит "
+                    "обязательные параметры: "
+                    + ", ".join(missing)
+                    + ". Выполните синхронизацию runtime."
+                )
+
+            if (
+                metadata.get("awg31_metadata_ready")
+                and not awg_metadata.get(
+                    "HeaderProtectionKey"
+                )
+            ):
+                return (
+                    "Переиздание запрещено: AWG 3.1 "
+                    "HeaderProtectionKey недоступен. "
+                    "Выполните синхронизацию runtime."
+                )
+
+        return ""
 
     @classmethod
     def can_reissue(cls, client: VPNClient):
@@ -911,6 +1087,12 @@ class VPNClientPolicyService:
 
 
 class VPNClientService:
+    AWG2_REQUIRED_METADATA_KEYS = (
+        "Jc", "Jmin", "Jmax",
+        "S1", "S2", "S3", "S4",
+        "H1", "H2", "H3", "H4",
+    )
+
     AWG_INTERFACE_EXTRA_KEYS = (
         "Jc", "Jmin", "Jmax",
         "S1", "S2", "S3", "S4",
@@ -1078,6 +1260,7 @@ class VPNClientService:
         awg2_metadata: dict,
         preshared_key: str = "",
         allowed_ips: str = "0.0.0.0/0, ::/0",
+        mtu=None,
     ) -> str:
         required = (
             "Jc", "Jmin", "Jmax",
@@ -1141,6 +1324,10 @@ class VPNClientService:
             f"Address = {address}/32",
             "DNS = 1.1.1.1",
         ]
+        if mtu:
+            interface_lines.append(
+                f"MTU = {mtu}"
+            )
 
         peer_lines = [
             "[Peer]",
@@ -1294,6 +1481,18 @@ class VPNClientService:
         ]
         if interface.get("DNS"):
             lines.append(f"DNS = {interface['DNS']}")
+        runtime = (
+            protocol.runtime_metadata
+            if protocol
+            else {}
+        )
+        mtu = (
+            interface.get("MTU")
+            or runtime.get("config_mtu")
+            or runtime.get("runtime_mtu")
+        )
+        if mtu:
+            lines.append(f"MTU = {mtu}")
         lines.extend(f"{k} = {extra_values[k]}" for k in cls.AWG_INTERFACE_EXTRA_KEYS if extra_values.get(k))
         lines.extend(["", "[Peer]", f"PublicKey = {peer['PublicKey']}"])
         if peer.get("PresharedKey"):
@@ -2105,10 +2304,58 @@ class VPNClientService:
                     "before reissue."
                 )
 
+        # Resolve all deterministic export inputs before touching
+        # the current runtime peer. A bad endpoint/profile/AWG schema
+        # must fail closed without disconnecting the working client.
+        endpoint = VPNClientService.resolve_endpoint(
+            client.server,
+            adapter.protocol,
+        )
+        allowed_ips = "0.0.0.0/0, ::/0"
+        awg_mtu = None
+
+        if (
+            client.protocol_type
+            == VPNClient.ProtocolType.AWG2
+        ):
+            allowed_ips = (
+                VPNClientService
+                .resolve_profile_allowed_ips(
+                    client.profile
+                )
+            )
+            awg_mtu = (
+                adapter.protocol.runtime_metadata.get(
+                    "config_mtu"
+                )
+                or adapter.protocol.runtime_metadata.get(
+                    "runtime_mtu"
+                )
+            )
+
+            # Reuse the production config builder as the source of
+            # truth for AWG 2.x/3.1 validation. Placeholder key
+            # material is never persisted or sent to the runtime.
+            VPNClientService.build_awg2_client_config(
+                private_key="preflight-private",
+                address="127.0.0.1",
+                endpoint=endpoint,
+                server_public_key="preflight-public",
+                awg2_metadata=(
+                    awg_runtime_metadata
+                    or {}
+                ),
+                allowed_ips=allowed_ips,
+                mtu=awg_mtu,
+            )
+
         if client.runtime_peer_public_key:
-            adapter.remove_peer(actor, client.runtime_peer_public_key)
+            adapter.remove_peer(
+                actor,
+                client.runtime_peer_public_key,
+            )
+
         generated = adapter.create_peer(actor)
-        endpoint = VPNClientService.resolve_endpoint(client.server, adapter.protocol)
 
         if client.protocol_type == VPNClient.ProtocolType.AWG:
             config = VPNClientService.build_awg_legacy_client_config(
@@ -2119,9 +2366,6 @@ class VPNClientService:
                 preshared_key=generated.get("preshared_key", ""),
             )
         else:
-            allowed_ips = VPNClientService.resolve_profile_allowed_ips(
-                client.profile
-            )
             config = VPNClientService.build_awg2_client_config(
                 private_key=generated["private_key"],
                 address=generated["address"],
@@ -2133,6 +2377,7 @@ class VPNClientService:
                 ),
                 preshared_key=generated.get("preshared_key", ""),
                 allowed_ips=allowed_ips,
+                mtu=awg_mtu,
             )
 
         amneziavpn_config = ""

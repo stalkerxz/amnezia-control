@@ -42,10 +42,21 @@ class VPNClientFlowTest(TestCase):
             server=self.server,
             protocol_type=ServerProtocol.ProtocolType.AWG2,
             container_name="amnezia-awg2",
+            container_status="running",
             enabled=True,
             runtime_metadata={
+                "config_path": "/opt/amnezia/awg/awg0.conf",
                 "udp_port": 51830,
+                "interface": "awg0",
+                "interface_ready": True,
                 "subnet": "10.77.0.0/24",
+                "subnet_ready": True,
+                "endpoint_host_ready": True,
+                "endpoint_port_ready": True,
+                "awg_export_compatible": True,
+                "awg_generation": "2.x",
+                "awg_capabilities": ["legacy_obfuscation"],
+                "command_bin": "wg",
                 "awg2_metadata": {"I1": "11", "I2": "12", "I3": "13", "I4": "14", "I5": "15", "S1": "1", "S2": "2", "S3": "3", "S4": "4", "Jc": "7", "Jmin": "8", "Jmax": "9", "H1": "3", "H2": "4", "H3": "5", "H4": "6"},
             },
         )
@@ -75,8 +86,10 @@ class VPNClientFlowTest(TestCase):
             "awg2.add_peer": R(""),
             "awg2.add_existing_peer": R(""),
             "awg2.remove_peer": R(""),
+            "awg2.save_runtime": R(""),
             "awg2.server_pub": R("server2-public-key==\n"),
             "awg2.list": R("peer2\tpsk\tendpoint\t10.77.0.10/32\t0\t0\t0\t25\n"),
+            "awg2.list_all": R("peer2\tpsk\tendpoint\t10.77.0.10/32\t0\t0\t0\t25\n"),
         }
         return mapping[action]
 
@@ -95,7 +108,13 @@ class VPNClientFlowTest(TestCase):
     def test_config_export_for_awg_legacy(self):
         from unittest.mock import patch
 
-        with patch("vpn.services.RuntimeCommandService.run", side_effect=self._mock_run):
+        with patch(
+            "vpn.services.RuntimeCommandService.run",
+            side_effect=self._mock_run,
+        ), patch(
+            "vpn.services.RuntimeCommandService.run_with_expected_failure",
+            side_effect=self._mock_run,
+        ):
             client = VPNClientService.create_client(server=self.server, name="awg-client", protocol_type=VPNClient.ProtocolType.AWG, actor=self.user)
         conf = VPNClientService.latest_config(client)
         self.assertIn("Endpoint = vpn.example.com:51820", conf)
@@ -105,7 +124,13 @@ class VPNClientFlowTest(TestCase):
     def test_config_export_for_awg2_uses_discovered_metadata(self):
         from unittest.mock import patch
 
-        with patch("vpn.services.RuntimeCommandService.run", side_effect=self._mock_run):
+        with patch(
+            "vpn.services.RuntimeCommandService.run",
+            side_effect=self._mock_run,
+        ), patch(
+            "vpn.services.RuntimeCommandService.run_with_expected_failure",
+            side_effect=self._mock_run,
+        ):
             client = VPNClientService.create_client(server=self.server, name="awg2-client", protocol_type=VPNClient.ProtocolType.AWG2, actor=self.user)
         conf = VPNClientService.latest_config(client)
         self.assertIn("I1 = 11", conf)
@@ -125,7 +150,13 @@ class VPNClientFlowTest(TestCase):
             "H1": "3", "H2": "4", "H3": "5", "H4": "6",
         }
         self.awg2_protocol.save(update_fields=["runtime_metadata"])
-        with patch("vpn.services.RuntimeCommandService.run", side_effect=self._mock_run):
+        with patch(
+            "vpn.services.RuntimeCommandService.run",
+            side_effect=self._mock_run,
+        ), patch(
+            "vpn.services.RuntimeCommandService.run_with_expected_failure",
+            side_effect=self._mock_run,
+        ):
             client = VPNClientService.create_client(server=self.server, name="awg2-no-i", protocol_type=VPNClient.ProtocolType.AWG2, actor=self.user)
         conf = VPNClientService.latest_config(client)
         self.assertIn("Jc = 7", conf)
@@ -134,7 +165,13 @@ class VPNClientFlowTest(TestCase):
     def test_native_awg2_export_moves_amnezia_fields_to_interface(self):
         from unittest.mock import patch
 
-        with patch("vpn.services.RuntimeCommandService.run", side_effect=self._mock_run):
+        with patch(
+            "vpn.services.RuntimeCommandService.run",
+            side_effect=self._mock_run,
+        ), patch(
+            "vpn.services.RuntimeCommandService.run_with_expected_failure",
+            side_effect=self._mock_run,
+        ):
             client = VPNClientService.create_client(server=self.server, name="awg2-native", protocol_type=VPNClient.ProtocolType.AWG2, actor=self.user)
 
         native_conf = VPNClientService.build_native_client_config(client)
@@ -257,7 +294,13 @@ class VPNClientFlowTest(TestCase):
 
         self.awg2_protocol.runtime_metadata = {"udp_port": 51830, "subnet": "10.77.0.0/24", "awg2_metadata": {"S1": "1"}}
         self.awg2_protocol.save(update_fields=["runtime_metadata"])
-        with patch("vpn.services.RuntimeCommandService.run", side_effect=self._mock_run):
+        with patch(
+            "vpn.services.RuntimeCommandService.run",
+            side_effect=self._mock_run,
+        ), patch(
+            "vpn.services.RuntimeCommandService.run_with_expected_failure",
+            side_effect=self._mock_run,
+        ):
             with self.assertRaises(RuntimeError):
                 VPNClientService.create_client(server=self.server, name="awg2-broken", protocol_type=VPNClient.ProtocolType.AWG2, actor=self.user)
 
@@ -268,7 +311,13 @@ class VPNClientFlowTest(TestCase):
 
         self.awg2_protocol.runtime_metadata.pop("subnet", None)
         self.awg2_protocol.save(update_fields=["runtime_metadata"])
-        with patch("vpn.services.RuntimeCommandService.run", side_effect=self._mock_run):
+        with patch(
+            "vpn.services.RuntimeCommandService.run",
+            side_effect=self._mock_run,
+        ), patch(
+            "vpn.services.RuntimeCommandService.run_with_expected_failure",
+            side_effect=self._mock_run,
+        ):
             with self.assertRaises(RuntimeError):
                 VPNClientService.create_client(server=self.server, name="awg2-no-subnet", protocol_type=VPNClient.ProtocolType.AWG2, actor=self.user)
 
@@ -281,7 +330,13 @@ class VPNClientFlowTest(TestCase):
         self.awg_protocol.runtime_metadata["public_host"] = "vpn2.example.com"
         self.awg_protocol.save(update_fields=["runtime_metadata"])
 
-        with patch("vpn.services.RuntimeCommandService.run", side_effect=self._mock_run):
+        with patch(
+            "vpn.services.RuntimeCommandService.run",
+            side_effect=self._mock_run,
+        ), patch(
+            "vpn.services.RuntimeCommandService.run_with_expected_failure",
+            side_effect=self._mock_run,
+        ):
             client = VPNClientService.create_client(server=self.server, name="awg-client-runtime-host", protocol_type=VPNClient.ProtocolType.AWG, actor=self.user)
         conf = VPNClientService.latest_config(client)
         self.assertIn("Endpoint = vpn2.example.com:51820", conf)
@@ -302,7 +357,13 @@ class VPNClientFlowTest(TestCase):
         self.awg2_protocol.runtime_metadata["awg2_metadata"] = parsed
         self.awg2_protocol.save(update_fields=["runtime_metadata"])
 
-        with patch("vpn.services.RuntimeCommandService.run", side_effect=self._mock_run):
+        with patch(
+            "vpn.services.RuntimeCommandService.run",
+            side_effect=self._mock_run,
+        ), patch(
+            "vpn.services.RuntimeCommandService.run_with_expected_failure",
+            side_effect=self._mock_run,
+        ):
             client = VPNClientService.create_client(server=self.server, name="awg2-parser-ok", protocol_type=VPNClient.ProtocolType.AWG2, actor=self.user)
         conf = VPNClientService.latest_config(client)
         self.assertIn("Jc = 7", conf)
@@ -414,6 +475,167 @@ class VPNClientFlowTest(TestCase):
         job = Job.objects.filter(action="awg2.list").latest("id")
         self.assertEqual(job.status, Job.Status.SUCCESS)
         self.assertEqual(job.events.latest("id").level, "warning")
+
+    def test_runtime_dump_output_is_not_persisted_in_jobs(self):
+        class Result:
+            def __init__(self, stdout="", stderr="", exit_code=0):
+                self.stdout = stdout
+                self.stderr = stderr
+                self.exit_code = exit_code
+
+        secret_dump = (
+            "awg0\tserver-private-secret\tserver-public\t51830\t0\n"
+            "peer-public\tpeer-psk-secret\tep\t10.77.0.10/32\t0\t1\t2\t25\n"
+        )
+
+        class FakeExecutor:
+            @staticmethod
+            def run(command):
+                return Result(stdout=secret_dump)
+
+        with patch.object(
+            RuntimeCommandService,
+            "executor_for_server",
+            return_value=FakeExecutor(),
+        ):
+            result = RuntimeCommandService.run(
+                self.server,
+                self.user,
+                "runtime.secret-dump",
+                "docker exec amnezia-awg2 awg show all dump",
+            )
+
+        self.assertIn("server-private-secret", result.stdout)
+        self.assertIn("peer-psk-secret", result.stdout)
+
+        job = Job.objects.filter(
+            action="runtime.secret-dump"
+        ).latest("id")
+        event = job.events.latest("id")
+
+        self.assertEqual(
+            job.payload.get("command"),
+            "[REDACTED]",
+        )
+        self.assertEqual(event.stdout, "")
+        self.assertEqual(event.stderr, "")
+        self.assertNotIn(
+            "server-private-secret",
+            event.stdout,
+        )
+        self.assertNotIn(
+            "peer-psk-secret",
+            event.stdout,
+        )
+
+    def test_expected_failure_dump_success_is_not_persisted_in_jobs(self):
+        class Result:
+            def __init__(self, stdout="", stderr="", exit_code=0):
+                self.stdout = stdout
+                self.stderr = stderr
+                self.exit_code = exit_code
+
+        secret_dump = (
+            "awg0\tserver-private-secret\tserver-public\t51830\t0\n"
+            "peer-public\tpeer-psk-secret\tep\t10.77.0.10/32\t0\t1\t2\t25\n"
+        )
+
+        class FakeExecutor:
+            @staticmethod
+            def run(command):
+                return Result(stdout=secret_dump)
+
+        with patch.object(
+            RuntimeCommandService,
+            "executor_for_server",
+            return_value=FakeExecutor(),
+        ):
+            result = (
+                RuntimeCommandService
+                .run_with_expected_failure(
+                    self.server,
+                    self.user,
+                    "runtime.secret-dump-expected",
+                    "docker exec amnezia-awg2 awg show dump",
+                    expected_error_patterns=(
+                        RuntimeCommandService
+                        .AWG2_EXPECTED_RUNTIME_DUMP_ERRORS
+                    ),
+                    fallback_message=(
+                        "AWG2 runtime telemetry unavailable"
+                    ),
+                )
+            )
+
+        self.assertIsNotNone(result)
+        self.assertIn(
+            "server-private-secret",
+            result.stdout,
+        )
+
+        job = Job.objects.filter(
+            action="runtime.secret-dump-expected"
+        ).latest("id")
+        event = job.events.latest("id")
+
+        self.assertEqual(
+            job.payload.get("command"),
+            "[REDACTED]",
+        )
+        self.assertEqual(event.stdout, "")
+        self.assertEqual(event.stderr, "")
+
+    def test_runtime_config_read_output_is_not_persisted_in_jobs(self):
+        class Result:
+            def __init__(self, stdout="", stderr="", exit_code=0):
+                self.stdout = stdout
+                self.stderr = stderr
+                self.exit_code = exit_code
+
+        secret_config = (
+            "[Interface]\n"
+            "PrivateKey = server-private-secret\n"
+            "HeaderProtectionKey = header-secret\n"
+            "[Peer]\n"
+            "PresharedKey = peer-psk-secret\n"
+        )
+
+        class FakeExecutor:
+            @staticmethod
+            def run(command):
+                return Result(stdout=secret_config)
+
+        with patch.object(
+            RuntimeCommandService,
+            "executor_for_server",
+            return_value=FakeExecutor(),
+        ):
+            result = RuntimeCommandService.run(
+                self.server,
+                self.user,
+                "runtime.secret-config",
+                (
+                    "docker exec amnezia-awg2 cat "
+                    "/opt/amnezia/awg/awg0.conf"
+                ),
+            )
+
+        self.assertIn(
+            "server-private-secret",
+            result.stdout,
+        )
+
+        job = Job.objects.filter(
+            action="runtime.secret-config"
+        ).latest("id")
+        event = job.events.latest("id")
+
+        self.assertEqual(
+            job.payload.get("command"),
+            "[REDACTED]",
+        )
+        self.assertEqual(event.stdout, "")
+        self.assertEqual(event.stderr, "")
 
     def test_awg2_list_peers_prefers_show_all_dump_runtime_telemetry(self):
         from unittest.mock import patch

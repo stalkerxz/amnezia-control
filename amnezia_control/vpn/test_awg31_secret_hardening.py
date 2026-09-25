@@ -106,6 +106,14 @@ class AWGRuntimeSecretExportTest(TestCase):
 
     def test_reissue_missing_encrypted_secret_fails_before_peer_mutation(self):
         self.protocol.runtime_metadata = {
+            "config_path": "/opt/amnezia/awg/awg0.conf",
+            "interface": "awg0",
+            "interface_ready": True,
+            "subnet": "10.8.1.0/24",
+            "subnet_ready": True,
+            "endpoint_host_ready": True,
+            "endpoint_port_ready": True,
+            "awg_export_compatible": True,
             "awg2_metadata": _legacy_metadata(),
             "awg31_metadata_ready": True,
         }

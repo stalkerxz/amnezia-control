@@ -73,10 +73,12 @@ class RuntimeDetectionTest(TestCase):
             Result("amnezia-awg\namnezia-awg2\n"),
             Result('[{"State":{"Status":"running"},"NetworkSettings":{"Ports":{"51820/udp":[{"HostIp":"203.0.113.10","HostPort":"51820"}]}},"Config":{"Image":"awg","Env":["A=1"]},"Mounts":[]}]'),
             Result("awg0\n"),
+            Result("1420\n"),
             Result("awg0\tprivate\tpub\t51820\npeer1\tpsk\tep\t10.66.0.10/32\t0\t0\t0\t25\n"),
             Result("[Interface]\nAddress = 10.66.0.1/24\nListenPort = 51820\n"),
             Result('[{"State":{"Status":"running"},"NetworkSettings":{"Ports":{"51830/udp":[{"HostIp":"198.51.100.20","HostPort":"51830"}]}},"Config":{"Image":"awg2","Env":["AWG2_S1=6","AWG2_S2=7","AWG2_S3=8","AWG2_S4=9","AWG2_JC=10","AWG2_JMIN=11","AWG2_JMAX=12","AWG2_H1=13","AWG2_H2=14","AWG2_H3=15","AWG2_H4=16"]},"Mounts":[]}]'),
             Result("wg0\n"),
+            Result("1376\n"),
             Result("wg0\tprivate\tpub\t51830\npeer2\tpsk\tep\t10.8.1.10/32\t0\t0\t0\t25\n"),
             Result("[Interface]\nAddress = 10.8.1.0/24\nListenPort = 49561\nJc = 10\n"),
         ]
@@ -108,6 +110,7 @@ class RuntimeDetectionTest(TestCase):
                 "runtime.ps_running": Result("amnezia-awg2\n"),
                 "runtime.inspect.awg2": Result('[{"State":{"Status":"running"},"NetworkSettings":{"Ports":{"51830/udp":[{"HostIp":"198.51.100.20","HostPort":"51830"}]}},"Config":{"Image":"awg2","Env":["AWG2_S1=6","AWG2_S2=7","AWG2_S3=8","AWG2_S4=9","AWG2_JC=10","AWG2_JMIN=11","AWG2_JMAX=12","AWG2_H1=13","AWG2_H2=14","AWG2_H3=15","AWG2_H4=16"]},"Mounts":[]}]'),
                 "runtime.iface.awg2": Result("wg0\n"),
+                "runtime.mtu.awg2": Result("1376\n"),
                 "runtime.peers.awg2": Result("wg0\tprivate\tpub\t51830\npk1\tpsk\tep\t10.8.1.10/32\t0\t1\t2\t25\n"),
                 "runtime.conf.awg2": Result("[Interface]\nAddress = 10.8.1.0/24\nListenPort = 49561\n[Peer]\nPublicKey = pk1\nAllowedIPs = 10.8.1.10/32\n"),
             }
@@ -154,6 +157,7 @@ class RuntimeDetectionTest(TestCase):
                 "runtime.ps_running": Result("amnezia-awg2\n"),
                 "runtime.inspect.awg2": Result('[{"State":{"Status":"running"},"NetworkSettings":{"Ports":{"51830/udp":[{"HostIp":"198.51.100.20","HostPort":"51830"}]}},"Config":{"Image":"awg2","Env":["AWG2_S1=6","AWG2_S2=7","AWG2_S3=8","AWG2_S4=9","AWG2_JC=10","AWG2_JMIN=11","AWG2_JMAX=12","AWG2_H1=13","AWG2_H2=14","AWG2_H3=15","AWG2_H4=16"]},"Mounts":[]}]'),
                 "runtime.iface.awg2": Result("wg0\n"),
+                "runtime.mtu.awg2": Result("1376\n"),
                 "runtime.conf.awg2": Result("[Interface]\nAddress = 10.8.1.0/24\nListenPort = 49561\n[Peer]\nPublicKey = pk1\nAllowedIPs = 10.8.1.10/32\n"),
             }
             if action in {"runtime.peers.awg2.all", "runtime.peers.awg2"}:
@@ -219,7 +223,7 @@ class ServerHealthEvaluationTest(TestCase):
             protocol_type=ServerProtocol.ProtocolType.AWG,
             container_name="amnezia-awg",
             container_status="running",
-            runtime_metadata={"subnet_ready": True, "endpoint_host_ready": True, "endpoint_port_ready": True},
+            runtime_metadata={"interface": "awg0", "interface_ready": True, "subnet_ready": True, "endpoint_host_ready": True, "endpoint_port_ready": True},
         )
         ServerProtocol.objects.create(
             server=self.server,
@@ -227,6 +231,8 @@ class ServerHealthEvaluationTest(TestCase):
             container_name="amnezia-awg2",
             container_status="running",
             runtime_metadata={
+                "interface": "awg0",
+                "interface_ready": True,
                 "subnet_ready": True,
                 "endpoint_host_ready": True,
                 "endpoint_port_ready": True,
@@ -245,7 +251,7 @@ class ServerHealthEvaluationTest(TestCase):
             protocol_type=ServerProtocol.ProtocolType.AWG,
             container_name="amnezia-awg",
             container_status="running",
-            runtime_metadata={"subnet_ready": True, "endpoint_host_ready": True, "endpoint_port_ready": True},
+            runtime_metadata={"interface": "awg0", "interface_ready": True, "subnet_ready": True, "endpoint_host_ready": True, "endpoint_port_ready": True},
         )
         ServerProtocol.objects.create(
             server=self.server,
@@ -253,6 +259,8 @@ class ServerHealthEvaluationTest(TestCase):
             container_name="amnezia-awg2",
             container_status="running",
             runtime_metadata={
+                "interface": "awg0",
+                "interface_ready": True,
                 "subnet_ready": True,
                 "endpoint_host_ready": True,
                 "endpoint_port_ready": True,
@@ -371,10 +379,12 @@ class ServerSyncDoesNotReenableDisabledProtocolTest(TestCase):
                 "runtime.ps_running": Result("amnezia-awg\namnezia-awg2\n"),
                 "runtime.inspect.awg": Result('[{"State":{"Status":"running"},"NetworkSettings":{"Ports":{"51820/udp":[{"HostIp":"0.0.0.0","HostPort":"51820"}]}},"Config":{"Image":"awg","Env":[]},"Mounts":[]}]'),
                 "runtime.iface.awg": Result("awg0\n"),
+                "runtime.mtu.awg": Result("1420\n"),
                 "runtime.peers.awg": Result("awg0\tprivate\tpub\t51820\n"),
                 "runtime.conf.awg": Result("[Interface]\nAddress = 10.0.0.1/24\nListenPort = 51820\n"),
                 "runtime.inspect.awg2": Result('[{"State":{"Status":"running"},"NetworkSettings":{"Ports":{"51830/udp":[{"HostIp":"0.0.0.0","HostPort":"51830"}]}},"Config":{"Image":"awg2","Env":[]},"Mounts":[]}]'),
                 "runtime.iface.awg2": Result("awg0\n"),
+                "runtime.mtu.awg2": Result("1376\n"),
                 "runtime.peers.awg2.all": Result("awg0\tprivate\tpub\t51830\n"),
                 "runtime.conf.awg2": Result("[Interface]\nAddress = 10.1.0.1/24\nListenPort = 51830\n"),
             }
