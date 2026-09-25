@@ -889,6 +889,7 @@ class ServerService:
                                 expected_error_patterns=RuntimeCommandService.AWG2_EXPECTED_RUNTIME_DUMP_ERRORS,
                                 fallback_message="AWG2 runtime telemetry unavailable: using config fallback (degraded mode).",
                                 warn_on_expected_failure=False,
+                                sensitive_output=True,
                             )
                             if dump_result is None:
                                 dump_result = RuntimeCommandService.run_with_expected_failure(
@@ -898,6 +899,7 @@ class ServerService:
                                     f"docker exec {container_name} {command_bin} show dump",
                                     expected_error_patterns=RuntimeCommandService.AWG2_EXPECTED_RUNTIME_DUMP_ERRORS,
                                     fallback_message="AWG2 runtime telemetry unavailable: using config fallback (degraded mode).",
+                                    sensitive_output=True,
                                 )
                                 if dump_result is None:
                                     peer_source = "runtime telemetry unavailable; config fallback"
@@ -914,7 +916,13 @@ class ServerService:
                                 )
                                 peer_source = "runtime wg dump"
                         else:
-                            dump = RuntimeCommandService.run(server, actor, f"runtime.peers.{protocol_type}", f"docker exec {container_name} wg show dump").stdout
+                            dump = RuntimeCommandService.run(
+                                server,
+                                actor,
+                                f"runtime.peers.{protocol_type}",
+                                f"docker exec {container_name} wg show dump",
+                                sensitive_output=True,
+                            ).stdout
                             peer_count = sum(1 for line in dump.splitlines() if len(line.split("\t")) >= 8)
                             peer_source = "runtime wg dump"
                     except Exception:
