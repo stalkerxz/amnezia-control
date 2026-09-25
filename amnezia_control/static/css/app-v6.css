@@ -1415,3 +1415,27 @@ body.app-shell .v4-connection-item small {
     animation-iteration-count: 1 !important;
   }
 }
+
+
+/* V6 readability pass */
+body.app-shell .form-text,
+body.app-shell .v4-customer-email,
+body.app-shell .v4-access-cell small,
+body.app-shell .v4-number-cell small,
+body.app-shell .v6-step-head p,
+body.app-shell .v6-product-card p,
+body.app-shell .v6-advanced summary,
+body.app-shell .v6-policy-note strong,
+body.app-shell .v6-policy-note span,
+body.app-shell .v6-summary-row,
+body.app-shell .v6-dashboard-health {
+  font-size: 11px !important;
+}
+
+body.app-shell .v4-customer-table thead th,
+body.app-shell .v4-system-table thead th,
+body.app-shell .v6-context-item span,
+body.app-shell .v6-product-state,
+body.app-shell .v6-feed-copy small {
+  font-size: 10px !important;
+}
