@@ -330,6 +330,28 @@ class CustomerOperatorWorkspaceTest(
         self.assertContains(response, "ALT")
         self.assertContains(response, "+ Подключение")
         self.assertContains(response, "v6-device-settings-toggle")
+        self.assertContains(
+            response,
+            reverse(
+                "clients-download",
+                args=[self.full.pk],
+            ),
+        )
+        self.assertContains(
+            response,
+            reverse(
+                "clients-download-native",
+                args=[self.full.pk],
+            ),
+        )
+        self.assertContains(
+            response,
+            "AmneziaVPN .vpn",
+        )
+        self.assertContains(
+            response,
+            "Native .conf",
+        )
 
         for hidden_metadata in (
             f"· ID {self.device.pk}",
