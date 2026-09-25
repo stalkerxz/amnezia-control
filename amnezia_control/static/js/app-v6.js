@@ -116,6 +116,38 @@
     activate(withErrors?.key || match?.[1] || sections[0].key);
   };
 
+
+  const enhanceOnboarding = () => {
+    const form = document.querySelector('[data-v6-onboarding]');
+    if (!form) return;
+
+    const toggle = form.querySelector('.v4-login-toggle input[type="checkbox"]');
+    const fields = form.querySelector('.v4-login-fields');
+    if (!toggle || !fields) return;
+
+    const controls = Array.from(fields.querySelectorAll('input, select, textarea, button'));
+
+    const sync = () => {
+      const open = toggle.checked;
+      fields.hidden = !open;
+      fields.setAttribute('aria-hidden', open ? 'false' : 'true');
+      toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+
+      controls.forEach((control) => {
+        if (!open) {
+          if (!control.disabled) control.dataset.v6WasEnabled = '1';
+          control.disabled = true;
+        } else if (control.dataset.v6WasEnabled === '1') {
+          control.disabled = false;
+          delete control.dataset.v6WasEnabled;
+        }
+      });
+    };
+
+    toggle.addEventListener('change', sync);
+    sync();
+  };
+
   const enhanceConnectionCreator = () => {
     const form = document.querySelector('[data-v6-connection-form]');
     if (!form) return;
@@ -190,6 +222,7 @@
 
   ready(() => {
     enhanceSettings();
+    enhanceOnboarding();
     enhanceConnectionCreator();
   });
 })();
