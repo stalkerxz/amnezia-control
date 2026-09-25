@@ -6,74 +6,250 @@
 {% block content %}
 <link href="{% static 'css/app-v4-forms.css' %}" rel="stylesheet">
 
-<div class="v4-form-page">
+<div class="v6-connection-page">
   <header class="v4-form-hero">
     <div class="v4-form-hero-copy">
-      <a class="v4-back-link" href="{% url 'customers-detail' account.pk %}">← {{ account.display_name }}</a>
-      <p class="page-kicker">VPN Control · Подключение</p>
+      <a class="v6-back-link" href="{% url 'customers-detail' account.pk %}">← {{ account.display_name }}</a>
+      <p class="page-kicker">VPN Control · подключение</p>
       <h1>Добавить подключение</h1>
-      <p>Выберите, как должен работать VPN на устройстве {{ device.name }}. Технические параметры будут подставлены автоматически.</p>
+      <p>Выберите результат для устройства. Технические параметры уже подобраны безопасными defaults и доступны только при необходимости.</p>
     </div>
   </header>
 
-  <div class="v4-inline-summary">
-    <div class="v4-inline-summary-item"><span>Клиент</span><strong>{{ account.display_name }}</strong></div>
-    <div class="v4-inline-summary-item"><span>Устройство</span><strong>{{ device.name }}</strong></div>
-    <div class="v4-inline-summary-item"><span>Платформа</span><strong>{{ device.get_platform_display }}</strong></div>
-    <div class="v4-inline-summary-item"><span>Создано</span><strong>{% if has_full %}FULL {% endif %}{% if has_selective %}SELECT {% endif %}{% if xhttp_total %}ALT {{ xhttp_total }}{% endif %}{% if not has_full and not has_selective and not xhttp_total %}Нет подключений{% endif %}</strong></div>
+  <div class="v6-context-strip" aria-label="Контекст подключения">
+    <div class="v6-context-item"><span>Клиент</span><strong>{{ account.display_name }}</strong></div>
+    <div class="v6-context-item"><span>Устройство</span><strong>{{ device.name }}</strong></div>
+    <div class="v6-context-item"><span>Доступ</span><strong>{% if device.effective_expires_at %}до {{ device.effective_expires_at|date:'d.m.Y H:i' }}{% else %}без срока{% endif %}</strong></div>
+    <div class="v6-context-item"><span>VPN-лимит</span><strong>{% if device.vpn_traffic_limit_bytes %}настроен{% else %}без лимита{% endif %}</strong></div>
   </div>
 
-  <section class="v4-form-card">
-    <div class="v4-form-card-head">
-      <div><h2>Что должно работать через VPN?</h2><p>Один тип не отключает другой. На устройстве могут одновременно существовать FULL, SELECT и альтернативные подключения.</p></div>
+  <form method="post" novalidate data-v6-connection-form>
+    {% csrf_token %}
+
+    {% if creation_error %}
+      <div class="alert alert-danger mb-3" role="alert">{{ creation_error }}</div>
+    {% endif %}
+
+    {% if access_form.non_field_errors %}
+      <div class="alert alert-danger mb-3" role="alert">{{ access_form.non_field_errors }}</div>
+    {% endif %}
+
+    <section class="v6-step" aria-labelledby="v6-product-title">
+      <div class="v6-step-head">
+        <span class="v6-step-number">1</span>
+        <div>
+          <h2 id="v6-product-title">Что должно работать</h2>
+          <p>FULL, SELECT и ALT могут существовать на одном устройстве одновременно.</p>
+        </div>
+      </div>
+
+      <div class="v6-product-grid">
+        <label class="v6-product-card {% if selected_product == 'full' %}is-selected{% endif %} {% if has_full or not full_available %}is-disabled{% endif %}" data-v6-product-card>
+          <input class="v6-product-radio" type="radio" name="product_type" value="full"
+            {% if selected_product == 'full' %}checked{% endif %}
+            {% if has_full or not full_available %}disabled{% endif %}>
+          <span class="v6-product-symbol" aria-hidden="true">F</span>
+          <h3>Весь интернет через VPN</h3>
+          <p>Основное подключение: весь трафик устройства направляется через AWG 3.1.</p>
+          <div class="v6-product-state">
+            {% if has_full %}
+              <span class="v4-status-pill is-success">Уже создано</span>
+            {% elif not full_available %}
+              <span class="v4-status-pill is-warning">Нет доступного сервера</span>
+            {% else %}
+              FULL · рекомендуется как основной режим
+            {% endif %}
+          </div>
+        </label>
+
+        <label class="v6-product-card is-selective {% if selected_product == 'selective' %}is-selected{% endif %} {% if has_selective or not selective_available %}is-disabled{% endif %}" data-v6-product-card>
+          <input class="v6-product-radio" type="radio" name="product_type" value="selective"
+            {% if selected_product == 'selective' %}checked{% endif %}
+            {% if has_selective or not selective_available %}disabled{% endif %}>
+          <span class="v6-product-symbol" aria-hidden="true">S</span>
+          <h3>Только выбранные сервисы</h3>
+          <p>Через VPN идут только настроенные маршруты, остальной интернет остаётся прямым.</p>
+          <div class="v6-product-state">
+            {% if has_selective %}
+              <span class="v4-status-pill is-success">Уже создано</span>
+            {% elif not selective_available %}
+              <span class="v4-status-pill is-warning">Нет SELECT-сервера</span>
+            {% else %}
+              SELECT · выборочная маршрутизация
+            {% endif %}
+          </div>
+        </label>
+
+        <label class="v6-product-card is-alt {% if selected_product == 'alt' %}is-selected{% endif %} {% if not alt_available %}is-disabled{% endif %}" data-v6-product-card>
+          <input class="v6-product-radio" type="radio" name="product_type" value="alt"
+            {% if selected_product == 'alt' %}checked{% endif %}
+            {% if not alt_available %}disabled{% endif %}>
+          <span class="v6-product-symbol" aria-hidden="true">A</span>
+          <h3>Альтернативное подключение</h3>
+          <p>VLESS/XHTTP как отдельный транспорт. Существующие FULL и SELECT не изменяются.</p>
+          <div class="v6-product-state">
+            {% if alt_available %}
+              {% if xhttp_total %}ALT · создано: {{ xhttp_total }}{% else %}Не создано · доступно{% endif %}
+            {% else %}
+              <span class="v4-status-pill is-warning">Нет доступного сервера</span>
+            {% endif %}
+          </div>
+        </label>
+      </div>
+    </section>
+
+    <div class="v6-create-grid">
+      <div class="v6-create-main">
+        <section class="v6-step">
+          <div class="v6-step-head">
+            <span class="v6-step-number">2</span>
+            <div>
+              <h2>Параметры подключения</h2>
+              <p>Обычный сценарий уже настроен. Открывайте дополнительные параметры только если это действительно нужно.</p>
+            </div>
+          </div>
+
+          <div class="v6-config-panel" data-v6-product-panel="full">
+            <div class="v6-panel-body">
+              <strong>FULL · AWG 3.1</strong>
+              <div class="form-text mt-1">Будет создано отдельное подключение с текущими сроком и VPN-лимитом устройства.</div>
+            </div>
+            <details class="v6-advanced">
+              <summary>Дополнительно · выбрать сервер вручную</summary>
+              <div class="v6-panel-body pt-0">
+                <label class="form-label" for="full_server_choice">Сервер</label>
+                <select class="form-select" id="full_server_choice" name="full_server_choice">
+                  <option value="auto" {% if full_server_choice == 'auto' %}selected{% endif %}>Автоматически{% if full_pool.0 %} · {{ full_pool.0.server.name }}{% endif %}</option>
+                  {% for row in full_pool %}
+                    <option value="{{ row.server.id }}" {% if full_server_choice == row.server.id|stringformat:'s' %}selected{% endif %}>{{ row.server.name }} · peers {{ row.peer_count }}/{{ row.capacity }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+            </details>
+          </div>
+
+          <div class="v6-config-panel" data-v6-product-panel="selective">
+            <div class="v6-panel-body">
+              <strong>SELECT · AWG 3.1</strong>
+              <div class="form-text mt-1">Используется активный SELECT-профиль и отдельный peer для этого устройства.</div>
+            </div>
+            <details class="v6-advanced">
+              <summary>Дополнительно · выбрать сервер вручную</summary>
+              <div class="v6-panel-body pt-0">
+                <label class="form-label" for="selective_server_choice">Сервер</label>
+                <select class="form-select" id="selective_server_choice" name="selective_server_choice">
+                  <option value="auto" {% if selective_server_choice == 'auto' %}selected{% endif %}>Автоматически{% if selective_pool.0 %} · {{ selective_pool.0.server.name }}{% endif %}</option>
+                  {% for row in selective_pool %}
+                    <option value="{{ row.server.id }}" {% if selective_server_choice == row.server.id|stringformat:'s' %}selected{% endif %}>{{ row.server.name }} · peers {{ row.peer_count }}/{{ row.capacity }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+            </details>
+          </div>
+
+          <div class="v6-config-panel" data-v6-product-panel="alt">
+            <div class="v6-panel-body">
+              {% if xhttp_form.non_field_errors %}<div class="alert alert-danger mb-3">{{ xhttp_form.non_field_errors }}</div>{% endif %}
+              <div class="v6-field-grid">
+                <div class="v6-field">
+                  <label class="form-label" for="{{ xhttp_form.name.id_for_label }}">Название</label>
+                  {{ xhttp_form.name }}
+                  {% for error in xhttp_form.name.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                </div>
+                <div class="v6-field">
+                  <label class="form-label" for="{{ xhttp_form.performance_profile.id_for_label }}">Профиль</label>
+                  {{ xhttp_form.performance_profile }}
+                  <div class="form-text">Standard — стабильный режим. Turbo — более агрессивный профиль.</div>
+                  {% for error in xhttp_form.performance_profile.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                </div>
+              </div>
+            </div>
+            <details class="v6-advanced">
+              <summary>Дополнительно · выбрать сервер вручную</summary>
+              <div class="v6-panel-body pt-0">
+                <label class="form-label" for="{{ xhttp_form.server.id_for_label }}">Сервер</label>
+                {{ xhttp_form.server }}
+                {% for error in xhttp_form.server.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                {% for error in xhttp_form.device.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+              </div>
+            </details>
+          </div>
+        </section>
+
+        <section class="v6-step">
+          <div class="v6-step-head">
+            <span class="v6-step-number">3</span>
+            <div>
+              <h2>Срок и лимиты</h2>
+              <p>Можно оставить как есть. Изменения здесь относятся ко всему устройству.</p>
+            </div>
+          </div>
+
+          <div class="v6-policy-panel">
+            <div class="v6-panel-body">
+              <div class="v6-policy-note" role="note">
+                <strong>Политика всего устройства</strong>
+                <span>Если вы измените срок или VPN-лимит, новое значение применится и к существующим FULL/SELECT-подключениям. Ключи, IP-адреса и сохранённые конфигурации не перевыпускаются.</span>
+              </div>
+
+              <div class="v6-field-grid">
+                <div class="v6-field">
+                  <label class="form-label" for="{{ access_form.expires_at.id_for_label }}">Срок устройства</label>
+                  {{ access_form.expires_at }}
+                  <div class="form-text">Пусто — наследовать срок аккаунта{% if account.expires_at %} · {{ account.expires_at|date:'d.m.Y H:i' }}{% endif %}.</div>
+                  {% for error in access_form.expires_at.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                </div>
+
+                <div class="v6-field">
+                  <label class="form-label" for="{{ access_form.apply_traffic.id_for_label }}">VPN-лимит трафика</label>
+                  <div data-v6-traffic-mode>{{ access_form.apply_traffic }}</div>
+                  <div class="form-text">ALT/XHTTP этим лимитом не измеряется.</div>
+                  {% for error in access_form.apply_traffic.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                </div>
+
+                <div class="v6-field" data-v6-traffic-size>
+                  <label class="form-label" for="{{ access_form.traffic_limit_preset.id_for_label }}">Размер лимита</label>
+                  <div data-v6-traffic-preset>{{ access_form.traffic_limit_preset }}</div>
+                  {% for error in access_form.traffic_limit_preset.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                </div>
+
+                <div class="v6-field" data-v6-traffic-custom>
+                  <label class="form-label" for="{{ access_form.traffic_custom_value.id_for_label }}">Свой объём</label>
+                  <div class="v6-inline-fields">
+                    {{ access_form.traffic_custom_value }}
+                    {{ access_form.traffic_custom_unit }}
+                  </div>
+                  {% for error in access_form.traffic_custom_value.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                  {% for error in access_form.traffic_custom_unit.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <div class="v6-submit-bar">
+          <a href="{% url 'customers-detail' account.pk %}" class="btn btn-outline-secondary">Отмена</a>
+          <button type="submit" class="btn btn-primary" data-v6-submit {% if not can_create_any %}disabled{% endif %}>Создать подключение</button>
+        </div>
+      </div>
+
+      <aside class="v6-summary" aria-label="Итог операции">
+        <section class="v6-summary-card">
+          <h3>Итог</h3>
+          <div class="v6-summary-row"><span>Тип</span><strong data-v6-summary-product>Не выбрано</strong></div>
+          <div class="v6-summary-row"><span>Устройство</span><strong>{{ device.name }}</strong></div>
+          <div class="v6-summary-row"><span>Создание</span><strong>только после подтверждения</strong></div>
+          <div class="v6-summary-row"><span>Существующие конфиги</span><strong>не перевыпускаются</strong></div>
+        </section>
+
+        <section class="v6-summary-card">
+          <h3>Уже есть</h3>
+          <div class="v6-summary-row"><span>FULL</span><strong>{% if has_full %}Создано{% else %}Не создано{% endif %}</strong></div>
+          <div class="v6-summary-row"><span>SELECT</span><strong>{% if has_selective %}Создано{% else %}Не создано{% endif %}</strong></div>
+          <div class="v6-summary-row"><span>ALT</span><strong>{% if xhttp_total %}{{ xhttp_total }}{% else %}Не создано{% endif %}</strong></div>
+        </section>
+      </aside>
     </div>
-
-    <div class="v4-product-grid">
-      <article class="v4-product-card">
-        <div class="v4-product-icon">F</div>
-        <div class="v4-product-eyebrow">Основной режим</div>
-        <h2>Весь интернет через VPN</h2>
-        <p>Весь интернет-трафик устройства направляется через VPN. Подходит как основное подключение.</p>
-        <div class="v4-product-action">
-          {% if has_full %}
-            <span class="v4-status-pill is-success">Уже создано</span>
-          {% elif full_available %}
-            <a class="btn btn-primary" href="{% url 'customers-device-vpn-create' device.pk %}?routing_mode=full">Продолжить</a>
-          {% else %}
-            <span class="v4-status-pill is-warning">Нет доступного сервера</span>
-          {% endif %}
-        </div>
-      </article>
-
-      <article class="v4-product-card is-selective">
-        <div class="v4-product-icon">S</div>
-        <div class="v4-product-eyebrow">Выборочный режим</div>
-        <h2>Только выбранные сервисы</h2>
-        <p>Через VPN идут только настроенные сервисы и маршруты. Остальной интернет остаётся прямым.</p>
-        <div class="v4-product-action">
-          {% if has_selective %}
-            <span class="v4-status-pill is-success">Уже создано</span>
-          {% elif selective_available %}
-            <a class="btn btn-outline-primary" href="{% url 'customers-device-vpn-create' device.pk %}?routing_mode=selective">Продолжить</a>
-          {% else %}
-            <span class="v4-status-pill is-warning">Нет доступного SELECT-сервера</span>
-          {% endif %}
-        </div>
-      </article>
-
-      <article class="v4-product-card is-alt">
-        <div class="v4-product-icon">A</div>
-        <div class="v4-product-eyebrow">Дополнительный способ</div>
-        <h2>Альтернативное подключение</h2>
-        <p>Отдельное альтернативное подключение. Существующие FULL и SELECT останутся без изменений.</p>
-        {% if xhttp_total %}<div class="v4-product-meta">Уже создано: {{ xhttp_total }}</div>{% endif %}
-        <div class="v4-product-action">
-          <a class="btn btn-outline-primary" href="{% url 'customers-device-xhttp-create' device.pk %}">Продолжить</a>
-        </div>
-      </article>
-    </div>
-  </section>
-
-  <div class="v4-context-note mt-3">На этом экране ничего не создаётся. Реальное подключение появится только после подтверждения на следующем шаге.</div>
+  </form>
 </div>
 {% endblock %}
