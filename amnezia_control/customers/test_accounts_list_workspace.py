@@ -185,7 +185,7 @@ class CustomerAccountsListWorkspaceTest(
 
         self.assertContains(
             response,
-            "Клиент, email или устройство",
+            "Имя, email или устройство",
         )
 
         metrics = response.context[
@@ -617,7 +617,7 @@ class CustomerAccountsListWorkspaceTest(
 
         self.assertContains(
             response,
-            "account-email-missing",
+            "Email не указан",
         )
 
     def test_actions_dropdown_raises_active_sticky_cell(
