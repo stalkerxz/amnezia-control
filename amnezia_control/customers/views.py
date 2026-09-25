@@ -1426,8 +1426,11 @@ def customer_device_connection_create_view(
                         )
 
                         return redirect(
-                            "customers-detail",
-                            pk=account.pk,
+                            reverse(
+                                "customers-detail",
+                                args=[account.pk],
+                            )
+                            + "#customer-connections"
                         )
 
         elif (
@@ -1596,8 +1599,11 @@ def customer_device_connection_create_view(
                     )
 
                     return redirect(
-                        "customers-detail",
-                        pk=account.pk,
+                        reverse(
+                            "customers-detail",
+                            args=[account.pk],
+                        )
+                        + "#customer-connections"
                     )
 
     return render(
