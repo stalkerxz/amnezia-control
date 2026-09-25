@@ -2413,6 +2413,9 @@ def customer_detail_view(request, pk):
             "server",
             "profile",
         )
+        .prefetch_related(
+            "revisions",
+        )
         .order_by(
             "protocol_type",
             "name",
