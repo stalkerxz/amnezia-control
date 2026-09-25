@@ -66,6 +66,25 @@ class RuntimeCommandService:
         "unable to access interface: protocol not supported",
         "protocol not supported",
     )
+    SENSITIVE_RUNTIME_OUTPUT_PATTERNS = (
+        re.compile(
+            r"^docker exec [a-zA-Z0-9_.-]+ "
+            r"(?:wg|awg) show(?: all| [a-zA-Z0-9_.-]+)? dump$"
+        ),
+        re.compile(
+            r"^docker exec [a-zA-Z0-9_.-]+ cat "
+            r"(?:/etc/amnezia|/opt/amnezia|/etc/wireguard)"
+            r"/[a-zA-Z0-9_./-]+$"
+        ),
+    )
+
+    @classmethod
+    def _command_output_is_sensitive(cls, command: str) -> bool:
+        value = (command or "").strip()
+        return any(
+            pattern.fullmatch(value)
+            for pattern in cls.SENSITIVE_RUNTIME_OUTPUT_PATTERNS
+        )
 
     @staticmethod
     def executor_for_server(server: Server):
@@ -78,6 +97,12 @@ class RuntimeCommandService:
 
     @staticmethod
     def run(server: Server, actor, action: str, command: str, sensitive_output: bool = False):
+        sensitive_output = (
+            sensitive_output
+            or RuntimeCommandService._command_output_is_sensitive(
+                command
+            )
+        )
         job = JobService.create_job(
             server=server,
             actor=actor,
@@ -170,6 +195,12 @@ class RuntimeCommandService:
         warn_on_expected_failure: bool = True,
         sensitive_output: bool = False,
     ):
+        sensitive_output = (
+            sensitive_output
+            or cls._command_output_is_sensitive(
+                command
+            )
+        )
         job = JobService.create_job(
             server=server,
             actor=actor,
@@ -597,6 +628,7 @@ class BaseProtocolAdapter:
                         warn_on_expected_failure=(
                             warn_on_expected_failure
                         ),
+                        sensitive_output=True,
                     )
                 )
 
@@ -641,7 +673,12 @@ class BaseProtocolAdapter:
                     return self._list_peers_from_config(actor)
                 return peers
             else:
-                out = self._run(actor, f"{self.protocol_type}.list", self._wg_cmd("show dump")).stdout
+                out = self._run(
+                    actor,
+                    f"{self.protocol_type}.list",
+                    self._wg_cmd("show dump"),
+                    sensitive_output=True,
+                ).stdout
             return self._parse_runtime_dump_peers(out)
         except RuntimeError:
             if self.protocol_type != VPNClient.ProtocolType.AWG2:
@@ -694,7 +731,12 @@ class BaseProtocolAdapter:
         config_path = self.protocol.runtime_metadata.get("config_path", "")
         if not config_path:
             return []
-        raw_conf = self._run(actor, f"{self.protocol_type}.list_fallback_conf", f"docker exec {self.container} cat {config_path}").stdout
+        raw_conf = self._run(
+            actor,
+            f"{self.protocol_type}.list_fallback_conf",
+            f"docker exec {self.container} cat {config_path}",
+            sensitive_output=True,
+        ).stdout
         return self._parse_peers_from_config_text(raw_conf)
 
     def peer_transfer_map(self, actor) -> dict[str, int] | None:
