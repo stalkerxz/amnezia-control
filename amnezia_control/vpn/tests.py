@@ -476,6 +476,167 @@ class VPNClientFlowTest(TestCase):
         self.assertEqual(job.status, Job.Status.SUCCESS)
         self.assertEqual(job.events.latest("id").level, "warning")
 
+    def test_runtime_dump_output_is_not_persisted_in_jobs(self):
+        class Result:
+            def __init__(self, stdout="", stderr="", exit_code=0):
+                self.stdout = stdout
+                self.stderr = stderr
+                self.exit_code = exit_code
+
+        secret_dump = (
+            "awg0\tserver-private-secret\tserver-public\t51830\t0\n"
+            "peer-public\tpeer-psk-secret\tep\t10.77.0.10/32\t0\t1\t2\t25\n"
+        )
+
+        class FakeExecutor:
+            @staticmethod
+            def run(command):
+                return Result(stdout=secret_dump)
+
+        with patch.object(
+            RuntimeCommandService,
+            "executor_for_server",
+            return_value=FakeExecutor(),
+        ):
+            result = RuntimeCommandService.run(
+                self.server,
+                self.user,
+                "runtime.secret-dump",
+                "docker exec amnezia-awg2 awg show all dump",
+            )
+
+        self.assertIn("server-private-secret", result.stdout)
+        self.assertIn("peer-psk-secret", result.stdout)
+
+        job = Job.objects.filter(
+            action="runtime.secret-dump"
+        ).latest("id")
+        event = job.events.latest("id")
+
+        self.assertEqual(
+            job.payload.get("command"),
+            "[REDACTED]",
+        )
+        self.assertEqual(event.stdout, "")
+        self.assertEqual(event.stderr, "")
+        self.assertNotIn(
+            "server-private-secret",
+            event.stdout,
+        )
+        self.assertNotIn(
+            "peer-psk-secret",
+            event.stdout,
+        )
+
+    def test_expected_failure_dump_success_is_not_persisted_in_jobs(self):
+        class Result:
+            def __init__(self, stdout="", stderr="", exit_code=0):
+                self.stdout = stdout
+                self.stderr = stderr
+                self.exit_code = exit_code
+
+        secret_dump = (
+            "awg0\tserver-private-secret\tserver-public\t51830\t0\n"
+            "peer-public\tpeer-psk-secret\tep\t10.77.0.10/32\t0\t1\t2\t25\n"
+        )
+
+        class FakeExecutor:
+            @staticmethod
+            def run(command):
+                return Result(stdout=secret_dump)
+
+        with patch.object(
+            RuntimeCommandService,
+            "executor_for_server",
+            return_value=FakeExecutor(),
+        ):
+            result = (
+                RuntimeCommandService
+                .run_with_expected_failure(
+                    self.server,
+                    self.user,
+                    "runtime.secret-dump-expected",
+                    "docker exec amnezia-awg2 awg show dump",
+                    expected_error_patterns=(
+                        RuntimeCommandService
+                        .AWG2_EXPECTED_RUNTIME_DUMP_ERRORS
+                    ),
+                    fallback_message=(
+                        "AWG2 runtime telemetry unavailable"
+                    ),
+                )
+            )
+
+        self.assertIsNotNone(result)
+        self.assertIn(
+            "server-private-secret",
+            result.stdout,
+        )
+
+        job = Job.objects.filter(
+            action="runtime.secret-dump-expected"
+        ).latest("id")
+        event = job.events.latest("id")
+
+        self.assertEqual(
+            job.payload.get("command"),
+            "[REDACTED]",
+        )
+        self.assertEqual(event.stdout, "")
+        self.assertEqual(event.stderr, "")
+
+    def test_runtime_config_read_output_is_not_persisted_in_jobs(self):
+        class Result:
+            def __init__(self, stdout="", stderr="", exit_code=0):
+                self.stdout = stdout
+                self.stderr = stderr
+                self.exit_code = exit_code
+
+        secret_config = (
+            "[Interface]\n"
+            "PrivateKey = server-private-secret\n"
+            "HeaderProtectionKey = header-secret\n"
+            "[Peer]\n"
+            "PresharedKey = peer-psk-secret\n"
+        )
+
+        class FakeExecutor:
+            @staticmethod
+            def run(command):
+                return Result(stdout=secret_config)
+
+        with patch.object(
+            RuntimeCommandService,
+            "executor_for_server",
+            return_value=FakeExecutor(),
+        ):
+            result = RuntimeCommandService.run(
+                self.server,
+                self.user,
+                "runtime.secret-config",
+                (
+                    "docker exec amnezia-awg2 cat "
+                    "/opt/amnezia/awg/awg0.conf"
+                ),
+            )
+
+        self.assertIn(
+            "server-private-secret",
+            result.stdout,
+        )
+
+        job = Job.objects.filter(
+            action="runtime.secret-config"
+        ).latest("id")
+        event = job.events.latest("id")
+
+        self.assertEqual(
+            job.payload.get("command"),
+            "[REDACTED]",
+        )
+        self.assertEqual(event.stdout, "")
+        self.assertEqual(event.stderr, "")
+
     def test_awg2_list_peers_prefers_show_all_dump_runtime_telemetry(self):
         from unittest.mock import patch
 
