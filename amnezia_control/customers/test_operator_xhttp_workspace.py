@@ -96,59 +96,49 @@ class OperatorXHTTPWorkspaceTest(
 
         self.assertEqual(
             response.status_code,
+            302,
+        )
+
+        self.assertEqual(
+            response.url,
+            (
+                reverse(
+                    "customers-device-connection-create",
+                    args=[self.device.pk],
+                )
+                + "?product=alt"
+            ),
+        )
+
+        unified = self.client.get(
+            response.url
+        )
+
+        self.assertEqual(
+            unified.status_code,
             200,
         )
 
         self.assertContains(
-            response,
+            unified,
             "Альтернативное подключение",
         )
 
-        self.assertNotContains(
-            response,
-            "VLESS / XHTTP",
-        )
-
-        self.assertNotContains(
-            response,
-            "VLESS/XHTTP",
-        )
-
-        self.assertNotContains(
-            response,
-            "UUID",
-        )
-
         self.assertContains(
-            response,
-            reverse(
-                "customers-device-connection-create",
-                args=[self.device.pk],
-            ),
-        )
-
-        self.assertContains(
-            response,
+            unified,
             self.account.display_name,
         )
 
         self.assertContains(
-            response,
+            unified,
             self.device.name,
         )
 
         self.assertEqual(
-            response.context[
-                "device"
-            ].pk,
-            self.device.pk,
-        )
-
-        self.assertEqual(
-            response.context[
-                "form"
-            ].initial["server"],
-            self.server.pk,
+            unified.context[
+                "selected_product"
+            ],
+            "alt",
         )
 
     @patch(
@@ -178,6 +168,9 @@ class OperatorXHTTPWorkspaceTest(
                 "device": "999999",
                 "server": self.server.pk,
                 "name": "New CDN",
+                "performance_profile": (
+                    XHTTPDevice.PerformanceProfile.STANDARD
+                ),
             },
         )
 
