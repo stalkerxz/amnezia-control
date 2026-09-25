@@ -9,6 +9,7 @@ from servers.models import (
 )
 
 from vpn.models import (
+    ClientConfigRevision,
     VPNClient,
     XHTTPDevice,
 )
@@ -121,6 +122,15 @@ class CustomerOperatorWorkspaceTest(
             runtime_peer_public_key=(
                 "workspace-full-key"
             ),
+        )
+
+        ClientConfigRevision.objects.create(
+            client=self.full,
+            revision_number=1,
+            protocol_type=VPNClient.ProtocolType.AWG2,
+            config_blob_encrypted="native-config",
+            amneziavpn_blob_encrypted="vpn-config",
+            config_hash="full-config-hash",
         )
 
         self.selective = (
@@ -351,6 +361,13 @@ class CustomerOperatorWorkspaceTest(
         self.assertContains(
             response,
             "Native .conf",
+        )
+        self.assertContains(
+            response,
+            reverse(
+                "clients-download-native",
+                args=[self.selective.pk],
+            ),
         )
 
         for hidden_metadata in (
