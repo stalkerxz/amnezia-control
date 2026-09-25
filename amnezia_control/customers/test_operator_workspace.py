@@ -231,6 +231,13 @@ class CustomerOperatorWorkspaceTest(
         )
 
         self.assertTrue(
+            row["full"][0].amneziavpn_download_available
+        )
+        self.assertFalse(
+            row["selective"][0].amneziavpn_download_available
+        )
+
+        self.assertTrue(
             row["can_add_connections"]
         )
 
