@@ -504,3 +504,63 @@ class UnifiedConnectionCreateTests(TestCase):
             response.status_code,
             403,
         )
+
+def test_legacy_vpn_full_get_redirects_to_unified(self):
+        response = self.client.get(
+            reverse(
+                "customers-device-vpn-create",
+                args=[self.device.pk],
+            )
+            + "?routing_mode=full"
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            response.url,
+            self.url() + "?product=full",
+        )
+
+    def test_legacy_vpn_selective_get_redirects_to_unified(self):
+        response = self.client.get(
+            reverse(
+                "customers-device-vpn-create",
+                args=[self.device.pk],
+            )
+            + "?routing_mode=selective"
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            response.url,
+            self.url() + "?product=selective",
+        )
+
+    def test_legacy_vpn_invalid_get_redirects_to_full(self):
+        response = self.client.get(
+            reverse(
+                "customers-device-vpn-create",
+                args=[self.device.pk],
+            )
+            + "?routing_mode=invalid"
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            response.url,
+            self.url() + "?product=full",
+        )
+
+    def test_legacy_xhttp_get_redirects_to_unified(self):
+        response = self.client.get(
+            reverse(
+                "customers-device-xhttp-create",
+                args=[self.device.pk],
+            )
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            response.url,
+            self.url() + "?product=alt",
+        )
+
