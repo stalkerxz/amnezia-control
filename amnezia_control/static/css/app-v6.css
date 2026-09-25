@@ -1385,3 +1385,33 @@ body.app-shell .v4-connection-actions .form-select {
     padding: 12px !important;
   }
 }
+
+
+/* V6 accessibility hardening */
+body.app-shell .v4-step-copy p,
+body.app-shell .v4-connection-card-head p,
+body.app-shell .v4-connection-card-head span,
+body.app-shell .v4-connection-item small {
+  font-size: 11px !important;
+}
+
+@media (max-width: 767.98px) {
+  body.app-shell .btn,
+  body.app-shell .sidebar-toggle,
+  body.app-shell .v4-more-button,
+  body.app-shell .v4-device-more,
+  body.app-shell .mobile-nav-item {
+    min-height: 44px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.app-shell *,
+  body.app-shell *::before,
+  body.app-shell *::after {
+    scroll-behavior: auto !important;
+    transition-duration: .01ms !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
