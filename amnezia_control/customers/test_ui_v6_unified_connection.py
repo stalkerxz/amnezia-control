@@ -215,7 +215,8 @@ class UnifiedConnectionCreateTests(TestCase):
             reverse(
                 "customers-detail",
                 args=[self.account.pk],
-            ),
+            )
+            + "#customer-connections",
         )
 
         self.device.refresh_from_db()
@@ -276,7 +277,8 @@ class UnifiedConnectionCreateTests(TestCase):
             reverse(
                 "customers-detail",
                 args=[self.account.pk],
-            ),
+            )
+            + "#customer-connections",
         )
 
         self.assertEqual(
@@ -315,7 +317,8 @@ class UnifiedConnectionCreateTests(TestCase):
             reverse(
                 "customers-detail",
                 args=[self.account.pk],
-            ),
+            )
+            + "#customer-connections",
         )
 
         create_device.assert_called_once()
