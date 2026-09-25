@@ -36,6 +36,9 @@ jobs:
       - name: Build test image
         run: docker compose -p ui_v6_ci build web
 
+      - name: Check V6 JavaScript syntax
+        run: node --check amnezia_control/static/js/app-v6.js
+
       - name: Run V6 targeted tests
         shell: bash
         run: |
