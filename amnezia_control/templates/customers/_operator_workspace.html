@@ -146,8 +146,12 @@
             {% if client.status == 'active' %}<span class="v4-status-pill is-success">Активно</span>{% elif client.status == 'disabled' %}<span class="v4-status-pill is-warning">Отключено</span>{% else %}<span class="v4-status-pill is-neutral">{{ client.get_status_display }}</span>{% endif %}
           </div>
           <div class="v4-connection-actions">
-            <a class="btn btn-sm btn-primary" href="{% url 'clients-download' client.pk %}">AmneziaVPN .vpn</a>
-            <a class="btn btn-sm btn-outline-secondary" href="{% url 'clients-download-native' client.pk %}">Native .conf</a>
+            {% if client.amneziavpn_download_available %}
+              <a class="btn btn-sm btn-primary" href="{% url 'clients-download' client.pk %}">AmneziaVPN .vpn</a>
+              <a class="btn btn-sm btn-outline-secondary" href="{% url 'clients-download-native' client.pk %}">Native .conf</a>
+            {% else %}
+              <a class="btn btn-sm btn-primary" href="{% url 'clients-download-native' client.pk %}">Native .conf</a>
+            {% endif %}
             <a class="btn btn-sm btn-outline-secondary" href="{% url 'clients-detail' client.pk %}">Открыть</a>
           </div>
         </div>
