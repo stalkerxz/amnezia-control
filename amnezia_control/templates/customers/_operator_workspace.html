@@ -37,7 +37,7 @@
       {% endif %}
 
       {% if account.status != 'deleted' and row.device.status != 'deleted' %}
-        <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#device-workspace-{{ row.device.pk }}" aria-expanded="false" aria-controls="device-workspace-{{ row.device.pk }}">Настройки</button>
+        <button class="btn btn-sm btn-outline-secondary v6-device-settings-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#device-workspace-{{ row.device.pk }}" aria-expanded="false" aria-controls="device-workspace-{{ row.device.pk }}">Настройки</button>
 
         <div class="dropdown">
           <button class="v4-device-more" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Действия с устройством">•••</button>
@@ -131,8 +131,10 @@
     </div>
   </div>
 
+  {% if row.full or row.selective or row.xhttp %}
   <div class="v4-connection-grid">
-    <article class="v4-connection-card {% if not row.full %}is-empty{% endif %}">
+    {% if row.full %}
+    <article class="v4-connection-card">
       <div class="v4-connection-card-head">
         <div><span>FULL</span><h4>Весь интернет</h4><p>Весь трафик устройства через VPN</p></div>
         <b>{{ row.full|length }}</b>
@@ -152,8 +154,10 @@
         <div class="v4-connection-empty">Не создано</div>
       {% endfor %}
     </article>
+    {% endif %}
 
-    <article class="v4-connection-card {% if not row.selective %}is-empty{% endif %}">
+    {% if row.selective %}
+    <article class="v4-connection-card">
       <div class="v4-connection-card-head">
         <div><span>SELECT</span><h4>Выбранные сервисы</h4><p>Только настроенные маршруты через VPN</p></div>
         <b>{{ row.selective|length }}</b>
@@ -173,8 +177,10 @@
         <div class="v4-connection-empty">Не создано</div>
       {% endfor %}
     </article>
+    {% endif %}
 
-    <article class="v4-connection-card {% if not row.xhttp %}is-empty{% endif %}">
+    {% if row.xhttp %}
+    <article class="v4-connection-card">
       <div class="v4-connection-card-head">
         <div><span>ALT</span><h4>Альтернативное</h4><p>VLESS/XHTTP через Yandex CDN</p></div>
         <b>{{ row.xhttp|length }}</b>
@@ -220,7 +226,9 @@
         <div class="v4-connection-empty">Не создано</div>
       {% endfor %}
     </article>
+    {% endif %}
   </div>
+  {% endif %}
 
   {% if row.legacy %}
     <details class="v4-device-legacy">
