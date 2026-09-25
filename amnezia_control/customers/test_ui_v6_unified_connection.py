@@ -505,7 +505,7 @@ class UnifiedConnectionCreateTests(TestCase):
             403,
         )
 
-def test_legacy_vpn_full_get_redirects_to_unified(self):
+    def test_legacy_vpn_full_get_redirects_to_unified(self):
         response = self.client.get(
             reverse(
                 "customers-device-vpn-create",
