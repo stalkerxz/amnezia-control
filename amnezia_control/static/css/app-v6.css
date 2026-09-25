@@ -1,0 +1,1090 @@
+/* VPN Control V6 — operator-first presentation layer.
+   Loaded after the stable V4/mobile bundles and intentionally keeps
+   existing template class names as compatibility hooks. */
+
+:root {
+  --v6-bg: #070a10;
+  --v6-bg-elevated: #0b111a;
+  --v6-surface: #0e1622;
+  --v6-surface-2: #111b29;
+  --v6-surface-3: #162235;
+  --v6-border: #223149;
+  --v6-border-soft: #182538;
+  --v6-text: #f3f7fb;
+  --v6-text-2: #b9c5d4;
+  --v6-text-3: #74849a;
+  --v6-blue: #5da8ff;
+  --v6-cyan: #58d2ff;
+  --v6-violet: #9f7cff;
+  --v6-green: #4fd5a2;
+  --v6-amber: #f1bd64;
+  --v6-red: #ff7585;
+  --v6-shadow: 0 18px 48px rgba(0, 0, 0, .24);
+  --v6-radius-sm: 10px;
+  --v6-radius: 14px;
+  --v6-radius-lg: 18px;
+  --v6-focus: 0 0 0 3px rgba(93, 168, 255, .22);
+}
+
+html[data-bs-theme="dark"],
+body.app-shell {
+  background: var(--v6-bg);
+  color: var(--v6-text);
+}
+
+body.app-shell {
+  font-size: 14px;
+  line-height: 1.45;
+  letter-spacing: -.005em;
+}
+
+body.app-shell .app-layout {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 78% 4%, rgba(95, 77, 181, .10), transparent 28rem),
+    radial-gradient(circle at 38% 18%, rgba(40, 126, 203, .07), transparent 30rem),
+    var(--v6-bg);
+}
+
+body.app-shell .sidebar {
+  width: 228px;
+  border-right: 1px solid var(--v6-border-soft) !important;
+  background: rgba(8, 13, 21, .94);
+  backdrop-filter: blur(18px);
+}
+
+body.app-shell.sidebar-collapsed .sidebar {
+  width: 74px;
+}
+
+body.app-shell .brand {
+  min-height: 72px;
+  padding: 0 18px;
+  gap: 11px;
+}
+
+body.app-shell .brand-mark {
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(93, 168, 255, .32);
+  border-radius: 11px;
+  background: linear-gradient(145deg, rgba(58, 145, 255, .22), rgba(132, 83, 255, .20));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.05);
+}
+
+body.app-shell .brand-label {
+  font-size: 15px;
+  font-weight: 720;
+  letter-spacing: -.02em;
+}
+
+body.app-shell .sidebar-section {
+  margin: 17px 18px 7px;
+  color: #55667c;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .16em;
+}
+
+body.app-shell .sidebar .nav {
+  padding: 0 10px;
+  gap: 3px;
+}
+
+body.app-shell .sidebar .nav-link,
+body.app-shell .sidebar-system summary {
+  min-height: 42px;
+  padding: 9px 11px;
+  gap: 10px;
+  border: 1px solid transparent;
+  border-radius: 11px;
+  color: #8fa0b5;
+  font-size: 13px;
+  font-weight: 620;
+  transition: color .16s ease, background .16s ease, border-color .16s ease, transform .16s ease;
+}
+
+body.app-shell .sidebar .nav-link:hover,
+body.app-shell .sidebar-system summary:hover {
+  color: #dce8f6;
+  background: rgba(255,255,255,.035);
+}
+
+body.app-shell .sidebar .nav-link.active {
+  color: #eaf4ff;
+  border-color: rgba(93, 168, 255, .34);
+  background: linear-gradient(90deg, rgba(52, 129, 233, .16), rgba(103, 76, 199, .08));
+}
+
+body.app-shell .sidebar .nav-link.active::before {
+  display: none;
+}
+
+body.app-shell .nav-icon {
+  width: 20px;
+  height: 20px;
+  color: currentColor;
+  opacity: .95;
+}
+
+body.app-shell .sidebar-account {
+  margin: 14px 12px 16px;
+  padding: 11px;
+  border-top: 1px solid var(--v6-border-soft);
+}
+
+body.app-shell .topbar {
+  min-height: 66px;
+  padding: 0 26px;
+  border-color: var(--v6-border-soft) !important;
+  background: rgba(7, 10, 16, .78);
+  backdrop-filter: blur(18px);
+}
+
+body.app-shell .sidebar-toggle {
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--v6-border);
+  border-radius: 11px;
+  background: rgba(255,255,255,.025);
+}
+
+body.app-shell .topbar-title {
+  color: #edf4fb;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+body.app-shell .topbar-subtitle {
+  color: var(--v6-text-3);
+  font-size: 11px;
+}
+
+body.app-shell .content {
+  width: min(100%, 1480px);
+  margin: 0 auto;
+  padding: 34px 34px 54px;
+}
+
+body.app-shell .page-kicker,
+body.app-shell .v4-panel-eyebrow,
+body.app-shell .v4-product-eyebrow {
+  color: #6bbdff;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .13em;
+  text-transform: uppercase;
+}
+
+body.app-shell .v4-page-hero,
+body.app-shell .v4-form-hero,
+body.app-shell .v4-detail-header {
+  margin-bottom: 22px !important;
+}
+
+body.app-shell .v4-page-hero h1,
+body.app-shell .v4-form-hero h1,
+body.app-shell .v4-detail-title-line h1 {
+  margin: 5px 0 5px;
+  color: var(--v6-text);
+  font-size: clamp(26px, 3vw, 38px);
+  font-weight: 760;
+  letter-spacing: -.035em;
+}
+
+body.app-shell .v4-hero-copy,
+body.app-shell .v4-form-hero-copy > p:last-child {
+  max-width: 720px;
+  color: var(--v6-text-3);
+  font-size: 14px;
+}
+
+body.app-shell .btn {
+  min-height: 38px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 720;
+  box-shadow: none;
+}
+
+body.app-shell .btn-sm {
+  min-height: 32px;
+  padding: 6px 10px;
+  font-size: 11px;
+}
+
+body.app-shell .btn-primary {
+  border: 0;
+  background: linear-gradient(105deg, #35bdf5 0%, #5f9cff 52%, #8d65f2 100%);
+  color: #fff;
+  box-shadow: 0 8px 24px rgba(66, 132, 238, .20);
+}
+
+body.app-shell .btn-primary:hover {
+  filter: brightness(1.05);
+  transform: translateY(-1px);
+}
+
+body.app-shell .btn-outline-primary,
+body.app-shell .btn-outline-secondary {
+  border-color: var(--v6-border);
+  background: rgba(255,255,255,.018);
+  color: #b9c9dc;
+}
+
+body.app-shell .btn-outline-primary:hover,
+body.app-shell .btn-outline-secondary:hover {
+  border-color: #385173;
+  background: #111b29;
+  color: #eef6ff;
+}
+
+body.app-shell :focus-visible {
+  outline: none !important;
+  box-shadow: var(--v6-focus) !important;
+}
+
+body.app-shell .form-control,
+body.app-shell .form-select {
+  min-height: 40px;
+  border-color: var(--v6-border);
+  border-radius: 10px;
+  background-color: #0a111b;
+  color: #e8eff8;
+  font-size: 13px;
+}
+
+body.app-shell .form-control:focus,
+body.app-shell .form-select:focus {
+  border-color: rgba(93, 168, 255, .68);
+  background-color: #0c1521;
+  box-shadow: var(--v6-focus);
+}
+
+body.app-shell .form-label {
+  margin-bottom: 6px;
+  color: #aab8c9;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+body.app-shell .form-text {
+  color: #66788e;
+  font-size: 10px;
+}
+
+body.app-shell .alert {
+  border: 1px solid var(--v6-border);
+  border-radius: 12px;
+  background: #101925;
+}
+
+body.app-shell .alert-danger {
+  border-color: rgba(255, 117, 133, .3);
+  background: rgba(109, 31, 45, .18);
+  color: #ffc4cb;
+}
+
+/* Unified card language */
+body.app-shell .v4-panel,
+body.app-shell .v4-kpi-card,
+body.app-shell .v4-system-panel,
+body.app-shell .v4-form-card,
+body.app-shell .v4-detail-panel,
+body.app-shell .v4-management-panel,
+body.app-shell .v4-server-card,
+body.app-shell .v4-customer-table-panel,
+body.app-shell .v4-context-card {
+  border: 1px solid var(--v6-border-soft) !important;
+  border-radius: var(--v6-radius) !important;
+  background: linear-gradient(180deg, rgba(16, 25, 38, .92), rgba(11, 17, 27, .94)) !important;
+  box-shadow: none !important;
+}
+
+body.app-shell .v4-panel:hover,
+body.app-shell .v4-kpi-card:hover,
+body.app-shell .v4-server-card:hover {
+  border-color: #2b3e59 !important;
+}
+
+body.app-shell .v4-kpi-grid {
+  gap: 10px !important;
+}
+
+body.app-shell .v4-kpi-card {
+  min-height: 126px !important;
+  padding: 16px !important;
+}
+
+body.app-shell .v4-kpi-value {
+  margin-top: 12px !important;
+  font-size: 30px !important;
+  font-weight: 760 !important;
+  letter-spacing: -.04em;
+}
+
+body.app-shell .v4-kpi-meta,
+body.app-shell .v4-kpi-label {
+  color: var(--v6-text-3) !important;
+}
+
+body.app-shell .v4-dashboard-grid {
+  gap: 12px !important;
+}
+
+body.app-shell .v4-panel-head,
+body.app-shell .v4-system-panel-head,
+body.app-shell .v4-form-card-head {
+  padding: 15px 16px !important;
+  border-bottom-color: var(--v6-border-soft) !important;
+}
+
+body.app-shell .v4-panel-head h2,
+body.app-shell .v4-system-panel-head h2,
+body.app-shell .v4-form-card-head h2 {
+  color: #eef4fa;
+  font-size: 15px !important;
+  font-weight: 720;
+  letter-spacing: -.015em;
+}
+
+body.app-shell .v4-panel-head p,
+body.app-shell .v4-system-panel-head p,
+body.app-shell .v4-form-card-head p {
+  color: var(--v6-text-3) !important;
+}
+
+body.app-shell .v4-attention-row {
+  min-height: 58px;
+  border-color: var(--v6-border-soft) !important;
+}
+
+body.app-shell .v4-attention-row:hover {
+  background: rgba(93, 168, 255, .035);
+}
+
+body.app-shell .v4-activity-panel {
+  margin-top: 12px !important;
+}
+
+body.app-shell .v4-activity-table tbody tr:nth-child(n+7) {
+  display: none;
+}
+
+body.app-shell .v4-operation-meta,
+body.app-shell .text-secondary {
+  color: var(--v6-text-3) !important;
+}
+
+body.app-shell .v4-status-pill,
+body.app-shell .v4-server-status {
+  border-radius: 999px !important;
+  font-size: 10px !important;
+  font-weight: 760 !important;
+}
+
+body.app-shell .v4-status-pill.is-success,
+body.app-shell .v4-server-status.is-success {
+  border-color: rgba(79, 213, 162, .24) !important;
+  background: rgba(79, 213, 162, .09) !important;
+  color: #71e6ba !important;
+}
+
+body.app-shell .v4-status-pill.is-warning,
+body.app-shell .v4-server-status.is-warning {
+  border-color: rgba(241, 189, 100, .25) !important;
+  background: rgba(241, 189, 100, .09) !important;
+  color: #f4c978 !important;
+}
+
+body.app-shell .v4-status-pill.is-danger,
+body.app-shell .v4-server-status.is-danger {
+  border-color: rgba(255, 117, 133, .25) !important;
+  background: rgba(255, 117, 133, .08) !important;
+  color: #ff98a5 !important;
+}
+
+/* Customers */
+body.app-shell .v4-customers-page,
+body.app-shell .v4-customer-detail {
+  max-width: 1320px;
+  margin: 0 auto;
+}
+
+body.app-shell .v4-customer-toolbar {
+  gap: 10px !important;
+  padding: 10px !important;
+  border: 1px solid var(--v6-border-soft);
+  border-radius: 13px;
+  background: rgba(10, 16, 25, .82);
+}
+
+body.app-shell .v4-search-box {
+  border-color: var(--v6-border) !important;
+  border-radius: 10px !important;
+  background: #09111a !important;
+}
+
+body.app-shell .v4-customer-table-panel {
+  overflow: hidden;
+}
+
+body.app-shell .v4-customer-table {
+  margin: 0 !important;
+}
+
+body.app-shell .v4-customer-table thead th {
+  padding: 11px 14px !important;
+  border-bottom: 1px solid var(--v6-border) !important;
+  background: #0d1520 !important;
+  color: #62748a !important;
+  font-size: 9px !important;
+  font-weight: 800 !important;
+  letter-spacing: .12em !important;
+  text-transform: uppercase;
+}
+
+body.app-shell .v4-customer-row td {
+  height: 58px;
+  padding: 9px 14px !important;
+  border-bottom-color: var(--v6-border-soft) !important;
+  background: transparent !important;
+}
+
+body.app-shell .v4-customer-row:hover td {
+  background: rgba(80, 151, 241, .035) !important;
+}
+
+body.app-shell .v4-customer-name {
+  color: #e7eef7 !important;
+  font-size: 12px !important;
+  font-weight: 710 !important;
+}
+
+body.app-shell .v4-customer-email,
+body.app-shell .v4-access-cell small,
+body.app-shell .v4-number-cell small {
+  color: #62738a !important;
+  font-size: 9px !important;
+}
+
+body.app-shell .v4-customer-avatar,
+body.app-shell .v4-detail-avatar {
+  border: 1px solid #2b3b56;
+  background: linear-gradient(145deg, #152743, #29244e);
+  color: #bfd8ff;
+}
+
+body.app-shell .v4-detail-tabs {
+  gap: 4px !important;
+  padding: 4px !important;
+  border: 1px solid var(--v6-border-soft) !important;
+  border-radius: 11px !important;
+  background: #0a111a !important;
+}
+
+body.app-shell .v4-detail-tabs a {
+  border-radius: 8px !important;
+  color: #72849b !important;
+}
+
+body.app-shell .v4-detail-tabs a:hover,
+body.app-shell .v4-detail-tabs a:focus-visible {
+  background: #111b29 !important;
+  color: #d8e7f7 !important;
+}
+
+body.app-shell .operator-workspace-v4 {
+  display: grid;
+  gap: 12px;
+}
+
+/* Servers + operations */
+body.app-shell .v4-server-card-list {
+  gap: 12px !important;
+}
+
+body.app-shell .v4-server-card {
+  overflow: hidden;
+}
+
+body.app-shell .v4-server-card-head {
+  padding: 16px !important;
+}
+
+body.app-shell .v4-server-card-stats {
+  border-color: var(--v6-border-soft) !important;
+}
+
+body.app-shell .v4-server-stat {
+  min-height: 72px !important;
+  border-color: var(--v6-border-soft) !important;
+}
+
+body.app-shell .v4-system-table {
+  margin-bottom: 0 !important;
+}
+
+body.app-shell .v4-system-table thead th {
+  padding: 11px 13px !important;
+  background: #0d1520 !important;
+  color: #62748a !important;
+  font-size: 9px !important;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+body.app-shell .v4-system-table tbody td {
+  padding: 10px 13px !important;
+  border-color: var(--v6-border-soft) !important;
+  color: #b5c1cf;
+}
+
+/* Settings — JS turns these panels into tabs without changing backend forms. */
+body.app-shell .v6-settings-tabs {
+  display: flex;
+  gap: 5px;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 0 12px;
+  padding: 4px;
+  overflow-x: auto;
+  border: 1px solid var(--v6-border-soft);
+  border-radius: 12px;
+  background: #0a111a;
+  scrollbar-width: none;
+}
+
+body.app-shell .v6-settings-tabs::-webkit-scrollbar { display: none; }
+
+body.app-shell .v6-settings-tab {
+  min-height: 34px;
+  padding: 7px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #75879d;
+  font-size: 11px;
+  font-weight: 720;
+  white-space: nowrap;
+}
+
+body.app-shell .v6-settings-tab:hover {
+  background: rgba(255,255,255,.035);
+  color: #d3e0ee;
+}
+
+body.app-shell .v6-settings-tab[aria-selected="true"] {
+  background: #132238;
+  color: #d9ebff;
+}
+
+body.app-shell .v6-settings-page .v4-settings-grid {
+  display: block !important;
+}
+
+body.app-shell .v6-settings-page .v4-settings-stack {
+  display: contents !important;
+}
+
+body.app-shell .v6-settings-panel {
+  width: 100%;
+  max-width: 1080px;
+}
+
+body.app-shell .v6-settings-panel[hidden] {
+  display: none !important;
+}
+
+body.app-shell .v4-settings-kv {
+  gap: 8px !important;
+}
+
+body.app-shell .v4-settings-kv > div {
+  border-color: var(--v6-border-soft) !important;
+  border-radius: 10px !important;
+  background: #0b131e !important;
+}
+
+/* V6 one-screen connection creator */
+body.app-shell .v6-connection-page {
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
+body.app-shell .v6-back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 12px;
+  color: #7f93aa;
+  font-size: 11px;
+  text-decoration: none;
+}
+
+body.app-shell .v6-back-link:hover { color: #c9d9eb; }
+
+body.app-shell .v6-context-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+body.app-shell .v6-context-item {
+  min-width: 0;
+  padding: 11px 12px;
+  border: 1px solid var(--v6-border-soft);
+  border-radius: 11px;
+  background: rgba(12, 19, 29, .78);
+}
+
+body.app-shell .v6-context-item span {
+  display: block;
+  margin-bottom: 4px;
+  color: #5f7086;
+  font-size: 9px;
+  font-weight: 740;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+body.app-shell .v6-context-item strong {
+  display: block;
+  overflow: hidden;
+  color: #dce8f5;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+body.app-shell .v6-step {
+  margin-bottom: 12px;
+}
+
+body.app-shell .v6-step-head {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  margin: 0 0 9px;
+}
+
+body.app-shell .v6-step-number {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border: 1px solid #2e4563;
+  border-radius: 7px;
+  background: #102039;
+  color: #9fcbff;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+body.app-shell .v6-step-head h2 {
+  margin: 0;
+  color: #e8f0f9;
+  font-size: 14px;
+  font-weight: 740;
+}
+
+body.app-shell .v6-step-head p {
+  margin: 0;
+  color: #6b7d92;
+  font-size: 10px;
+}
+
+body.app-shell .v6-product-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 9px;
+}
+
+body.app-shell .v6-product-card {
+  position: relative;
+  min-height: 150px;
+  padding: 14px;
+  cursor: pointer;
+  border: 1px solid var(--v6-border);
+  border-radius: 13px;
+  background: linear-gradient(180deg, #0f1825, #0c131e);
+  transition: border-color .16s ease, background .16s ease, transform .16s ease;
+}
+
+body.app-shell .v6-product-card:hover {
+  transform: translateY(-1px);
+  border-color: #355276;
+}
+
+body.app-shell .v6-product-card.is-selected {
+  border-color: rgba(93,168,255,.62);
+  background: linear-gradient(180deg, rgba(33,64,103,.42), rgba(13,24,37,.96));
+  box-shadow: inset 0 0 0 1px rgba(93,168,255,.08);
+}
+
+body.app-shell .v6-product-card.is-selective.is-selected {
+  border-color: rgba(159,124,255,.55);
+}
+
+body.app-shell .v6-product-card.is-alt.is-selected {
+  border-color: rgba(241,189,100,.48);
+}
+
+body.app-shell .v6-product-card.is-disabled {
+  cursor: not-allowed;
+  opacity: .5;
+}
+
+body.app-shell .v6-product-radio {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  accent-color: var(--v6-blue);
+}
+
+body.app-shell .v6-product-symbol {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  margin-bottom: 13px;
+  border: 1px solid #2a466c;
+  border-radius: 9px;
+  background: #10213a;
+  color: #9dcbff;
+  font-size: 12px;
+  font-weight: 820;
+}
+
+body.app-shell .v6-product-card.is-selective .v6-product-symbol {
+  border-color: #473766;
+  background: #211938;
+  color: #c9b2ff;
+}
+
+body.app-shell .v6-product-card.is-alt .v6-product-symbol {
+  border-color: #5a4528;
+  background: #2a2116;
+  color: #f3c873;
+}
+
+body.app-shell .v6-product-card h3 {
+  margin: 0 0 5px;
+  color: #e8f1fb;
+  font-size: 13px;
+  font-weight: 740;
+}
+
+body.app-shell .v6-product-card p {
+  margin: 0;
+  color: #6c7e93;
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+body.app-shell .v6-product-state {
+  margin-top: 11px;
+  color: #7890aa;
+  font-size: 9px;
+  font-weight: 720;
+}
+
+body.app-shell .v6-create-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 285px;
+  gap: 12px;
+  align-items: start;
+}
+
+body.app-shell .v6-create-main {
+  display: grid;
+  gap: 12px;
+}
+
+body.app-shell .v6-config-panel,
+body.app-shell .v6-policy-panel,
+body.app-shell .v6-summary-card {
+  border: 1px solid var(--v6-border-soft);
+  border-radius: 13px;
+  background: linear-gradient(180deg, #0f1824, #0b121c);
+}
+
+body.app-shell .v6-config-panel[hidden],
+body.app-shell [data-v6-traffic-size][hidden],
+body.app-shell [data-v6-traffic-custom][hidden] {
+  display: none !important;
+}
+
+body.app-shell .v6-panel-body {
+  padding: 14px;
+}
+
+body.app-shell .v6-advanced {
+  margin-top: 10px;
+  border-top: 1px solid var(--v6-border-soft);
+}
+
+body.app-shell .v6-advanced summary {
+  padding: 11px 14px;
+  cursor: pointer;
+  color: #7890a9;
+  font-size: 10px;
+  font-weight: 700;
+  list-style: none;
+}
+
+body.app-shell .v6-advanced summary::-webkit-details-marker { display: none; }
+
+body.app-shell .v6-advanced[open] summary {
+  color: #b9cce0;
+}
+
+body.app-shell .v6-field-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+body.app-shell .v6-field.is-wide { grid-column: 1 / -1; }
+
+body.app-shell .v6-inline-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 90px;
+  gap: 7px;
+}
+
+body.app-shell .v6-policy-note {
+  margin-bottom: 11px;
+  padding: 10px 11px;
+  border-left: 2px solid rgba(241,189,100,.65);
+  border-radius: 8px;
+  background: rgba(241,189,100,.045);
+}
+
+body.app-shell .v6-policy-note strong {
+  display: block;
+  margin-bottom: 3px;
+  color: #dfbd78;
+  font-size: 10px;
+}
+
+body.app-shell .v6-policy-note span {
+  color: #75869a;
+  font-size: 10px;
+}
+
+body.app-shell .v6-summary {
+  position: sticky;
+  top: 82px;
+  display: grid;
+  gap: 10px;
+}
+
+body.app-shell .v6-summary-card {
+  padding: 14px;
+}
+
+body.app-shell .v6-summary-card h3 {
+  margin: 0 0 12px;
+  color: #e5eef7;
+  font-size: 12px;
+  font-weight: 730;
+}
+
+body.app-shell .v6-summary-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-top: 1px solid var(--v6-border-soft);
+  color: #697d93;
+  font-size: 10px;
+}
+
+body.app-shell .v6-summary-row:first-of-type { border-top: 0; }
+
+body.app-shell .v6-summary-row strong {
+  max-width: 58%;
+  color: #c7d5e5;
+  text-align: right;
+}
+
+body.app-shell .v6-submit-bar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 2px;
+}
+
+body.app-shell .v6-submit-bar .btn-primary {
+  min-width: 190px;
+}
+
+body.app-shell .v6-submit-bar .btn-primary.is-busy {
+  pointer-events: none;
+  opacity: .72;
+}
+
+/* Responsive */
+@media (max-width: 1100px) {
+  body.app-shell .content {
+    padding: 28px 24px 48px;
+  }
+
+  body.app-shell .v6-create-grid {
+    grid-template-columns: 1fr;
+  }
+
+  body.app-shell .v6-summary {
+    position: static;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  body.app-shell .v6-context-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  body.app-shell .v6-product-grid {
+    grid-template-columns: 1fr;
+  }
+
+  body.app-shell .v6-product-card {
+    min-height: 0;
+  }
+}
+
+@media (max-width: 767.98px) {
+  body.app-shell {
+    padding-bottom: 70px;
+  }
+
+  body.app-shell .content {
+    width: 100%;
+    padding: 20px 14px 34px;
+  }
+
+  body.app-shell .topbar {
+    min-height: 58px;
+    padding: 0 13px;
+  }
+
+  body.app-shell .topbar-user-copy,
+  body.app-shell .topbar-subtitle {
+    display: none !important;
+  }
+
+  body.app-shell .v4-page-hero,
+  body.app-shell .v4-form-hero,
+  body.app-shell .v4-detail-header {
+    margin-bottom: 16px !important;
+  }
+
+  body.app-shell .v4-page-hero h1,
+  body.app-shell .v4-form-hero h1,
+  body.app-shell .v4-detail-title-line h1 {
+    font-size: 26px;
+  }
+
+  body.app-shell .v4-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  body.app-shell .v4-kpi-card {
+    min-height: 105px !important;
+    padding: 12px !important;
+  }
+
+  body.app-shell .v4-kpi-value {
+    font-size: 25px !important;
+  }
+
+  body.app-shell .v4-customer-table thead {
+    display: none;
+  }
+
+  body.app-shell .v4-customer-table,
+  body.app-shell .v4-customer-table tbody,
+  body.app-shell .v4-customer-row {
+    display: block;
+    width: 100%;
+  }
+
+  body.app-shell .v4-customer-row {
+    position: relative;
+    padding: 11px 12px;
+    border-bottom: 1px solid var(--v6-border-soft);
+  }
+
+  body.app-shell .v4-customer-row td {
+    display: inline-flex;
+    width: auto;
+    height: auto;
+    padding: 4px 8px 4px 0 !important;
+    border: 0 !important;
+  }
+
+  body.app-shell .v4-customer-row td:first-child {
+    display: flex;
+    width: 100%;
+    padding-bottom: 7px !important;
+  }
+
+  body.app-shell .v4-customer-row td:last-child {
+    position: absolute;
+    top: 10px;
+    right: 8px;
+  }
+
+  body.app-shell .v6-context-strip {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  body.app-shell .v6-field-grid,
+  body.app-shell .v6-summary {
+    grid-template-columns: 1fr;
+  }
+
+  body.app-shell .v6-submit-bar {
+    position: sticky;
+    bottom: 76px;
+    z-index: 20;
+    margin: 0 -4px;
+    padding: 9px 4px;
+    background: linear-gradient(180deg, transparent, rgba(7,10,16,.96) 24%);
+  }
+
+  body.app-shell .v6-submit-bar .btn {
+    flex: 1;
+  }
+
+  body.app-shell .v6-submit-bar .btn-primary {
+    min-width: 0;
+  }
+}
+
+@media (max-width: 520px) {
+  body.app-shell .v4-kpi-grid {
+    grid-template-columns: 1fr 1fr !important;
+  }
+
+  body.app-shell .v6-context-strip {
+    grid-template-columns: 1fr;
+  }
+
+  body.app-shell .v6-inline-fields {
+    grid-template-columns: minmax(0, 1fr) 78px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.app-shell *,
+  body.app-shell *::before,
+  body.app-shell *::after {
+    scroll-behavior: auto !important;
+    transition-duration: .001ms !important;
+    animation-duration: .001ms !important;
+  }
+}
