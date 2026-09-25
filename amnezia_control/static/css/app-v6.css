@@ -1216,3 +1216,172 @@ body.app-shell .v6-dashboard-health > a {
     margin-left: 0;
   }
 }
+
+
+/* Forms, onboarding and customer workspace */
+body.app-shell .v4-form-page {
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
+body.app-shell .v4-form-layout {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) 280px !important;
+  gap: 12px !important;
+  align-items: start;
+}
+
+body.app-shell .v4-form-main {
+  display: grid;
+  gap: 12px;
+}
+
+body.app-shell .v4-step-card {
+  overflow: hidden;
+  border: 1px solid var(--v6-border-soft) !important;
+  border-radius: var(--v6-radius) !important;
+  background: linear-gradient(180deg, #0f1824, #0b121c) !important;
+  box-shadow: none !important;
+}
+
+body.app-shell .v4-step-head {
+  padding: 14px 15px !important;
+  border-bottom: 1px solid var(--v6-border-soft) !important;
+}
+
+body.app-shell .v4-step-number {
+  border-color: #2c4667 !important;
+  background: #102039 !important;
+  color: #9fcbff !important;
+}
+
+body.app-shell .v4-step-copy h2 {
+  color: #e7eff8 !important;
+  font-size: 14px !important;
+  font-weight: 730 !important;
+}
+
+body.app-shell .v4-step-copy p {
+  color: #6b7d92 !important;
+  font-size: 10px !important;
+}
+
+body.app-shell .v4-step-body {
+  padding: 14px !important;
+}
+
+body.app-shell .v4-field-grid {
+  gap: 10px !important;
+}
+
+body.app-shell .v4-check-card {
+  border: 1px solid var(--v6-border-soft) !important;
+  border-radius: 11px !important;
+  background: #0a121d !important;
+}
+
+body.app-shell .v4-login-fields[hidden] {
+  display: none !important;
+}
+
+body.app-shell .v4-form-aside {
+  position: sticky;
+  top: 82px;
+}
+
+body.app-shell .v4-context-row {
+  border-color: var(--v6-border-soft) !important;
+}
+
+body.app-shell .v4-context-note {
+  border-color: var(--v6-border-soft) !important;
+  border-radius: 10px !important;
+  background: rgba(93, 168, 255, .035) !important;
+  color: #6e8095 !important;
+}
+
+/* Device workspace: existing products only, quiet settings action. */
+body.app-shell .v6-device-settings-toggle {
+  border-color: #24344a !important;
+  background: transparent !important;
+  color: #778aa0 !important;
+}
+
+body.app-shell .v6-device-settings-toggle:hover,
+body.app-shell .v6-device-settings-toggle:focus-visible {
+  border-color: #36516f !important;
+  background: #111b29 !important;
+  color: #c6d7e9 !important;
+}
+
+body.app-shell .v4-connection-grid {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)) !important;
+  gap: 9px !important;
+}
+
+body.app-shell .v4-connection-card {
+  min-width: 0;
+  padding: 11px !important;
+  border: 1px solid var(--v6-border-soft) !important;
+  border-radius: 11px !important;
+  background: #0b141f !important;
+}
+
+body.app-shell .v4-connection-card-head {
+  gap: 8px !important;
+  margin-bottom: 8px !important;
+}
+
+body.app-shell .v4-connection-card-head h4 {
+  color: #dde7f2 !important;
+  font-size: 12px !important;
+  font-weight: 720 !important;
+}
+
+body.app-shell .v4-connection-card-head p,
+body.app-shell .v4-connection-card-head span,
+body.app-shell .v4-connection-item small {
+  color: #67798e !important;
+  font-size: 9px !important;
+}
+
+body.app-shell .v4-connection-item {
+  padding: 9px !important;
+  border-color: var(--v6-border-soft) !important;
+  border-radius: 9px !important;
+  background: rgba(255,255,255,.012) !important;
+}
+
+body.app-shell .v4-connection-actions {
+  gap: 5px !important;
+  margin-top: 8px !important;
+}
+
+body.app-shell .v4-connection-actions .btn,
+body.app-shell .v4-connection-actions .form-select {
+  min-height: 30px !important;
+  padding: 5px 8px !important;
+  font-size: 10px !important;
+}
+
+@media (max-width: 991.98px) {
+  body.app-shell .v4-form-layout {
+    grid-template-columns: 1fr !important;
+  }
+
+  body.app-shell .v4-form-aside {
+    position: static;
+  }
+}
+
+@media (max-width: 767.98px) {
+  body.app-shell .v4-field-grid,
+  body.app-shell .v4-connection-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  body.app-shell .v4-step-body {
+    padding: 12px !important;
+  }
+}
