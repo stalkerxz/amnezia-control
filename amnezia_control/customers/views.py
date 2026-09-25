@@ -19,6 +19,7 @@ from django.http import (
     HttpResponseForbidden,
 )
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import (
     require_GET,
@@ -1704,6 +1705,21 @@ def customer_device_vpn_create_view(request, device_id):
             VPNClientCreateForm
             .ROUTING_MODE_FULL
         )
+
+    # Legacy GET entry points now converge on the V6 one-screen flow.
+    # POST remains supported for backward compatibility.
+    if request.method == "GET":
+        product = (
+            "selective"
+            if requested_routing_mode
+            == VPNClientCreateForm.ROUTING_MODE_SELECTIVE
+            else "full"
+        )
+        target = reverse(
+            "customers-device-connection-create",
+            args=[device.pk],
+        )
+        return redirect(f"{target}?product={product}")
 
     server_rows = (
         vpn_server_candidate_rows(
