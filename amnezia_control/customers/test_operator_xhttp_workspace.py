@@ -151,7 +151,10 @@ class OperatorXHTTPWorkspaceTest(
     ):
         create_device.return_value = (
             SimpleNamespace(
-                name="New CDN"
+                name="New CDN",
+                get_performance_profile_display=(
+                    lambda: "Standard"
+                ),
             )
         )
 
