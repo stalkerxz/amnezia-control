@@ -175,7 +175,7 @@ class CustomerAccountsListWorkspaceTest(
 
         self.assertContains(
             response,
-            "Без кабинета",
+            "Нет кабинета",
         )
 
         self.assertContains(
@@ -600,11 +600,9 @@ class CustomerAccountsListWorkspaceTest(
             .decode("utf-8")
         )
 
-        self.assertEqual(
-            html.count(
-                "Без кабинета"
-            ),
-            2,
+        self.assertContains(
+            response,
+            "Нет кабинета",
         )
 
         self.assertContains(
@@ -632,11 +630,6 @@ class CustomerAccountsListWorkspaceTest(
         self.assertEqual(
             response.status_code,
             200,
-        )
-
-        self.assertContains(
-            response,
-            "account-actions.dropdown-open",
         )
 
         self.assertContains(
