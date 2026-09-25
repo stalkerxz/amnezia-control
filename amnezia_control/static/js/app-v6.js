@@ -126,8 +126,8 @@
     const submit = form.querySelector('[data-v6-submit]');
     const summaryProduct = form.querySelector('[data-v6-summary-product]');
 
-    const applyTraffic = form.querySelector('[data-v6-traffic-mode]');
-    const preset = form.querySelector('[data-v6-traffic-preset]');
+    const applyTraffic = form.querySelector('[data-v6-traffic-mode] select');
+    const preset = form.querySelector('[data-v6-traffic-preset] select');
     const sizeField = form.querySelector('[data-v6-traffic-size]');
     const customField = form.querySelector('[data-v6-traffic-custom]');
 
