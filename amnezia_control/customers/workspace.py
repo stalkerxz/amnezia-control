@@ -124,6 +124,20 @@ def build_customer_workspace(
         ]
 
         for client in vpn_clients:
+            latest_revision = next(
+                iter(client.revisions.all()),
+                None,
+            )
+
+            client.amneziavpn_download_available = bool(
+                latest_revision
+                and (
+                    latest_revision
+                    .amneziavpn_blob_encrypted
+                    or ""
+                ).strip()
+            )
+
             client.traffic_used_display = (
                 _fmt_bytes(
                     client.traffic_used_bytes

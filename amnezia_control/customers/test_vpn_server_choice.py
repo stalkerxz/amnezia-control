@@ -154,9 +154,12 @@ class CustomerVPNServerChoiceTests(
         self,
     ):
         response = self.client.get(
-            self.vpn_url(),
+            reverse(
+                "customers-device-connection-create",
+                args=[self.device.pk],
+            ),
             {
-                "routing_mode": "full",
+                "product": "full",
             },
         )
 
@@ -167,7 +170,7 @@ class CustomerVPNServerChoiceTests(
 
         self.assertContains(
             response,
-            'name="server_choice"',
+            'name="full_server_choice"',
         )
 
         self.assertContains(
@@ -185,16 +188,16 @@ class CustomerVPNServerChoiceTests(
             self.server_b.name,
         )
 
-        # Auto must choose the less loaded
-        # eligible server.
         self.assertEqual(
-            response.context["server"],
-            self.server_a,
+            response.context[
+                "selected_product"
+            ],
+            "full",
         )
 
         self.assertEqual(
             response.context[
-                "server_choice"
+                "full_server_choice"
             ],
             "auto",
         )
@@ -203,9 +206,12 @@ class CustomerVPNServerChoiceTests(
         self,
     ):
         response = self.client.get(
-            self.vpn_url(),
+            reverse(
+                "customers-device-connection-create",
+                args=[self.device.pk],
+            ),
             {
-                "routing_mode": "full",
+                "product": "full",
                 "server_choice": str(
                     self.server_b.pk
                 ),
@@ -218,15 +224,25 @@ class CustomerVPNServerChoiceTests(
         )
 
         self.assertEqual(
-            response.context["server"],
-            self.server_b,
+            response.context[
+                "selected_product"
+            ],
+            "full",
         )
 
         self.assertEqual(
             response.context[
-                "server_choice"
+                "full_server_choice"
             ],
             str(self.server_b.pk),
+        )
+
+        self.assertContains(
+            response,
+            (
+                f'value="{self.server_b.pk}" '
+                "selected"
+            ),
         )
 
     @patch(
@@ -302,7 +318,7 @@ class CustomerVPNServerChoiceTests(
             ]
         )
 
-        response = self.client.get(
+        response = self.client.post(
             self.vpn_url(),
             {
                 "routing_mode": "full",

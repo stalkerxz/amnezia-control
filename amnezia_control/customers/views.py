@@ -19,6 +19,7 @@ from django.http import (
     HttpResponseForbidden,
 )
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import (
     require_GET,
@@ -710,9 +711,49 @@ def _device_vpn_client_name(
     return candidate
 
 
+def _default_xhttp_connection_name(device):
+    base = f"{device.name} ALT".strip()[:120]
+    candidate = base
+    counter = 2
+
+    while device.xhttp_devices.filter(
+        name=candidate,
+    ).exists():
+        suffix = f" {counter}"
+        candidate = (
+            base[: 120 - len(suffix)]
+            + suffix
+        )
+        counter += 1
+
+    return candidate
+
+
+def _restore_device_access_policy(
+    *,
+    device,
+    expires_at,
+    traffic_limit_bytes,
+    actor,
+):
+    restore_traffic = (
+        DeviceAccessUpdateForm.APPLY_SET
+        if traffic_limit_bytes is not None
+        else DeviceAccessUpdateForm.APPLY_CLEAR
+    )
+
+    return update_customer_device_access(
+        device_id=device.pk,
+        expires_at=expires_at,
+        apply_traffic=restore_traffic,
+        traffic_limit_bytes=traffic_limit_bytes,
+        actor=actor,
+    )
+
+
 @login_required
 @operator_required
-@require_GET
+@require_http_methods(["GET", "POST"])
 def customer_device_connection_create_view(
     request,
     device_id,
@@ -813,6 +854,758 @@ def customer_device_connection_create_view(
         )
     )
 
+    xhttp_servers = list(
+        Server.objects
+        .filter(is_enabled=True)
+        .order_by("name", "id")
+    )
+
+    full_available = bool(
+        full_pool
+    )
+    selective_available = bool(
+        selective_pool
+    )
+    alt_available = bool(
+        xhttp_servers
+    )
+
+    selectable_products = []
+
+    if (
+        full_available
+        and not has_full
+    ):
+        selectable_products.append(
+            "full"
+        )
+
+    if (
+        selective_available
+        and not has_selective
+    ):
+        selectable_products.append(
+            "selective"
+        )
+
+    if alt_available:
+        selectable_products.append(
+            "alt"
+        )
+
+    requested_product = (
+        (
+            request.POST.get(
+                "product_type"
+            )
+            if request.method == "POST"
+            else (
+                request.GET.get(
+                    "product"
+                )
+                or request.GET.get(
+                    "routing_mode"
+                )
+            )
+        )
+        or ""
+    ).strip().lower()
+
+    product_aliases = {
+        "full": "full",
+        "selective": "selective",
+        "select": "selective",
+        "alt": "alt",
+        "xhttp": "alt",
+    }
+
+    selected_product = (
+        product_aliases.get(
+            requested_product
+        )
+    )
+
+    if request.method == "GET":
+        if (
+            selected_product
+            not in selectable_products
+        ):
+            selected_product = (
+                selectable_products[0]
+                if selectable_products
+                else "full"
+            )
+
+    creation_error = ""
+    vpn_form = None
+
+    access_form = DeviceAccessUpdateForm(
+        (
+            request.POST
+            if request.method == "POST"
+            else None
+        ),
+        device=device,
+        prefix="access",
+    )
+
+    full_server_choice = (
+        (
+            request.POST.get(
+                "full_server_choice"
+            )
+            if request.method == "POST"
+            else request.GET.get(
+                "server_choice"
+            )
+        )
+        or "auto"
+    ).strip()
+
+    selective_server_choice = (
+        (
+            request.POST.get(
+                "selective_server_choice"
+            )
+            if request.method == "POST"
+            else request.GET.get(
+                "server_choice"
+            )
+        )
+        or "auto"
+    ).strip()
+
+    alt_initial_server = (
+        xhttp_servers[0].pk
+        if xhttp_servers
+        else None
+    )
+
+    if (
+        request.method == "POST"
+        and selected_product == "alt"
+    ):
+        alt_data = request.POST.copy()
+        alt_data["alt-device"] = str(
+            device.pk
+        )
+
+        xhttp_form = (
+            XHTTPDeviceCreateForm(
+                alt_data,
+                prefix="alt",
+            )
+        )
+    else:
+        xhttp_form = (
+            XHTTPDeviceCreateForm(
+                initial={
+                    "device": device.pk,
+                    "server": (
+                        alt_initial_server
+                    ),
+                    "name": (
+                        _default_xhttp_connection_name(
+                            device
+                        )
+                    ),
+                    "performance_profile": (
+                        XHTTPDevice
+                        .PerformanceProfile
+                        .STANDARD
+                    ),
+                },
+                prefix="alt",
+            )
+        )
+
+    for field_name in (
+        "server",
+        "performance_profile",
+    ):
+        xhttp_form.fields[
+            field_name
+        ].widget.attrs.update(
+            {"class": "form-select"}
+        )
+
+    xhttp_form.fields[
+        "name"
+    ].widget.attrs.update(
+        {"class": "form-control"}
+    )
+
+    if request.method == "POST":
+        if selected_product not in {
+            "full",
+            "selective",
+            "alt",
+        }:
+            creation_error = (
+                "Выберите тип подключения."
+            )
+
+        elif (
+            selected_product == "full"
+            and has_full
+        ):
+            creation_error = (
+                "У этого устройства уже есть "
+                "FULL-подключение."
+            )
+
+        elif (
+            selected_product
+            == "selective"
+            and has_selective
+        ):
+            creation_error = (
+                "У этого устройства уже есть "
+                "SELECT-подключение."
+            )
+
+        elif (
+            selected_product == "full"
+            and not full_available
+        ):
+            creation_error = (
+                "Нет доступного сервера "
+                "для FULL-подключения."
+            )
+
+        elif (
+            selected_product
+            == "selective"
+            and not selective_available
+        ):
+            creation_error = (
+                "Нет доступного сервера "
+                "для SELECT-подключения."
+            )
+
+        elif (
+            selected_product == "alt"
+            and not alt_available
+        ):
+            creation_error = (
+                "Нет доступного сервера "
+                "для альтернативного подключения."
+            )
+
+        access_valid = (
+            access_form.is_valid()
+        )
+
+        if access_valid:
+            requested_device_expiry = (
+                access_form.cleaned_data[
+                    "expires_at"
+                ]
+            )
+
+            if (
+                requested_device_expiry
+                and requested_device_expiry
+                <= timezone.now()
+            ):
+                access_form.add_error(
+                    "expires_at",
+                    (
+                        "Срок устройства должен "
+                        "быть в будущем."
+                    ),
+                )
+                access_valid = False
+
+        if (
+            not creation_error
+            and access_valid
+            and selected_product
+            in {"full", "selective"}
+        ):
+            routing_mode = (
+                VPNClientCreateForm
+                .ROUTING_MODE_FULL
+                if selected_product == "full"
+                else (
+                    VPNClientCreateForm
+                    .ROUTING_MODE_SELECTIVE
+                )
+            )
+
+            server_choice = (
+                full_server_choice
+                if selected_product == "full"
+                else selective_server_choice
+            )
+
+            try:
+                server = (
+                    resolve_vpn_server_choice(
+                        choice=server_choice,
+                        routing_mode=routing_mode,
+                    )
+                )
+            except ValueError as exc:
+                creation_error = str(exc)
+                server = None
+
+            if (
+                not creation_error
+                and server is None
+            ):
+                creation_error = (
+                    "Нет доступного VPN-сервера "
+                    "для выбранного режима."
+                )
+
+            if (
+                not creation_error
+                and server is not None
+            ):
+                technical_name = (
+                    _device_vpn_client_name(
+                        device=device,
+                        server=server,
+                        routing_mode=(
+                            routing_mode
+                        ),
+                    )
+                )
+
+                vpn_data = {
+                    "server": str(server.pk),
+                    "name": technical_name,
+                    "contact_email": (
+                        account.email
+                    ),
+                    "protocol_type": (
+                        VPNClient
+                        .ProtocolType
+                        .AWG2
+                    ),
+                    "routing_mode": (
+                        routing_mode
+                    ),
+                    "expires_preset": (
+                        VPNClientCreateForm
+                        .EXPIRATION_PRESET_UNLIMITED
+                    ),
+                    "expires_at": "",
+                    "traffic_limit_preset": (
+                        VPNClientCreateForm
+                        .TRAFFIC_PRESET_UNLIMITED
+                    ),
+                    "traffic_custom_value": "",
+                    "traffic_custom_unit": (
+                        VPNClientCreateForm
+                        .TRAFFIC_UNIT_GB
+                    ),
+                }
+
+                vpn_form = (
+                    VPNClientCreateForm(
+                        vpn_data,
+                        server=server,
+                    )
+                )
+
+                if vpn_form.is_valid():
+                    wants_selective = (
+                        routing_mode
+                        == (
+                            VPNClientCreateForm
+                            .ROUTING_MODE_SELECTIVE
+                        )
+                    )
+
+                    duplicate_mode = any(
+                        (
+                            VPNClientService
+                            ._profile_is_selective(
+                                existing.profile
+                            )
+                            == wants_selective
+                        )
+                        for existing
+                        in existing_awg2
+                    )
+
+                    if duplicate_mode:
+                        creation_error = (
+                            "У этого устройства уже "
+                            "есть активное подключение "
+                            + (
+                                "«Только выбранные "
+                                "сервисы»."
+                                if wants_selective
+                                else (
+                                    "«Весь интернет "
+                                    "через VPN»."
+                                )
+                            )
+                        )
+
+                else:
+                    creation_error = (
+                        "Параметры VPN-подключения "
+                        "не прошли проверку."
+                    )
+
+                if (
+                    not creation_error
+                    and vpn_form.is_valid()
+                ):
+                    old_expires_at = (
+                        device.expires_at
+                    )
+                    old_traffic_limit = (
+                        device
+                        .vpn_traffic_limit_bytes
+                    )
+
+                    apply_traffic = (
+                        access_form.cleaned_data.get(
+                            "apply_traffic"
+                        )
+                        or (
+                            DeviceAccessUpdateForm
+                            .APPLY_KEEP
+                        )
+                    )
+
+                    target_traffic_limit = (
+                        old_traffic_limit
+                    )
+
+                    if (
+                        apply_traffic
+                        == (
+                            DeviceAccessUpdateForm
+                            .APPLY_SET
+                        )
+                    ):
+                        target_traffic_limit = (
+                            access_form
+                            .cleaned_data[
+                                "resolved_traffic_limit_bytes"
+                            ]
+                        )
+
+                    elif (
+                        apply_traffic
+                        == (
+                            DeviceAccessUpdateForm
+                            .APPLY_CLEAR
+                        )
+                    ):
+                        target_traffic_limit = None
+
+                    target_expires_at = (
+                        access_form.cleaned_data[
+                            "expires_at"
+                        ]
+                    )
+
+                    policy_changed = (
+                        target_expires_at
+                        != old_expires_at
+                        or (
+                            target_traffic_limit
+                            != old_traffic_limit
+                        )
+                    )
+
+                    try:
+                        if policy_changed:
+                            (
+                                update_customer_device_access(
+                                    device_id=device.pk,
+                                    expires_at=(
+                                        target_expires_at
+                                    ),
+                                    apply_traffic=(
+                                        apply_traffic
+                                        if (
+                                            target_traffic_limit
+                                            != old_traffic_limit
+                                        )
+                                        else (
+                                            DeviceAccessUpdateForm
+                                            .APPLY_KEEP
+                                        )
+                                    ),
+                                    traffic_limit_bytes=(
+                                        target_traffic_limit
+                                    ),
+                                    actor=request.user,
+                                )
+                            )
+
+                            device.refresh_from_db()
+
+                        client = (
+                            VPNClientService
+                            .create_client(
+                                server=server,
+                                name=technical_name,
+                                protocol_type=(
+                                    VPNClient
+                                    .ProtocolType
+                                    .AWG2
+                                ),
+                                routing_mode=(
+                                    routing_mode
+                                ),
+                                expires_at=(
+                                    device
+                                    .effective_expires_at
+                                ),
+                                traffic_limit_bytes=(
+                                    device
+                                    .vpn_traffic_limit_bytes
+                                ),
+                                contact_email=(
+                                    account.email
+                                ),
+                                actor=request.user,
+                                device=device,
+                            )
+                        )
+
+                    except Exception as exc:
+                        if policy_changed:
+                            try:
+                                (
+                                    _restore_device_access_policy(
+                                        device=device,
+                                        expires_at=(
+                                            old_expires_at
+                                        ),
+                                        traffic_limit_bytes=(
+                                            old_traffic_limit
+                                        ),
+                                        actor=request.user,
+                                    )
+                                )
+                                device.refresh_from_db()
+
+                            except Exception as rollback_exc:
+                                creation_error = (
+                                    "Создание подключения "
+                                    "не выполнено, а вернуть "
+                                    "предыдущие лимиты "
+                                    "устройства автоматически "
+                                    "не удалось. Проверьте "
+                                    "устройство перед повторной "
+                                    "попыткой. Ошибка: "
+                                    f"{rollback_exc}"
+                                )
+
+                        if not creation_error:
+                            creation_error = (
+                                "Не удалось создать "
+                                "VPN-подключение: "
+                                f"{exc}"
+                            )
+
+                    else:
+                        messages.success(
+                            request,
+                            (
+                                "Подключение "
+                                + (
+                                    "SELECT"
+                                    if wants_selective
+                                    else "FULL"
+                                )
+                                + " создано для "
+                                + device.name
+                                + "."
+                            ),
+                        )
+
+                        return redirect(
+                            reverse(
+                                "customers-detail",
+                                args=[account.pk],
+                            )
+                            + "#customer-connections"
+                        )
+
+        elif (
+            not creation_error
+            and access_valid
+            and selected_product == "alt"
+        ):
+            if xhttp_form.is_valid():
+                old_expires_at = (
+                    device.expires_at
+                )
+                old_traffic_limit = (
+                    device
+                    .vpn_traffic_limit_bytes
+                )
+
+                apply_traffic = (
+                    access_form.cleaned_data.get(
+                        "apply_traffic"
+                    )
+                    or (
+                        DeviceAccessUpdateForm
+                        .APPLY_KEEP
+                    )
+                )
+
+                target_traffic_limit = (
+                    old_traffic_limit
+                )
+
+                if (
+                    apply_traffic
+                    == (
+                        DeviceAccessUpdateForm
+                        .APPLY_SET
+                    )
+                ):
+                    target_traffic_limit = (
+                        access_form
+                        .cleaned_data[
+                            "resolved_traffic_limit_bytes"
+                        ]
+                    )
+
+                elif (
+                    apply_traffic
+                    == (
+                        DeviceAccessUpdateForm
+                        .APPLY_CLEAR
+                    )
+                ):
+                    target_traffic_limit = None
+
+                target_expires_at = (
+                    access_form.cleaned_data[
+                        "expires_at"
+                    ]
+                )
+
+                policy_changed = (
+                    target_expires_at
+                    != old_expires_at
+                    or (
+                        target_traffic_limit
+                        != old_traffic_limit
+                    )
+                )
+
+                try:
+                    if policy_changed:
+                        (
+                            update_customer_device_access(
+                                device_id=device.pk,
+                                expires_at=(
+                                    target_expires_at
+                                ),
+                                apply_traffic=(
+                                    apply_traffic
+                                    if (
+                                        target_traffic_limit
+                                        != old_traffic_limit
+                                    )
+                                    else (
+                                        DeviceAccessUpdateForm
+                                        .APPLY_KEEP
+                                    )
+                                ),
+                                traffic_limit_bytes=(
+                                    target_traffic_limit
+                                ),
+                                actor=request.user,
+                            )
+                        )
+
+                        device.refresh_from_db()
+
+                    xhttp = (
+                        XHTTPDeviceService
+                        .create_device(
+                            device=device,
+                            server=(
+                                xhttp_form
+                                .cleaned_data[
+                                    "server"
+                                ]
+                            ),
+                            name=(
+                                xhttp_form
+                                .cleaned_data[
+                                    "name"
+                                ]
+                            ),
+                            performance_profile=(
+                                xhttp_form
+                                .cleaned_data[
+                                    "performance_profile"
+                                ]
+                            ),
+                            actor=request.user,
+                        )
+                    )
+
+                except Exception as exc:
+                    if policy_changed:
+                        try:
+                            (
+                                _restore_device_access_policy(
+                                    device=device,
+                                    expires_at=(
+                                        old_expires_at
+                                    ),
+                                    traffic_limit_bytes=(
+                                        old_traffic_limit
+                                    ),
+                                    actor=request.user,
+                                )
+                            )
+                            device.refresh_from_db()
+
+                        except Exception as rollback_exc:
+                            creation_error = (
+                                "Создание подключения "
+                                "не выполнено, а вернуть "
+                                "предыдущие лимиты "
+                                "устройства автоматически "
+                                "не удалось. Проверьте "
+                                "устройство перед повторной "
+                                "попыткой. Ошибка: "
+                                f"{rollback_exc}"
+                            )
+
+                    if not creation_error:
+                        creation_error = (
+                            "Не удалось создать "
+                            "альтернативное подключение: "
+                            f"{exc}"
+                        )
+
+                else:
+                    messages.success(
+                        request,
+                        (
+                            "Альтернативное подключение "
+                            f"«{xhttp.name}» создано."
+                        ),
+                    )
+
+                    return redirect(
+                        reverse(
+                            "customers-detail",
+                            args=[account.pk],
+                        )
+                        + "#customer-connections"
+                    )
+
     return render(
         request,
         (
@@ -827,11 +1620,35 @@ def customer_device_connection_create_view(
                 has_selective
             ),
             "xhttp_total": xhttp_total,
-            "full_available": bool(
-                full_pool
+            "full_available": (
+                full_available
             ),
-            "selective_available": bool(
+            "selective_available": (
+                selective_available
+            ),
+            "alt_available": (
+                alt_available
+            ),
+            "full_pool": full_pool,
+            "selective_pool": (
                 selective_pool
+            ),
+            "xhttp_servers": xhttp_servers,
+            "selected_product": (
+                selected_product
+            ),
+            "full_server_choice": (
+                full_server_choice
+            ),
+            "selective_server_choice": (
+                selective_server_choice
+            ),
+            "access_form": access_form,
+            "xhttp_form": xhttp_form,
+            "vpn_form": vpn_form,
+            "creation_error": creation_error,
+            "can_create_any": bool(
+                selectable_products
             ),
         },
     )
@@ -894,6 +1711,21 @@ def customer_device_vpn_create_view(request, device_id):
             VPNClientCreateForm
             .ROUTING_MODE_FULL
         )
+
+    # Legacy GET entry points now converge on the V6 one-screen flow.
+    # POST remains supported for backward compatibility.
+    if request.method == "GET":
+        product = (
+            "selective"
+            if requested_routing_mode
+            == VPNClientCreateForm.ROUTING_MODE_SELECTIVE
+            else "full"
+        )
+        target = reverse(
+            "customers-device-connection-create",
+            args=[device.pk],
+        )
+        return redirect(f"{target}?product={product}")
 
     server_rows = (
         vpn_server_candidate_rows(
@@ -1580,6 +2412,9 @@ def customer_detail_view(request, pk):
         .select_related(
             "server",
             "profile",
+        )
+        .prefetch_related(
+            "revisions",
         )
         .order_by(
             "protocol_type",
