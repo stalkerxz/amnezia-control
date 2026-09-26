@@ -161,6 +161,30 @@ class UnifiedConnectionCreateTests(TestCase):
             response,
             "Создать подключение",
         )
+        self.assertContains(
+            response,
+            'name="full_server_choice"',
+        )
+        self.assertContains(
+            response,
+            'name="selective_server_choice"',
+        )
+        self.assertContains(
+            response,
+            'name="alt-server"',
+        )
+        self.assertContains(
+            response,
+            "Сервер подключения",
+        )
+        self.assertContains(
+            response,
+            "data-v6-summary-server",
+        )
+        self.assertNotContains(
+            response,
+            "Дополнительно · выбрать сервер вручную",
+        )
 
         self.assertNotContains(
             response,
