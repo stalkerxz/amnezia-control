@@ -157,6 +157,8 @@
     const panels = Array.from(form.querySelectorAll('[data-v6-product-panel]'));
     const submit = form.querySelector('[data-v6-submit]');
     const summaryProduct = form.querySelector('[data-v6-summary-product]');
+    const summaryServer = form.querySelector('[data-v6-summary-server]');
+    const serverRoots = Array.from(form.querySelectorAll('[data-v6-server-product]'));
 
     const applyTraffic = form.querySelector('[data-v6-traffic-mode] select');
     const preset = form.querySelector('[data-v6-traffic-preset] select');
@@ -173,6 +175,15 @@
       full: 'FULL · весь интернет',
       selective: 'SELECT · выбранные сервисы',
       alt: 'ALT · VLESS/XHTTP',
+    };
+
+    const syncServerSummary = () => {
+      const selected = radios.find((radio) => radio.checked)?.value || '';
+      const root = serverRoots.find((item) => item.dataset.v6ServerProduct === selected);
+      const select = root?.matches('select') ? root : root?.querySelector('select');
+      const label = select?.selectedOptions?.[0]?.textContent?.trim() || '—';
+
+      if (summaryServer) summaryServer.textContent = label;
     };
 
     const syncProduct = () => {
@@ -195,6 +206,7 @@
 
       if (submit) submit.textContent = labels[selected] || 'Создать подключение';
       if (summaryProduct) summaryProduct.textContent = titles[selected] || 'Не выбрано';
+      syncServerSummary();
     };
 
     const syncTraffic = () => {
@@ -206,6 +218,10 @@
     };
 
     radios.forEach((radio) => radio.addEventListener('change', syncProduct));
+    serverRoots.forEach((root) => {
+      const select = root.matches('select') ? root : root.querySelector('select');
+      select?.addEventListener('change', syncServerSummary);
+    });
     applyTraffic?.addEventListener('change', syncTraffic);
     preset?.addEventListener('change', syncTraffic);
 
