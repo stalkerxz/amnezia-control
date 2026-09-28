@@ -852,15 +852,53 @@ class BaseProtocolAdapter:
             f"printf %s {quoted} | docker exec -i {self.container} {self.command_bin} "
             f"set {iface} peer {public_key} preshared-key /dev/stdin allowed-ips {address}/32"
         )
-        self._run(actor, f"{self.protocol_type}.add_peer", add_peer_cmd, sensitive_output=True)
-        self._persist_runtime(actor)
+
+        add_attempted = False
+
+        try:
+            # Once the add command is attempted, a transport failure is
+            # ambiguous: the peer may already exist remotely. Any later
+            # error therefore triggers a compensating remove + save.
+            add_attempted = True
+            self._run(
+                actor,
+                f"{self.protocol_type}.add_peer",
+                add_peer_cmd,
+                sensitive_output=True,
+            )
+            self._persist_runtime(actor)
+            server_public_key = self.server_public_key(
+                actor,
+                iface,
+            )
+
+        except Exception:
+            if add_attempted:
+                try:
+                    self._run(
+                        actor,
+                        f"{self.protocol_type}.rollback_peer",
+                        self._wg_cmd(
+                            f"set {iface} peer {public_key} remove"
+                        ),
+                    )
+                    self._persist_runtime(actor)
+
+                except Exception as cleanup_exc:
+                    raise RuntimeError(
+                        "VPN peer creation failed and "
+                        "runtime cleanup was incomplete."
+                    ) from cleanup_exc
+
+            raise
+
         return {
             "private_key": private_key,
             "public_key": public_key,
             "preshared_key": preshared_key,
             "address": address,
             "iface": iface,
-            "server_public_key": self.server_public_key(actor, iface),
+            "server_public_key": server_public_key,
         }
 
     def add_existing_peer(self, actor, *, peer_public_key: str, allowed_ips: str, preshared_key: str = ""):
@@ -2144,10 +2182,19 @@ class VPNClientService:
                     )
 
                 except Exception as cleanup_exc:
+                    cleanup_label = (
+                        "remote AWG4 cleanup"
+                        if (
+                            server.runtime_backend
+                            == Server.RuntimeBackend.AWG_AGENT
+                            and protocol_type
+                            == VPNClient.ProtocolType.AWG2
+                        )
+                        else "runtime peer cleanup"
+                    )
                     raise RuntimeError(
-                        "VPN client creation failed "
-                        "and runtime peer cleanup "
-                        "was incomplete."
+                        "VPN client creation failed and "
+                        f"{cleanup_label} was incomplete."
                     ) from cleanup_exc
 
             raise
