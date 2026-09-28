@@ -2125,16 +2125,8 @@ class VPNClientService:
                 or ""
             ).strip()
 
-            cleanup_required = (
-                bool(cleanup_public_key)
-                and (
-                    server.runtime_backend
-                    == Server.RuntimeBackend.AWG_AGENT
-                )
-                and (
-                    protocol_type
-                    == VPNClient.ProtocolType.AWG2
-                )
+            cleanup_required = bool(
+                cleanup_public_key
             )
 
             if cleanup_required:
@@ -2154,7 +2146,7 @@ class VPNClientService:
                 except Exception as cleanup_exc:
                     raise RuntimeError(
                         "VPN client creation failed "
-                        "and remote AWG4 cleanup "
+                        "and runtime peer cleanup "
                         "was incomplete."
                     ) from cleanup_exc
 
@@ -2268,203 +2260,307 @@ class VPNClientService:
         return client
 
     @staticmethod
-    @transaction.atomic
     def reissue_config(*, client: VPNClient, actor):
-        VPNClientPolicyService.assert_reissue_allowed(client)
-
-        adapter = AdapterFactory.get_for_client(client)
-        old_peer_public_key = str(
-            client.runtime_peer_public_key
-            or ""
-        ).strip()
-
-        awg_runtime_metadata = None
-        if (
-            client.protocol_type
-            == VPNClient.ProtocolType.AWG2
-        ):
-            awg_runtime_metadata = (
-                VPNClientService
-                ._runtime_awg_metadata(
-                    adapter.protocol
-                )
-            )
-
-            runtime = (
-                adapter.protocol.runtime_metadata
-                or {}
-            )
-            if (
-                runtime.get(
-                    "awg31_metadata_ready"
-                )
-                and not awg_runtime_metadata.get(
-                    "HeaderProtectionKey"
-                )
-            ):
-                raise RuntimeError(
-                    "AWG 3.1 HeaderProtectionKey "
-                    "is unavailable. Run runtime sync "
-                    "before reissue."
-                )
-
-        # Resolve all deterministic export inputs before touching
-        # runtime. A bad endpoint/profile/AWG schema must fail closed
-        # without disconnecting the currently working peer.
-        endpoint = VPNClientService.resolve_endpoint(
-            client.server,
-            adapter.protocol,
-        )
-        allowed_ips = "0.0.0.0/0, ::/0"
-        awg_mtu = None
-
-        if (
-            client.protocol_type
-            == VPNClient.ProtocolType.AWG2
-        ):
-            allowed_ips = (
-                VPNClientService
-                .resolve_profile_allowed_ips(
-                    client.profile
-                )
-            )
-            awg_mtu = (
-                adapter.protocol.runtime_metadata.get(
-                    "config_mtu"
-                )
-                or adapter.protocol.runtime_metadata.get(
-                    "runtime_mtu"
-                )
-            )
-
-            # Reuse the production config builder as the source of
-            # truth for AWG 2.x/3.1 validation. Placeholder key
-            # material is never persisted or sent to the runtime.
-            VPNClientService.build_awg2_client_config(
-                private_key="preflight-private",
-                address="127.0.0.1",
-                endpoint=endpoint,
-                server_public_key="preflight-public",
-                awg2_metadata=(
-                    awg_runtime_metadata
-                    or {}
-                ),
-                allowed_ips=allowed_ips,
-                mtu=awg_mtu,
-            )
-
         generated = None
+        adapter = None
+        old_peer_public_key = ""
 
         try:
-            # Availability-first rotation: provision the replacement
-            # before revoking the current peer. If anything below fails,
-            # the old peer remains valid and the replacement is removed.
-            generated = adapter.create_peer(actor)
-
-            if client.protocol_type == VPNClient.ProtocolType.AWG:
-                config = VPNClientService.build_awg_legacy_client_config(
-                    private_key=generated["private_key"],
-                    address=generated["address"],
-                    endpoint=endpoint,
-                    server_public_key=generated["server_public_key"],
-                    preshared_key=generated.get("preshared_key", ""),
+            # Serialize rotations for the same client. Runtime calls are
+            # intentionally made while this row lock is held because key
+            # rotation is rare and two concurrent rotations must never race.
+            with transaction.atomic():
+                VPNClient.objects.select_for_update().only(
+                    "pk"
+                ).get(
+                    pk=client.pk
                 )
-            else:
-                config = VPNClientService.build_awg2_client_config(
-                    private_key=generated["private_key"],
-                    address=generated["address"],
-                    endpoint=endpoint,
-                    server_public_key=generated["server_public_key"],
-                    awg2_metadata=(
-                        awg_runtime_metadata
-                        or {}
-                    ),
-                    preshared_key=generated.get("preshared_key", ""),
-                    allowed_ips=allowed_ips,
-                    mtu=awg_mtu,
+                client.refresh_from_db()
+
+                VPNClientPolicyService.assert_reissue_allowed(
+                    client
                 )
 
-            amneziavpn_config = ""
-
-            if (
-                client.protocol_type
-                == VPNClient.ProtocolType.AWG2
-                and client.server.runtime_backend
-                == Server.RuntimeBackend.DOCKER
-                and bool(
-                    (
-                        adapter.protocol.runtime_metadata
-                        or {}
-                    ).get(
-                        "awg31_metadata_ready"
-                    )
+                adapter = AdapterFactory.get_for_client(
+                    client
                 )
-            ):
-                try:
-                    amneziavpn_config = (
+                old_peer_public_key = str(
+                    client.runtime_peer_public_key
+                    or ""
+                ).strip()
+
+                awg_runtime_metadata = None
+                if (
+                    client.protocol_type
+                    == VPNClient.ProtocolType.AWG2
+                ):
+                    awg_runtime_metadata = (
                         VPNClientService
-                        .build_amneziavpn_awg31_artifact(
-                            client=client,
-                            config=config,
-                            client_public_key=(
-                                generated[
-                                    "public_key"
-                                ]
-                            ),
-                            protocol=(
-                                adapter.protocol
-                            ),
+                        ._runtime_awg_metadata(
+                            adapter.protocol
                         )
                     )
 
-                except Exception:
-                    # Native .conf remains the
-                    # authoritative/fail-safe export.
-                    # Do not invalidate a successfully
-                    # created peer only because the
-                    # secondary AmneziaVPN artifact
-                    # could not be serialized.
-                    import logging
+                    runtime = (
+                        adapter.protocol.runtime_metadata
+                        or {}
+                    )
+                    if (
+                        runtime.get(
+                            "awg31_metadata_ready"
+                        )
+                        and not awg_runtime_metadata.get(
+                            "HeaderProtectionKey"
+                        )
+                    ):
+                        raise RuntimeError(
+                            "AWG 3.1 HeaderProtectionKey "
+                            "is unavailable. Run runtime sync "
+                            "before reissue."
+                        )
 
-                    logging.getLogger(
-                        __name__
-                    ).exception(
-                        "Failed to build AmneziaVPN "
-                        "artifact for Docker AWG2 "
-                        "client_id=%s server_id=%s",
-                        client.pk,
-                        client.server_id,
+                # Resolve all deterministic export inputs before
+                # provisioning the replacement. Invalid endpoint/profile/
+                # AWG metadata must fail without touching the working peer.
+                endpoint = VPNClientService.resolve_endpoint(
+                    client.server,
+                    adapter.protocol,
+                )
+                allowed_ips = "0.0.0.0/0, ::/0"
+                awg_mtu = None
+
+                if (
+                    client.protocol_type
+                    == VPNClient.ProtocolType.AWG2
+                ):
+                    allowed_ips = (
+                        VPNClientService
+                        .resolve_profile_allowed_ips(
+                            client.profile
+                        )
+                    )
+                    awg_mtu = (
+                        adapter.protocol.runtime_metadata.get(
+                            "config_mtu"
+                        )
+                        or adapter.protocol.runtime_metadata.get(
+                            "runtime_mtu"
+                        )
                     )
 
-            rev = VPNClientService._store_revision(
-                client,
-                config,
-                amneziavpn_config=(
-                    amneziavpn_config
-                ),
-            )
-            client.runtime_peer_public_key = generated["public_key"]
-            client.runtime_address = generated["address"]
-            client.last_runtime_sync_at = timezone.now()
-            client.save(
-                update_fields=[
-                    "runtime_peer_public_key",
-                    "runtime_address",
-                    "last_runtime_sync_at",
-                ]
-            )
-            AuditService.log(
-                actor,
-                "client.reissue",
-                "VPNClient",
-                client.id,
-                {
-                    "revision": rev,
-                    "rotated_existing_peer": bool(
-                        old_peer_public_key
+                    VPNClientService.build_awg2_client_config(
+                        private_key="preflight-private",
+                        address="127.0.0.1",
+                        endpoint=endpoint,
+                        server_public_key="preflight-public",
+                        awg2_metadata=(
+                            awg_runtime_metadata
+                            or {}
+                        ),
+                        allowed_ips=allowed_ips,
+                        mtu=awg_mtu,
+                    )
+
+                # Availability-first rotation: the currently installed
+                # profile remains valid until the replacement has been
+                # persisted in both runtime and the database.
+                generated = adapter.create_peer(
+                    actor
+                )
+
+                if (
+                    client.protocol_type
+                    == VPNClient.ProtocolType.AWG
+                ):
+                    config = (
+                        VPNClientService
+                        .build_awg_legacy_client_config(
+                            private_key=generated[
+                                "private_key"
+                            ],
+                            address=generated[
+                                "address"
+                            ],
+                            endpoint=endpoint,
+                            server_public_key=generated[
+                                "server_public_key"
+                            ],
+                            preshared_key=generated.get(
+                                "preshared_key",
+                                "",
+                            ),
+                        )
+                    )
+                else:
+                    config = (
+                        VPNClientService
+                        .build_awg2_client_config(
+                            private_key=generated[
+                                "private_key"
+                            ],
+                            address=generated[
+                                "address"
+                            ],
+                            endpoint=endpoint,
+                            server_public_key=generated[
+                                "server_public_key"
+                            ],
+                            awg2_metadata=(
+                                awg_runtime_metadata
+                                or {}
+                            ),
+                            preshared_key=generated.get(
+                                "preshared_key",
+                                "",
+                            ),
+                            allowed_ips=allowed_ips,
+                            mtu=awg_mtu,
+                        )
+                    )
+
+                amneziavpn_config = ""
+
+                if (
+                    client.protocol_type
+                    == VPNClient.ProtocolType.AWG2
+                    and client.server.runtime_backend
+                    == Server.RuntimeBackend.DOCKER
+                    and bool(
+                        (
+                            adapter.protocol.runtime_metadata
+                            or {}
+                        ).get(
+                            "awg31_metadata_ready"
+                        )
+                    )
+                ):
+                    try:
+                        amneziavpn_config = (
+                            VPNClientService
+                            .build_amneziavpn_awg31_artifact(
+                                client=client,
+                                config=config,
+                                client_public_key=generated[
+                                    "public_key"
+                                ],
+                                protocol=adapter.protocol,
+                            )
+                        )
+
+                    except Exception:
+                        # Native .conf remains authoritative. Failure
+                        # to serialize the secondary .vpn artifact must
+                        # not invalidate a valid replacement peer.
+                        import logging
+
+                        logging.getLogger(
+                            __name__
+                        ).exception(
+                            "Failed to build AmneziaVPN "
+                            "artifact for Docker AWG2 "
+                            "client_id=%s server_id=%s",
+                            client.pk,
+                            client.server_id,
+                        )
+
+                rev = VPNClientService._store_revision(
+                    client,
+                    config,
+                    amneziavpn_config=(
+                        amneziavpn_config
                     ),
-                },
-            )
+                )
+
+                client.runtime_peer_public_key = (
+                    generated[
+                        "public_key"
+                    ]
+                )
+                client.runtime_address = (
+                    generated[
+                        "address"
+                    ]
+                )
+                client.last_runtime_sync_at = (
+                    timezone.now()
+                )
+                client.save(
+                    update_fields=[
+                        "runtime_peer_public_key",
+                        "runtime_address",
+                        "last_runtime_sync_at",
+                    ]
+                )
+
+                AuditService.log(
+                    actor,
+                    "client.reissue",
+                    "VPNClient",
+                    client.id,
+                    {
+                        "revision": rev,
+                        "rotated_existing_peer": bool(
+                            old_peer_public_key
+                        ),
+                    },
+                )
+
+                replacement_public_key = str(
+                    generated.get(
+                        "public_key"
+                    )
+                    or ""
+                ).strip()
+
+                if (
+                    old_peer_public_key
+                    and old_peer_public_key
+                    != replacement_public_key
+                ):
+                    client_id = client.id
+                    revision_number = rev
+
+                    def cleanup_old_peer():
+                        try:
+                            adapter.remove_peer(
+                                actor,
+                                old_peer_public_key,
+                            )
+                        except Exception as cleanup_exc:
+                            try:
+                                AuditService.log(
+                                    actor,
+                                    "client.reissue.cleanup_failed",
+                                    "VPNClient",
+                                    client_id,
+                                    {
+                                        "revision":
+                                            revision_number,
+                                        "phase":
+                                            "old_peer_remove",
+                                        "error_type":
+                                            type(
+                                                cleanup_exc
+                                            ).__name__,
+                                    },
+                                )
+                            except Exception:
+                                import logging
+
+                                logging.getLogger(
+                                    __name__
+                                ).exception(
+                                    "Failed to record stale peer "
+                                    "cleanup failure for client_id=%s",
+                                    client_id,
+                                )
+
+                    # This runs only after the outermost DB transaction
+                    # commits. A rollback therefore never revokes the
+                    # currently working profile.
+                    transaction.on_commit(
+                        cleanup_old_peer
+                    )
 
         except Exception:
             replacement_public_key = str(
@@ -2475,7 +2571,8 @@ class VPNClientService:
             ).strip()
 
             if (
-                replacement_public_key
+                adapter is not None
+                and replacement_public_key
                 and replacement_public_key
                 != old_peer_public_key
             ):
@@ -2492,10 +2589,12 @@ class VPNClientService:
                             "VPNClient",
                             client.id,
                             {
-                                "phase": "replacement_peer_remove",
-                                "error_type": type(
-                                    cleanup_exc
-                                ).__name__,
+                                "phase":
+                                    "replacement_peer_remove",
+                                "error_type":
+                                    type(
+                                        cleanup_exc
+                                    ).__name__,
                             },
                         )
                     except Exception:
@@ -2507,60 +2606,6 @@ class VPNClientService:
                     ) from cleanup_exc
 
             raise
-
-        replacement_public_key = str(
-            generated.get(
-                "public_key"
-            )
-            or ""
-        ).strip()
-
-        if (
-            old_peer_public_key
-            and old_peer_public_key
-            != replacement_public_key
-        ):
-            client_id = client.id
-            revision_number = rev
-
-            def cleanup_old_peer():
-                try:
-                    adapter.remove_peer(
-                        actor,
-                        old_peer_public_key,
-                    )
-                except Exception as cleanup_exc:
-                    try:
-                        AuditService.log(
-                            actor,
-                            "client.reissue.cleanup_failed",
-                            "VPNClient",
-                            client_id,
-                            {
-                                "revision": revision_number,
-                                "phase": "old_peer_remove",
-                                "error_type": type(
-                                    cleanup_exc
-                                ).__name__,
-                            },
-                        )
-                    except Exception:
-                        import logging
-
-                        logging.getLogger(
-                            __name__
-                        ).exception(
-                            "Failed to record stale peer cleanup "
-                            "failure for client_id=%s",
-                            client_id,
-                        )
-
-            # Runtime revocation happens only after the outermost DB
-            # transaction commits. A DB rollback therefore never
-            # disconnects the currently working profile.
-            transaction.on_commit(
-                cleanup_old_peer
-            )
 
     @staticmethod
     @transaction.atomic
