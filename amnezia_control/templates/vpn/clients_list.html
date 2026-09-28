@@ -104,7 +104,6 @@
       <button type="button" class="btn btn-sm btn-outline-success js-bulk-action" data-action="enable" data-label="Включить" data-danger="0">Включить</button>
       <button type="button" class="btn btn-sm btn-outline-info js-bulk-action" data-action="restore" data-label="Восстановить" data-danger="0">Восстановить</button>
       <button type="button" class="btn btn-sm btn-outline-danger js-bulk-action" data-action="delete" data-label="Удалить" data-danger="1">Удалить</button>
-      <button type="button" class="btn btn-sm btn-outline-primary js-bulk-action" data-action="reissue" data-label="Переиздать" data-danger="0">Переиздать</button>
       <button type="button" class="btn btn-sm btn-primary" id="bulkLimitsBtn">Лимиты</button>
     </div>
   </div>
@@ -165,13 +164,6 @@
                 <li><a class="dropdown-item" href="/clients/{{ c.id }}/download/native/">Скачать AmneziaWG .conf</a></li>
                 <li><button class="dropdown-item js-open-qr-modal" type="button" data-client-id="{{ c.id }}" data-client-name="{{ c.name }}" data-bs-toggle="modal" data-bs-target="#clientQrModal">Показать QR-коды</button></li>
                 <li><hr class="dropdown-divider"></li>
-                <li>
-                  {% if row.reissue_blocked %}
-                  <button class="dropdown-item text-secondary" type="button" disabled title="{{ row.reissue_block_reason }}">Переиздать (недоступно)</button>
-                  {% else %}
-                  <form method="post" action="/clients/{{ c.id }}/action/reissue/">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><button class="dropdown-item" type="submit">Переиздать</button></form>
-                  {% endif %}
-                </li>
                 <li>
                   {% if c.status == 'active' %}
                   <form method="post" action="/clients/{{ c.id }}/action/disable/">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><button class="dropdown-item" type="submit">Отключить</button></form>
