@@ -104,13 +104,13 @@
     <div class="console-stack">
       <section class="portal-section">
         <div class="section-body">
-          <div class="section-header"><h2 class="h6">Переиздание конфигурации</h2></div>
-          <p class="small text-secondary mb-2">После переиздания старая конфигурация и предыдущий QR-код перестанут работать.</p>
+          <div class="section-header"><h2 class="h6">Смена ключей подключения</h2></div>
+          <p class="small text-secondary mb-2"><strong>Это аварийная операция, а не повторное скачивание.</strong> После смены ключей все ранее установленные конфигурации и QR-коды этого подключения перестанут работать.</p>
           {% if can_selfservice_reissue %}
           <form method="post" action="/portal/{{ token }}/reissue-config/" class="d-flex flex-column gap-2">
             {% csrf_token %}
-            <div class="form-check"><input class="form-check-input" type="checkbox" value="1" id="confirmReissue" name="confirm_reissue" required><label class="form-check-label small" for="confirmReissue">Подтверждаю переиздание и понимаю последствия.</label></div>
-            <div class="action-cluster"><button class="btn btn-outline-danger btn-sm">Переиздать конфигурацию</button><span class="small text-secondary align-self-center">Не чаще 1 раза в {{ reissue_cooldown_hours }} ч.</span></div>
+            <div class="form-check"><input class="form-check-input" type="checkbox" value="1" id="confirmReissue" name="confirm_reissue" required><label class="form-check-label small" for="confirmReissue">Подтверждаю смену ключей и понимаю, что старые профили перестанут подключаться.</label></div>
+            <div class="action-cluster"><button class="btn btn-outline-danger btn-sm">Сменить ключи</button><span class="small text-secondary align-self-center">Не чаще 1 раза в {{ reissue_cooldown_hours }} ч.</span></div>
           </form>
           {% else %}
           <div class="small text-secondary">{{ reissue_block_message }}</div>
