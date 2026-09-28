@@ -497,7 +497,7 @@ class PortalFlowTests(TestCase):
         self.assertContains(response, "Доступ к кабинету выдан")
         self.assertContains(response, "Заявка выполнена")
         self.assertContains(response, "Комментарий оператора: Продление подтверждено.")
-        self.assertContains(response, "Конфигурация переиздана")
+        self.assertContains(response, "Ключи подключения сменены")
         self.assertNotContains(response, "Кабинет открыт")
 
     def test_portal_shows_in_progress_state_for_open_request(self):
@@ -665,7 +665,7 @@ class PortalFlowTests(TestCase):
 
         self.assertEqual(first.status_code, 200)
         self.assertEqual(second.status_code, 200)
-        self.assertContains(second, "Переиздать конфигурацию можно позже")
+        self.assertContains(second, "Сменить ключи можно позже")
 
     def test_portal_download_and_qr_use_new_current_config_after_reissue(self):
         from unittest.mock import patch
@@ -712,7 +712,7 @@ class PortalFlowTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Переиздание недоступно: обратитесь к оператору.")
+        self.assertContains(response, "Смена ключей недоступна: обратитесь к оператору.")
 
     def test_blocked_reissue_does_not_update_last_selfservice_reissue_at(self):
         token = self._issue_token()
@@ -752,7 +752,7 @@ class PortalFlowTests(TestCase):
 
         access.refresh_from_db()
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Не удалось переиздать конфигурацию")
+        self.assertContains(response, "Не удалось сменить ключи подключения")
         self.assertIsNone(access.last_selfservice_reissue_at)
 
     def test_portal_reissue_policy_cooldown_helper_returns_timedelta(self):

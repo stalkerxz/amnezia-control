@@ -99,6 +99,128 @@ class AWG2RuntimePersistenceTest(TestCase):
         )
         self.assertTrue(calls[0]["sensitive_output"])
 
+    def test_create_peer_rolls_back_live_peer_when_persist_fails(self):
+        calls = []
+
+        def fake_run(actor, action, command, sensitive_output=False):
+            calls.append(action)
+
+            class Result:
+                stdout = ""
+
+            return Result()
+
+        with patch.object(
+            self.adapter,
+            "interface_name",
+            return_value="awg0",
+        ), patch.object(
+            self.adapter,
+            "generate_keypair",
+            return_value=("private", "new-public"),
+        ), patch.object(
+            self.adapter,
+            "generate_preshared_key",
+            return_value="psk",
+        ), patch.object(
+            self.adapter,
+            "_next_address",
+            return_value="10.8.1.20",
+        ), patch.object(
+            self.adapter,
+            "_run",
+            side_effect=fake_run,
+        ), patch.object(
+            self.adapter,
+            "_persist_runtime",
+            side_effect=[
+                RuntimeError("save failed"),
+                None,
+            ],
+        ) as persist_mock, patch.object(
+            self.adapter,
+            "server_public_key",
+        ) as server_key_mock:
+            with self.assertRaisesRegex(
+                RuntimeError,
+                "save failed",
+            ):
+                self.adapter.create_peer(
+                    self.actor
+                )
+
+        self.assertEqual(
+            calls,
+            [
+                "awg2.add_peer",
+                "awg2.rollback_peer",
+            ],
+        )
+        self.assertEqual(
+            persist_mock.call_count,
+            2,
+        )
+        server_key_mock.assert_not_called()
+
+    def test_create_peer_reports_incomplete_compensation(self):
+        calls = []
+
+        def fake_run(actor, action, command, sensitive_output=False):
+            calls.append(action)
+
+            class Result:
+                stdout = ""
+
+            if action == "awg2.rollback_peer":
+                raise RuntimeError(
+                    "rollback failed"
+                )
+
+            return Result()
+
+        with patch.object(
+            self.adapter,
+            "interface_name",
+            return_value="awg0",
+        ), patch.object(
+            self.adapter,
+            "generate_keypair",
+            return_value=("private", "new-public"),
+        ), patch.object(
+            self.adapter,
+            "generate_preshared_key",
+            return_value="psk",
+        ), patch.object(
+            self.adapter,
+            "_next_address",
+            return_value="10.8.1.20",
+        ), patch.object(
+            self.adapter,
+            "_run",
+            side_effect=fake_run,
+        ), patch.object(
+            self.adapter,
+            "_persist_runtime",
+            side_effect=RuntimeError(
+                "save failed"
+            ),
+        ):
+            with self.assertRaisesRegex(
+                RuntimeError,
+                "runtime cleanup was incomplete",
+            ):
+                self.adapter.create_peer(
+                    self.actor
+                )
+
+        self.assertEqual(
+            calls,
+            [
+                "awg2.add_peer",
+                "awg2.rollback_peer",
+            ],
+        )
+
     def test_missing_config_path_is_backward_compatible(self):
         self.protocol.runtime_metadata = {
             "interface": "awg0",

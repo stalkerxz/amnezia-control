@@ -1210,6 +1210,233 @@ class VPNClientLimitsTest(TestCase):
         self.assertTrue(client.runtime_peer_public_key)
         self.assertEqual(client.revisions.count(), 1)
 
+    def test_reissue_provisions_replacement_before_revoking_old_peer(self):
+        client = self._make_client(
+            name="safe-rotation-order",
+            status=VPNClient.Status.ACTIVE,
+            runtime_peer_public_key="old-peer",
+            runtime_address="10.66.0.10",
+            limit_state=VPNClient.LimitState.ACTIVE,
+        )
+        VPNClientService._store_revision(
+            client,
+            (
+                "[Interface]\n"
+                "PrivateKey = old-private\n"
+                "Address = 10.66.0.10/32\n\n"
+                "[Peer]\n"
+                "PublicKey = server-public\n"
+                "PresharedKey = old-psk\n"
+                "Endpoint = vpn.example.com:51820\n"
+                "AllowedIPs = 0.0.0.0/0, ::/0\n"
+            ),
+        )
+
+        events = []
+        protocol = self.protocol
+
+        class FakeAdapter:
+            def __init__(self):
+                self.protocol = protocol
+
+            def create_peer(self, actor):
+                events.append(("create", "new-peer"))
+                return {
+                    "private_key": "new-private",
+                    "public_key": "new-peer",
+                    "preshared_key": "new-psk",
+                    "address": "10.66.0.11",
+                    "iface": "awg0",
+                    "server_public_key": "server-public",
+                }
+
+            def remove_peer(self, actor, peer_public_key):
+                events.append(("remove", peer_public_key))
+
+        adapter = FakeAdapter()
+
+        with patch(
+            "vpn.services.AdapterFactory.get_for_client",
+            return_value=adapter,
+        ):
+            with self.captureOnCommitCallbacks(execute=True):
+                VPNClientService.reissue_config(
+                    client=client,
+                    actor=self.user,
+                )
+
+        client.refresh_from_db()
+        self.assertEqual(
+            events,
+            [
+                ("create", "new-peer"),
+                ("remove", "old-peer"),
+            ],
+        )
+        self.assertEqual(
+            client.runtime_peer_public_key,
+            "new-peer",
+        )
+        self.assertEqual(
+            client.runtime_address,
+            "10.66.0.11",
+        )
+        self.assertEqual(client.revisions.count(), 2)
+
+    def test_reissue_failure_removes_replacement_and_keeps_old_peer_identity(self):
+        client = self._make_client(
+            name="safe-rotation-rollback",
+            status=VPNClient.Status.ACTIVE,
+            runtime_peer_public_key="old-peer",
+            runtime_address="10.66.0.10",
+            limit_state=VPNClient.LimitState.ACTIVE,
+        )
+        VPNClientService._store_revision(
+            client,
+            (
+                "[Interface]\n"
+                "PrivateKey = old-private\n"
+                "Address = 10.66.0.10/32\n\n"
+                "[Peer]\n"
+                "PublicKey = server-public\n"
+                "Endpoint = vpn.example.com:51820\n"
+            ),
+        )
+
+        events = []
+        protocol = self.protocol
+
+        class FakeAdapter:
+            def __init__(self):
+                self.protocol = protocol
+
+            def create_peer(self, actor):
+                events.append(("create", "new-peer"))
+                return {
+                    "private_key": "new-private",
+                    "public_key": "new-peer",
+                    "preshared_key": "new-psk",
+                    "address": "10.66.0.11",
+                    "iface": "awg0",
+                    "server_public_key": "server-public",
+                }
+
+            def remove_peer(self, actor, peer_public_key):
+                events.append(("remove", peer_public_key))
+
+        adapter = FakeAdapter()
+
+        with patch(
+            "vpn.services.AdapterFactory.get_for_client",
+            return_value=adapter,
+        ), patch(
+            "vpn.services.VPNClientService._store_revision",
+            side_effect=RuntimeError("revision write failed"),
+        ):
+            with self.assertRaisesRegex(
+                RuntimeError,
+                "revision write failed",
+            ):
+                VPNClientService.reissue_config(
+                    client=client,
+                    actor=self.user,
+                )
+
+        client.refresh_from_db()
+        self.assertEqual(
+            events,
+            [
+                ("create", "new-peer"),
+                ("remove", "new-peer"),
+            ],
+        )
+        self.assertEqual(
+            client.runtime_peer_public_key,
+            "old-peer",
+        )
+        self.assertEqual(
+            client.runtime_address,
+            "10.66.0.10",
+        )
+        self.assertEqual(client.revisions.count(), 1)
+
+    def test_reissue_old_peer_cleanup_failure_keeps_new_peer_and_writes_audit(self):
+        client = self._make_client(
+            name="safe-rotation-cleanup-alert",
+            status=VPNClient.Status.ACTIVE,
+            runtime_peer_public_key="old-peer",
+            runtime_address="10.66.0.10",
+            limit_state=VPNClient.LimitState.ACTIVE,
+        )
+        VPNClientService._store_revision(
+            client,
+            (
+                "[Interface]\n"
+                "PrivateKey = old-private\n"
+                "Address = 10.66.0.10/32\n\n"
+                "[Peer]\n"
+                "PublicKey = server-public\n"
+                "Endpoint = vpn.example.com:51820\n"
+            ),
+        )
+
+        events = []
+        protocol = self.protocol
+
+        class FakeAdapter:
+            def __init__(self):
+                self.protocol = protocol
+
+            def create_peer(self, actor):
+                events.append(("create", "new-peer"))
+                return {
+                    "private_key": "new-private",
+                    "public_key": "new-peer",
+                    "preshared_key": "new-psk",
+                    "address": "10.66.0.11",
+                    "iface": "awg0",
+                    "server_public_key": "server-public",
+                }
+
+            def remove_peer(self, actor, peer_public_key):
+                events.append(("remove", peer_public_key))
+                if peer_public_key == "old-peer":
+                    raise RuntimeError("old peer cleanup failed")
+
+        adapter = FakeAdapter()
+
+        with patch(
+            "vpn.services.AdapterFactory.get_for_client",
+            return_value=adapter,
+        ):
+            with self.captureOnCommitCallbacks(execute=True):
+                VPNClientService.reissue_config(
+                    client=client,
+                    actor=self.user,
+                )
+
+        client.refresh_from_db()
+        self.assertEqual(
+            client.runtime_peer_public_key,
+            "new-peer",
+        )
+        self.assertEqual(
+            events,
+            [
+                ("create", "new-peer"),
+                ("remove", "old-peer"),
+            ],
+        )
+        cleanup_log = AuditLog.objects.filter(
+            action="client.reissue.cleanup_failed",
+            entity_id=str(client.id),
+        ).first()
+        self.assertIsNotNone(cleanup_log)
+        self.assertEqual(
+            cleanup_log.details.get("phase"),
+            "old_peer_remove",
+        )
+
 
 class VPNClientCreateFormTest(TestCase):
     def setUp(self):
@@ -1461,6 +1688,152 @@ class VPNClientLimitsUpdateFlowTest(TestCase):
         form = VPNClientLimitsUpdateForm(client=self.vpn_client)
         self.assertEqual(form.initial["expires_preset"], VPNClientLimitsUpdateForm.EXPIRATION_PRESET_CUSTOM)
         self.assertEqual(form.initial["traffic_limit_preset"], VPNClientLimitsUpdateForm.TRAFFIC_PRESET_CUSTOM)
+
+
+@override_settings(CONFIG_ENCRYPTION_KEY=Fernet.generate_key().decode())
+class VPNClientReissueSafetyViewTest(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(
+            "admin-reissue-safety",
+            password="123",
+            is_staff=True,
+        )
+        self.client.force_login(self.user)
+        self.server = Server.objects.create(
+            name="reissue-safety-server",
+            public_endpoint_host="vpn.example.com",
+        )
+        self.protocol = ServerProtocol.objects.create(
+            server=self.server,
+            protocol_type=ServerProtocol.ProtocolType.AWG,
+            container_name="amnezia-awg",
+            enabled=True,
+            runtime_metadata={
+                "udp_port": 51820,
+                "subnet": "10.66.0.0/24",
+            },
+        )
+        self.profile = ProtocolProfile.objects.create(
+            server_protocol=self.protocol,
+            name="reissue-safety-profile",
+            protocol_type=ServerProtocol.ProtocolType.AWG,
+            config_template="[Interface]",
+        )
+        self.vpn_client = VPNClient.objects.create(
+            server=self.server,
+            name="reissue-safety-client",
+            protocol_type=VPNClient.ProtocolType.AWG,
+            profile=self.profile,
+            created_by=self.user,
+            status=VPNClient.Status.ACTIVE,
+            limit_state=VPNClient.LimitState.ACTIVE,
+            runtime_peer_public_key="old-peer",
+            runtime_address="10.66.0.10",
+        )
+        VPNClientService._store_revision(
+            self.vpn_client,
+            (
+                "[Interface]\n"
+                "PrivateKey = old-private\n"
+                "Address = 10.66.0.10/32\n"
+                "DNS = 1.1.1.1\n\n"
+                "[Peer]\n"
+                "PublicKey = server-public\n"
+                "Endpoint = vpn.example.com:51820\n"
+                "AllowedIPs = 0.0.0.0/0, ::/0\n"
+                "PersistentKeepalive = 25\n"
+            ),
+        )
+
+    def test_operator_key_rotation_requires_explicit_confirmation(self):
+        with patch(
+            "vpn.views.VPNClientService.reissue_config"
+        ) as reissue_mock:
+            response = self.client.post(
+                f"/clients/{self.vpn_client.id}/action/reissue/",
+                follow=True,
+            )
+
+        reissue_mock.assert_not_called()
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            "Смена ключей не выполнена",
+        )
+
+    def test_operator_key_rotation_runs_after_confirmation(self):
+        with patch(
+            "vpn.views.VPNClientService.reissue_config"
+        ) as reissue_mock:
+            response = self.client.post(
+                f"/clients/{self.vpn_client.id}/action/reissue/",
+                data={"confirm_reissue": "1"},
+                follow=True,
+            )
+
+        reissue_mock.assert_called_once_with(
+            client=self.vpn_client,
+            actor=self.user,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            "Ключи подключения сменены",
+        )
+
+    def test_initial_issue_without_revision_does_not_require_rotation_confirmation(self):
+        self.vpn_client.revisions.all().delete()
+
+        with patch(
+            "vpn.views.VPNClientService.reissue_config"
+        ) as reissue_mock:
+            response = self.client.post(
+                f"/clients/{self.vpn_client.id}/action/reissue/",
+                follow=True,
+            )
+
+        reissue_mock.assert_called_once()
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            "Конфигурация клиента выпущена",
+        )
+
+    def test_bulk_key_rotation_is_rejected(self):
+        with patch(
+            "vpn.views.VPNClientService.reissue_config"
+        ) as reissue_mock:
+            response = self.client.post(
+                "/clients/bulk-action/",
+                data={
+                    "action": "reissue",
+                    "client_ids": [
+                        str(self.vpn_client.id),
+                    ],
+                    "next": "/clients/",
+                },
+                follow=True,
+            )
+
+        reissue_mock.assert_not_called()
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            "Массовая смена ключей отключена",
+        )
+
+    def test_clients_list_has_no_one_click_or_bulk_key_rotation(self):
+        response = self.client.get("/clients/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(
+            response,
+            'data-action="reissue"',
+        )
+        self.assertNotContains(
+            response,
+            f"/clients/{self.vpn_client.id}/action/reissue/",
+        )
 
 
 @override_settings(CONFIG_ENCRYPTION_KEY=Fernet.generate_key().decode())
