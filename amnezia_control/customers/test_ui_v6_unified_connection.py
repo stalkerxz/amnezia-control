@@ -56,7 +56,8 @@ class UnifiedConnectionCreateTests(TestCase):
             container_name="amnezia-awg2",
             container_status="running",
             runtime_metadata={
-                "awg31_metadata_ready": True,
+                "awg_generation": "3.1",
+                    "awg31_metadata_ready": True,
                 "subnet_ready": True,
                 "endpoint_host_ready": True,
                 "endpoint_port_ready": True,
