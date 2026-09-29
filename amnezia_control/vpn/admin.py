@@ -25,7 +25,7 @@ class VPNClientAdmin(admin.ModelAdmin):
         "id",
         "name",
         "server",
-        "protocol_type",
+        "protocol_display",
         "status",
         "limit_state",
         "disable_reason",
@@ -47,6 +47,26 @@ class VPNClientAdmin(admin.ModelAdmin):
         "created_at",
     )
     ordering = ("-created_at",)
+    list_select_related = (
+        "server",
+        "profile__server_protocol",
+    )
+
+    @admin.display(description="Protocol")
+    def protocol_display(self, obj):
+        if obj.protocol_type == VPNClient.ProtocolType.AWG2:
+            generation = (
+                obj.profile.server_protocol.runtime_metadata
+                or {}
+            ).get("awg_generation")
+
+            if generation == "3.1":
+                return "AmneziaWG 3.1"
+
+            return "AmneziaWG legacy / existing only"
+
+        return obj.get_protocol_type_display()
+
     fieldsets = (
         (_("Базовые"), {"fields": ("server", "name", "protocol_type", "profile", "created_by")}),
         (_("Статус"), {"fields": ("status", "limit_state", "disable_reason")}),
