@@ -256,8 +256,33 @@ def server_create_client_view(request, pk: int, protocol_type: str):
     if request.method != "POST":
         return redirect("servers-detail", pk=pk)
 
-    if protocol_type not in {VPNClient.ProtocolType.AWG, VPNClient.ProtocolType.AWG2}:
-        messages.error(request, "Неподдерживаемый протокол")
+    if protocol_type != VPNClient.ProtocolType.AWG2:
+        messages.error(
+            request,
+            "Новые VPN-подключения выпускаются только "
+            "как AmneziaWG 3.1.",
+        )
+        return redirect("servers-detail", pk=pk)
+
+    issuance_status = vpn_server_mode_status(
+        server=server,
+        routing_mode=ROUTING_MODE_FULL,
+    )
+
+    if (
+        not server.accepts_new_vpn_clients
+        or server.vpn_pool_locked
+        or not issuance_status["eligible"]
+    ):
+        reason = (
+            issuance_status["reason"]
+            or "сервер исключён из пула выпуска"
+        )
+        messages.error(
+            request,
+            "Новый AmneziaWG 3.1 клиент не создан: "
+            f"{reason}.",
+        )
         return redirect("servers-detail", pk=pk)
 
     client_name = request.POST.get("name", "").strip()
@@ -276,7 +301,10 @@ def server_create_client_view(request, pk: int, protocol_type: str):
         messages.error(request, f"Ошибка создания клиента: {exc}")
         return redirect("servers-detail", pk=pk)
 
-    messages.success(request, f"Клиент «{client.name}» создан ({client.protocol_type.upper()})")
+    messages.success(
+        request,
+        f"Клиент «{client.name}» создан (AmneziaWG 3.1)",
+    )
     return redirect("clients-detail", pk=client.id)
 
 

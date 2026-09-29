@@ -197,7 +197,7 @@ def _job_action_label(action: str) -> str:
         "server.sync_runtime": "Синхронизация состояния сервера",
         "server.import_runtime_peers": "Импорт клиентов из runtime",
         "client.create": "Создание клиента",
-        "client.reissue": "Переиздание конфигурации клиента",
+        "client.reissue": "Смена ключей подключения клиента",
         "client.disable": "Отключение клиента",
         "client.enable": "Включение клиента",
         "client.delete": "Удаление клиента",
@@ -210,7 +210,9 @@ def _audit_action_label(action: str) -> str:
         "server.sync_runtime": "Сервер: синхронизация состояния",
         "server.import_runtime_peers": "Сервер: импорт клиентов с сервера",
         "client.create": "Клиент: создан",
-        "client.reissue": "Клиент: конфигурация переиздана",
+        "client.reissue": "Клиент: ключи подключения сменены",
+        "client.reissue.cleanup_failed": "Клиент: не удалось удалить старый peer после смены ключей",
+        "client.reissue.rollback_cleanup_failed": "Клиент: не удалось очистить replacement peer после ошибки",
         "client.disable": "Клиент: отключён",
         "client.enable": "Клиент: включён",
         "client.delete": "Клиент: помечен удалённым",
@@ -220,7 +222,7 @@ def _audit_action_label(action: str) -> str:
         "portal.renewal.extend_and_close": "Портал: заявка продлена и закрыта оператором",
         "portal.renewal.dismissed": "Портал: заявка на продление отклонена",
         "portal.renewal.note_updated": "Портал: обновлён комментарий оператора по заявке",
-        "portal.config.reissue": "Портал: клиент переиздал конфигурацию",
+        "portal.config.reissue": "Портал: клиент сменил ключи подключения",
     }
     return labels.get(action, (action or "—").replace(".", " · "))
 

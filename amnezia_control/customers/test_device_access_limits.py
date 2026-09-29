@@ -497,7 +497,7 @@ class DeviceAccessLimitsTest(TestCase):
 
         self.assertContains(
             response,
-            "Срок и VPN-лимиты",
+            "Срок и VPN-лимит",
         )
 
         self.assertContains(

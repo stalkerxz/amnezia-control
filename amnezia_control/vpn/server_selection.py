@@ -11,6 +11,7 @@ from servers.models import (
 
 ROUTING_MODE_FULL = "full"
 ROUTING_MODE_SELECTIVE = "selective"
+AWG31_GENERATION = "3.1"
 
 VALID_ROUTING_MODES = {
     ROUTING_MODE_FULL,
@@ -36,6 +37,21 @@ def _protocol_runtime_ready(
         protocol.runtime_metadata or {}
     )
 
+    # New issuance is fail-closed: AWG2 is only an internal
+    # compatibility value. The runtime must explicitly prove
+    # that it is AmneziaWG 3.1 before it can enter the pool.
+    if (
+        metadata.get("awg_generation")
+        != AWG31_GENERATION
+    ):
+        return False
+
+    if (
+        metadata.get("awg31_metadata_ready")
+        is not True
+    ):
+        return False
+
     if (
         server.runtime_backend
         == Server.RuntimeBackend.AWG_AGENT
@@ -49,18 +65,9 @@ def _protocol_runtime_ready(
                 "awg2_metadata_ready"
             )
             is True
-            and metadata.get(
-                "awg31_metadata_ready"
-            )
-            is True
         )
 
-    return (
-        metadata.get(
-            "awg31_metadata_ready"
-        )
-        is True
-    )
+    return True
 
 
 def _protocol_supports_mode(
@@ -412,6 +419,15 @@ def vpn_server_mode_status(
         )
         return result
 
+    if (
+        metadata.get("awg_generation")
+        != AWG31_GENERATION
+    ):
+        result["reason"] = (
+            "Runtime не подтверждён как AmneziaWG 3.1"
+        )
+        return result
+
     if not _protocol_runtime_ready(
         protocol,
         server=server,
@@ -421,11 +437,13 @@ def vpn_server_mode_status(
             == Server.RuntimeBackend.AWG_AGENT
         ):
             result["reason"] = (
-                "AWG agent readiness не подтверждён"
+                "AmneziaWG 3.1 agent readiness "
+                "не подтверждён"
             )
         else:
             result["reason"] = (
-                "AWG 3.1 readiness не подтверждён"
+                "AmneziaWG 3.1 readiness "
+                "не подтверждён"
             )
 
         return result

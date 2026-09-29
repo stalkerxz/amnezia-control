@@ -15,6 +15,7 @@ from servers.models import (
     ServerProtocol,
 )
 from vpn.models import VPNClient
+from vpn.server_selection import vpn_server_candidate_rows
 
 
 class CustomerVPNServerChoiceTests(
@@ -112,6 +113,7 @@ class CustomerVPNServerChoiceTests(
                 container_name="awg",
                 container_status="running",
                 runtime_metadata={
+                    "awg_generation": "3.1",
                     "awg31_metadata_ready": True,
                     "subnet_ready": True,
                     "endpoint_host_ready": True,
@@ -154,9 +156,12 @@ class CustomerVPNServerChoiceTests(
         self,
     ):
         response = self.client.get(
-            self.vpn_url(),
+            reverse(
+                "customers-device-connection-create",
+                args=[self.device.pk],
+            ),
             {
-                "routing_mode": "full",
+                "product": "full",
             },
         )
 
@@ -167,7 +172,7 @@ class CustomerVPNServerChoiceTests(
 
         self.assertContains(
             response,
-            'name="server_choice"',
+            'name="full_server_choice"',
         )
 
         self.assertContains(
@@ -185,16 +190,16 @@ class CustomerVPNServerChoiceTests(
             self.server_b.name,
         )
 
-        # Auto must choose the less loaded
-        # eligible server.
         self.assertEqual(
-            response.context["server"],
-            self.server_a,
+            response.context[
+                "selected_product"
+            ],
+            "full",
         )
 
         self.assertEqual(
             response.context[
-                "server_choice"
+                "full_server_choice"
             ],
             "auto",
         )
@@ -203,9 +208,12 @@ class CustomerVPNServerChoiceTests(
         self,
     ):
         response = self.client.get(
-            self.vpn_url(),
+            reverse(
+                "customers-device-connection-create",
+                args=[self.device.pk],
+            ),
             {
-                "routing_mode": "full",
+                "product": "full",
                 "server_choice": str(
                     self.server_b.pk
                 ),
@@ -218,15 +226,25 @@ class CustomerVPNServerChoiceTests(
         )
 
         self.assertEqual(
-            response.context["server"],
-            self.server_b,
+            response.context[
+                "selected_product"
+            ],
+            "full",
         )
 
         self.assertEqual(
             response.context[
-                "server_choice"
+                "full_server_choice"
             ],
             str(self.server_b.pk),
+        )
+
+        self.assertContains(
+            response,
+            (
+                f'value="{self.server_b.pk}" '
+                "selected"
+            ),
         )
 
     @patch(
@@ -282,6 +300,30 @@ class CustomerVPNServerChoiceTests(
             VPNClient.ProtocolType.AWG2,
         )
 
+    def test_unverified_runtime_generation_is_excluded(
+        self,
+    ):
+        protocol = self.server_a.protocols.get(
+            protocol_type=ServerProtocol.ProtocolType.AWG2,
+        )
+        metadata = dict(protocol.runtime_metadata or {})
+        metadata.pop("awg_generation", None)
+        protocol.runtime_metadata = metadata
+        protocol.save(update_fields=["runtime_metadata"])
+
+        rows = vpn_server_candidate_rows(
+            routing_mode="full",
+        )
+
+        self.assertNotIn(
+            self.server_a.pk,
+            [row["server"].pk for row in rows],
+        )
+        self.assertIn(
+            self.server_b.pk,
+            [row["server"].pk for row in rows],
+        )
+
     def test_server_outside_pool_rejected(
         self,
     ):
@@ -302,7 +344,7 @@ class CustomerVPNServerChoiceTests(
             ]
         )
 
-        response = self.client.get(
+        response = self.client.post(
             self.vpn_url(),
             {
                 "routing_mode": "full",

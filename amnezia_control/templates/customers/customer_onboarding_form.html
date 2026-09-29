@@ -16,13 +16,7 @@
     </div>
   </header>
 
-  <div class="v4-workflow-steps" aria-label="Этапы создания клиента">
-    <div class="v4-workflow-step is-current"><b>1</b><span>Аккаунт</span></div>
-    <div class="v4-workflow-step is-current"><b>2</b><span>Устройство</span></div>
-    <div class="v4-workflow-step"><b>3</b><span>Подключения после создания</span></div>
-  </div>
-
-  <form method="post" novalidate>
+  <form method="post" data-v6-onboarding novalidate novalidate>
     {% csrf_token %}
 
     {% if form.non_field_errors %}

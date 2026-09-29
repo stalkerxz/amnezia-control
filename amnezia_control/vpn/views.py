@@ -81,6 +81,28 @@ def _is_awg2_degraded_telemetry(peer_source: str) -> bool:
     return "config file fallback" in source and "degraded telemetry" in source
 
 
+def _protocol_display_label(
+    *,
+    client: VPNClient,
+    protocol: ServerProtocol | None,
+) -> str:
+    if client.protocol_type == VPNClient.ProtocolType.AWG2:
+        generation = (
+            (protocol.runtime_metadata or {}).get(
+                "awg_generation"
+            )
+            if protocol
+            else None
+        )
+
+        if generation == "3.1":
+            return "AmneziaWG 3.1"
+
+        return "AmneziaWG · legacy"
+
+    return client.get_protocol_type_display()
+
+
 def _safe_next_url(request, fallback_url: str) -> str:
     raw_next = (request.POST.get("next") or "").strip()
     if raw_next and url_has_allowed_host_and_scheme(raw_next, allowed_hosts={request.get_host()}, require_https=request.is_secure()):
@@ -233,6 +255,10 @@ def clients_list_view(request):
                 "traffic_used_display": _fmt_bytes(client.traffic_used_bytes),
                 "traffic_limit_display": _fmt_bytes(client.traffic_limit_bytes),
                 "runtime_address_display": _normalize_runtime_address(client.runtime_address),
+                "protocol_label": _protocol_display_label(
+                    client=client,
+                    protocol=protocol,
+                ),
                 "telemetry": telemetry_state,
                 "reissue_blocked": bool(reissue_block_reason),
                 "reissue_block_reason": reissue_block_reason,
@@ -423,8 +449,9 @@ def clients_detail_view(request, pk: int):
             qr_unavailable_message = (
                 (
                     "Для AmneziaVPN отсутствует "
-                    "профиль .vpn. Переиздайте "
-                    "конфигурацию клиента."
+                    "профиль .vpn. Используйте "
+                    "AmneziaWG .conf; смена ключей "
+                    "не требуется."
                 )
                 if amneziavpn_reissue_supported
                 else (
@@ -532,10 +559,10 @@ def clients_detail_view(request, pk: int):
     if amneziavpn_artifact_missing:
         if amneziavpn_reissue_supported:
             warning_items.append(
-                "Текущая ревизия создана до "
-                "поддержки AmneziaVPN 3.1. "
-                "Для получения файла .vpn "
-                "переиздайте конфигурацию."
+                "Для текущей ревизии отсутствует "
+                "профиль AmneziaVPN .vpn. "
+                "Используйте AmneziaWG .conf; "
+                "смена ключей не требуется."
             )
         else:
             warning_items.append(
@@ -590,6 +617,10 @@ def clients_detail_view(request, pk: int):
         "vpn/clients_detail.html",
         {
             "client": client,
+            "protocol_label": _protocol_display_label(
+                client=client,
+                protocol=protocol,
+            ),
             "revision": revision,
             "revision_count": revision_count,
             "qr_base64_amneziavpn": qr_base64_amneziavpn,
@@ -729,7 +760,30 @@ def client_action_view(request, pk: int, action: str):
             VPNClientService.set_status(client=client, status=VPNClient.Status.DELETED, actor=request.user)
             success_message = "Клиент помечен как удалённый и скрыт из основного списка"
         elif action == "reissue":
-            VPNClientService.reissue_config(client=client, actor=request.user)
+            has_existing_revision = client.revisions.exists()
+            if (
+                has_existing_revision
+                and request.POST.get("confirm_reissue") != "1"
+            ):
+                messages.warning(
+                    request,
+                    "Смена ключей не выполнена. "
+                    "Подтвердите, что все ранее установленные "
+                    "конфигурации этого подключения перестанут работать.",
+                )
+                return redirect(next_url)
+
+            VPNClientService.reissue_config(
+                client=client,
+                actor=request.user,
+            )
+            success_message = (
+                "Ключи подключения сменены. "
+                "Все ранее установленные конфигурации "
+                "этого подключения больше не работают."
+                if has_existing_revision
+                else "Конфигурация клиента выпущена."
+            )
         elif action == "portal_issue":
             access, _raw_token = PortalAccessService.issue_for_client(client)
             AuditLog.objects.create(
@@ -1007,6 +1061,15 @@ def clients_bulk_action_view(request):
         messages.warning(request, "Выбранные клиенты не найдены.")
         return redirect(next_url)
 
+    if action == "reissue":
+        messages.error(
+            request,
+            "Массовая смена ключей отключена. "
+            "Откройте карточку конкретного клиента и "
+            "подтвердите ротацию ключей вручную.",
+        )
+        return redirect(next_url)
+
     if action == "limits":
         form = VPNClientBulkLimitsUpdateForm(request.POST)
         if not form.is_valid():
@@ -1077,8 +1140,6 @@ def clients_bulk_action_view(request):
                 )
             elif action == "delete":
                 VPNClientService.set_status(client=client, status=VPNClient.Status.DELETED, actor=request.user)
-            elif action == "reissue":
-                VPNClientService.reissue_config(client=client, actor=request.user)
             else:
                 messages.error(request, "Неизвестное массовое действие.")
                 return redirect(next_url)
@@ -1092,7 +1153,6 @@ def clients_bulk_action_view(request):
         "enable": "включено",
         "restore": "восстановлено",
         "delete": "помечено удалёнными",
-        "reissue": "переиздано",
     }
     if applied:
         message = f"Массовое действие выполнено: {action_labels[action]} — {applied} шт."

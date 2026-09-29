@@ -2,6 +2,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponseBadRequest, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST, require_http_methods
 
@@ -39,6 +40,15 @@ def customer_device_xhttp_create_view(request, device_id):
 
     if device.expires_at and device.expires_at <= timezone.now():
         return HttpResponseForbidden("Срок действия устройства истёк.")
+
+    # Legacy XHTTP GET entry points converge on the unified V6 creator.
+    # POST is preserved for backward compatibility.
+    if request.method == "GET":
+        target = reverse(
+            "customers-device-connection-create",
+            args=[device.pk],
+        )
+        return redirect(f"{target}?product=alt")
 
     default_server = (
         Server.objects.filter(is_enabled=True)

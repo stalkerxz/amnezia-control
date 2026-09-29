@@ -1,0 +1,63 @@
+name: UI V6
+
+on:
+  pull_request:
+    paths:
+      - "amnezia_control/customers/**"
+      - "amnezia_control/core/**"
+      - "amnezia_control/templates/**"
+      - "amnezia_control/static/css/app-v6.css"
+      - "amnezia_control/static/js/app-v6.js"
+      - ".github/workflows/ui-v6.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare isolated test environment
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          cp .env.example .env
+          FERNET_KEY="$(
+            python3 -c 'import base64,os; print(base64.urlsafe_b64encode(os.urandom(32)).decode())'
+          )"
+          sed -i             -e 's/^DJANGO_SECRET_KEY=.*/DJANGO_SECRET_KEY=github-actions-ui-v6/'             -e "s|^CONFIG_ENCRYPTION_KEY=.*|CONFIG_ENCRYPTION_KEY=$FERNET_KEY|"             -e 's/^NOTIFICATIONS_ENABLED=.*/NOTIFICATIONS_ENABLED=0/'             -e 's/^ENABLE_RUNTIME_PEER_IMPORT=.*/ENABLE_RUNTIME_PEER_IMPORT=0/'             .env
+
+      - name: Build test image
+        run: docker compose -p ui_v6_ci build web
+
+      - name: Check V6 JavaScript syntax
+        run: node --check amnezia_control/static/js/app-v6.js
+
+      - name: Run V6 targeted tests
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          docker compose -p ui_v6_ci run --rm --entrypoint "" web             python manage.py test             customers.test_ui_v6_unified_connection             customers.test_connection_products             customers.test_operator_workspace             customers.test_accounts_list_workspace             customers.test_operator_xhttp_workspace             customers.test_device_access_limits             customers.test_vpn_server_choice             customers.test_xhttp_profile_workflow             core.test_dashboard_customer_metrics             core.test_mobile_shell             core.test_navigation_consolidation
+
+      - name: Django system check
+        run: docker compose -p ui_v6_ci run --rm --entrypoint "" web python manage.py check
+
+      - name: Migration drift check
+        run: docker compose -p ui_v6_ci run --rm --entrypoint "" web python manage.py makemigrations --check --dry-run
+
+      - name: Full Django regression suite
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          docker compose -p ui_v6_ci run --rm --entrypoint "" web             python manage.py test
+
+      - name: Cleanup
+        if: always()
+        run: docker compose -p ui_v6_ci down -v --remove-orphans

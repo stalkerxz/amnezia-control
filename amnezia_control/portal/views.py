@@ -136,7 +136,7 @@ def _build_portal_history(*, access, client, limit: int = 8):
         "portal.renewal.done": "Заявка выполнена",
         "portal.renewal.extend_and_close": "Заявка выполнена",
         "portal.renewal.dismissed": "Заявка отклонена",
-        "portal.config.reissue": "Конфигурация переиздана",
+        "portal.config.reissue": "Ключи подключения сменены",
     }
 
     recent_audits = (
@@ -170,7 +170,7 @@ def _build_portal_history(*, access, client, limit: int = 8):
         elif event.action == "portal.renewal.dismissed":
             text = "По заявке принято решение об отклонении."
         elif event.action == "portal.config.reissue":
-            text = "Конфигурация обновлена и готова к скачиванию."
+            text = "Выпущены новые ключи. Старый профиль больше не действует."
         push(event.created_at, title, text)
 
     timeline.sort(key=lambda item: item["at"], reverse=True)
@@ -465,7 +465,7 @@ def portal_reissue_config_view(request, token: str):
         return error_response
 
     if (request.POST.get("confirm_reissue") or "") != "1":
-        messages.warning(request, "Подтвердите переиздание конфигурации.")
+        messages.warning(request, "Подтвердите смену ключей подключения.")
         return redirect("portal-home", token=token)
 
     can_selfservice_reissue, block_message = PortalReissuePolicyService.can_selfservice_reissue(access=access)
@@ -477,7 +477,7 @@ def portal_reissue_config_view(request, token: str):
     try:
         VPNClientService.reissue_config(client=client, actor=None)
     except Exception:
-        messages.error(request, "Не удалось переиздать конфигурацию. Попробуйте позже или обратитесь к оператору.")
+        messages.error(request, "Не удалось сменить ключи подключения. Попробуйте позже или обратитесь к оператору.")
         return redirect("portal-home", token=token)
 
     access.last_selfservice_reissue_at = timezone.now()
@@ -497,6 +497,6 @@ def portal_reissue_config_view(request, token: str):
     )
     messages.success(
         request,
-        "Готово. Новая конфигурация уже выпущена. Скачайте её заново или откройте новый QR-код. Предыдущая конфигурация больше не действует.",
+        "Готово. Ключи подключения сменены. Скачайте новую конфигурацию или откройте новый QR-код. Предыдущая конфигурация больше не действует.",
     )
     return redirect("portal-home", token=token)

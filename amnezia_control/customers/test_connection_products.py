@@ -126,87 +126,38 @@ class CustomerConnectionProductTest(
             self.operator
         )
 
+
     def test_product_selector_renders_three_connection_types(
         self,
     ):
         response = self.client.get(
             reverse(
-                (
-                    "customers-device-"
-                    "connection-create"
-                ),
+                "customers-device-connection-create",
                 args=[self.device.pk],
             )
         )
 
-        self.assertEqual(
-            response.status_code,
-            200,
-        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Весь интернет через VPN")
+        self.assertContains(response, "Только выбранные сервисы")
+        self.assertContains(response, "Альтернативное подключение")
+        self.assertContains(response, 'name="product_type"')
+        self.assertContains(response, 'value="full"')
+        self.assertContains(response, 'value="selective"')
+        self.assertContains(response, 'value="alt"')
+        self.assertContains(response, "Создать подключение")
 
-        self.assertContains(
-            response,
-            "Весь интернет через VPN",
-        )
-
-        self.assertContains(
-            response,
-            "Только выбранные сервисы",
-        )
-
-        self.assertContains(
-            response,
-            "Альтернативное подключение",
-        )
-
-        for technical_marker in (
-            "AWG2",
-            "VLESS / XHTTP",
-            "VLESS/XHTTP",
-            "FULL",
-            "SELECTIVE",
-            "Runtime создаётся только после подтверждения",
-        ):
-            self.assertNotContains(
-                response,
-                technical_marker,
-            )
-
-        self.assertContains(
-            response,
-            (
-                reverse(
-                    (
-                        "customers-device-"
-                        "vpn-create"
-                    ),
-                    args=[self.device.pk],
-                )
-                + "?routing_mode=full"
-            ),
-        )
-
-        self.assertContains(
-            response,
-            (
-                reverse(
-                    (
-                        "customers-device-"
-                        "vpn-create"
-                    ),
-                    args=[self.device.pk],
-                )
-                + "?routing_mode=selective"
-            ),
-        )
-
-        self.assertContains(
+        self.assertNotContains(
             response,
             reverse(
-                (
-                    "customers-device-"
-                    "xhttp-create"
-                ),
+                "customers-device-vpn-create",
+                args=[self.device.pk],
+            ),
+        )
+        self.assertNotContains(
+            response,
+            reverse(
+                "customers-device-xhttp-create",
                 args=[self.device.pk],
             ),
         )
@@ -284,6 +235,7 @@ class CustomerConnectionProductTest(
             html,
         )
 
+
     def test_full_form_is_product_specific(
         self,
     ):
@@ -297,30 +249,16 @@ class CustomerConnectionProductTest(
 
         response = self.client.get(url)
 
+        self.assertEqual(response.status_code, 302)
         self.assertEqual(
-            response.status_code,
-            200,
+            response.url,
+            reverse(
+                "customers-device-connection-create",
+                args=[self.device.pk],
+            )
+            + "?product=full",
         )
 
-        self.assertContains(
-            response,
-            "Весь интернет через VPN",
-        )
-
-        self.assertContains(
-            response,
-            'name="routing_mode"',
-        )
-
-        self.assertContains(
-            response,
-            'value="full"',
-        )
-
-        self.assertNotContains(
-            response,
-            "Режим подключения",
-        )
 
     def test_selective_form_is_product_specific(
         self,
@@ -335,29 +273,14 @@ class CustomerConnectionProductTest(
 
         response = self.client.get(url)
 
+        self.assertEqual(response.status_code, 302)
         self.assertEqual(
-            response.status_code,
-            200,
-        )
-
-        self.assertContains(
-            response,
-            "Только выбранные сервисы",
-        )
-
-        self.assertContains(
-            response,
-            'name="routing_mode"',
-        )
-
-        self.assertContains(
-            response,
-            'value="selective"',
-        )
-
-        self.assertNotContains(
-            response,
-            "Режим подключения",
+            response.url,
+            reverse(
+                "customers-device-connection-create",
+                args=[self.device.pk],
+            )
+            + "?product=selective",
         )
 
     def test_non_operator_cannot_open_product_selector(

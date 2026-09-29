@@ -248,7 +248,8 @@
 </div>
 {% endif %}
 
+{% if user.is_authenticated %}<link data-v6-styles href="{% static 'css/app-v6.css' %}?v=6.0.0" rel="stylesheet">{% endif %}
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-{% if user.is_authenticated %}<script src="{% static 'js/app-shell.js' %}"></script>{% endif %}
+{% if user.is_authenticated %}<script src="{% static 'js/app-shell.js' %}"></script><script src="{% static 'js/app-v6.js' %}?v=6.0.0"></script>{% endif %}
 </body>
 </html>

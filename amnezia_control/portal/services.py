@@ -435,7 +435,7 @@ class PortalReissuePolicyService:
     def can_selfservice_reissue(cls, *, access: ClientPortalAccess):
         client = access.client
         if client.status != VPNClient.Status.ACTIVE:
-            return False, "Переиздание недоступно: обратитесь к оператору."
+            return False, "Смена ключей недоступна: обратитесь к оператору."
         if not client.revisions.exists():
             return False, "Конфигурация ещё не готова. Обратитесь к оператору."
         block_reason = VPNClientPolicyService.reissue_block_reason(client)
@@ -450,4 +450,4 @@ class PortalReissuePolicyService:
     @staticmethod
     def cooldown_message(next_allowed_at):
         local_time = timezone.localtime(next_allowed_at).strftime("%d.%m.%Y %H:%M")
-        return f"Переиздать конфигурацию можно позже. Следующая попытка будет доступна после {local_time}."
+        return f"Сменить ключи можно позже. Следующая попытка будет доступна после {local_time}."
