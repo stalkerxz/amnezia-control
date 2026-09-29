@@ -112,6 +112,7 @@ class CustomerVPNServerChoiceTests(
                 container_name="awg",
                 container_status="running",
                 runtime_metadata={
+                    "awg_generation": "3.1",
                     "awg31_metadata_ready": True,
                     "subnet_ready": True,
                     "endpoint_host_ready": True,
