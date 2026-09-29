@@ -6,7 +6,7 @@
     <div>
       <h1 class="h3 mb-1">{{ client.name }}</h1>
       <div class="meta-strip">
-        <span class="badge badge-soft {% if client.protocol_type == 'awg2' %}badge-protocol-awg2{% else %}badge-protocol-awg{% endif %}">{{ client.protocol_type|upper }}</span>
+        <span class="badge badge-soft {% if client.protocol_type == 'awg2' %}badge-protocol-awg2{% else %}badge-protocol-awg{% endif %}">{{ protocol_label }}</span>
         <span class="badge status-badge {% if client.status == 'active' %}status-success{% elif client.status == 'disabled' %}status-warning{% else %}status-danger{% endif %}">{{ client.get_status_display }}</span>
         <span class="badge {{ limit_badge_class }}">{{ limit_badge_label }}</span>
         <span class="badge status-badge {% if client.imported_from_runtime %}status-info{% else %}status-neutral{% endif %}">{% if client.imported_from_runtime %}Импорт{% else %}Панель{% endif %}</span>
@@ -256,7 +256,7 @@
       <div class="section-body">
         <div class="section-header"><h2 class="h6">Технический профиль</h2></div>
         <div class="kv-inline">
-          <div><div class="k">Протокол</div><div class="v">{{ client.protocol_type|upper }}</div></div>
+          <div><div class="k">Протокол</div><div class="v">{{ protocol_label }}</div></div>
           <div><div class="k">Состояние лимитов</div><div class="v">{{ limit_badge_label }}</div></div>
           <div><div class="k">Источник клиента</div><div class="v">{% if client.imported_from_runtime %}Импортирован{% else %}Создан в панели{% endif %}</div></div>
           <div><div class="k">Ревизия</div><div class="v">{% if revision %}Есть{% else %}Нет{% endif %}</div></div>
