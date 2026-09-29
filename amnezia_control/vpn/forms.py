@@ -5,19 +5,41 @@ from django.utils import timezone
 
 from servers.models import ProtocolProfile, Server, ServerProtocol
 
+from .models import VPNClient
+from .server_selection import (
+    ROUTING_MODE_FULL,
+    ROUTING_MODE_SELECTIVE,
+    vpn_server_candidate_rows,
+)
+
 
 def client_creation_servers():
+    # Legacy creation screens must use the same fail-closed
+    # AWG 3.1 issuance pool as the V6 account/device flow.
+    eligible_ids = []
+    seen = set()
+
+    for routing_mode in (
+        ROUTING_MODE_FULL,
+        ROUTING_MODE_SELECTIVE,
+    ):
+        for row in vpn_server_candidate_rows(
+            routing_mode=routing_mode,
+        ):
+            server_id = row["server"].id
+            if server_id not in seen:
+                seen.add(server_id)
+                eligible_ids.append(server_id)
+
     return (
         Server.objects
-        .filter(is_enabled=True)
+        .filter(id__in=eligible_ids)
         .order_by(
             "-is_default_for_new_clients",
             "name",
             "id",
         )
     )
-
-from .models import VPNClient
 
 
 class VPNClientCreateForm(forms.Form):
@@ -181,9 +203,34 @@ class VPNClientCreateForm(forms.Form):
         protocol_types = list(
             active_profiles.values_list("protocol_type", flat=True).distinct()
         )
-        protocol_label_map = dict(VPNClient.ProtocolType.choices)
-        ordered = [ptype for ptype, _label in VPNClient.ProtocolType.choices if ptype in protocol_types]
-        return [(ptype, protocol_label_map.get(ptype, ptype.upper())) for ptype in ordered]
+        protocol_label_map = dict(
+            VPNClient.ProtocolType.choices
+        )
+        protocol_label_map[
+            VPNClient.ProtocolType.AWG2
+        ] = "AmneziaWG 3.1"
+
+        ordered = [
+            ptype
+            for ptype, _label
+            in VPNClient.ProtocolType.choices
+            if (
+                ptype in protocol_types
+                and ptype
+                == VPNClient.ProtocolType.AWG2
+            )
+        ]
+
+        return [
+            (
+                ptype,
+                protocol_label_map.get(
+                    ptype,
+                    ptype.upper(),
+                ),
+            )
+            for ptype in ordered
+        ]
 
     @classmethod
     def resolve_expires_at(cls, *, expires_preset, custom_expires_at):
